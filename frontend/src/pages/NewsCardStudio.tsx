@@ -124,6 +124,8 @@ export interface CustomFramePreset {
   name: string;
   tagColor?: string; // màu nhãn nhận diện kênh (#ef4444, #f59e0b, #3b82f6,...)
   url: string;
+  template?: CardTemplate; // Mẫu thiết kế liên kết với kênh (gradient, editorial, breaking, etc.)
+  bandBg?: string;
   photoTop?: number;
   photoHeight?: number;
   textBottom?: number;
@@ -156,9 +158,10 @@ const PREVIEW_MODE_KEY = 'newsCardStudio.previewMode';
 const DEFAULT_CUSTOM_FRAMES: CustomFramePreset[] = [
   {
     id: 'vietnam_health_news',
-    name: 'Vietnam Health News',
+    name: 'Vietnam Health News (Khung PNG)',
     tagColor: '#ef4444',
     url: 'http://localhost:8081/uploads/43130ba9-7445-4a77-998d-2436b85c5e11.png',
+    template: 'classic',
     photoTop: 0,
     photoHeight: 68,
     textBottom: 4,
@@ -177,36 +180,58 @@ const DEFAULT_CUSTOM_FRAMES: CustomFramePreset[] = [
     logoFrame: 'none',
   },
   {
-    id: 'kinh_te_tai_chinh',
-    name: 'Kênh Kinh Tế & Tài Chính',
-    tagColor: '#f59e0b',
+    id: 'radiant_neon_cyber',
+    name: 'Radiant Gradient (Neon Cyber)',
+    tagColor: '#a855f7',
     url: '',
-    photoTop: 0,
-    photoHeight: 68,
-    textBottom: 4,
-    textLeft: 6,
-    textRight: 6,
-    textHeight: 24,
-    textAlign: 'center',
-    textColor: '#111111',
-    accent: '#d97706',
-    footerText: 'TIN KINH TẾ 24H',
+    template: 'gradient',
+    bandBg: '#090d16',
+    textColor: '#ffffff',
+    accent: '#ec4899',
+    footerText: 'RADIANT NEWS 24H',
+    showLogo: true,
+    logoUrl: 'http://localhost:8081/uploads/8e90b86e-d533-4521-b58d-82cd1880c07f.png',
+    logoPos: 'tr',
+    logoSize: 210,
+    logoOpacity: 1,
+    logoFrame: 'pill',
+    logoFrameBg: 'rgba(255,255,255,0.18)',
   },
   {
-    id: 'tin_nong_tong_hop',
-    name: 'Tin Nóng & Đời Sống',
+    id: 'bao_chi_hien_dai',
+    name: 'Báo Chí Hiện Đại',
     tagColor: '#3b82f6',
     url: '',
-    photoTop: 0,
-    photoHeight: 68,
-    textBottom: 4,
-    textLeft: 6,
-    textRight: 6,
-    textHeight: 24,
-    textAlign: 'center',
+    template: 'editorial',
+    bandBg: '#ffffff',
+    textColor: '#0f172a',
+    accent: '#2563eb',
+    footerText: 'THỜI SỰ BÁO CHÍ 24H',
+    showLogo: false,
+  },
+  {
+    id: 'tin_nong_red',
+    name: 'Tin Nóng Nền Tối',
+    tagColor: '#e11d48',
+    url: '',
+    template: 'breaking',
+    bandBg: '#0b0b0b',
     textColor: '#ffffff',
-    accent: '#ffd400',
-    footerText: 'BẢN TIN 24H',
+    accent: '#ff0033',
+    footerText: 'BẢN TIN NÓNG 24H',
+    showLogo: false,
+  },
+  {
+    id: 'kinh_te_tai_chinh',
+    name: 'Kênh Kinh Tế & Tài Chính (Gold)',
+    tagColor: '#f59e0b',
+    url: '',
+    template: 'classic',
+    bandBg: '#181611',
+    textColor: '#fef3c7',
+    accent: '#d97706',
+    footerText: 'TIN KINH TẾ 24H',
+    showLogo: false,
   },
 ];
 
@@ -1188,9 +1213,18 @@ export default function NewsCardStudio() {
   const [galleryOpen, setGalleryOpen] = useState(false);
 
   // ── Thư viện khung ảnh tùy chỉnh (Custom Frames) ──
-  const [customFrames, setCustomFrames] = useState<CustomFramePreset[]>(() =>
-    loadJson(CUSTOM_FRAMES_KEY, DEFAULT_CUSTOM_FRAMES)
-  );
+  const [customFrames, setCustomFrames] = useState<CustomFramePreset[]>(() => {
+    const saved = loadJson<CustomFramePreset[]>(CUSTOM_FRAMES_KEY, []);
+    if (!saved || saved.length === 0) return DEFAULT_CUSTOM_FRAMES;
+    const existingIds = new Set(saved.map((s) => s.id));
+    const merged = [...saved];
+    for (const def of DEFAULT_CUSTOM_FRAMES) {
+      if (!existingIds.has(def.id)) {
+        merged.push(def);
+      }
+    }
+    return merged;
+  });
   const [frameNameInput, setFrameNameInput] = useState('');
   const [saveFramePopoverOpen, setSaveFramePopoverOpen] = useState(false);
   const [uploadingFrame, setUploadingFrame] = useState(false);
@@ -1255,6 +1289,8 @@ export default function NewsCardStudio() {
         frameTextRight: preset.textRight ?? 6,
         frameTextHeight: preset.textHeight ?? 24,
         frameTextAlign: preset.textAlign ?? 'center',
+        ...(preset.template ? { template: preset.template } : {}),
+        ...(preset.bandBg ? { bandBg: preset.bandBg } : {}),
         ...(preset.textColor ? { textColor: preset.textColor } : {}),
         ...(preset.accent ? { accent: preset.accent } : {}),
         ...(preset.footerText ? { footerText: preset.footerText, showFooter: true } : {}),
@@ -1302,6 +1338,8 @@ export default function NewsCardStudio() {
       textRight: s.frameTextRight ?? 6,
       textHeight: s.frameTextHeight ?? 24,
       textAlign: s.frameTextAlign ?? 'center',
+      template: s.template,
+      bandBg: s.bandBg,
       textColor: s.textColor,
       accent: s.accent,
       footerText: s.footerText,
@@ -1342,6 +1380,8 @@ export default function NewsCardStudio() {
         frameTextRight: channel.textRight ?? 6,
         frameTextHeight: channel.textHeight ?? 24,
         frameTextAlign: channel.textAlign ?? 'center',
+        ...(channel.template ? { template: channel.template } : {}),
+        ...(channel.bandBg ? { bandBg: channel.bandBg } : {}),
         ...(channel.textColor ? { textColor: channel.textColor } : {}),
         ...(channel.accent ? { accent: channel.accent } : {}),
         ...(channel.footerText ? { footerText: channel.footerText, showFooter: true } : {}),
@@ -1385,6 +1425,8 @@ export default function NewsCardStudio() {
             frameTextRight: channel.textRight ?? 6,
             frameTextHeight: channel.textHeight ?? 24,
             frameTextAlign: channel.textAlign ?? 'center',
+            ...(channel.template ? { template: channel.template } : {}),
+            ...(channel.bandBg ? { bandBg: channel.bandBg } : {}),
             ...(channel.textColor ? { textColor: channel.textColor } : {}),
             ...(channel.accent ? { accent: channel.accent } : {}),
             ...(channel.footerText ? { footerText: channel.footerText, showFooter: true } : {}),
@@ -1406,6 +1448,26 @@ export default function NewsCardStudio() {
       })
     );
     message.success(`Đã áp dụng mẫu Kênh "${channel.name}" cho ${count} bài đã chọn!`);
+  };
+
+  const applyTemplateToChecked = (template: CardTemplate) => {
+    const count = checkedItems.length;
+    setItems((prev) =>
+      prev.map((it) => {
+        if (!it.checked && it.id !== active?.id) return it;
+        return {
+          ...it,
+          style: {
+            ...it.style,
+            template,
+            ...(template === 'gradient'
+              ? { useCustomFrame: false, bandBg: '#090d16', textColor: '#ffffff', accent: '#ec4899' }
+              : {}),
+          },
+        };
+      })
+    );
+    message.success(`Đã gán mẫu "${TEMPLATES.find((t) => t.value === template)?.label || template}" cho ${count} bài đã chọn!`);
   };
 
   const applyCurrentChannelToAllChecked = () => {
@@ -1693,28 +1755,46 @@ export default function NewsCardStudio() {
             </div>
           )}
 
-          {/* Thanh gán Kênh hàng loạt khi tick chọn bài */}
+          {/* Thanh gán Kênh & Mẫu hàng loạt khi tick chọn bài */}
           {checkedItems.length > 0 && (
-            <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/30 flex items-center justify-between gap-2 mt-1">
-              <span className="text-[11px] font-semibold text-blue-300 shrink-0">
-                {checkedItems.length} bài chọn:
-              </span>
-              <Select
-                size="small"
-                placeholder="Gán Kênh hàng loạt..."
-                className="flex-1 text-xs"
-                value={undefined}
-                onChange={(channelId) => applyChannelToChecked(channelId)}
-                options={customFrames.map((f) => ({
-                  value: f.id,
-                  label: (
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: f.tagColor || '#3b82f6' }} />
-                      <span className="truncate">{f.name}</span>
-                    </span>
-                  ),
-                }))}
-              />
+            <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/30 space-y-1.5 mt-1">
+              <div className="flex items-center justify-between text-[11px] font-semibold text-blue-300">
+                <span>⚡ Áp dụng cho {checkedItems.length} bài chọn:</span>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                <Select
+                  size="small"
+                  placeholder="Gán Kênh..."
+                  className="w-full text-xs"
+                  value={undefined}
+                  onChange={(channelId) => applyChannelToChecked(channelId)}
+                  options={customFrames.map((f) => ({
+                    value: f.id,
+                    label: (
+                      <span className="flex items-center gap-1.5 truncate">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: f.tagColor || '#3b82f6' }} />
+                        <span className="truncate">{f.name}</span>
+                      </span>
+                    ),
+                  }))}
+                />
+                <Select
+                  size="small"
+                  placeholder="Gán Mẫu..."
+                  className="w-full text-xs"
+                  value={undefined}
+                  onChange={(tVal) => applyTemplateToChecked(tVal as CardTemplate)}
+                  options={TEMPLATES.map((t) => ({
+                    value: t.value,
+                    label: (
+                      <span className="flex items-center gap-1 truncate">
+                        {t.value === 'gradient' && <span className="text-pink-400">✨</span>}
+                        <span className="truncate">{t.label}</span>
+                      </span>
+                    ),
+                  }))}
+                />
+              </div>
             </div>
           )}
 
@@ -1995,37 +2075,78 @@ export default function NewsCardStudio() {
             <div className="text-xs text-slate-500 py-10 text-center">Chọn một bài đã cào xong để chỉnh</div>
           ) : (
             <>
-              {/* Thanh chọn Kênh nhanh trên đầu bộ soạn */}
-              <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-900 border border-slate-800">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <span className="text-xs font-semibold text-slate-300 shrink-0">Kênh:</span>
-                  <Select
-                    size="small"
-                    className="flex-1 text-xs"
-                    placeholder="Chọn Kênh thương hiệu..."
-                    value={active.channelId || (active.style.customFrameUrl ? customFrames.find((f) => f.url === active.style.customFrameUrl)?.id : undefined)}
-                    onChange={(val) => applyChannelToItem(active.id, val)}
-                    options={customFrames.map((f) => ({
-                      value: f.id,
-                      label: (
-                        <span className="flex items-center gap-1.5 truncate">
-                          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: f.tagColor || '#3b82f6' }} />
-                          <span className="truncate">{f.name}</span>
-                        </span>
-                      ),
-                    }))}
-                  />
+              {/* Thanh chọn Kênh & Mẫu nhanh trên đầu bộ soạn */}
+              <div className="flex flex-col gap-2 p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className="text-xs font-semibold text-slate-300 shrink-0">Kênh:</span>
+                    <Select
+                      size="small"
+                      className="flex-1 text-xs"
+                      placeholder="Chọn Kênh thương hiệu..."
+                      value={active.channelId || (active.style.customFrameUrl ? customFrames.find((f) => f.url === active.style.customFrameUrl)?.id : undefined)}
+                      onChange={(val) => applyChannelToItem(active.id, val)}
+                      options={customFrames.map((f) => ({
+                        value: f.id,
+                        label: (
+                          <span className="flex items-center gap-1.5 truncate">
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: f.tagColor || '#3b82f6' }} />
+                            <span className="truncate">{f.name}</span>
+                          </span>
+                        ),
+                      }))}
+                    />
+                  </div>
+                  {checkedItems.length > 1 && (
+                    <Button
+                      size="small"
+                      type="dashed"
+                      onClick={applyCurrentChannelToAllChecked}
+                      title={`Áp dụng khung và phong cách của kênh này cho tất cả ${checkedItems.length} bài đã chọn`}
+                    >
+                      Gán Kênh ({checkedItems.length})
+                    </Button>
+                  )}
                 </div>
-                {checkedItems.length > 1 && (
-                  <Button
-                    size="small"
-                    type="dashed"
-                    onClick={applyCurrentChannelToAllChecked}
-                    title={`Áp dụng khung và phong cách của kênh này cho tất cả ${checkedItems.length} bài đã chọn`}
-                  >
-                    Gán cho {checkedItems.length} bài chọn
-                  </Button>
-                )}
+
+                <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-800/60">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className="text-xs font-semibold text-slate-300 shrink-0">Mẫu:</span>
+                    <Select
+                      size="small"
+                      className="flex-1 text-xs"
+                      value={normalizeTemplate(s.template)}
+                      onChange={(tVal) => {
+                        const tpl = tVal as CardTemplate;
+                        setStyle({
+                          template: tpl,
+                          ...(tpl === 'gradient'
+                            ? { useCustomFrame: false, bandBg: '#090d16', textColor: '#ffffff', accent: '#ec4899' }
+                            : {}),
+                        });
+                      }}
+                      options={TEMPLATES.map((t) => ({
+                        value: t.value,
+                        label: (
+                          <span className="flex items-center gap-1.5 truncate">
+                            {t.value === 'gradient' && <span className="text-pink-400">✨</span>}
+                            <span>{t.label}</span>
+                          </span>
+                        ),
+                      }))}
+                    />
+                  </div>
+                  {checkedItems.length > 1 && (
+                    <Button
+                      size="small"
+                      type="dashed"
+                      onClick={() => applyTemplateToChecked(normalizeTemplate(s.template))}
+                      title={`Gán mẫu thiết kế này cho tất cả ${checkedItems.length} bài đã chọn`}
+                    >
+                      Gán Mẫu ({checkedItems.length})
+                    </Button>
+                  )}
+                </div>
               </div>
 
               <Button type="primary" block icon={<ThunderboltOutlined />} loading={active.headlineLoading} onClick={() => runPackage(active)}>

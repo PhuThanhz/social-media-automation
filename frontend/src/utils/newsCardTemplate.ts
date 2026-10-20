@@ -18,10 +18,11 @@ export type Corner = 'tl' | 'tr' | 'bl' | 'br';
 export type LogoFrame = 'none' | 'circle' | 'rounded' | 'square' | 'pill';
 // 'topbar' / 'footer' là mẫu cũ — vẫn nhận để bài đã lưu không lỗi, khi dựng sẽ quy đổi (xem normalizeTemplate)
 export type CardTemplate =
-  | 'classic' | 'marker' | 'breaking' | 'editorial' | 'floating' | 'overlay' | 'slant' | 'boldframe' | 'framed' | 'split' | 'quote'
+  | 'classic' | 'marker' | 'breaking' | 'editorial' | 'floating' | 'overlay' | 'slant' | 'boldframe' | 'framed' | 'split' | 'quote' | 'gradient'
   | 'topbar' | 'footer';
 
 export const TEMPLATES: Array<{ value: CardTemplate; label: string; hint: string }> = [
+  { value: 'gradient', label: 'Radiant Gradient', hint: 'Nền chuyển sắc dạ quang huyền ảo, hộp chữ bóng kính cao cấp' },
   { value: 'classic', label: 'Cổ điển', hint: 'Ảnh trên, dải tiêu đề in hoa căn giữa' },
   { value: 'marker', label: 'Bút dạ', hint: 'Cụm nhấn được tô nền màu như bút dạ' },
   { value: 'breaking', label: 'Nền tối', hint: 'Dải tiêu đề nền đen chữ trắng, viền màu nhấn phía trên' },
@@ -299,13 +300,16 @@ export function buildNewsCardHtml(spec: CardSpec): string {
   if (spec.transparentPhoto) {
     cells = '<div class="cell" style="background:transparent !important; border:none !important;"></div>';
   } else if (spec.videoUrl) {
-    cells = `<div class="cell" data-cell="0" style="grid-column:1/-1;grid-row:1/-1;background:#000;"><video src="${esc(spec.videoUrl)}" autoplay loop muted playsinline style="width:100%;height:100%;object-fit:${s.fit};pointer-events:none;"></video></div>`;
+    cells = `<div class="cell" data-cell="0" style="grid-column:1/-1;grid-row:1/-1;position:relative;overflow:hidden;background:#090d16;">
+      <div class="video-blur"><video src="${esc(spec.videoUrl)}" autoplay loop muted playsinline></video></div>
+      <video class="main-video" src="${esc(spec.videoUrl)}" autoplay loop muted playsinline style="object-fit:${s.fit};"></video>
+    </div>`;
   } else {
     cells = imgs
       .map((url, i) => {
         const u = esc(url);
         const span = i === 0 ? FIRST_CELL_SPAN[spec.layout] || '' : '';
-        const blur = s.fit === 'contain' ? `<div class="blur" style="background-image:url('${u}')"></div>` : '';
+        const blur = `<div class="blur" style="background-image:url('${u}')"></div>`;
         return `<div class="cell" data-cell="${i}" style="${span}">${blur}<img src="${u}" referrerpolicy="no-referrer"/></div>`;
       })
       .join('');
@@ -427,6 +431,29 @@ export function buildNewsCardHtml(spec: CardSpec): string {
   #text { position: relative; text-align: left; text-transform: none; font-weight: 800; padding-left: 196px; padding-right: 64px; letter-spacing: -0.3px; }
   #text .qmark { position: absolute; left: 52px; top: ${padTop - 30}px; font-family: Georgia, 'Times New Roman', serif; font-size: 230px; font-weight: 900; line-height: 1; color: ${accent}; }
   #text .speaker { margin-top: 20px; font-family: 'Montserrat', Arial, sans-serif; font-size: 34px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; line-height: 1; color: ${accent}; }`,
+    gradient: `
+  #card { background: linear-gradient(145deg, #090d16 0%, #160f2b 45%, #2a0b3f 75%, #0a1120 100%); }
+  #photos { border-radius: 24px; overflow: hidden; margin: 28px 28px 0; box-shadow: 0 20px 50px rgba(0,0,0,0.6); }
+  #text {
+    position: relative; z-index: 2; margin: 24px 28px ${showFooter ? 16 : 28}px; padding: 36px 44px;
+    background: rgba(18, 24, 38, 0.85); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    border-radius: 24px; border: 2px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.25);
+    text-align: left; color: #ffffff;
+  }
+  #text::before {
+    content: ''; position: absolute; top: 0; left: 44px; right: 44px; height: 4px;
+    background: linear-gradient(90deg, #ec4899, #8b5cf6, #3b82f6); border-radius: 4px;
+  }
+  #text .hl {
+    background: linear-gradient(90deg, #f43f5e, #fb923c, #facc15);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 2px 10px rgba(244,63,94,0.45));
+  }
+  #footer {
+    background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(16px);
+    border-top: 1px solid rgba(255,255,255,0.12); color: #e2e8f0;
+  }`,
   };
   const templateCss = TEMPLATE_CSS[tpl] || '';
   const customFrameHtml = isCustomFrame
@@ -435,7 +462,7 @@ export function buildNewsCardHtml(spec: CardSpec): string {
 
   const cardBg = spec.transparentPhoto ? 'transparent !important' : esc(s.bandBg);
   const photosBg = spec.transparentPhoto ? 'transparent !important' : gapBg;
-  const cellBg = spec.transparentPhoto ? 'transparent !important' : '#111';
+  const cellBg = spec.transparentPhoto ? 'transparent !important' : '#090d16';
 
   return `<!doctype html>
 <html><head><meta charset="utf-8"/>
@@ -455,8 +482,11 @@ export function buildNewsCardHtml(spec: CardSpec): string {
   #photos { position: relative; flex: 1 1 auto; min-height: 0; display: grid; gap: ${gap}px; ${GRID_CSS[spec.layout] || GRID_CSS.single} background: ${photosBg}; ${multi && radius > 0 ? `padding: ${Math.max(gap, 12)}px;` : ''} }
   .cell { position: relative; overflow: hidden; background: ${cellBg}; min-height: 0; ${multi ? `border-radius: ${radius}px;` : ''} }
   ${layoutCss}
-  .cell img { position: relative; width: 100%; height: 100%; display: block; object-fit: ${s.fit}; object-position: ${s.focusX}% ${s.focusY}%; }
-  .cell .blur { position: absolute; inset: -40px; background: center/cover no-repeat; filter: blur(28px) brightness(.75); }
+  .cell img { position: relative; z-index: 2; width: 100%; height: 100%; display: block; object-fit: ${s.fit}; object-position: ${s.focusX}% ${s.focusY}%; }
+  .cell .blur { position: absolute; inset: -60px; z-index: 1; background-position: center; background-size: cover; background-repeat: no-repeat; filter: blur(42px) brightness(0.68) saturate(1.3); transform: scale(1.25); pointer-events: none; }
+  .cell .video-blur { position: absolute; inset: -60px; z-index: 1; overflow: hidden; filter: blur(42px) brightness(0.65) saturate(1.35); transform: scale(1.3); pointer-events: none; }
+  .cell .video-blur video { width: 100%; height: 100%; object-fit: cover; }
+  .cell video.main-video { position: relative; z-index: 2; width: 100%; height: 100%; object-fit: ${s.fit}; pointer-events: none; }
   #text {
     flex: 0 0 auto; padding: ${padTop}px 56px ${padBottom}px; text-align: center; color: ${esc(s.textColor)};
     font-family: 'DT Phudu', 'Phudu', 'Montserrat', 'Arial Black', sans-serif; font-size: ${fitStart}px;

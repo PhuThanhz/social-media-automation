@@ -249,12 +249,15 @@ public class NewsCardController {
             Path outFile = uploadDir.resolve(outFilename);
 
             String filterComplex = String.format(
-                    "[0:v]scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,setsar=1[vtop];" +
+                    "[0:v]scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,boxblur=25:5,setsar=1[vbg];" +
+                    "[0:v]scale=%d:%d:force_original_aspect_ratio=decrease,setsar=1[vfg];" +
+                    "[vbg][vfg]overlay=(W-w)/2:(H-h)/2[vphoto];" +
                     "color=c=black:s=%dx%d:r=30[canvas];" +
-                    "[canvas][vtop]overlay=0:%d[base];" +
+                    "[canvas][vphoto]overlay=0:%d[base];" +
                     "[1:v]scale=%d:%d[overlay_sc];" +
                     "[base][overlay_sc]overlay=0:0:format=auto[vout]",
                     canvasW, photoH, canvasW, photoH,
+                    canvasW, photoH,
                     canvasW, canvasH,
                     photoTop,
                     canvasW, canvasH
