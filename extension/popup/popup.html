@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ToolZutter Helper</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <div class="logo-icon">⚡</div>
+        <div class="brand-text">
+          <h1>ToolZutter</h1>
+          <span class="version">Scraper Helper v1.0</span>
+        </div>
+      </div>
+      <div class="status-badges">
+        <span id="backend-status" class="badge badge-offline" title="Backend Status">Backend</span>
+        <span id="worker-status" class="badge badge-offline" title="Worker Status">Worker</span>
+      </div>
+    </header>
+
+    <!-- Main Navigation Tabs -->
+    <nav class="nav-tabs">
+      <button class="tab-btn active" data-tab="tab-current">⚡ Bài Hiện Tại</button>
+      <button class="tab-btn" data-tab="tab-batch">🔍 Quét Hàng Loạt</button>
+      <button class="tab-btn" data-tab="tab-cookie">🔑 Cookie FB</button>
+      <button class="tab-btn" data-tab="tab-threads">🧵 Threads</button>
+      <button class="tab-btn" data-tab="tab-settings">⚙️ Cài Đặt</button>
+    </nav>
+
+    <!-- Content Sections -->
+    <main class="tab-content">
+      
+      <!-- TAB 1: BÀI HIỆN TẠI -->
+      <section id="tab-current" class="tab-pane active">
+        <div class="card">
+          <div class="card-title">Bài Viết / Reel Đang Mở</div>
+          <div class="post-preview">
+            <div id="current-post-title" class="preview-title">Đang quét trang hiện tại...</div>
+            <div id="current-post-url" class="preview-url">Chưa nhận diện được link</div>
+          </div>
+          
+          <div class="action-grid">
+            <button id="btn-send-current" class="btn btn-primary">
+              <span>🚀</span> Đẩy Vào Hàng Đợi Tool
+            </button>
+            <button id="btn-copy-current" class="btn btn-secondary">
+              <span>📋</span> Copy Link Sạch
+            </button>
+          </div>
+        </div>
+
+        <div class="quick-options card">
+          <div class="card-title">Tuỳ chọn đăng nhanh</div>
+          <label class="checkbox-label">
+            <input type="checkbox" id="chk-publish-now">
+            <span>Đăng ngay lập tức (Bỏ qua hàng đợi)</span>
+          </label>
+        </div>
+      </section>
+
+      <!-- TAB 2: QUÉT HÀNG LOẠT -->
+      <section id="tab-batch" class="tab-pane">
+        <div class="card">
+          <div class="card-title">Cào Danh Sách Bài Viết / Reels</div>
+          <div class="batch-controls">
+            <button id="btn-scan-visible" class="btn btn-primary">
+              <span>⚡</span> Quét Bài Đang Thấy
+            </button>
+            <button id="btn-scan-deep" class="btn btn-secondary">
+              <span>📜</span> Tự Động Cuộn & Quét Sâu
+            </button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header-row">
+            <span class="card-title">Kết Quả (<span id="batch-count">0</span> bài)</span>
+            <div class="btn-link-group">
+              <button id="btn-select-all" class="btn-text">Chọn tất cả</button>
+              <button id="btn-copy-batch" class="btn-text">Copy danh sách</button>
+            </div>
+          </div>
+          
+          <div id="batch-list" class="batch-list-container">
+            <div class="empty-state">Chưa quét bài nào. Nhấn nút quét ở trên để bắt đầu.</div>
+          </div>
+
+          <button id="btn-send-batch" class="btn btn-success" style="margin-top: 12px; width: 100%;" disabled>
+            <span>🚀</span> Đẩy Tất Cả Bài Đã Chọn Vào Hàng Đợi
+          </button>
+        </div>
+      </section>
+
+      <!-- TAB 3: COOKIE FACEBOOK -->
+      <section id="tab-cookie" class="tab-pane">
+        <div class="card">
+          <div class="card-title">Trích Xuất Cookie Facebook 1-Chạm</div>
+          <p class="card-desc">Lấy Cookie tài khoản Facebook hiện tại của bạn đang đăng nhập trên trình duyệt một cách an toàn.</p>
+          
+          <div class="cookie-info-box">
+            <div class="info-row">
+              <span class="info-label">Trạng thái:</span>
+              <span id="cookie-auth-status" class="info-value">Đang kiểm tra...</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">User ID (c_user):</span>
+              <span id="cookie-uid" class="info-value">-</span>
+            </div>
+          </div>
+
+          <div class="action-grid" style="margin-top: 12px;">
+            <button id="btn-copy-cookie" class="btn btn-primary">
+              <span>📋</span> Copy Chuỗi Cookie
+            </button>
+            <button id="btn-refresh-cookie" class="btn btn-secondary">
+              <span>🔄</span> Làm Mới
+            </button>
+          </div>
+
+          <button id="btn-sync-fb-cookie" class="btn btn-success" style="margin-top: 10px; width: 100%;">
+            <span>⚡</span> Đồng Bộ Nick Này Sang ToolZutter (1-Chạm)
+          </button>
+        </div>
+      </section>
+
+      <!-- TAB: ĐỒNG BỘ THREADS -->
+      <section id="tab-threads" class="tab-pane">
+        <div class="card">
+          <div class="card-title">Đồng Bộ Nick Threads</div>
+          <p class="card-desc">Giữ 1 tab threads.com đăng nhập trên Chrome — extension tự gửi cookie mới nhất vào ToolZutter, nick không bị hết hạn.</p>
+
+          <div class="cookie-info-box">
+            <div class="info-row">
+              <span class="info-label">Chrome:</span>
+              <span id="threads-login-status" class="info-value">Đang kiểm tra...</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Lần đồng bộ cuối:</span>
+              <span id="threads-last-sync" class="info-value">-</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Tự động đồng bộ:</span>
+              <span class="info-value"><input type="checkbox" id="threads-autosync" checked /></span>
+            </div>
+          </div>
+
+          <div class="action-grid" style="margin-top: 12px;">
+            <button id="btn-threads-sync" class="btn btn-primary">
+              <span>🔄</span> Đồng Bộ Ngay
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: CÀI ĐẶT -->
+      <section id="tab-settings" class="tab-pane">
+        <div class="card">
+          <div class="card-title">Cấu Hình Kết Nối ToolZutter</div>
+          
+          <div class="form-group">
+            <label for="input-backend-url">Backend API URL:</label>
+            <input type="text" id="input-backend-url" class="form-input" value="http://localhost:8081" placeholder="http://localhost:8081">
+          </div>
+
+          <div class="form-group">
+            <label for="input-worker-url">Worker URL:</label>
+            <input type="text" id="input-worker-url" class="form-input" value="http://localhost:3001" placeholder="http://localhost:3001">
+          </div>
+
+          <button id="btn-save-settings" class="btn btn-primary" style="width: 100%; margin-top: 8px;">
+            <span>💾</span> Lưu Cài Đặt
+          </button>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Global Toast inside popup -->
+    <div id="popup-alert" class="popup-alert"></div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+# Secrets
+.env
+**/.env
+*.env
+
+# Backups
+_backup_*
+**/_backup_*
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build artifacts
+backend/target/
+frontend/dist/
+frontend/build/
+dist/
+build/
+
+# Logs & test artifacts
+*.log
+**/*.log
+worker/*.png
+worker/worker.log
+
+# System & IDE files
+.DS_Store
+**/.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.claude/
+.agents/

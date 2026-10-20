@@ -1,0 +1,57 @@
+services:
+  mysql:
+    image: mysql:8.0
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DB_PASSWORD:-autopost_root_pw}
+      - MYSQL_DATABASE=${DB_NAME:-autopost_saas}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${DB_PASSWORD:-autopost_root_pw}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  worker:
+    build: ./worker
+    restart: always
+    ports:
+      - "3001:3001"
+    shm_size: "1gb"
+
+  backend:
+    build: ./backend
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+      worker:
+        condition: service_started
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_NAME=${DB_NAME:-autopost_saas}
+      - DB_USER=root
+      - DB_PASSWORD=${DB_PASSWORD:-autopost_root_pw}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - WORKER_BASE_URL=http://worker:3001
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: /api
+        VITE_WORKER_BASE_URL: /worker
+    restart: always
+    depends_on:
+      - backend
+      - worker
+    ports:
+      - "80:80"
+
+volumes:
+  mysql_data:

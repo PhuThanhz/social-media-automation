@@ -1,0 +1,9 @@
+node_modules
+debug_output
+debug_*.png
+debug_*.html
+debug_*.txt
+temp_media_*
+*.log
+downloads
+_archive_debug_scripts

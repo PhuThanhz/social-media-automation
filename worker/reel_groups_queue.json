@@ -1,0 +1,22 @@
+{
+  "intervalMinutes": 20,
+  "nextRunAt": null,
+  "items": [
+    {
+      "id": "q_1785814566628_988",
+      "cookieString": "c_user=100023403136194; datr=flkNaorLLLc-Jt0TyefcGE43; fr=1WhBZYRQvafVi6dPU.AWeOs64f2wuq8RpQ7Ep754xiR6Xfs_p859CQhKnCIJB2JeFpWWk.BqcNLT..AAA.0.0.BqcNLT.AWcmduvkpD_xmYeBtMhS-NcAPnQ; sb=f1kNaidyOexVUhTEy37sYHde; xs=48%3AU3wQCX2FimHbhw%3A2%3A1785739263%3A-1%3A-1%3A%3AAcxFCLornbquinVW_nbqEhztOSr04SaTaTe7twRygV4; wd=505x861",
+      "targetFanpageId": "61584834510803",
+      "content": null,
+      "threadsUrl": "https://www.threads.com/share/F2fmKezx9/",
+      "mediaUrls": null,
+      "groupNames": [
+        "Đảo Mèo",
+        "Đảo Mèo"
+      ],
+      "status": "failed",
+      "addedAt": "2026-08-04T03:36:06.628Z",
+      "postedAt": null,
+      "error": "False positive: bị chặn bởi Modal phụ \"Trò chuyện trực tiếp với mọi người\" của Facebook sau khi bấm Đăng — báo thành công nhầm, Reel thực tế KHÔNG được xuất bản. Đã fix ở server.js (kiểm tra Modal \"Tạo bài viết\" phải đóng hẳn mới coi là thành công) và đăng lại thủ công."
+    }
+  ]
+}

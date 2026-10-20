@@ -1,0 +1,20 @@
+{
+  "telegramBotToken": "",
+  "telegramChatId": "",
+  "notifyOnViaDead": true,
+  "notifyOnHunter": true,
+  "notifyOnBuffDone": true,
+  "maxDailyPageActions": 10,
+  "autoBuffOwnPosts": false,
+  "autoBuffOwnFanpage": false,
+  "autoBuffOwnGroup": false,
+  "autoBuffDelayMinutes": 8,
+  "autoBuffReaction": "RANDOM_POSITIVE",
+  "maxPagesPerPost": 60,
+  "buffParallelVias": 2,
+  "isEmergencyStopped": false,
+  "emergencyReason": "",
+  "emergencyStoppedAt": null,
+  "autoBuffLikesTarget": 25,
+  "proxyPool": []
+}
