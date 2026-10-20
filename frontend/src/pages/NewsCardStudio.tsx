@@ -2377,6 +2377,157 @@ export default function NewsCardStudio() {
                             </div>
                           )}
                         </div>
+
+                        {/* Watermark / Che nguồn video & ảnh */}
+                        <div className="pt-3 border-t border-slate-800/80 space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                              🏷️ Watermark / Che nguồn Video
+                            </span>
+                            {s.videoWatermark ? (
+                              <Tag color="cyan" className="!mr-0 !text-[10px]">Đang bật</Tag>
+                            ) : (
+                              <Tag className="!mr-0 !text-[10px] text-slate-500">Tắt</Tag>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-slate-400">
+                            Nhập tag riêng (VD: <b className="text-cyan-400">@thanhphu</b>) để đóng dấu bản quyền hoặc đè che watermark nguồn của video.
+                          </div>
+                          <div className="space-y-1.5">
+                            <Input
+                              size="small"
+                              placeholder="Nhập watermark (ví dụ: @thanhphu)"
+                              value={s.videoWatermark || ''}
+                              onChange={(e) => setStyle({ videoWatermark: e.target.value })}
+                              allowClear
+                            />
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[10px] text-slate-500">Gợi ý nhanh:</span>
+                              <Button
+                                size="small"
+                                type="dashed"
+                                className="!text-[10px] !h-5 !px-1.5"
+                                onClick={() => setStyle({ videoWatermark: '@thanhphu' })}
+                              >
+                                @thanhphu
+                              </Button>
+                              {s.footerText && (
+                                <Button
+                                  size="small"
+                                  type="dashed"
+                                  className="!text-[10px] !h-5 !px-1.5"
+                                  onClick={() => setStyle({ videoWatermark: `@${s.footerText.toLowerCase().replace(/\s+/g, '')}` })}
+                                >
+                                  @{s.footerText.toLowerCase().replace(/\s+/g, '')}
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+
+                          {s.videoWatermark && (
+                            <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-2.5 space-y-2.5">
+                              <div>
+                                <div className="text-[10px] text-slate-400 mb-1 font-medium">Góc đặt che watermark:</div>
+                                <CornerButtons
+                                  value={s.videoWatermarkPos || 'tr'}
+                                  onPick={(c) => {
+                                    const coords: Record<Corner, [number, number]> = {
+                                      tr: [74, 4],
+                                      tl: [4, 4],
+                                      br: [74, 88],
+                                      bl: [4, 88],
+                                    };
+                                    const [x, y] = coords[c] || [74, 4];
+                                    setStyle({ videoWatermarkPos: c, videoWatermarkX: x, videoWatermarkY: y });
+                                  }}
+                                />
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2">
+                                <FieldSlider
+                                  label="X (Ngang)"
+                                  value={s.videoWatermarkX ?? 74}
+                                  unit="%"
+                                  min={0}
+                                  max={95}
+                                  step={1}
+                                  onChange={(v) => setStyle({ videoWatermarkX: v })}
+                                />
+                                <FieldSlider
+                                  label="Y (Dọc)"
+                                  value={s.videoWatermarkY ?? 4}
+                                  unit="%"
+                                  min={0}
+                                  max={95}
+                                  step={1}
+                                  onChange={(v) => setStyle({ videoWatermarkY: v })}
+                                />
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <div className="text-[10px] text-slate-400 mb-1">Kiểu nhãn:</div>
+                                  <Segmented
+                                    block
+                                    size="small"
+                                    value={s.videoWatermarkBg || 'dark'}
+                                    onChange={(v) => setStyle({ videoWatermarkBg: v as any })}
+                                    options={[
+                                      { value: 'dark', label: 'Tối mờ' },
+                                      { value: 'glass', label: 'Kính mờ' },
+                                      { value: 'accent', label: 'Màu nhấn' },
+                                    ]}
+                                  />
+                                </div>
+                                <FieldSlider
+                                  label="Cỡ chữ"
+                                  value={s.videoWatermarkSize ?? 28}
+                                  unit="px"
+                                  min={16}
+                                  max={54}
+                                  step={2}
+                                  onChange={(v) => setStyle({ videoWatermarkSize: v })}
+                                />
+                              </div>
+
+                              {checkedItems.length > 1 && (
+                                <Button
+                                  size="small"
+                                  block
+                                  type="dashed"
+                                  onClick={() => {
+                                    const wm = s.videoWatermark;
+                                    const pos = s.videoWatermarkPos;
+                                    const x = s.videoWatermarkX;
+                                    const y = s.videoWatermarkY;
+                                    const bg = s.videoWatermarkBg;
+                                    const size = s.videoWatermarkSize;
+                                    setItems((prev) =>
+                                      prev.map((it) => {
+                                        if (!it.checked && it.id !== active?.id) return it;
+                                        return {
+                                          ...it,
+                                          style: {
+                                            ...it.style,
+                                            videoWatermark: wm,
+                                            videoWatermarkPos: pos,
+                                            videoWatermarkX: x,
+                                            videoWatermarkY: y,
+                                            videoWatermarkBg: bg,
+                                            videoWatermarkSize: size,
+                                          },
+                                        };
+                                      })
+                                    );
+                                    message.success(`Đã áp dụng watermark "${wm}" cho ${checkedItems.length} bài đã chọn!`);
+                                  }}
+                                >
+                                  Gán watermark cho {checkedItems.length} bài chọn
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ),
                   },

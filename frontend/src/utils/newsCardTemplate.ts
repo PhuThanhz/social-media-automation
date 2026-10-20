@@ -98,6 +98,13 @@ export interface CardStyle {
   frameTextRight?: number; // % lề phải (mặc định 6)
   frameTextHeight?: number; // % chiều cao tối đa của hộp chữ (mặc định 24)
   frameTextAlign?: 'left' | 'center' | 'right'; // căn lề chữ (mặc định 'center')
+  // Watermark / Tag ẩn nguồn video & ảnh (@thanhphu,...)
+  videoWatermark?: string;
+  videoWatermarkPos?: Corner;
+  videoWatermarkX?: number;
+  videoWatermarkY?: number;
+  videoWatermarkBg?: 'dark' | 'glass' | 'accent';
+  videoWatermarkSize?: number;
 }
 
 export interface InsetOptions {
@@ -164,6 +171,12 @@ export const DEFAULT_CARD_STYLE: CardStyle = {
   frameTextRight: 6,
   frameTextHeight: 24,
   frameTextAlign: 'center',
+  videoWatermark: '',
+  videoWatermarkPos: 'tr',
+  videoWatermarkX: 74,
+  videoWatermarkY: 4,
+  videoWatermarkBg: 'dark',
+  videoWatermarkSize: 28,
 };
 
 export const COLOR_PRESETS: Array<{ label: string; bandBg: string; textColor: string; accent: string }> = [
@@ -349,6 +362,14 @@ export function buildNewsCardHtml(spec: CardSpec): string {
     ? `<div id="badge" style="left:${clampPct(badge.left, 3)}%;top:${clampPct(badge.top, 4)}%">${esc(badge.text)}</div>`
     : '';
   const creditHtml = s.showCredit && spec.credit ? `<div id="credit">${esc(spec.credit)}</div>` : '';
+
+  const wmText = s.videoWatermark?.trim();
+  const wmBgClass = s.videoWatermarkBg === 'accent' ? 'wm-accent' : s.videoWatermarkBg === 'glass' ? 'wm-glass' : 'wm-dark';
+  const wmLeft = clampPct(s.videoWatermarkX, s.videoWatermarkPos === 'tl' || s.videoWatermarkPos === 'bl' ? 4 : 74);
+  const wmTop = clampPct(s.videoWatermarkY, s.videoWatermarkPos === 'bl' || s.videoWatermarkPos === 'br' ? 88 : 4);
+  const watermarkHtml = wmText
+    ? `<div id="video-watermark" class="${wmBgClass}" style="left:${wmLeft}%;top:${wmTop}%;font-size:${s.videoWatermarkSize || 28}px;"><span class="handle">${esc(wmText)}</span></div>`
+    : '';
 
   const tpl = normalizeTemplate(s.template);
   const PAD: Record<string, [number, number]> = {
@@ -558,10 +579,32 @@ export function buildNewsCardHtml(spec: CardSpec): string {
     position: absolute; z-index: 2; right: 24px; bottom: 18px; color: #fff; font-size: 26px; font-weight: 700;
     font-family: 'Montserrat', Arial, sans-serif; text-shadow: 0 1px 6px rgba(0,0,0,.85); opacity: .92;
   }
+  #video-watermark {
+    position: absolute; z-index: 6; display: inline-flex; align-items: center; gap: 8px;
+    padding: 0.28em 0.68em 0.24em; border-radius: 999px;
+    font-family: 'DT Phudu', 'Phudu', 'Montserrat', Arial Black, sans-serif;
+    font-weight: 800; letter-spacing: -0.3px; white-space: nowrap;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.55); pointer-events: none;
+    line-height: 1.15;
+  }
+  #video-watermark.wm-dark {
+    background: rgba(10, 15, 25, 0.88); color: #ffffff;
+    border: 2px solid rgba(255,255,255,0.25); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  }
+  #video-watermark.wm-glass {
+    background: rgba(255, 255, 255, 0.22); color: #ffffff;
+    border: 2px solid rgba(255,255,255,0.45); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    text-shadow: 0 2px 6px rgba(0,0,0,0.6);
+  }
+  #video-watermark.wm-accent {
+    background: ${accent}; color: ${onAccent};
+    border: 2px solid rgba(255,255,255,0.35);
+  }
+  #video-watermark .handle { font-weight: 800; }
 </style></head>
 <body>
   <div id="card">
-    <div id="photos">${cells}${logoHtml}${insetHtml}${badgeHtml}${creditHtml}</div>
+    <div id="photos">${cells}${logoHtml}${insetHtml}${badgeHtml}${creditHtml}${watermarkHtml}</div>
     ${customFrameHtml}
     <div id="text">${quoteMark}<div id="headline">${headlineHtml(spec.headline) || '&nbsp;'}</div>${speaker}</div>
     ${footerHtml}
