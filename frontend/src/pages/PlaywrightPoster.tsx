@@ -7487,17 +7487,19 @@ const PlaywrightPoster = () => {
 
               {/* BƯỚC 2: KHUNG ĐIỀU KHIỂN XUẤT BẢN */}
               <div className="space-y-4">
-                {/* NẾU LÀ GROUP_ONLY HOẶC FANPAGE_AND_GROUP: HIỂN THỊ KHUNG CHỌN NHÓM ĐẦU TIÊN ĐỂ LUỒNG TỰ NHIÊN HƠN */}
-                {(postMode === 'GROUP_ONLY' || postMode === 'FANPAGE_AND_GROUP') && (
-                  <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/80 border border-slate-700/60 shadow-xl space-y-3.5 backdrop-blur-md">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-800">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-sm shadow-sm shrink-0">
-                          <TeamOutlined />
-                        </div>
-                        <div>
-                          <div className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                            <span>Nhóm Facebook nhận bài</span>
+                {/* Lưới 2 cột trực quan: Cột trái chọn Nhóm, Cột phải chọn Người đăng */}
+                <div className={postMode !== 'FANPAGE_ONLY' ? 'grid grid-cols-1 xl:grid-cols-2 gap-4 items-stretch' : 'space-y-4'}>
+                  {/* NẾU LÀ GROUP_ONLY HOẶC FANPAGE_AND_GROUP: HIỂN THỊ KHUNG CHỌN NHÓM ĐẦU TIÊN ĐỂ LUỒNG TỰ NHIÊN HƠN */}
+                  {(postMode === 'GROUP_ONLY' || postMode === 'FANPAGE_AND_GROUP') && (
+                    <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/80 border border-emerald-500/30 shadow-xl space-y-3.5 backdrop-blur-md flex flex-col justify-between">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-800">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-sm shadow-sm shrink-0">
+                            <TeamOutlined />
+                          </div>
+                          <div>
+                            <div className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                              <span>Nhóm Facebook nhận bài</span>
                             {activeSelectedGroupIds.length > 0 ? (
                               <Tag color="emerald" className="!rounded-full font-bold text-xs !m-0 border-0 bg-emerald-500/20 text-emerald-300">
                                 ✓ Đã chọn {activeSelectedGroupIds.length} nhóm
@@ -7592,7 +7594,7 @@ const PlaywrightPoster = () => {
                 )}
 
                 {/* KHUNG CHỌN TÀI KHOẢN ĐẠI DIỆN ĐĂNG BÀI */}
-                <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/80 border border-slate-700/60 shadow-xl space-y-4 backdrop-blur-md">
+                <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/80 border border-sky-500/30 shadow-xl space-y-4 backdrop-blur-md flex flex-col justify-between">
                   {/* Header: Tiêu đề & Trạng thái phân bổ đang kích hoạt + Nút reset */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
                     <div className="flex items-center gap-2.5">
@@ -7753,6 +7755,21 @@ const PlaywrightPoster = () => {
                       />
                     </Form.Item>
                   </div>
+                </div>
+
+                {/* Tóm tắt nhanh Nơi đăng & Người đăng */}
+                {postMode !== 'FANPAGE_ONLY' && (
+                  <div className="px-4 py-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-slate-300 flex items-center justify-between gap-2 flex-wrap">
+                    <span className="flex items-center gap-2">
+                      <span className="text-emerald-400 font-bold">👥 {activeSelectedGroupIds.length} Nhóm nhận bài</span>
+                      <span className="text-slate-600">➔</span>
+                      <span className="text-sky-400 font-bold">👤 {activeSelectedFanpageIds.length} Người đăng / Page đại diện</span>
+                    </span>
+                    <span className="text-slate-400 text-[11px]">
+                      {activeSelectedGroupIds.length === 0 ? '⚠️ Hãy chọn ít nhất 1 nhóm ở cột bên trái' : '✓ Sẵn sàng xuất bản'}
+                    </span>
+                  </div>
+                )}
 
                   {/* Tự động hiện cấu hình phân phối đa kênh khi FANPAGE_ONLY và chọn nhiều tài khoản */}
                   {postMode === 'FANPAGE_ONLY' && activeSelectedFanpageIds.length > 1 && (
@@ -7944,14 +7961,127 @@ const PlaywrightPoster = () => {
                 </Button>
               </div>
 
-              <div className="poster-source-row">
-                <span className="poster-source-label">Lấy nội dung từ</span>
-                <div className="poster-source-actions">
-                  <Button icon={<LinkOutlined className="text-sky-400" />} onClick={() => setBulkModalVisible(true)}>Dán nhiều link</Button>
-                  <Button icon={<FileTextOutlined className="text-emerald-400" />} onClick={() => setShowArticleBatchModal(true)}>Cào báo & tin tức</Button>
-                  <Button icon={<TeamOutlined className="text-purple-400" />} onClick={() => setGroupHunterDrawerVisible(true)}>Quét bài Group FB</Button>
-                  <Button icon={<FireOutlined className="text-amber-400" />} onClick={() => setHunterDrawerVisible(true)}>Săn kênh TikTok</Button>
+              {/* HERO: DÁN HÀNG LOẠT LINK SIÊU TỐC (Ưu tiên số 1 của người dùng) */}
+              <div className="mb-5 p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-900/95 via-slate-900/90 to-blue-950/40 border border-blue-500/40 shadow-xl space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-800">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-blue-500/20 border border-blue-400/40 flex items-center justify-center text-blue-400 text-sm shadow-sm shrink-0">
+                      <LinkOutlined />
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                        <span>Dán link hàng loạt (Siêu tốc)</span>
+                        <Tag color="processing" className="!rounded-full font-bold text-xs !m-0 border-0 bg-blue-500/20 text-blue-300">
+                          Khuyên dùng
+                        </Tag>
+                      </div>
+                      <div className="text-xs text-slate-400 mt-0.5">
+                        Dán danh sách các link (mỗi dòng 1 link Facebook, Threads, TikTok, Shorts...), hệ thống tự động bóc tách bài đăng
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button
+                      size="small"
+                      icon={<CopyOutlined />}
+                      onClick={async () => {
+                        try {
+                          const text = await navigator.clipboard.readText();
+                          if (text && text.trim()) {
+                            setBulkText((prev) => (prev ? prev + '\n' + text.trim() : text.trim()));
+                            message.success('Đã dán link từ Clipboard!');
+                          } else {
+                            message.info('Bộ nhớ tạm đang trống');
+                          }
+                        } catch {
+                          message.warning('Trình duyệt chặn đọc clipboard tự động, bạn hãy bấm Ctrl+V vào ô dưới');
+                        }
+                      }}
+                      className="text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700 rounded-lg"
+                    >
+                      Dán từ Clipboard
+                    </Button>
+                    <Button
+                      size="small"
+                      icon={<ThunderboltOutlined />}
+                      onClick={() => setBulkModalVisible(true)}
+                      className="text-xs font-semibold bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border-indigo-500/40 rounded-lg"
+                    >
+                      Mở bảng chi tiết
+                    </Button>
+                    {bulkText && (
+                      <Button
+                        size="small"
+                        type="text"
+                        danger
+                        icon={<ClearOutlined />}
+                        onClick={() => setBulkText('')}
+                        className="text-xs"
+                      >
+                        Xóa
+                      </Button>
+                    )}
+                  </div>
                 </div>
+
+                <Input.TextArea
+                  rows={3}
+                  value={bulkText}
+                  onChange={(e) => setBulkText(e.target.value)}
+                  placeholder="👉 Dán danh sách link vào đây, mỗi dòng 1 link:&#10;https://www.facebook.com/...&#10;https://www.threads.net/...&#10;https://www.tiktok.com/..."
+                  className="bg-slate-950 text-slate-100 font-mono text-xs rounded-xl border-slate-700/80 p-3 focus:border-blue-500"
+                />
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                  <div className="flex items-center gap-2 flex-wrap text-xs text-slate-400">
+                    {bulkPasteSummary.finalUrls.length > 0 ? (
+                      <>
+                        <span className="font-semibold text-emerald-400 flex items-center gap-1">
+                          ✓ Đã phát hiện <b>{bulkPasteSummary.finalUrls.length}</b> link hợp lệ
+                        </span>
+                        {bulkPasteSummary.duplicateInHistoryCount > 0 && (
+                          <span className="text-amber-400 font-medium">
+                            · ({bulkPasteSummary.duplicateInHistoryCount} link đã từng đăng)
+                          </span>
+                        )}
+                        {bulkPasteSummary.invalidLineCount > 0 && (
+                          <span className="text-slate-500">
+                            · ({bulkPasteSummary.invalidLineCount} dòng không phải link)
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span>💡 Hỗ trợ: Facebook, Threads, TikTok (không watermark), Reddit, Reels, Shorts...</span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      type="primary"
+                      size="middle"
+                      icon={<RocketOutlined />}
+                      disabled={bulkPasteSummary.finalUrls.length === 0}
+                      onClick={() => {
+                        handleApplyBulkPaste();
+                        setBulkText('');
+                      }}
+                      className="bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 text-white font-bold rounded-xl border-none shadow-md shadow-indigo-950/40 px-5"
+                    >
+                      {bulkPasteSummary.finalUrls.length > 0
+                        ? `🚀 Nạp ngay ${bulkPasteSummary.finalUrls.length} bài vào danh sách`
+                        : 'Nạp bài viết'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Các nguồn cào bài khác (Gọn gàng) */}
+              <div className="flex items-center gap-2 text-xs text-slate-400 mb-5 flex-wrap">
+                <span className="text-slate-500 font-medium">Hoặc cào từ nguồn khác:</span>
+                <Button size="small" icon={<FileTextOutlined className="text-emerald-400" />} onClick={() => setShowArticleBatchModal(true)} className="text-xs bg-slate-900 border-slate-700 text-slate-300 rounded-lg">Cào báo & tin tức</Button>
+                <Button size="small" icon={<TeamOutlined className="text-purple-400" />} onClick={() => setGroupHunterDrawerVisible(true)} className="text-xs bg-slate-900 border-slate-700 text-slate-300 rounded-lg">Quét bài Group FB</Button>
+                <Button size="small" icon={<FireOutlined className="text-amber-400" />} onClick={() => setHunterDrawerVisible(true)} className="text-xs bg-slate-900 border-slate-700 text-slate-300 rounded-lg">Săn kênh TikTok</Button>
               </div>
 
               {/* Bảng Ma Trận Phân Bổ Đa Kênh Xem Trước */}
@@ -8412,8 +8542,8 @@ const PlaywrightPoster = () => {
                   </div>
                 </div>}
               </div>
-              {/* Thanh thao tác nhanh hàng loạt nổi bật ngay trên danh sách bài viết */}
-              {linkItems.length > 0 && (
+              {/* Thanh thao tác nhanh hàng loạt nổi bật ngay trên danh sách bài viết (chỉ hiện khi đã có link hợp lệ) */}
+              {validLinkCount > 0 && (
                 <div className="poster-bulk-credit mb-4 p-3 sm:p-3.5 bg-slate-900/90 rounded-2xl border border-slate-700/80 flex flex-wrap items-center justify-between gap-3 shadow-lg backdrop-blur-md">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center font-bold text-sm border border-blue-500/25 shrink-0">
