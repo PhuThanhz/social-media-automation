@@ -158,7 +158,7 @@ const PREVIEW_MODE_KEY = 'newsCardStudio.previewMode';
 const DEFAULT_CUSTOM_FRAMES: CustomFramePreset[] = [
   {
     id: 'vietnam_health_news',
-    name: 'Vietnam Health News (Khung PNG)',
+    name: 'Vietnam Healthy New',
     tagColor: '#ef4444',
     url: 'http://localhost:8081/uploads/43130ba9-7445-4a77-998d-2436b85c5e11.png',
     template: 'classic',
@@ -171,67 +171,13 @@ const DEFAULT_CUSTOM_FRAMES: CustomFramePreset[] = [
     textAlign: 'center',
     textColor: '#111111',
     accent: '#e3151a',
-    footerText: 'VIETNAM HEALTH NEWS',
+    footerText: 'VIETNAM HEALTHY NEW',
     showLogo: true,
     logoUrl: 'http://localhost:8081/uploads/8e90b86e-d533-4521-b58d-82cd1880c07f.png',
     logoPos: 'tr',
     logoSize: 220,
     logoOpacity: 1,
     logoFrame: 'none',
-  },
-  {
-    id: 'radiant_neon_cyber',
-    name: 'Radiant Gradient (Neon Cyber)',
-    tagColor: '#a855f7',
-    url: '',
-    template: 'gradient',
-    bandBg: '#090d16',
-    textColor: '#ffffff',
-    accent: '#ec4899',
-    footerText: 'RADIANT NEWS 24H',
-    showLogo: true,
-    logoUrl: 'http://localhost:8081/uploads/8e90b86e-d533-4521-b58d-82cd1880c07f.png',
-    logoPos: 'tr',
-    logoSize: 210,
-    logoOpacity: 1,
-    logoFrame: 'pill',
-    logoFrameBg: 'rgba(255,255,255,0.18)',
-  },
-  {
-    id: 'bao_chi_hien_dai',
-    name: 'Báo Chí Hiện Đại',
-    tagColor: '#3b82f6',
-    url: '',
-    template: 'editorial',
-    bandBg: '#ffffff',
-    textColor: '#0f172a',
-    accent: '#2563eb',
-    footerText: 'THỜI SỰ BÁO CHÍ 24H',
-    showLogo: false,
-  },
-  {
-    id: 'tin_nong_red',
-    name: 'Tin Nóng Nền Tối',
-    tagColor: '#e11d48',
-    url: '',
-    template: 'breaking',
-    bandBg: '#0b0b0b',
-    textColor: '#ffffff',
-    accent: '#ff0033',
-    footerText: 'BẢN TIN NÓNG 24H',
-    showLogo: false,
-  },
-  {
-    id: 'kinh_te_tai_chinh',
-    name: 'Kênh Kinh Tế & Tài Chính (Gold)',
-    tagColor: '#f59e0b',
-    url: '',
-    template: 'classic',
-    bandBg: '#181611',
-    textColor: '#fef3c7',
-    accent: '#d97706',
-    footerText: 'TIN KINH TẾ 24H',
-    showLogo: false,
   },
 ];
 
@@ -1215,15 +1161,16 @@ export default function NewsCardStudio() {
   // ── Thư viện khung ảnh tùy chỉnh (Custom Frames) ──
   const [customFrames, setCustomFrames] = useState<CustomFramePreset[]>(() => {
     const saved = loadJson<CustomFramePreset[]>(CUSTOM_FRAMES_KEY, []);
-    if (!saved || saved.length === 0) return DEFAULT_CUSTOM_FRAMES;
-    const existingIds = new Set(saved.map((s) => s.id));
-    const merged = [...saved];
-    for (const def of DEFAULT_CUSTOM_FRAMES) {
-      if (!existingIds.has(def.id)) {
-        merged.push(def);
-      }
-    }
-    return merged;
+    // Chỉ giữ lại những khung thật có url và loại bỏ các mẫu giả lập vừa thêm
+    const valid = (saved || []).filter(
+      (s) =>
+        s.url &&
+        s.url.trim().length > 0 &&
+        !['radiant_neon_cyber', 'bao_chi_hien_dai', 'tin_nong_red', 'kinh_te_tai_chinh'].includes(s.id)
+    );
+    const finalFrames = valid.length > 0 ? valid : DEFAULT_CUSTOM_FRAMES;
+    localStorage.setItem(CUSTOM_FRAMES_KEY, JSON.stringify(finalFrames));
+    return finalFrames;
   });
   const [frameNameInput, setFrameNameInput] = useState('');
   const [saveFramePopoverOpen, setSaveFramePopoverOpen] = useState(false);
