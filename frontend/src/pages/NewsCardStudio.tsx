@@ -731,8 +731,8 @@ export default function NewsCardStudio() {
     return [CARD_SIZE, cardH - BAND_ESTIMATE];
   };
 
-  // ── Kéo thả trên preview: ảnh tròn, logo, nhãn, hoặc vị trí ảnh (khi cắt đầy khung) ──
-  type DragKind = 'inset' | 'logo' | 'badge' | 'photo';
+  // ── Kéo thả trên preview: ảnh tròn, logo, nhãn, watermark/nguồn, hoặc vị trí ảnh ──
+  type DragKind = 'inset' | 'logo' | 'badge' | 'watermark' | 'photo';
   const dragRef = useRef<{ kind: DragKind; x0: number; y0: number; a0: number; b0: number; pw: number; ph: number; el: HTMLElement } | null>(null);
   const [hoverKind, setHoverKind] = useState<DragKind | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -743,11 +743,12 @@ export default function NewsCardStudio() {
     const box = previewElRef.current?.getBoundingClientRect();
     if (!doc || !box) return null;
     const el = doc.elementFromPoint((clientX - box.left) / scale, (clientY - box.top) / scale) as HTMLElement | null;
-    const target = el?.closest('#badge, #inset, #logo, .cell') as HTMLElement | null;
+    const target = el?.closest('#badge, #inset, #logo, #video-watermark, .cell') as HTMLElement | null;
     if (!target) return null;
     if (target.id === 'badge') return { kind: 'badge', el: target };
     if (target.id === 'inset') return { kind: 'inset', el: target };
     if (target.id === 'logo') return { kind: 'logo', el: target };
+    if (target.id === 'video-watermark') return { kind: 'watermark', el: target };
     return { kind: 'photo', el: target };
   };
 
@@ -808,6 +809,7 @@ export default function NewsCardStudio() {
       if (d.kind === 'inset') patchItem(active.id, (it) => ({ inset: it.inset ? { ...it.inset, left, top } : it.inset }));
       if (d.kind === 'badge') patchItem(active.id, (it) => ({ badge: it.badge ? { ...it.badge, left, top } : it.badge }));
       if (d.kind === 'logo') patchItem(active.id, (it) => ({ style: { ...it.style, logoX: left, logoY: top } }));
+      if (d.kind === 'watermark') patchItem(active.id, (it) => ({ style: { ...it.style, videoWatermarkX: left, videoWatermarkY: top } }));
     };
     window.addEventListener('mousemove', move);
     window.addEventListener('mouseup', up);
@@ -834,6 +836,9 @@ export default function NewsCardStudio() {
     } else if (hit.kind === 'badge' && active.badge) {
       const nextSize = Math.min(110, Math.max(36, active.badge.size + delta * 4));
       setBadge({ size: nextSize });
+    } else if (hit.kind === 'watermark' && active.style.videoWatermark) {
+      const nextSize = Math.min(54, Math.max(14, (active.style.videoWatermarkSize || 28) + delta * 2));
+      setStyle({ videoWatermarkSize: nextSize });
     }
   };
 
@@ -1936,7 +1941,7 @@ export default function NewsCardStudio() {
                 );
               })()}
               <div className="text-[11px] text-slate-500 text-center -mt-2">
-                Kéo trực tiếp trên ảnh để di chuyển ảnh tròn, logo, nhãn{active.style.fit === 'cover' ? ' hoặc chỉnh phần ảnh hiển thị' : ''}.
+                Kéo trực tiếp trên ảnh để di chuyển ảnh tròn, logo, nhãn, nguồn/watermark{active.style.fit === 'cover' ? ' hoặc chỉnh góc ảnh' : ''}.
               </div>
 
               {(() => {
@@ -2378,11 +2383,11 @@ export default function NewsCardStudio() {
                           )}
                         </div>
 
-                        {/* Watermark / Che nguồn video & ảnh */}
+                        {/* Watermark / Ghi nguồn Video & Che logo cũ */}
                         <div className="pt-3 border-t border-slate-800/80 space-y-2.5">
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                              🏷️ Watermark / Che nguồn Video
+                              🎥 Ghi nguồn / Watermark Video
                             </span>
                             {s.videoWatermark ? (
                               <Tag color="cyan" className="!mr-0 !text-[10px]">Đang bật</Tag>
@@ -2390,35 +2395,45 @@ export default function NewsCardStudio() {
                               <Tag className="!mr-0 !text-[10px] text-slate-500">Tắt</Tag>
                             )}
                           </div>
-                          <div className="text-[11px] text-slate-400">
-                            Nhập tag riêng (VD: <b className="text-cyan-400">@thanhphu</b>) để đóng dấu bản quyền hoặc đè che watermark nguồn của video.
+                          <div className="text-[11px] text-slate-400 leading-relaxed">
+                            Tự do custom nguồn video (VD: <b className="text-cyan-400">🎥 Nguồn: @thanhphu</b>, <b className="text-cyan-400">Cre: Douyin</b>) hoặc đặt nhãn đè che logo watermark cũ của video.
                           </div>
                           <div className="space-y-1.5">
                             <Input
                               size="small"
-                              placeholder="Nhập watermark (ví dụ: @thanhphu)"
+                              placeholder="Ví dụ: 🎥 Nguồn: @thanhphu hoặc Cre: @thanhphu"
                               value={s.videoWatermark || ''}
                               onChange={(e) => setStyle({ videoWatermark: e.target.value })}
                               allowClear
                             />
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-[10px] text-slate-500">Gợi ý nhanh:</span>
-                              <Button
-                                size="small"
-                                type="dashed"
-                                className="!text-[10px] !h-5 !px-1.5"
-                                onClick={() => setStyle({ videoWatermark: '@thanhphu' })}
-                              >
-                                @thanhphu
-                              </Button>
+                              <span className="text-[10px] text-slate-500">Mẫu nhanh:</span>
+                              {[
+                                '🎥 Nguồn: @thanhphu',
+                                '🎬 Cre: @thanhphu',
+                                '⚡ Via: @thanhphu',
+                                '@thanhphu',
+                                '🎥 Nguồn: Douyin',
+                                '🎬 Cre: TikTok',
+                              ].map((chip) => (
+                                <Button
+                                  key={chip}
+                                  size="small"
+                                  type="dashed"
+                                  className="!text-[10px] !h-5 !px-1.5 bg-slate-900/60 text-slate-300 hover:!text-cyan-300 hover:!border-cyan-400"
+                                  onClick={() => setStyle({ videoWatermark: chip })}
+                                >
+                                  {chip}
+                                </Button>
+                              ))}
                               {s.footerText && (
                                 <Button
                                   size="small"
                                   type="dashed"
-                                  className="!text-[10px] !h-5 !px-1.5"
-                                  onClick={() => setStyle({ videoWatermark: `@${s.footerText.toLowerCase().replace(/\s+/g, '')}` })}
+                                  className="!text-[10px] !h-5 !px-1.5 bg-slate-900/60 text-amber-300 hover:!text-amber-200"
+                                  onClick={() => setStyle({ videoWatermark: `🎥 Nguồn: @${s.footerText.toLowerCase().replace(/\s+/g, '')}` })}
                                 >
-                                  @{s.footerText.toLowerCase().replace(/\s+/g, '')}
+                                  Nguồn: @{s.footerText.toLowerCase().replace(/\s+/g, '')}
                                 </Button>
                               )}
                             </div>
@@ -2426,21 +2441,55 @@ export default function NewsCardStudio() {
 
                           {s.videoWatermark && (
                             <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-2.5 space-y-2.5">
+                              <div className="bg-cyan-950/40 border border-cyan-800/40 rounded p-2 text-[11px] text-cyan-200 flex items-start gap-1.5">
+                                <span className="text-base leading-none">💡</span>
+                                <span>
+                                  <b>Kéo thả trực tiếp:</b> Dùng chuột kéo nhãn nguồn trên khung xem trước đến bất kỳ đâu (hoặc đè thẳng lên logo cũ để che). Cuộn chuột trên nhãn để đổi cỡ chữ nhanh!
+                                </span>
+                              </div>
+
                               <div>
-                                <div className="text-[10px] text-slate-400 mb-1 font-medium">Góc đặt che watermark:</div>
-                                <CornerButtons
-                                  value={s.videoWatermarkPos || 'tr'}
-                                  onPick={(c) => {
-                                    const coords: Record<Corner, [number, number]> = {
-                                      tr: [74, 4],
-                                      tl: [4, 4],
-                                      br: [74, 88],
-                                      bl: [4, 88],
-                                    };
-                                    const [x, y] = coords[c] || [74, 4];
-                                    setStyle({ videoWatermarkPos: c, videoWatermarkX: x, videoWatermarkY: y });
-                                  }}
+                                <div className="text-[10px] text-slate-400 mb-1 font-medium">Kiểu hiển thị nhãn:</div>
+                                <Segmented
+                                  block
+                                  size="small"
+                                  value={s.videoWatermarkBg || 'glass'}
+                                  onChange={(v) => setStyle({ videoWatermarkBg: v as any })}
+                                  options={[
+                                    { value: 'glass', label: 'Kính mờ' },
+                                    { value: 'dark', label: 'Tối mờ' },
+                                    { value: 'accent', label: 'Màu nhấn' },
+                                    { value: 'card', label: 'Thẻ bo' },
+                                    { value: 'clean', label: 'Chữ trần' },
+                                  ]}
                                 />
+                              </div>
+
+                              <div>
+                                <div className="text-[10px] text-slate-400 mb-1 font-medium">Đặt nhanh vị trí:</div>
+                                <div className="flex items-center gap-1.5">
+                                  <CornerButtons
+                                    value={s.videoWatermarkPos || 'tr'}
+                                    onPick={(c) => {
+                                      const coords: Record<Corner, [number, number]> = {
+                                        tr: [74, 4],
+                                        tl: [4, 4],
+                                        br: [74, 88],
+                                        bl: [4, 88],
+                                      };
+                                      const [x, y] = coords[c] || [74, 4];
+                                      setStyle({ videoWatermarkPos: c, videoWatermarkX: x, videoWatermarkY: y });
+                                    }}
+                                  />
+                                  <Button
+                                    size="small"
+                                    type={s.videoWatermarkX === 38 && s.videoWatermarkY === 48 ? 'primary' : 'dashed'}
+                                    className="!text-[10px] !h-6"
+                                    onClick={() => setStyle({ videoWatermarkX: 38, videoWatermarkY: 48 })}
+                                  >
+                                    Giữa video
+                                  </Button>
+                                </div>
                               </div>
 
                               <div className="grid grid-cols-2 gap-2">
@@ -2465,28 +2514,23 @@ export default function NewsCardStudio() {
                               </div>
 
                               <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                  <div className="text-[10px] text-slate-400 mb-1">Kiểu nhãn:</div>
-                                  <Segmented
-                                    block
-                                    size="small"
-                                    value={s.videoWatermarkBg || 'dark'}
-                                    onChange={(v) => setStyle({ videoWatermarkBg: v as any })}
-                                    options={[
-                                      { value: 'dark', label: 'Tối mờ' },
-                                      { value: 'glass', label: 'Kính mờ' },
-                                      { value: 'accent', label: 'Màu nhấn' },
-                                    ]}
-                                  />
-                                </div>
                                 <FieldSlider
                                   label="Cỡ chữ"
                                   value={s.videoWatermarkSize ?? 28}
                                   unit="px"
-                                  min={16}
+                                  min={14}
                                   max={54}
                                   step={2}
                                   onChange={(v) => setStyle({ videoWatermarkSize: v })}
+                                />
+                                <FieldSlider
+                                  label="Độ mờ"
+                                  value={Math.round((s.videoWatermarkOpacity ?? 1) * 100)}
+                                  unit="%"
+                                  min={20}
+                                  max={100}
+                                  step={5}
+                                  onChange={(v) => setStyle({ videoWatermarkOpacity: v / 100 })}
                                 />
                               </div>
 
@@ -2495,6 +2539,7 @@ export default function NewsCardStudio() {
                                   size="small"
                                   block
                                   type="dashed"
+                                  className="!text-cyan-300 !border-cyan-500/50 hover:!border-cyan-400 mt-1"
                                   onClick={() => {
                                     const wm = s.videoWatermark;
                                     const pos = s.videoWatermarkPos;
@@ -2502,6 +2547,7 @@ export default function NewsCardStudio() {
                                     const y = s.videoWatermarkY;
                                     const bg = s.videoWatermarkBg;
                                     const size = s.videoWatermarkSize;
+                                    const opacity = s.videoWatermarkOpacity;
                                     setItems((prev) =>
                                       prev.map((it) => {
                                         if (!it.checked && it.id !== active?.id) return it;
@@ -2515,14 +2561,15 @@ export default function NewsCardStudio() {
                                             videoWatermarkY: y,
                                             videoWatermarkBg: bg,
                                             videoWatermarkSize: size,
+                                            videoWatermarkOpacity: opacity,
                                           },
                                         };
                                       })
                                     );
-                                    message.success(`Đã áp dụng watermark "${wm}" cho ${checkedItems.length} bài đã chọn!`);
+                                    message.success(`Đã áp dụng nguồn watermark cho ${checkedItems.length} bài đã chọn!`);
                                   }}
                                 >
-                                  Gán watermark cho {checkedItems.length} bài chọn
+                                  Gán nguồn này cho {checkedItems.length} bài chọn
                                 </Button>
                               )}
                             </div>

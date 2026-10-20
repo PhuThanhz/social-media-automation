@@ -98,13 +98,13 @@ export interface CardStyle {
   frameTextRight?: number; // % lề phải (mặc định 6)
   frameTextHeight?: number; // % chiều cao tối đa của hộp chữ (mặc định 24)
   frameTextAlign?: 'left' | 'center' | 'right'; // căn lề chữ (mặc định 'center')
-  // Watermark / Tag ẩn nguồn video & ảnh (@thanhphu,...)
   videoWatermark?: string;
   videoWatermarkPos?: Corner;
   videoWatermarkX?: number;
   videoWatermarkY?: number;
-  videoWatermarkBg?: 'dark' | 'glass' | 'accent';
+  videoWatermarkBg?: 'glass' | 'dark' | 'accent' | 'card' | 'clean';
   videoWatermarkSize?: number;
+  videoWatermarkOpacity?: number;
 }
 
 export interface InsetOptions {
@@ -175,8 +175,9 @@ export const DEFAULT_CARD_STYLE: CardStyle = {
   videoWatermarkPos: 'tr',
   videoWatermarkX: 74,
   videoWatermarkY: 4,
-  videoWatermarkBg: 'dark',
+  videoWatermarkBg: 'glass',
   videoWatermarkSize: 28,
+  videoWatermarkOpacity: 1,
 };
 
 export const COLOR_PRESETS: Array<{ label: string; bandBg: string; textColor: string; accent: string }> = [
@@ -364,11 +365,12 @@ export function buildNewsCardHtml(spec: CardSpec): string {
   const creditHtml = s.showCredit && spec.credit ? `<div id="credit">${esc(spec.credit)}</div>` : '';
 
   const wmText = s.videoWatermark?.trim();
-  const wmBgClass = s.videoWatermarkBg === 'accent' ? 'wm-accent' : s.videoWatermarkBg === 'glass' ? 'wm-glass' : 'wm-dark';
+  const wmBgClass = `wm-${s.videoWatermarkBg || 'glass'}`;
   const wmLeft = clampPct(s.videoWatermarkX, s.videoWatermarkPos === 'tl' || s.videoWatermarkPos === 'bl' ? 4 : 74);
   const wmTop = clampPct(s.videoWatermarkY, s.videoWatermarkPos === 'bl' || s.videoWatermarkPos === 'br' ? 88 : 4);
+  const wmOpacity = s.videoWatermarkOpacity ?? 1;
   const watermarkHtml = wmText
-    ? `<div id="video-watermark" class="${wmBgClass}" style="left:${wmLeft}%;top:${wmTop}%;font-size:${s.videoWatermarkSize || 28}px;"><span class="handle">${esc(wmText)}</span></div>`
+    ? `<div id="video-watermark" class="${wmBgClass}" style="left:${wmLeft}%;top:${wmTop}%;font-size:${s.videoWatermarkSize || 28}px;opacity:${wmOpacity};"><span class="handle">${esc(wmText)}</span></div>`
     : '';
 
   const tpl = normalizeTemplate(s.template);
@@ -582,23 +584,35 @@ export function buildNewsCardHtml(spec: CardSpec): string {
   #video-watermark {
     position: absolute; z-index: 6; display: inline-flex; align-items: center; gap: 8px;
     padding: 0.28em 0.68em 0.24em; border-radius: 999px;
-    font-family: 'DT Phudu', 'Phudu', 'Montserrat', Arial Black, sans-serif;
-    font-weight: 800; letter-spacing: -0.3px; white-space: nowrap;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.55); pointer-events: none;
-    line-height: 1.15;
+    font-family: 'Montserrat', 'DT Phudu', sans-serif;
+    font-weight: 800; letter-spacing: -0.2px; white-space: nowrap;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.55); cursor: move;
+    line-height: 1.15; user-select: none;
+    transition: box-shadow 0.2s ease;
   }
-  #video-watermark.wm-dark {
-    background: rgba(10, 15, 25, 0.88); color: #ffffff;
-    border: 2px solid rgba(255,255,255,0.25); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  #video-watermark:hover {
+    box-shadow: 0 10px 30px rgba(0,0,0,0.7), 0 0 0 2px rgba(59,130,246,0.6);
   }
   #video-watermark.wm-glass {
-    background: rgba(255, 255, 255, 0.22); color: #ffffff;
-    border: 2px solid rgba(255,255,255,0.45); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-    text-shadow: 0 2px 6px rgba(0,0,0,0.6);
+    background: rgba(15, 23, 42, 0.68); color: #ffffff;
+    border: 1.5px solid rgba(255,255,255,0.32); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    text-shadow: 0 1px 4px rgba(0,0,0,0.7);
+  }
+  #video-watermark.wm-dark {
+    background: rgba(10, 15, 25, 0.92); color: #ffffff;
+    border: 1.5px solid rgba(255,255,255,0.2); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   }
   #video-watermark.wm-accent {
     background: ${accent}; color: ${onAccent};
-    border: 2px solid rgba(255,255,255,0.35);
+    border: 1.5px solid rgba(255,255,255,0.35);
+  }
+  #video-watermark.wm-card {
+    background: rgba(0, 0, 0, 0.85); color: #ffffff; border-radius: 10px;
+    border: 1.5px solid rgba(255,255,255,0.25);
+  }
+  #video-watermark.wm-clean {
+    background: transparent; color: #ffffff; border: none; box-shadow: none;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.95), 0 0 2px #000;
   }
   #video-watermark .handle { font-weight: 800; }
 </style></head>
