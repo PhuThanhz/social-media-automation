@@ -404,9 +404,15 @@ public class RedditService {
     }
 
     public static String ffmpegPath() {
-        for (String c : List.of("/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg")) {
+        for (String c : List.of("/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg", "/usr/bin/ffmpeg")) {
             if (new java.io.File(c).canExecute()) return c;
         }
+        try {
+            java.io.File workerFfmpeg = new java.io.File("../worker/node_modules/ffmpeg-static/ffmpeg");
+            if (workerFfmpeg.canExecute()) return workerFfmpeg.getAbsolutePath();
+            workerFfmpeg = new java.io.File("worker/node_modules/ffmpeg-static/ffmpeg");
+            if (workerFfmpeg.canExecute()) return workerFfmpeg.getAbsolutePath();
+        } catch (Exception ignored) {}
         return "ffmpeg";
     }
 

@@ -60,7 +60,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import api from '../config/axios';
-import { getStoredGeminiKeys } from '../components/modals/AiSettingsModal';
+import AiSettingsModal, { getStoredGeminiKeys } from '../components/modals/AiSettingsModal';
 
 export interface HuntedPost {
   id: string;
@@ -591,6 +591,7 @@ export default function ViralHunter() {
   const [aiCurating, setAiCurating] = useState(false);
   const [autoGeminiCurate, setAutoGeminiCurate] = useState(true);
   const [onlyShowHighQualityAi, setOnlyShowHighQualityAi] = useState(false);
+  const [aiKeySettingsOpen, setAiKeySettingsOpen] = useState(false);
 
   // Get active cookie account for FB if available
   const { data: connections = [] } = useQuery({
@@ -810,6 +811,11 @@ export default function ViralHunter() {
       return;
     }
     const geminiKey = getStoredGeminiKeys();
+    if (!geminiKey) {
+      setAiKeySettingsOpen(true);
+      message.warning('Vui lòng cài đặt ít nhất 1 Gemini API Key để AI thẩm định & chấm điểm!');
+      return;
+    }
     setAiCurating(true);
     message.loading({
       content: '💎 Đang dùng Gemini API thẩm định, chấm điểm chất lượng (1-100) và lọc bài rác...',
@@ -1804,12 +1810,19 @@ export default function ViralHunter() {
       message.warning('Bài viết này không có nội dung chữ để AI viết lại!');
       return;
     }
+    const geminiKey = getStoredGeminiKeys();
+    if (!geminiKey) {
+      setAiKeySettingsOpen(true);
+      message.warning('Vui lòng cài đặt ít nhất 1 Gemini API Key để viết lại bài!');
+      return;
+    }
     setAiLoading(true);
     try {
       const res = await api.post('/tools/gemini-rewrite', {
         content: aiTargetPost.caption,
         mode: aiMode,
         platform: aiTargetPlatform,
+        apiKey: geminiKey,
       });
       if (res.data?.success && res.data?.rewritten) {
         setAiResultText(res.data.rewritten);
@@ -1855,6 +1868,12 @@ export default function ViralHunter() {
   };
 
   const handleExecuteBatchAiRewrite = async () => {
+    const geminiKey = getStoredGeminiKeys();
+    if (!geminiKey) {
+      setAiKeySettingsOpen(true);
+      message.warning('Vui lòng cài đặt ít nhất 1 Gemini API Key để viết lại hàng loạt!');
+      return;
+    }
     setBatchAiLoading(true);
     let updatedCount = 0;
     const newPostsMap = new Map<string, string>();
@@ -1869,6 +1888,7 @@ export default function ViralHunter() {
           content: p.caption,
           mode: batchAiMode,
           platform: batchAiPlatform,
+          apiKey: geminiKey,
         });
         if (res.data?.success && res.data?.rewritten) {
           newPostsMap.set(p.id, res.data.rewritten);
@@ -3338,7 +3358,16 @@ export default function ViralHunter() {
                 </div>
               </div>
               <span className="text-[11px] text-slate-400">
-                Key Gemini tích hợp: <strong className="text-emerald-400">{getStoredGeminiKeys() ? 'Đã kích hoạt' : 'Chưa nhập (vào Cài đặt AI)'}</strong>
+                Key Gemini tích hợp:{' '}
+                <button
+                  type="button"
+                  onClick={() => setAiKeySettingsOpen(true)}
+                  className={`underline cursor-pointer font-semibold ${
+                    getStoredGeminiKeys() ? 'text-emerald-400 hover:text-emerald-300' : 'text-amber-400 hover:text-amber-300'
+                  }`}
+                >
+                  {getStoredGeminiKeys() ? '✅ Đã kích hoạt' : '⚠️ Chưa nhập (Bấm để cài đặt)'}
+                </button>
               </span>
             </div>
           </div>
@@ -4312,6 +4341,12 @@ export default function ViralHunter() {
           </div>
         </div>
       </Modal>
+
+      {/* MODAL: Cài đặt Gemini API Keys */}
+      <AiSettingsModal
+        open={aiKeySettingsOpen}
+        onClose={() => setAiKeySettingsOpen(false)}
+      />
     </div>
   );
 }

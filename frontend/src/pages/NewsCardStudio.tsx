@@ -500,6 +500,12 @@ export default function NewsCardStudio() {
   });
 
   const generateHeadline = useCallback(async (it: StudioItem) => {
+    if (!geminiKey || !geminiKey.trim()) {
+      setKeyDraft('');
+      setAiModalOpen(true);
+      message.warning('Vui lòng nhập ít nhất 1 Gemini API Key để kích hoạt AI!');
+      return false;
+    }
     patchItem(it.id, { headlineLoading: true });
     try {
       const res = await api.post('/news-card/headline', articlePayload(it));
@@ -512,10 +518,16 @@ export default function NewsCardStudio() {
       return false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [patchItem, message, aiExtra]);
+  }, [patchItem, message, aiExtra, geminiKey]);
 
   // "AI soạn bài": tiêu đề ảnh + caption hook + tóm tắt có nguồn + gợi ý nhãn — 1 lần gọi
   const runPackage = useCallback(async (it: StudioItem, silent = false) => {
+    if (!geminiKey || !geminiKey.trim()) {
+      setKeyDraft('');
+      setAiModalOpen(true);
+      if (!silent) message.warning('Vui lòng nhập ít nhất 1 Gemini API Key để kích hoạt AI!');
+      return false;
+    }
     patchItem(it.id, { headlineLoading: true });
     try {
       const res = await api.post('/news-card/package', articlePayload(it));
@@ -540,10 +552,16 @@ export default function NewsCardStudio() {
       return false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [patchItem, message, aiExtra]);
+  }, [patchItem, message, aiExtra, geminiKey]);
 
   // 3 gợi ý tiêu đề (gọi song song) để chọn
   const suggestHeadlines = async (it: StudioItem) => {
+    if (!geminiKey || !geminiKey.trim()) {
+      setKeyDraft('');
+      setAiModalOpen(true);
+      message.warning('Vui lòng nhập ít nhất 1 Gemini API Key để kích hoạt AI!');
+      return;
+    }
     setSuggesting(true);
     try {
       const results = await Promise.allSettled([0, 1, 2].map(() => api.post('/news-card/headline', articlePayload(it))));
@@ -560,6 +578,12 @@ export default function NewsCardStudio() {
   };
 
   const rewriteCaption = async (it: StudioItem) => {
+    if (!geminiKey || !geminiKey.trim()) {
+      setKeyDraft('');
+      setAiModalOpen(true);
+      message.warning('Vui lòng nhập ít nhất 1 Gemini API Key để kích hoạt AI!');
+      return;
+    }
     setCaptionAiLoading(true);
     try {
       const res = await api.post('/news-radar/rewrite', { ...articlePayload(it), style: 'FANPAGE_POST' });
@@ -1605,13 +1629,16 @@ export default function NewsCardStudio() {
             <Button
               size="small"
               icon={<KeyOutlined />}
+              type={parsedKeys.length === 0 ? 'primary' : 'default'}
+              danger={parsedKeys.length === 0}
+              className={parsedKeys.length === 0 ? 'animate-pulse font-medium text-xs' : 'text-xs'}
               onClick={() => { setKeyDraft(geminiKey); setAiModalOpen(true); }}
             >
               {parsedKeys.length > 1
                 ? `AI: ${parsedKeys.length} keys`
                 : parsedKeys.length === 1
                   ? 'AI: 1 key riêng'
-                  : 'Cài đặt AI'}
+                  : '⚠️ Nhập Key AI (Free)'}
             </Button>
           </div>
           <TextArea
