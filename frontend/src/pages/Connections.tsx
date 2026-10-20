@@ -528,11 +528,12 @@ const Connections = () => {
       return response.data as SocialAccount;
     },
     onSuccess: (account) => {
-      message.success('Đã lưu Via cá nhân thành công!');
+      message.success('Đã lưu Via cá nhân thành công! Đang tự động quét danh sách Fanpage...');
       personalViaForm.resetFields();
       setPersonalViaModalOpen(false);
       setLatestPageScan(null);
       setPageAuditSource(account);
+      scanManagedPagesMutation.mutate(account.id);
       queryClient.invalidateQueries({ queryKey: ['socialAccounts'] });
     },
     onError: (error: any) => {
