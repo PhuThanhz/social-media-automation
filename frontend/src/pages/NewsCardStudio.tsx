@@ -2599,10 +2599,33 @@ export default function NewsCardStudio() {
 
                             {/* Thư viện các kênh đã lưu */}
                             <div className="pt-2 border-t border-slate-800/80">
-                              <div className="text-[11px] font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+                              <div className="text-[11px] font-semibold text-slate-300 mb-2 flex items-center justify-between">
                                 <span>Thư viện Kênh thương hiệu ({customFrames.length})</span>
+                                <Upload
+                                  accept="image/png,image/webp"
+                                  showUploadList={false}
+                                  beforeUpload={uploadCustomFrame}
+                                >
+                                  <Button size="small" type="link" className="!p-0 !text-xs !text-blue-400 font-semibold" icon={<PlusOutlined />}>
+                                    Thêm Khung PNG
+                                  </Button>
+                                </Upload>
                               </div>
-                              <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                              <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
+                                {/* Thẻ nút bấm nạp thêm Khung PNG nhanh */}
+                                <Upload
+                                  accept="image/png,image/webp"
+                                  showUploadList={false}
+                                  beforeUpload={uploadCustomFrame}
+                                  className="w-full"
+                                >
+                                  <div className="rounded-lg border-2 border-dashed border-slate-700 hover:border-blue-500 bg-slate-900/40 p-2 cursor-pointer flex flex-col items-center justify-center text-center aspect-square transition-all group hover:bg-blue-500/5">
+                                    <PlusOutlined className="text-xl text-slate-400 group-hover:text-blue-400 mb-1" />
+                                    <span className="text-[11px] font-semibold text-slate-300 group-hover:text-blue-300">Nạp Khung PNG</span>
+                                    <span className="text-[10px] text-slate-500 mt-0.5">Thêm vào thư viện</span>
+                                  </div>
+                                </Upload>
+
                                 {customFrames.map((frame) => {
                                   const isCur = s.customFrameUrl === frame.url && s.useCustomFrame;
                                   return (
@@ -2616,12 +2639,30 @@ export default function NewsCardStudio() {
                                       }`}
                                     >
                                       <div className="aspect-square w-full rounded bg-black/60 flex items-center justify-center overflow-hidden mb-1 border border-slate-800/60 relative">
-                                        <img
-                                          src={frame.url}
-                                          alt={frame.name}
-                                          className="w-full h-full object-contain"
-                                          loading="lazy"
-                                        />
+                                        {frame.url ? (
+                                          <img
+                                            src={frame.url}
+                                            alt={frame.name}
+                                            className="w-full h-full object-contain"
+                                            loading="lazy"
+                                          />
+                                        ) : (
+                                          <div
+                                            className="w-full h-full flex flex-col items-center justify-center p-2 text-center"
+                                            style={{
+                                              background: frame.template === 'gradient'
+                                                ? 'linear-gradient(135deg, #090d16 0%, #2a0b3f 100%)'
+                                                : frame.template === 'breaking'
+                                                ? '#0b0b0b'
+                                                : '#1e293b'
+                                            }}
+                                          >
+                                            <span className="text-lg mb-0.5">{frame.template === 'gradient' ? '✨' : '📰'}</span>
+                                            <span className="text-[10px] font-bold text-white leading-tight truncate max-w-full px-1">
+                                              {frame.template === 'gradient' ? 'Radiant' : frame.name}
+                                            </span>
+                                          </div>
+                                        )}
                                         {frame.logoUrl && (
                                           <img
                                             src={frame.logoUrl}
