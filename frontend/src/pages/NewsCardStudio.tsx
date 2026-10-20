@@ -1087,6 +1087,7 @@ export default function NewsCardStudio() {
         ratio: active.style.ratio,
         photoTopPct: active.style.useCustomFrame ? (active.style.framePhotoTop ?? 0) : 0,
         photoHeightPct: active.style.useCustomFrame ? (active.style.framePhotoHeight ?? 68) : 68,
+        frameDuration: active.style.frameDuration ?? 0,
       });
       if (!res.data?.success || !res.data.url) throw new Error(res.data?.error || 'Không tạo được video');
       message.success({ content: 'Đã tạo video tin tức thành công!', key: 'export-video' });
@@ -1123,6 +1124,7 @@ export default function NewsCardStudio() {
               ratio: it.style.ratio,
               photoTopPct: it.style.useCustomFrame ? (it.style.framePhotoTop ?? 0) : 0,
               photoHeightPct: it.style.useCustomFrame ? (it.style.framePhotoHeight ?? 68) : 68,
+              frameDuration: it.style.frameDuration ?? 0,
             });
             if (res.data?.success && res.data.url) {
               posts.push({ ...postOf(it), imageUrl: res.data.url, mediaType: 'VIDEO' });
@@ -2943,11 +2945,73 @@ export default function NewsCardStudio() {
                                         { value: 'center', label: 'Căn giữa' },
                                         { value: 'right', label: 'Căn phải' },
                                       ]}
-                                    />
+                                      />
+                                    </div>
                                   </div>
                                 </div>
+                              )}
+
+                            {/* TỰ ĐỘNG ẨN KHUNG SAU N GIÂY (HOOK VIDEO 5S) */}
+                            <div className="pt-3 border-t border-slate-800 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-semibold text-white flex items-center gap-1.5">
+                                  ⏱️ Tự động ẩn khung sau vài giây (Hook Video)
+                                </span>
+                                {s.frameDuration ? (
+                                  <Tag color="cyan" className="!mr-0 !text-[10px]">Ẩn sau {s.frameDuration}s</Tag>
+                                ) : (
+                                  <Tag className="!mr-0 !text-[10px] text-slate-500">Luôn hiện khung</Tag>
+                                )}
                               </div>
-                            )}
+                              <div className="text-[11px] text-slate-400 leading-relaxed">
+                                Hiển thị khung & tiêu đề trong <b>3 - 5 giây đầu</b> để giật tít giữ chân người xem (Hook), sau đó khung sẽ <b>mờ dần và biến mất</b> để lộ trọn vẹn toàn bộ video full màn hình!
+                              </div>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {[
+                                  { label: 'Luôn hiện khung', val: 0 },
+                                  { label: 'Ẩn sau 3s', val: 3 },
+                                  { label: 'Ẩn sau 5s (Chuẩn)', val: 5 },
+                                  { label: 'Ẩn sau 7s', val: 7 },
+                                  { label: 'Ẩn sau 10s', val: 10 },
+                                ].map((opt) => (
+                                  <Button
+                                    key={opt.val}
+                                    size="small"
+                                    type={(s.frameDuration ?? 0) === opt.val ? 'primary' : 'dashed'}
+                                    className="!text-[10px] !h-6"
+                                    onClick={() => setStyle({ frameDuration: opt.val })}
+                                  >
+                                    {opt.label}
+                                  </Button>
+                                ))}
+                              </div>
+                              {checkedItems.length > 1 && (
+                                <Button
+                                  size="small"
+                                  block
+                                  type="dashed"
+                                  className="!text-cyan-300 !border-cyan-500/50 hover:!border-cyan-400 mt-1"
+                                  onClick={() => {
+                                    const fd = s.frameDuration ?? 0;
+                                    setItems((prev) =>
+                                      prev.map((it) => {
+                                        if (!it.checked && it.id !== active?.id) return it;
+                                        return {
+                                          ...it,
+                                          style: {
+                                            ...it.style,
+                                            frameDuration: fd,
+                                          },
+                                        };
+                                      })
+                                    );
+                                    message.success(fd > 0 ? `Đã đặt ẩn khung sau ${fd}s cho ${checkedItems.length} bài chọn!` : `Đã đặt luôn hiện khung cho ${checkedItems.length} bài chọn!`);
+                                  }}
+                                >
+                                  Gán thiết lập ẩn khung ({s.frameDuration ? `${s.frameDuration}s` : 'Luôn hiện'}) cho {checkedItems.length} bài chọn
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         </div>
 

@@ -18,6 +18,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -238,30 +239,63 @@ public class NewsCardController {
             // 3. Đo kích thước canvas từ ratio hoặc thông số (mặc định 1080x1080 vuông hoặc 1080x1350 dọc 4:5)
             int canvasW = 1080;
             int canvasH = "4:5".equals(body.get("ratio")) ? 1350 : 1080;
+            int frameDuration = body.get("frameDuration") instanceof Number n ? n.intValue() : 0;
             double photoHeightPct = body.get("photoHeightPct") instanceof Number n ? n.doubleValue() : 68.0;
             double photoTopPct = body.get("photoTopPct") instanceof Number n ? n.doubleValue() : 0.0;
-            int photoH = Math.max(200, (int) Math.round(canvasH * (photoHeightPct / 100.0)));
-            int photoTop = Math.max(0, (int) Math.round(canvasH * (photoTopPct / 100.0)));
+
+            // Nếu bật tự động ẩn khung sau N giây (Hook Video):
+            // Video bên dưới tự động chiếm trọn 100% màn hình để khi khung biến mất, toàn bộ video hiển thị tràn viền cực đẹp!
+            int photoH;
+            int photoTop;
+            if (frameDuration > 0) {
+                photoH = canvasH;
+                photoTop = 0;
+            } else {
+                photoH = Math.max(200, (int) Math.round(canvasH * (photoHeightPct / 100.0)));
+                photoTop = Math.max(0, (int) Math.round(canvasH * (photoTopPct / 100.0)));
+            }
 
             // 4. Ghép Video + Khung Overlay bằng FFmpeg
             Files.createDirectories(uploadDir);
             String outFilename = "newscard-video-" + UUID.randomUUID() + ".mp4";
             Path outFile = uploadDir.resolve(outFilename);
 
-            String filterComplex = String.format(
-                    "[0:v]scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,boxblur=25:5,setsar=1[vbg];" +
-                    "[0:v]scale=%d:%d:force_original_aspect_ratio=decrease,setsar=1[vfg];" +
-                    "[vbg][vfg]overlay=(W-w)/2:(H-h)/2[vphoto];" +
-                    "color=c=black:s=%dx%d:r=30[canvas];" +
-                    "[canvas][vphoto]overlay=0:%d[base];" +
-                    "[1:v]scale=%d:%d[overlay_sc];" +
-                    "[base][overlay_sc]overlay=0:0:format=auto[vout]",
-                    canvasW, photoH, canvasW, photoH,
-                    canvasW, photoH,
-                    canvasW, canvasH,
-                    photoTop,
-                    canvasW, canvasH
-            );
+            String filterComplex;
+            if (frameDuration > 0) {
+                double fadeDuration = 0.8;
+                double fadeStart = Math.max(0.1, frameDuration - fadeDuration);
+                filterComplex = String.format(Locale.ROOT,
+                        "[0:v]scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,boxblur=25:5,setsar=1[vbg];" +
+                        "[0:v]scale=%d:%d:force_original_aspect_ratio=decrease,setsar=1[vfg];" +
+                        "[vbg][vfg]overlay=(W-w)/2:(H-h)/2[vphoto];" +
+                        "color=c=black:s=%dx%d:r=30[canvas];" +
+                        "[canvas][vphoto]overlay=0:%d[base];" +
+                        "[1:v]scale=%d:%d,format=yuva420p,fade=t=out:st=%.2f:d=%.2f:alpha=1[overlay_sc];" +
+                        "[base][overlay_sc]overlay=0:0:enable='lte(t,%.2f)':format=auto[vout]",
+                        canvasW, photoH, canvasW, photoH,
+                        canvasW, photoH,
+                        canvasW, canvasH,
+                        photoTop,
+                        canvasW, canvasH,
+                        fadeStart, fadeDuration,
+                        (double) frameDuration
+                );
+            } else {
+                filterComplex = String.format(Locale.ROOT,
+                        "[0:v]scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,boxblur=25:5,setsar=1[vbg];" +
+                        "[0:v]scale=%d:%d:force_original_aspect_ratio=decrease,setsar=1[vfg];" +
+                        "[vbg][vfg]overlay=(W-w)/2:(H-h)/2[vphoto];" +
+                        "color=c=black:s=%dx%d:r=30[canvas];" +
+                        "[canvas][vphoto]overlay=0:%d[base];" +
+                        "[1:v]scale=%d:%d[overlay_sc];" +
+                        "[base][overlay_sc]overlay=0:0:format=auto[vout]",
+                        canvasW, photoH, canvasW, photoH,
+                        canvasW, photoH,
+                        canvasW, canvasH,
+                        photoTop,
+                        canvasW, canvasH
+                );
+            }
 
             ProcessBuilder pb = new ProcessBuilder(
                     RedditService.ffmpegPath(), "-y",

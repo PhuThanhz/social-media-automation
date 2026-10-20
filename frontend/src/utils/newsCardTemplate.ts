@@ -105,6 +105,8 @@ export interface CardStyle {
   videoWatermarkBg?: 'clean' | 'stroke' | 'glass' | 'blur' | 'card' | 'dark' | 'accent';
   videoWatermarkSize?: number;
   videoWatermarkOpacity?: number;
+  frameDuration?: number; // số giây hiển thị khung cho video (0 = luôn hiện, 3, 5, 7s...)
+  videoFullScreenOnFade?: boolean;
 }
 
 export interface InsetOptions {
@@ -178,6 +180,8 @@ export const DEFAULT_CARD_STYLE: CardStyle = {
   videoWatermarkBg: 'glass',
   videoWatermarkSize: 28,
   videoWatermarkOpacity: 1,
+  frameDuration: 0,
+  videoFullScreenOnFade: true,
 };
 
 export const COLOR_PRESETS: Array<{ label: string; bandBg: string; textColor: string; accent: string }> = [
@@ -554,8 +558,8 @@ export function buildNewsCardHtml(spec: CardSpec): string {
   #card { display: block !important; position: relative !important; }
   #photos {
     position: absolute !important; left: 0 !important; right: 0 !important;
-    top: ${s.framePhotoTop ?? 0}% !important;
-    height: ${s.framePhotoHeight ?? 68}% !important;
+    top: ${s.frameDuration && s.frameDuration > 0 ? 0 : (s.framePhotoTop ?? 0)}% !important;
+    height: ${s.frameDuration && s.frameDuration > 0 ? 100 : (s.framePhotoHeight ?? 68)}% !important;
     min-height: unset !important; flex: unset !important; z-index: 1 !important;
   }
   #custom-frame {
@@ -574,6 +578,16 @@ export function buildNewsCardHtml(spec: CardSpec): string {
   }
   #text::before { display: none !important; }
   #footer { display: none !important; }
+  ` : ''}
+  ${s.frameDuration && s.frameDuration > 0 && !spec.transparentPhoto ? `
+  @keyframes frameFadeOut {
+    0% { opacity: 1; }
+    ${Math.max(10, Math.round(((s.frameDuration - 0.8) / s.frameDuration) * 100))}% { opacity: 1; }
+    100% { opacity: 0; pointer-events: none; }
+  }
+  #custom-frame, #text, #footer {
+    animation: frameFadeOut ${s.frameDuration}s forwards ease-in-out;
+  }
   ` : ''}
   #logo {
     position: absolute; z-index: 3; width: ${Math.round(s.logoSize)}px; opacity: ${s.logoOpacity};
