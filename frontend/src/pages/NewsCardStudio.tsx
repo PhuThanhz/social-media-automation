@@ -331,6 +331,8 @@ const sourceName = (url: string) => {
 
 const specOf = (it: StudioItem, transparentPhoto = false): CardSpec => ({
   headline: it.headline,
+  summary: it.summary || it.hook || it.caption || it.title,
+  title: it.title,
   images: it.selectedImages,
   videoUrl: it.videoUrl,
   transparentPhoto,
@@ -1051,9 +1053,8 @@ export default function NewsCardStudio() {
 
   const problemOf = (it: StudioItem) => {
     if (it.status !== 'ready') return 'chưa cào xong';
-    if (it.selectedImages.length === 0) return 'chưa chọn ảnh';
-    if (!it.headline.trim()) return 'chưa có tiêu đề';
-    if (it.selectedImages.length < IMAGES_PER_LAYOUT[it.layout]) return 'thiếu ảnh cho bố cục';
+    if (!it.headline.trim() && !it.title.trim()) return 'chưa có tiêu đề';
+    if (it.selectedImages.length > 0 && it.selectedImages.length < IMAGES_PER_LAYOUT[it.layout]) return 'thiếu ảnh cho bố cục';
     if (it.captionMode === 'hook' && !(it.hook || '').trim()) return 'chưa có caption hook';
     return null;
   };
@@ -1761,9 +1762,14 @@ export default function NewsCardStudio() {
                   className={`flex gap-2.5 p-2 rounded-lg border cursor-pointer transition-colors ${it.id === activeId ? 'border-blue-500 bg-blue-500/10' : 'border-slate-800 hover:border-slate-600 hover:bg-slate-800/40'}`}
                 >
                   <Checkbox checked={it.checked} onClick={(e) => e.stopPropagation()} onChange={(e) => patchItem(it.id, { checked: e.target.checked })} />
-                  <div className="w-14 h-14 rounded-md bg-slate-900 border border-slate-800 overflow-hidden shrink-0">
-                    {(it.cardUrl || it.selectedImages[0]) && (
+                  <div className="w-14 h-14 rounded-md bg-slate-900 border border-slate-800 overflow-hidden shrink-0 flex items-center justify-center">
+                    {(it.cardUrl || it.selectedImages[0]) ? (
                       <img src={it.cardUrl || it.selectedImages[0]} referrerPolicy="no-referrer" alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center text-center p-1">
+                        <span className="text-base leading-none">💬</span>
+                        <span className="text-[9px] text-cyan-400 font-bold mt-1 tracking-tight">Thẻ chữ</span>
+                      </div>
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -1781,7 +1787,13 @@ export default function NewsCardStudio() {
                           {it.channelName}
                         </span>
                       )}
-                      {it.status === 'ready' && !it.sentToPoster && problemOf(it) && <span className="text-amber-400"> · {problemOf(it)}</span>}
+                      {it.status === 'ready' && !it.sentToPoster && (
+                        problemOf(it) ? (
+                          <span className="text-amber-400"> · {problemOf(it)}</span>
+                        ) : it.selectedImages.length === 0 && !it.videoUrl ? (
+                          <span className="text-cyan-400 font-medium"> · Thẻ chữ</span>
+                        ) : null
+                      )}
                     </div>
                     <div className="mt-1 flex items-center gap-1">
                       {statusTag(it)}
@@ -2421,7 +2433,10 @@ export default function NewsCardStudio() {
                                   size="small"
                                   type="dashed"
                                   className="!text-[10px] !h-5 !px-1.5 bg-slate-900/60 text-slate-300 hover:!text-cyan-300 hover:!border-cyan-400"
-                                  onClick={() => setStyle({ videoWatermark: chip })}
+                                  onClick={() => {
+                                    const currentPos = (s.videoWatermarkX === undefined || s.videoWatermarkX === 74) ? { videoWatermarkPos: 'center' as const, videoWatermarkX: 35, videoWatermarkY: 46 } : {};
+                                    setStyle({ videoWatermark: chip, ...currentPos });
+                                  }}
                                 >
                                   {chip}
                                 </Button>
@@ -2431,7 +2446,10 @@ export default function NewsCardStudio() {
                                   size="small"
                                   type="dashed"
                                   className="!text-[10px] !h-5 !px-1.5 bg-slate-900/60 text-amber-300 hover:!text-amber-200"
-                                  onClick={() => setStyle({ videoWatermark: `🎥 Nguồn: @${s.footerText.toLowerCase().replace(/\s+/g, '')}` })}
+                                  onClick={() => {
+                                    const currentPos = (s.videoWatermarkX === undefined || s.videoWatermarkX === 74) ? { videoWatermarkPos: 'center' as const, videoWatermarkX: 35, videoWatermarkY: 46 } : {};
+                                    setStyle({ videoWatermark: `🎥 Nguồn: @${s.footerText.toLowerCase().replace(/\s+/g, '')}`, ...currentPos });
+                                  }}
                                 >
                                   Nguồn: @{s.footerText.toLowerCase().replace(/\s+/g, '')}
                                 </Button>
@@ -2449,7 +2467,7 @@ export default function NewsCardStudio() {
                               </div>
 
                               <div>
-                                <div className="text-[10px] text-slate-400 mb-1 font-medium">Kiểu hiển thị nhãn:</div>
+                                <div className="text-[10px] text-slate-400 mb-1 font-medium">Kiểu hiển thị & Che logo:</div>
                                 <Segmented
                                   block
                                   size="small"
@@ -2457,9 +2475,10 @@ export default function NewsCardStudio() {
                                   onChange={(v) => setStyle({ videoWatermarkBg: v as any })}
                                   options={[
                                     { value: 'glass', label: 'Kính mờ' },
+                                    { value: 'blur', label: 'Che mờ video' },
+                                    { value: 'card', label: 'Thẻ che kín' },
                                     { value: 'dark', label: 'Tối mờ' },
                                     { value: 'accent', label: 'Màu nhấn' },
-                                    { value: 'card', label: 'Thẻ bo' },
                                     { value: 'clean', label: 'Chữ trần' },
                                   ]}
                                 />
@@ -2469,7 +2488,7 @@ export default function NewsCardStudio() {
                                 <div className="text-[10px] text-slate-400 mb-1 font-medium">Đặt nhanh vị trí:</div>
                                 <div className="flex items-center gap-1.5">
                                   <CornerButtons
-                                    value={s.videoWatermarkPos || 'tr'}
+                                    value={s.videoWatermarkPos === 'center' ? undefined : s.videoWatermarkPos}
                                     onPick={(c) => {
                                       const coords: Record<Corner, [number, number]> = {
                                         tr: [74, 4],
@@ -2483,11 +2502,11 @@ export default function NewsCardStudio() {
                                   />
                                   <Button
                                     size="small"
-                                    type={s.videoWatermarkX === 38 && s.videoWatermarkY === 48 ? 'primary' : 'dashed'}
-                                    className="!text-[10px] !h-6"
-                                    onClick={() => setStyle({ videoWatermarkX: 38, videoWatermarkY: 48 })}
+                                    type={s.videoWatermarkX === 35 && s.videoWatermarkY === 46 ? 'primary' : 'dashed'}
+                                    className="!text-[10px] !h-6 text-cyan-300 border-cyan-700/60"
+                                    onClick={() => setStyle({ videoWatermarkPos: 'center', videoWatermarkX: 35, videoWatermarkY: 46 })}
                                   >
-                                    Giữa video
+                                    📍 Ra giữa video
                                   </Button>
                                 </div>
                               </div>

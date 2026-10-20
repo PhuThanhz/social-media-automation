@@ -99,10 +99,10 @@ export interface CardStyle {
   frameTextHeight?: number; // % chiều cao tối đa của hộp chữ (mặc định 24)
   frameTextAlign?: 'left' | 'center' | 'right'; // căn lề chữ (mặc định 'center')
   videoWatermark?: string;
-  videoWatermarkPos?: Corner;
+  videoWatermarkPos?: Corner | 'center';
   videoWatermarkX?: number;
   videoWatermarkY?: number;
-  videoWatermarkBg?: 'glass' | 'dark' | 'accent' | 'card' | 'clean';
+  videoWatermarkBg?: 'glass' | 'blur' | 'card' | 'dark' | 'accent' | 'clean';
   videoWatermarkSize?: number;
   videoWatermarkOpacity?: number;
 }
@@ -172,9 +172,9 @@ export const DEFAULT_CARD_STYLE: CardStyle = {
   frameTextHeight: 24,
   frameTextAlign: 'center',
   videoWatermark: '',
-  videoWatermarkPos: 'tr',
-  videoWatermarkX: 74,
-  videoWatermarkY: 4,
+  videoWatermarkPos: 'center',
+  videoWatermarkX: 35,
+  videoWatermarkY: 46,
   videoWatermarkBg: 'glass',
   videoWatermarkSize: 28,
   videoWatermarkOpacity: 1,
@@ -237,6 +237,8 @@ export const cornerPercent = (corner: Corner, w: number, h: number, photoW: numb
 export interface CardSpec {
   headline: string;
   images: string[];
+  summary?: string;
+  title?: string;
   videoUrl?: string;
   transparentPhoto?: boolean;
   layout: CardLayout;
@@ -318,6 +320,28 @@ export function buildNewsCardHtml(spec: CardSpec): string {
       <div class="video-blur"><video src="${esc(spec.videoUrl)}" autoplay loop muted playsinline></video></div>
       <video class="main-video" src="${esc(spec.videoUrl)}" autoplay loop muted playsinline style="object-fit:${s.fit};"></video>
     </div>`;
+  } else if (imgs.length === 0) {
+    // Chế độ bài thuần chữ (Text Post / Reddit Story / Confession / Trích dẫn cộng đồng)
+    const rawQuote = spec.summary?.trim() || spec.title?.trim() || spec.headline?.trim() || '';
+    const cleanQuote = rawQuote.replace(/\[\[|\]\]/g, '');
+    const shortQuote = cleanQuote.length > 260 ? cleanQuote.slice(0, 257) + '...' : cleanQuote;
+    const quoteLabel = /reddit/i.test(spec.credit || '') ? 'REDDIT CHIA SẺ' : 'TÂM SỰ & GÓC NHÌN';
+    cells = `<div class="cell text-story-cell" data-cell="0" style="grid-column:1/-1;grid-row:1/-1;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px 64px;background:radial-gradient(circle at 50% 30%, #1e293b 0%, #0d1527 60%, #050814 100%);overflow:hidden;">
+      <div class="story-glow" style="position:absolute;width:640px;height:640px;background:radial-gradient(circle, ${esc(s.accent)}33 0%, transparent 70%);top:8%;left:50%;transform:translate(-50%,-20%);filter:blur(60px);pointer-events:none;"></div>
+      <div class="story-grid-pattern" style="position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);background-size:48px 48px;pointer-events:none;"></div>
+      <div class="story-qmark" style="position:absolute;top:20px;left:44px;font-family:Georgia,serif;font-size:170px;font-weight:900;line-height:0.8;color:${esc(s.accent)};opacity:0.25;pointer-events:none;">&ldquo;</div>
+      <div class="story-badge" style="position:relative;z-index:2;display:inline-flex;align-items:center;gap:8px;padding:8px 22px;border-radius:999px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);backdrop-filter:blur(10px);font-family:'Montserrat',sans-serif;font-size:22px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:${esc(s.accent)};margin-bottom:28px;">
+        <span>💬</span> <span>${quoteLabel}</span>
+      </div>
+      <div class="story-body" style="position:relative;z-index:2;max-width:92%;text-align:center;font-family:'Montserrat',sans-serif;font-size:38px;font-weight:700;line-height:1.48;color:#f8fafc;text-shadow:0 2px 14px rgba(0,0,0,0.85);word-break:break-word;">
+        &ldquo;${esc(shortQuote)}&rdquo;
+      </div>
+      <div class="story-dots" style="margin-top:28px;display:flex;gap:8px;opacity:0.45;position:relative;z-index:2;">
+        <span style="width:8px;height:8px;border-radius:50%;background:#fff;"></span>
+        <span style="width:28px;height:8px;border-radius:4px;background:${esc(s.accent)};"></span>
+        <span style="width:8px;height:8px;border-radius:50%;background:#fff;"></span>
+      </div>
+    </div>`;
   } else {
     cells = imgs
       .map((url, i) => {
@@ -366,8 +390,10 @@ export function buildNewsCardHtml(spec: CardSpec): string {
 
   const wmText = s.videoWatermark?.trim();
   const wmBgClass = `wm-${s.videoWatermarkBg || 'glass'}`;
-  const wmLeft = clampPct(s.videoWatermarkX, s.videoWatermarkPos === 'tl' || s.videoWatermarkPos === 'bl' ? 4 : 74);
-  const wmTop = clampPct(s.videoWatermarkY, s.videoWatermarkPos === 'bl' || s.videoWatermarkPos === 'br' ? 88 : 4);
+  const defaultLeft = s.videoWatermarkPos === 'tl' || s.videoWatermarkPos === 'bl' ? 4 : s.videoWatermarkPos === 'center' ? 35 : 74;
+  const defaultTop = s.videoWatermarkPos === 'bl' || s.videoWatermarkPos === 'br' ? 88 : s.videoWatermarkPos === 'center' ? 46 : 4;
+  const wmLeft = clampPct(s.videoWatermarkX, defaultLeft);
+  const wmTop = clampPct(s.videoWatermarkY, defaultTop);
   const wmOpacity = s.videoWatermarkOpacity ?? 1;
   const watermarkHtml = wmText
     ? `<div id="video-watermark" class="${wmBgClass}" style="left:${wmLeft}%;top:${wmTop}%;font-size:${s.videoWatermarkSize || 28}px;opacity:${wmOpacity};"><span class="handle">${esc(wmText)}</span></div>`
@@ -594,21 +620,28 @@ export function buildNewsCardHtml(spec: CardSpec): string {
     box-shadow: 0 10px 30px rgba(0,0,0,0.7), 0 0 0 2px rgba(59,130,246,0.6);
   }
   #video-watermark.wm-glass {
-    background: rgba(15, 23, 42, 0.68); color: #ffffff;
-    border: 1.5px solid rgba(255,255,255,0.32); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    background: rgba(15, 23, 42, 0.72); color: #ffffff;
+    border: 1.5px solid rgba(255,255,255,0.35); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
     text-shadow: 0 1px 4px rgba(0,0,0,0.7);
   }
+  #video-watermark.wm-blur {
+    background: rgba(8, 12, 22, 0.88); color: #ffffff;
+    border: 2px solid rgba(255,255,255,0.42); backdrop-filter: blur(28px); -webkit-backdrop-filter: blur(28px);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.75), inset 0 1px 1px rgba(255,255,255,0.4);
+    text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+  }
   #video-watermark.wm-dark {
-    background: rgba(10, 15, 25, 0.92); color: #ffffff;
-    border: 1.5px solid rgba(255,255,255,0.2); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    background: rgba(10, 15, 25, 0.94); color: #ffffff;
+    border: 1.5px solid rgba(255,255,255,0.25); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
   }
   #video-watermark.wm-accent {
     background: ${accent}; color: ${onAccent};
     border: 1.5px solid rgba(255,255,255,0.35);
   }
   #video-watermark.wm-card {
-    background: rgba(0, 0, 0, 0.85); color: #ffffff; border-radius: 10px;
-    border: 1.5px solid rgba(255,255,255,0.25);
+    background: #000000; color: #ffffff; border-radius: 12px;
+    border: 1.5px solid rgba(255,255,255,0.3);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.85);
   }
   #video-watermark.wm-clean {
     background: transparent; color: #ffffff; border: none; box-shadow: none;
