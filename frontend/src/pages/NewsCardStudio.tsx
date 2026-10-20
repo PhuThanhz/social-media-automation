@@ -2466,23 +2466,27 @@ export default function NewsCardStudio() {
                                 </span>
                               </div>
 
-                              <div>
-                                <div className="text-[10px] text-slate-400 mb-1 font-medium">Kiểu hiển thị & Che logo:</div>
-                                <Segmented
-                                  block
-                                  size="small"
-                                  value={s.videoWatermarkBg || 'glass'}
-                                  onChange={(v) => setStyle({ videoWatermarkBg: v as any })}
-                                  options={[
-                                    { value: 'glass', label: 'Kính mờ' },
-                                    { value: 'blur', label: 'Che mờ video' },
-                                    { value: 'card', label: 'Thẻ che kín' },
-                                    { value: 'dark', label: 'Tối mờ' },
-                                    { value: 'accent', label: 'Màu nhấn' },
-                                    { value: 'clean', label: 'Chữ trần' },
-                                  ]}
-                                />
-                              </div>
+                                <div>
+                                  <div className="text-[10px] text-slate-400 mb-1 font-medium">Kiểu hiển thị & Che logo:</div>
+                                  <Segmented
+                                    block
+                                    size="small"
+                                    value={s.videoWatermarkBg || 'clean'}
+                                    onChange={(v) => setStyle({ videoWatermarkBg: v as any })}
+                                    options={[
+                                      { value: 'clean', label: 'Không viền' },
+                                      { value: 'stroke', label: 'Viền đen' },
+                                      { value: 'glass', label: 'Kính mờ' },
+                                      { value: 'blur', label: 'Che mờ' },
+                                      { value: 'card', label: 'Thẻ đen' },
+                                      { value: 'dark', label: 'Tối mờ' },
+                                      { value: 'accent', label: 'Màu nhấn' },
+                                    ]}
+                                  />
+                                  <div className="text-[10px] text-slate-500 mt-1">
+                                    💡 <b>Không viền</b> & <b>Viền đen</b>: Chữ nổi không có khung hộp bọc quanh, đặt ở giữa hoặc kéo ở đâu cũng thoáng mắt, dễ nhìn!
+                                  </div>
+                                </div>
 
                               <div>
                                 <div className="text-[10px] text-slate-400 mb-1 font-medium">Đặt nhanh vị trí:</div>

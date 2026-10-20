@@ -102,7 +102,7 @@ export interface CardStyle {
   videoWatermarkPos?: Corner | 'center';
   videoWatermarkX?: number;
   videoWatermarkY?: number;
-  videoWatermarkBg?: 'glass' | 'blur' | 'card' | 'dark' | 'accent' | 'clean';
+  videoWatermarkBg?: 'clean' | 'stroke' | 'glass' | 'blur' | 'card' | 'dark' | 'accent';
   videoWatermarkSize?: number;
   videoWatermarkOpacity?: number;
 }
@@ -644,8 +644,25 @@ export function buildNewsCardHtml(spec: CardSpec): string {
     box-shadow: 0 12px 32px rgba(0,0,0,0.85);
   }
   #video-watermark.wm-clean {
-    background: transparent; color: #ffffff; border: none; box-shadow: none;
-    text-shadow: 0 2px 8px rgba(0,0,0,0.95), 0 0 2px #000;
+    background: transparent !important; color: #ffffff !important; border: none !important; box-shadow: none !important;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.95), 0 0 4px #000, 0 1px 2px #000;
+    padding: 0 4px; border-radius: 0;
+  }
+  #video-watermark.wm-clean:hover {
+    box-shadow: none !important;
+    outline: 2px dashed rgba(59,130,246,0.7);
+    outline-offset: 4px;
+  }
+  #video-watermark.wm-stroke {
+    background: transparent !important; color: #ffffff !important; border: none !important; box-shadow: none !important;
+    -webkit-text-stroke: 2px #000000; text-stroke: 2px #000000;
+    text-shadow: 0 4px 16px rgba(0,0,0,0.95);
+    padding: 0 4px; border-radius: 0;
+  }
+  #video-watermark.wm-stroke:hover {
+    box-shadow: none !important;
+    outline: 2px dashed rgba(59,130,246,0.7);
+    outline-offset: 4px;
   }
   #video-watermark .handle { font-weight: 800; }
 </style></head>
