@@ -2777,44 +2777,48 @@ export default function NewsCardStudio() {
                           )}
                         </div>
 
-                        {/* Watermark / Ghi nguồn Video & Che logo cũ */}
+                        {/* Watermark / Nhãn thương hiệu Thạnh Phú & Che logo cũ */}
                         <div className="pt-3 border-t border-slate-800/80 space-y-2.5">
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                              🎥 Ghi nguồn / Watermark Video
+                              🏷️ Nhãn thương hiệu / Chữ ký (Thạnh Phú)
                             </span>
                             {s.videoWatermark ? (
-                              <Tag color="cyan" className="!mr-0 !text-[10px]">Đang bật</Tag>
+                              <Tag color="cyan" className="!mr-0 !text-[10px]">Đang bật: {s.videoWatermark}</Tag>
                             ) : (
                               <Tag className="!mr-0 !text-[10px] text-slate-500">Tắt</Tag>
                             )}
                           </div>
                           <div className="text-[11px] text-slate-400 leading-relaxed">
-                            Tự do custom nguồn video (VD: <b className="text-cyan-400">🎥 Nguồn: @thanhphu</b>, <b className="text-cyan-400">Cre: Douyin</b>) hoặc đặt nhãn đè che logo watermark cũ của video.
+                            Chèn chữ ký bản quyền <b className="text-cyan-400">Thạnh Phú</b> lên video/ảnh hoặc di chuyển để che logo watermark cũ.
                           </div>
                           <div className="space-y-1.5">
                             <Input
                               size="small"
-                              placeholder="Ví dụ: 🎥 Nguồn: @thanhphu hoặc Cre: @thanhphu"
+                              placeholder="Nhập tên thương hiệu: Thạnh Phú, @thanhphu..."
                               value={s.videoWatermark || ''}
                               onChange={(e) => setStyle({ videoWatermark: e.target.value })}
                               allowClear
                             />
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-[10px] text-slate-500">Mẫu nhanh:</span>
+                              <span className="text-[10px] text-slate-500 font-medium">Chọn nhanh:</span>
                               {[
-                                '🎥 Nguồn: @thanhphu',
-                                '🎬 Cre: @thanhphu',
-                                '⚡ Via: @thanhphu',
+                                'Thạnh Phú',
                                 '@thanhphu',
-                                '🎥 Nguồn: Douyin',
-                                '🎬 Cre: TikTok',
+                                'Huỳnh Thạnh Phú',
+                                'Thạnh Phú Studio',
+                                '⚡ Thạnh Phú',
+                                'Thạnh Phú Official',
                               ].map((chip) => (
                                 <Button
                                   key={chip}
                                   size="small"
-                                  type="dashed"
-                                  className="!text-[10px] !h-5 !px-1.5 bg-slate-900/60 text-slate-300 hover:!text-cyan-300 hover:!border-cyan-400"
+                                  type={s.videoWatermark === chip ? 'primary' : 'dashed'}
+                                  className={`!text-[10px] !h-6 !px-2 font-medium ${
+                                    s.videoWatermark === chip
+                                      ? 'bg-blue-600 text-white border-blue-400'
+                                      : 'bg-slate-900/60 text-slate-300 hover:!text-cyan-300 hover:!border-cyan-400'
+                                  }`}
                                   onClick={() => {
                                     const currentPos = (s.videoWatermarkX === undefined || s.videoWatermarkX === 74) ? { videoWatermarkPos: 'center' as const, videoWatermarkX: 35, videoWatermarkY: 46 } : {};
                                     setStyle({ videoWatermark: chip, ...currentPos });
@@ -2823,17 +2827,15 @@ export default function NewsCardStudio() {
                                   {chip}
                                 </Button>
                               ))}
-                              {s.footerText && (
+                              {s.videoWatermark && (
                                 <Button
                                   size="small"
-                                  type="dashed"
-                                  className="!text-[10px] !h-5 !px-1.5 bg-slate-900/60 text-amber-300 hover:!text-amber-200"
-                                  onClick={() => {
-                                    const currentPos = (s.videoWatermarkX === undefined || s.videoWatermarkX === 74) ? { videoWatermarkPos: 'center' as const, videoWatermarkX: 35, videoWatermarkY: 46 } : {};
-                                    setStyle({ videoWatermark: `🎥 Nguồn: @${s.footerText.toLowerCase().replace(/\s+/g, '')}`, ...currentPos });
-                                  }}
+                                  danger
+                                  type="text"
+                                  className="!text-[10px] !h-6 !px-1.5"
+                                  onClick={() => setStyle({ videoWatermark: '' })}
                                 >
-                                  Nguồn: @{s.footerText.toLowerCase().replace(/\s+/g, '')}
+                                  ✕ Tắt nhãn
                                 </Button>
                               )}
                             </div>
@@ -2849,64 +2851,77 @@ export default function NewsCardStudio() {
                               </div>
 
                                 <div>
-                                  <div className="text-[10px] text-slate-400 mb-1 font-medium">Kiểu hiển thị & Che logo:</div>
-                                  <Segmented
-                                    block
-                                    size="small"
-                                    value={s.videoWatermarkBg || 'clean'}
-                                    onChange={(v) => setStyle({ videoWatermarkBg: v as any })}
-                                    options={[
-                                      { value: 'clean', label: 'Không viền' },
-                                      { value: 'stroke', label: 'Viền đen' },
-                                      { value: 'glass', label: 'Kính mờ' },
-                                      { value: 'blur', label: 'Che mờ' },
-                                      { value: 'card', label: 'Thẻ đen' },
-                                      { value: 'dark', label: 'Tối mờ' },
-                                      { value: 'accent', label: 'Màu nhấn' },
-                                    ]}
-                                  />
-                                  <div className="text-[10px] text-slate-500 mt-1">
+                                  <div className="text-[10px] text-slate-400 mb-1.5 font-medium">Kiểu hiển thị & Che logo:</div>
+                                  <div className="grid grid-cols-3 gap-1.5">
+                                    {[
+                                      { value: 'clean', label: 'Không viền', desc: 'Chữ đổ bóng' },
+                                      { value: 'stroke', label: 'Viền đen', desc: 'Chuẩn TikTok' },
+                                      { value: 'glass', label: 'Kính mờ', desc: 'Bán trong suốt' },
+                                      { value: 'blur', label: 'Che mờ', desc: 'Mờ nền sau' },
+                                      { value: 'card', label: 'Thẻ đen', desc: 'Hộp bo góc' },
+                                      { value: 'dark', label: 'Tối mờ', desc: 'Nền tối nhẹ' },
+                                      { value: 'accent', label: 'Màu nhấn', desc: 'Theo màu chủ đề' },
+                                    ].map((opt) => {
+                                      const isSelected = (s.videoWatermarkBg || 'clean') === opt.value;
+                                      return (
+                                        <button
+                                          key={opt.value}
+                                          type="button"
+                                          onClick={() => setStyle({ videoWatermarkBg: opt.value as any })}
+                                          className={`px-2 py-1.5 rounded-lg text-xs font-semibold border text-center transition-all cursor-pointer ${
+                                            isSelected
+                                              ? 'bg-blue-600 border-blue-400 text-white shadow-sm ring-1 ring-blue-400/50'
+                                              : 'bg-slate-800/90 border-slate-700/80 text-slate-300 hover:bg-slate-750 hover:text-white hover:border-slate-600'
+                                          }`}
+                                          title={opt.desc}
+                                        >
+                                          {opt.label}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                  <div className="text-[10px] text-slate-500 mt-1.5">
                                     💡 <b>Không viền</b> & <b>Viền đen</b>: Chữ nổi không có khung hộp bọc quanh, đặt ở giữa hoặc kéo ở đâu cũng thoáng mắt, dễ nhìn!
                                   </div>
                                 </div>
 
-                              <div>
-                                <div className="text-[10px] text-slate-400 mb-1 font-medium">Đặt nhanh vị trí:</div>
-                                <div className="flex items-center gap-1.5">
-                                  <CornerButtons
-                                    value={s.videoWatermarkPos === 'center' ? undefined : s.videoWatermarkPos}
-                                    onPick={(c) => {
-                                      const coords: Record<Corner, [number, number]> = {
-                                        tr: [74, 4],
-                                        tl: [4, 4],
-                                        br: [74, 88],
-                                        bl: [4, 88],
-                                      };
-                                      const [x, y] = coords[c] || [74, 4];
-                                      setStyle({ videoWatermarkPos: c, videoWatermarkX: x, videoWatermarkY: y });
-                                    }}
-                                  />
-                                  <Button
-                                    size="small"
-                                    type={s.videoWatermarkX === 35 && s.videoWatermarkY === 46 ? 'primary' : 'dashed'}
-                                    className="!text-[10px] !h-6 text-cyan-300 border-cyan-700/60"
-                                    onClick={() => setStyle({ videoWatermarkPos: 'center', videoWatermarkX: 35, videoWatermarkY: 46 })}
-                                  >
-                                    📍 Ra giữa video
-                                  </Button>
+                                <div>
+                                  <div className="text-[10px] text-slate-400 mb-1 font-medium">Đặt nhanh vị trí:</div>
+                                  <div className="flex items-center gap-1.5">
+                                    <CornerButtons
+                                      value={s.videoWatermarkPos === 'center' ? undefined : s.videoWatermarkPos}
+                                      onPick={(c) => {
+                                        const coords: Record<Corner, [number, number]> = {
+                                          tr: [74, 4],
+                                          tl: [4, 4],
+                                          br: [74, 88],
+                                          bl: [4, 88],
+                                        };
+                                        const [x, y] = coords[c] || [74, 4];
+                                        setStyle({ videoWatermarkPos: c, videoWatermarkX: x, videoWatermarkY: y });
+                                      }}
+                                    />
+                                    <Button
+                                      size="small"
+                                      type={s.videoWatermarkX === 35 && s.videoWatermarkY === 46 ? 'primary' : 'dashed'}
+                                      className="!text-[10px] !h-6 text-cyan-300 border-cyan-700/60"
+                                      onClick={() => setStyle({ videoWatermarkPos: 'center', videoWatermarkX: 35, videoWatermarkY: 46 })}
+                                    >
+                                      📍 Ra giữa video
+                                    </Button>
+                                  </div>
                                 </div>
-                              </div>
 
-                              <div className="grid grid-cols-2 gap-2">
-                                <FieldSlider
-                                  label="X (Ngang)"
-                                  value={s.videoWatermarkX ?? 74}
-                                  unit="%"
-                                  min={0}
-                                  max={95}
-                                  step={1}
-                                  onChange={(v) => setStyle({ videoWatermarkX: v })}
-                                />
+                                <div className="grid grid-cols-2 gap-2">
+                                  <FieldSlider
+                                    label="X (Ngang)"
+                                    value={s.videoWatermarkX ?? 74}
+                                    unit="%"
+                                    min={0}
+                                    max={95}
+                                    step={1}
+                                    onChange={(v) => setStyle({ videoWatermarkX: v })}
+                                  />
                                 <FieldSlider
                                   label="Y (Dọc)"
                                   value={s.videoWatermarkY ?? 4}
@@ -2939,7 +2954,6 @@ export default function NewsCardStudio() {
                                 />
                               </div>
 
-                              {checkedItems.length > 1 && (
                                 <Button
                                   size="small"
                                   block
@@ -2953,9 +2967,10 @@ export default function NewsCardStudio() {
                                     const bg = s.videoWatermarkBg;
                                     const size = s.videoWatermarkSize;
                                     const opacity = s.videoWatermarkOpacity;
+                                    const applyToChecked = checkedItems.length > 1;
                                     setItems((prev) =>
                                       prev.map((it) => {
-                                        if (!it.checked && it.id !== active?.id) return it;
+                                        if (applyToChecked && !it.checked && it.id !== active?.id) return it;
                                         return {
                                           ...it,
                                           style: {
@@ -2971,12 +2986,15 @@ export default function NewsCardStudio() {
                                         };
                                       })
                                     );
-                                    message.success(`Đã áp dụng nguồn watermark cho ${checkedItems.length} bài đã chọn!`);
+                                    message.success(
+                                      applyToChecked
+                                        ? `Đã gán chữ ký "${wm || 'Tắt'}" cho ${checkedItems.length} bài đã chọn!`
+                                        : `Đã áp dụng chữ ký "${wm || 'Tắt'}" cho toàn bộ ${items.length} bài!`
+                                    );
                                   }}
                                 >
-                                  Gán nguồn này cho {checkedItems.length} bài chọn
+                                  🏷️ Áp dụng chữ ký này cho {checkedItems.length > 1 ? `${checkedItems.length} bài chọn` : `tất cả ${items.length} bài`}
                                 </Button>
-                              )}
                             </div>
                           )}
                         </div>
