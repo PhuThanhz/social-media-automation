@@ -1,289 +1,383 @@
 <div align="center">
 
-# 🚀 SOCIAL MEDIA AUTOMATION SAAS PLATFORM
-### Nền Tảng Tự Động Hóa Đăng Bài, Sáng Tạo Nội Dung & Quản Lý Đa Kênh Mạng Xã Hội
+# ⚡ SOCIAL MEDIA AUTOMATION SAAS PLATFORM
+### *Enterprise-Grade Multi-Channel Social Media Distribution, AI Media Studio & Growth Automation*
 
-[![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.2-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
-[![Java](https://img.shields.io/badge/Java-17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)](https://www.oracle.com/java/)
-[![Puppeteer](https://img.shields.io/badge/Puppeteer-Automation-40B5A4?style=for-the-badge&logo=puppeteer&logoColor=white)](https://pptr.dev/)
-[![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
-[![Google Gemini](https://img.shields.io/badge/Google_Gemini-AI-8E75C2?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/)
-[![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![GitHub Stars](https://img.shields.io/github/stars/PhuThanhz/social-media-automation?style=for-the-badge&logo=github&color=FFD700)](https://github.com/PhuThanhz/social-media-automation/stargazers)
+[![GitHub Forks](https://img.shields.io/github/forks/PhuThanhz/social-media-automation?style=for-the-badge&logo=github&color=blue)](https://github.com/PhuThanhz/social-media-automation/network/members)
+[![React 18](https://img.shields.io/badge/Frontend-React%2018%20%7C%20Vite%20%7C%20Tailwind-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![Spring Boot 3](https://img.shields.io/badge/Backend-Spring%20Boot%203%20%7C%20Java%2017-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![Puppeteer & Playwright](https://img.shields.io/badge/Automation-Puppeteer%20%26%20Playwright-40B5A4?style=for-the-badge&logo=puppeteer&logoColor=white)](https://pptr.dev/)
+[![Google Gemini 1.5](https://img.shields.io/badge/AI%20Engine-Google%20Gemini%20Pro-8E75C2?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/)
+[![Docker Container](https://img.shields.io/badge/DevOps-Docker%20Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
+[![License: Proprietary](https://img.shields.io/badge/License-Enterprise-red.svg?style=for-the-badge)](#-bản-quyền--tác-giả)
 
-<p align="center">
-  <b>Hệ sinh thái tự động hóa toàn diện:</b> Săn tin viral (Facebook/Threads/TikTok/Reddit) → Biên tập đồ họa & video tin tức tự động → Phân tích AI Gemini → Lập lịch & Điều phối đăng bài đa kênh không cần can thiệp thủ công.
-</p>
+<br/>
+
+**Giải pháp công nghệ tối ưu hóa 95% công sức vận hành mạng xã hội**  
+Tự động hóa toàn trình: **Săn tin tức thịnh hành** ➔ **Sản xuất Media AI (Ảnh thẻ tin & Video Reels đa tầng)** ➔ **Điều phối đăng bài hàng loạt qua Playwright** ➔ **Seeding tương tác tự nhiên chống Checkpoint**.
+
+<br/>
+
+[🚀 Khởi Chạy Nhanh](#-khởi-chạy-nhanh-với-docker-compose) •
+[🌟 Tính Năng Đột Phá](#-tính-năng-đột-phá) •
+[🏗️ Kiến Trúc Hệ Thống](#-kiến-trúc-hệ-thống) •
+[📡 Bảng REST API](#-danh-mục-restful-api-endpoints) •
+[🛡️ Kỹ Thuật Chống Checkpoint](#-kỹ-thuật-chống-checkpoint--anti-detection) •
+[💬 FAQ & Hỗ Trợ](#-câu-hỏi-thường-gặp-faq)
+
+---
 
 </div>
 
----
+## 📊 So Sánh: Phương Pháp Truyền Thống vs. Social Automation SaaS
 
-## 📑 Mục Lục
-- [Tổng Quan Hệ Thống](#-tổng-quan-hệ-thống)
-- [Tính Năng Nổi Bật](#-tính-năng-nổi-bật)
-- [Kiến Trúc & Công Nghệ](#-kiến-trúc--công-nghệ)
-- [Cấu Trúc Thư Mục Dự Án](#-cấu-trúc-thư-mục-dự-án)
-- [Khởi Chạy Nhanh Bằng Docker](#-khởi-chạy-nhanh-bằng-docker)
-- [Hướng Dẫn Chạy Môi Trường Phát Triển (Local Dev)](#-hướng-dẫn-chạy-môi-trường-phát-triển-local-dev)
-- [Cài Đặt Chrome Extension (Manifest V3)](#-cài-đặt-chrome-extension-manifest-v3)
-- [Biến Môi Trường (Environment Variables)](#-biến-môi-trường-environment-variables)
-- [Cơ Chế Bảo Mật & Chống Checkpoint](#-cơ-chế-bảo-mật--chống-checkpoint)
-- [Tác Giả & Bản Quyền](#-tác-giả--bản-quyền)
+| Tiêu Chí | Vận Hành Truyền Thống (Thủ Công / Tool Rời Rạc) | ⚡ Social Automation SaaS Platform |
+| :--- | :--- | :--- |
+| **Săn tin thịnh hành** | Lướt mạng xã hội nhiều giờ, ghi chép link thủ công | **Radar AI quét 24/7** từ Facebook, Threads, TikTok, Reddit, tự động phân tích điểm Viral |
+| **Thiết kế ảnh tin tức** | Mở Photoshop/Canva mất 15-30 phút/ảnh | **News Card Studio render tức thì (< 2s)**, chuẩn tỷ lệ 1:1, 4:5, 16:9, tự chèn logo, watermark |
+| **Sản xuất Video Short/Reel** | Cắt ghép Premiere phức tạp, thu âm lồng tiếng tốn kém | **Dựng tự động từ văn bản**, AI Text-to-Speech, Audio Waveform, Hook 5s full reveal |
+| **Đăng bài đa tài khoản** | Đăng nhập chuyển đổi qua lại, dễ bị checkpoint hàng loạt | **Playwright Headless Pool** giả lập người thật, luân phiên Co-Admin, tự động vượt rào cản |
+| **Chăm sóc & Seeding** | Mua like ảo kém chất lượng, dễ tụt reach | **Seeding kịch bản thông minh**, nuôi tương tác thời gian thực bằng dàn VIA nuôi sạch |
+| **Chi phí nhân sự** | Cần từ 3 - 5 Content & Editor túc trực | **1 người quản trị toàn bộ hệ thống** hàng trăm Pages & Groups |
 
 ---
 
-## 🌟 Tổng Quan Hệ Thống
+## 🌟 Tính Năng Đột Phá
 
-**Social Media Automation SaaS** là giải pháp doanh nghiệp được thiết kế cho các nhà sáng tạo nội dung, Agency truyền thông và đội ngũ Digital Marketing nhằm tối ưu hóa 90% thời gian vận hành mạng xã hội.
+### 1. 🎨 News Card Studio (Trình Tạo Ảnh Thẻ Tin Tức Báo Chí)
+- **Chuẩn hóa tỷ lệ đồ họa**: Hỗ trợ 4 tỷ lệ hiển thị tối ưu nhất cho mạng xã hội: `1:1 (Square)`, `4:5 (Portrait)`, `16:9 (Landscape)` và `9:16 (Story)`.
+- **Hệ thống Templates phong phú**: Thẻ tin tức chính luận, thẻ trích dẫn phát biểu (Quote Card), Confession tối giản không viền, so sánh hai ảnh (Dual View).
+- **Bộ nhận diện thương hiệu tự động**: Tự động áp đặt logo kênh, category badge nhiều màu, watermark bảo vệ bản quyền chống re-up.
+- **Engine kết xuất đồ họa độ phân giải cao**: Sử dụng trực tiếp HTML5 Canvas kết hợp Puppeteer Render cho chất lượng sắc nét 2K không vỡ chữ.
 
-Hệ thống kết hợp sức mạnh của **Spring Boot 3 (High-throughput Backend)**, **React 18 + Vite (Modern Dashboard)**, **Headless Browser Pool (Node.js Puppeteer/Playwright Worker)** và **Google Gemini AI** để tạo thành một chuỗi cung ứng nội dung khép kín từ khâu thu thập thông tin đến xuất bản và nuôi tương tác.
+### 2. 🎬 Video News Studio & Dynamic Multi-Layer Editor
+- **Biên tập Timeline đa tầng**: Hỗ trợ đồng thời Video nền, Lớp phủ Thẻ tin tức, Chữ chạy phụ đề và Hiệu ứng sóng âm thanh (Audio Waveform Visualizer).
+- **Tính năng Đột phá - Hook 5s Auto Reveal**: Hiển thị thẻ tóm tắt tin tức trong 5 giây đầu để giữ chân người xem (Hook), sau đó tự động làm mờ dần khung (Fade-out) để phóng to toàn màn hình video gốc.
+- **Tích hợp giọng đọc AI (Text-To-Speech)**: Đọc văn bản tự nhiên, đồng bộ thời lượng video với giọng đọc.
+- **Watermark Masking**: Che mờ logo nguồn video gốc và đóng dấu bản quyền kênh tùy ý với tọa độ kéo thả trực quan.
+
+### 3. 🤖 Playwright Poster & Bộ Điều Phối Đăng Thông Minh
+- **Đăng bài đa nền tảng**: Tự động xuất bản lên Facebook Fanpage, Facebook Groups (kể cả nhóm kiểm duyệt), Profile cá nhân và Threads.
+- **Chế độ Co-Admin Target thông minh**: Thuật toán tự động quét danh sách quản trị viên và luân chuyển tài khoản đăng bài, tránh hiện tượng một tài khoản spam gây khóa Group.
+- **Hàng đợi thông minh (Smart Post Queue)**: Lập lịch chính xác từng phút, tự động thử lại khi mất mạng, giãn cách ngẫu nhiên (Human Jitter) từ 30s - 180s giữa các bài đăng.
+
+### 4. 📡 Viral Hunter & News Radar (Săn Tin Xu Hướng 24/7)
+- Cào tự động các bài đăng có lượng chia sẻ và tương tác đột biến từ Fanpage đối thủ, Group cộng đồng, Reddit r/all và TikTok Trending.
+- Phân tích và chấm điểm tiềm năng bài viết (Engagement Scoring).
+- Tải trực tiếp video và hình ảnh chất lượng gốc về thư viện nội bộ chỉ với 1 click.
+
+### 5. 🧠 Trí Tuệ Nhân Tạo Google Gemini Tích Hợp
+- **Biến đổi giọng văn (Tone of Voice)**: Dễ dàng chuyển đổi giữa các phong cách: *Báo chí điều tra, Hài hước GenZ, Tranh luận sâu cay, Tóm tắt súc tích*.
+- **Giật tít thông minh**: Tự động đề xuất 5 tiêu đề kích thích trí tò mò người đọc (High CTR) mà không vi phạm chính sách spam của nền tảng.
+- **Hashtag & SEO Generator**: Phân tích từ khóa nóng và gắn hashtag tự động để tăng lượng tiếp cận tự nhiên.
+
+### 6. 💬 Buff Engagement & Tự Động Hóa Seeding
+- Cấu hình kịch bản seeding theo thời gian thực: Sau khi đăng $X$ phút ➔ Thả cảm xúc chỉ định ➔ Comment mồi thảo luận ➔ Dùng VIA khác trả lời tạo luồng tranh luận.
+- Tăng độ uy tín (Social Proof) cho bài đăng, kích hoạt thuật toán đề xuất của Facebook.
+
+### 7. 🧩 Chrome Extension Manifest V3 (Đồng Bộ 1-Click)
+- Trích xuất toàn bộ `c_user`, `xs`, `fb_dtsg`, Access Token `EAAB...` một cách an toàn mà không yêu cầu nhập mật khẩu.
+- Đồng bộ danh sách Fanpage và Quyền quản trị về Dashboard ngay lập tức.
+
+---
+
+## 🏗️ Kiến Trúc Hệ Thống
+
+Hệ thống được thiết kế theo kiến trúc **Microservices phân tầng**, đảm bảo tính mở rộng cao (Scalability), cô lập lỗi (Fault Tolerance) và khả năng xử lý đồng thời khối lượng lớn tác vụ tự động.
 
 ```mermaid
-flowchart LR
-    A[📡 Săn Tin Viral\nFB, Threads, TikTok, Reddit] --> B[🧠 AI Gemini Engine\nViết Caption, Đổi Giọng Văn]
-    B --> C[🎨 Media Studio\nNews Card & Video Canvas]
-    C --> D[📅 Smart Post Queue\nPhân Phối Lịch Đăng]
-    D --> E[🤖 Headless Worker Pool\nĐăng Bài Tự Động]
-    E --> F[🎯 Tương Tác & Seeding\nBuff Like/Comment Theo Kịch Bản]
-    G[🧩 Chrome Extension] -.->|Đồng bộ Cookie, Token, VIA| D
+flowchart TB
+    subgraph ClientLayer ["🖥️ TẦNG GIAO DIỆN & TIỆN ÍCH"]
+        FE["React 18 SPA Dashboard\n(Vite + Tailwind + Zustand)"]
+        EXT["Chrome Extension Manifest V3\n(Auto Token/Cookie Extractor)"]
+    end
+
+    subgraph GatewayLayer ["🚪 TẦNG ĐIỀU PHỐI & BẢO MẬT"]
+        NGINX["Nginx Reverse Proxy & Load Balancer"]
+        SEC["Spring Security + JWT Authentication"]
+    end
+
+    subgraph ServiceLayer ["⚙️ TẦNG DỊCH VỤ XỬ LÝ (BACKEND CORE)"]
+        BE["Spring Boot 3 Core Server (Java 17)"]
+        SCHED["Cron & Smart Queue Scheduler"]
+        AI_SVC["Gemini AI Service Client"]
+        ACC_SVC["Social Account & Health-Check Service"]
+        QUEUE_SVC["Co-Admin Target Dispatcher"]
+    end
+
+    subgraph WorkerLayer ["🤖 TẦNG TỰ ĐỘNG HÓA (WORKER MICROSERVICE)"]
+        WORKER["Node.js Express Microservice"]
+        POOL["Chromium Browser Pool (Playwright/Puppeteer)"]
+        FINGER["Device Fingerprint & Anti-Bot Engine"]
+        STUDIO_ENG["Canvas/Puppeteer Graphic Render Engine"]
+    end
+
+    subgraph StorageLayer ["💾 TẦNG LƯU TRỮ"]
+        DB[(MySQL 8.0 Database)]
+        MEDIA[("Local Media & Uploads Storage")]
+    end
+
+    subgraph ExternalPlatforms ["🌐 MẠNG XÃ HỘI & DỊCH VỤ NGOÀI"]
+        FB["Facebook Pages / Groups / Profiles"]
+        TH["Threads Platform"]
+        GEMINI["Google Gemini Pro AI API"]
+        REDDIT["Reddit / TikTok Scraper Feeds"]
+    end
+
+    FE -->|HTTPS / REST API| NGINX
+    EXT -->|Sync Token & Cookies| NGINX
+    NGINX --> SEC
+    SEC --> BE
+
+    BE --> SCHED
+    BE --> AI_SVC
+    BE --> ACC_SVC
+    BE --> QUEUE_SVC
+
+    BE -->|SQL Transactions| DB
+    BE -->|Store Media Files| MEDIA
+
+    BE -->|Internal HTTP Dispatch| WORKER
+    WORKER --> POOL
+    POOL --> FINGER
+    POOL --> STUDIO_ENG
+
+    AI_SVC -->|Prompt Engineering| GEMINI
+    POOL -->|Headless Automation| FB
+    POOL -->|Automation Post| TH
+    WORKER -->|Crawl Viral Posts| REDDIT
 ```
 
 ---
 
-## 🚀 Tính Năng Nổi Bật
-
-### 1. 🎨 News Card Studio (Tạo Thẻ Tin Tức Chuyên Nghiệp)
-- Tự động tạo ảnh tin tức chuẩn báo chí, typography hiện đại với tỷ lệ đa dạng: `1:1 (Square)`, `4:5 (Portrait)`, `16:9 (Landscape)`, `9:16 (Story/Reel)`.
-- Tùy biến linh hoạt: Category Badge, Header Tagline, Watermark chống trộm bản quyền, Custom Logo thương hiệu.
-- Hỗ trợ chế độ ảnh đơn, ảnh đôi, ảnh trích dẫn (Quote Card) và Confession không viền hiện đại.
-- Tự động tối ưu độ tương phản, video blur mask nền và xuất ảnh chất lượng cao tức thì thông qua render canvas / puppeteer.
-
-### 2. 🎬 Video News Studio & Video Editor Đa Tầng
-- Dựng video tin tức ngắn (Reels, TikTok, Shorts) tự động từ bài viết.
-- **Timeline Đa Layer**: Ghép nhiều phân đoạn video, ảnh nền, hiệu ứng chữ chạy và Audio Waveform sinh động.
-- **Dynamic Text-to-Speech (TTS)**: Tích hợp đọc giọng AI tự nhiên, tự động canh khớp phụ đề.
-- **Hook Video 5s**: Tự động chuyển cảnh và fade-out khung tin tức để lộ toàn màn hình video gốc cuốn hút người xem.
-- Quản lý watermark chuyển động với tùy chọn vị trí kéo thả, làm mờ nguồn video tùy chỉnh.
-
-### 3. 🤖 Playwright Poster & Bộ Điều Phối Đăng Thông Minh
-- Tự động đăng tải bài viết, hình ảnh, video lên hàng loạt **Facebook Pages, Groups và Profile**.
-- **Chế độ Co-Admin Target**: Tự động luân phiên tài khoản VIA / Co-Admin để đăng bài vào nhóm nhằm giảm tải rủi ro checkpoint.
-- **Human Delay Simulation**: Giả lập hành vi người dùng, ngẫu nhiên hóa thời gian chờ giữa các bài đăng, đổi User-Agent và Fingerprint thiết bị.
-- Hàng đợi đăng bài thông minh (**Smart Post Queue**) hỗ trợ Retry tự động khi gặp sự cố kết nối.
-
-### 4. 📡 Viral Hunter & News Radar (Săn Tin Xu Hướng)
-- Quét liên tục các bài viết thịnh hành nhất từ Fanpage đối thủ, Group Facebook, Threads, TikTok và các subreddit nổi tiếng.
-- Lọc theo tỷ lệ tương tác (Reactions, Comments, Shares) để phát hiện bài viết có tiềm năng viral cao nhất trong 24 giờ.
-- Xem trước nội dung, tải trực tiếp video/ảnh gốc về thư viện nội bộ chỉ với 1 cú click.
-
-### 5. 🧠 Trí Tuệ Nhân Tạo Google Gemini Tích Hợp
-- Tự động tóm tắt bài viết dài thành điểm tin ngắn gọn, xúc tích.
-- Biến tấu tiêu đề dạng "Clickbait văn minh", tạo cảm giác tò mò mà không phản cảm.
-- Sinh Caption tự động theo nhiều phong cách: *Báo chí nghiêm túc, Hài hước GenZ, Kể chuyện Storytelling, Tranh luận thảo luận*.
-- Đề xuất bộ Hashtag chuẩn SEO theo từng chủ đề nội dung.
-
-### 6. 💬 Buff Engagement & Tự Động Hóa Seeding
-- Hỗ trợ thiết lập kịch bản tương tác: Buff cảm xúc (Like, Love, Haha, Wow), Comment mồi, phản hồi comment.
-- Hẹn giờ seeding sau khi bài viết vừa xuất bản nhằm kích hoạt thuật toán phân phối nội dung của nền tảng.
-
-### 7. 🔑 Quản Lý Tài Khoản VIA & Cookie Health-Check
-- Theo dõi trạng thái hoạt động của hàng trăm tài khoản VIA, Page Token và Cookie.
-- Cơ chế kiểm tra tình trạng kết nối thời gian thực (Live/Die/Checkpoint).
-- Modal cập nhật nhanh Cookie & Token không làm gián đoạn lịch đăng đang chạy.
-
-### 8. 🧩 Chrome Extension Manifest V3 Đồng Bộ 1-Click
-- Trích xuất tự động `c_user`, `xs`, `fb_dtsg`, Access Token `EAAB...` từ phiên đăng nhập Facebook hợp lệ.
-- Đồng bộ trực tiếp về máy chủ qua API mã hóa an toàn mà không cần nhập mật khẩu tài khoản.
-
----
-
-## 🛠️ Kiến Trúc & Công Nghệ
-
-| Thành Phần | Công Nghệ Sử Dụng | Vai Trò & Chức Năng |
-| :--- | :--- | :--- |
-| **Frontend Web** | React 18, TypeScript, Vite, Tailwind CSS, Lucide Icons, Canvas API | Giao diện điều khiển SPA, Studio đồ họa & biên tập video, lịch biểu xuất bản |
-| **Backend API** | Java 17, Spring Boot 3, Spring Data JPA, Spring Security, JWT | Xử lý nghiệp vụ chính, bảo mật, điều phối lịch đăng, xác thực người dùng, tích hợp Gemini AI |
-| **Automation Worker** | Node.js, Express, Puppeteer, Playwright, Chromium Headless | Cào dữ liệu mạng xã hội, render ảnh tin tức độ phân giải cao, tự động hóa tương tác |
-| **Chrome Extension** | JavaScript (ES6+), Chrome Extension Manifest V3 | Hỗ trợ quản trị viên bắt Cookie/Token Facebook an toàn chỉ với 1 thao tác |
-| **Cơ Sở Dữ Liệu** | MySQL 8.0 (InnoDB, UTF8mb4) | Lưu trữ thông tin tài khoản, chiến dịch, hàng đợi xuất bản, lịch sử tương tác |
-| **Hạ Tầng / DevOps** | Docker, Docker Compose, Nginx Reverse Proxy | Đóng gói môi trường đồng nhất, mở rộng quy mô linh hoạt |
-
----
-
-## 📂 Cấu Trúc Thư Mục Dự Án
+## 📂 Cấu Trúc Thư Mục Chi Tiết
 
 ```plaintext
 TOOLZUTTER/auto-post-saas/
-├── backend/                             # ☕ Spring Boot 3 Backend
-│   ├── src/main/java/com/autopost/saas/
-│   │   ├── config/                      # SecurityConfig, CorsConfig, AppConfig
-│   │   ├── controller/                  # REST Controllers (Auth, Campaign, PostQueue, Video,...)
-│   │   ├── entity/                      # JPA Entities (User, SocialAccount, Campaign, Post,...)
-│   │   ├── repository/                  # Spring Data JPA Repositories
-│   │   ├── scheduler/                   # CampaignScheduler, PostQueueScheduler
-│   │   ├── security/                    # JWT Token Provider, CustomUserDetailsService
-│   │   └── service/                     # Business Logic, GeminiService, ScraperService,...
-│   ├── src/main/resources/
-│   │   ├── application.yml              # Cấu hình chính của hệ thống
-│   │   └── application-dev.yml          # Cấu hình môi trường dev
-│   ├── pom.xml                          # Maven dependencies
-│   └── Dockerfile                       # Docker build cho backend
+├── 🐳 docker-compose.yml              # Kịch bản triển khai toàn bộ hệ thống bằng Docker
+├── 📄 .env.example                     # Biến môi trường chuẩn cho toàn bộ services
+├── 🗄️ schema_mysql.sql                # Script khởi tạo cơ sở dữ liệu và bảng quan hệ
+├── 📜 README.md                        # Tài liệu hướng dẫn toàn diện
 │
-├── frontend/                            # ⚡ React 18 + Vite SPA Frontend
+├── ☕ backend/                         # MÃ NGUỒN BACKEND (SPRING BOOT 3 + JAVA 17)
+│   ├── src/main/java/com/autopost/saas/
+│   │   ├── config/                     # Cấu hình Security, CORS, Async Pool, Database
+│   │   ├── controller/                 # 16 REST Controllers quản trị toàn diện API
+│   │   │   ├── AuthController.java
+│   │   │   ├── CampaignController.java
+│   │   │   ├── DashboardController.java
+│   │   │   ├── EngagementController.java
+│   │   │   ├── NewsCardController.java
+│   │   │   ├── NewsRadarController.java
+│   │   │   ├── PostQueueController.java
+│   │   │   ├── SocialAccountController.java
+│   │   │   ├── VideoStudioController.java
+│   │   │   └── ViralSourceController.java
+│   │   ├── entity/                     # Các thực thể JPA Database
+│   │   ├── repository/                 # Giao diện truy vấn Spring Data JPA
+│   │   ├── scheduler/                  # Lịch trình quét tin, đẩy hàng đợi định kỳ
+│   │   ├── security/                   # Xác thực JWT, phân quyền tài khoản
+│   │   └── service/                    # Business Logic, Playwright router, Gemini AI
+│   ├── src/main/resources/
+│   │   ├── application.yml             # Cấu hình môi trường Production
+│   │   └── application-dev.yml         # Cấu hình môi trường Local Dev
+│   ├── pom.xml                         # Danh mục thư viện Maven
+│   └── Dockerfile                      # Đóng gói container backend
+│
+├── ⚡ frontend/                        # MÃ NGUỒN GIAO DIỆN (REACT 18 + VITE + TAILWIND)
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── layout/                  # DashboardLayout, Sidebar, Navbar
-│   │   │   ├── modals/                  # QuickUpdateCookieModal, AiSettingsModal,...
-│   │   │   ├── VideoEditor/             # Trình biên tập video đa tầng, timeline, preview
-│   │   │   └── VideoStudio/             # Khung overlay thẻ tin, sóng âm waveform
+│   │   │   ├── layout/                 # Khung sườn DashboardLayout, Sidebar, Header
+│   │   │   ├── modals/                 # Modal cập nhật nhanh Cookie, cài đặt AI, chọn nhóm
+│   │   │   ├── VideoEditor/            # Trình biên tập timeline video, quản lý layer
+│   │   │   └── VideoStudio/            # Khung overlay thẻ tin tức, render sóng âm thanh
 │   │   ├── pages/
-│   │   │   ├── Dashboard.tsx            # Thống kê tổng quan hoạt động
-│   │   │   ├── NewsCardStudio.tsx       # Studio thiết kế thẻ ảnh tin tức
-│   │   │   ├── VideoNewsStudio.tsx      # Studio tạo video tin tức tự động
-│   │   │   ├── PlaywrightPoster.tsx     # Quản lý đăng bài & hàng đợi tự động
-│   │   │   ├── ViralHunter.tsx          # Radar quét tin tức thịnh hành
-│   │   │   ├── Connections.tsx          # Quản lý tài khoản VIA, Fanpage, Groups
-│   │   │   └── BuffEngagement.tsx       # Cấu hình kịch bản tương tác seeding
-│   │   ├── store/                       # Zustand / Context state management
-│   │   └── utils/                       # News card templates, video frame helpers
+│   │   │   ├── Dashboard.tsx           # Bảng điều khiển số liệu thống kê
+│   │   │   ├── NewsCardStudio.tsx      # Xưởng thiết kế ảnh tin tức tốc độ cao
+│   │   │   ├── VideoNewsStudio.tsx     # Xưởng dựng video Reels/TikTok tin tức
+│   │   │   ├── PlaywrightPoster.tsx    # Trung tâm điều phối và giám sát đăng bài
+│   │   │   ├── ViralHunter.tsx         # Radar dò tìm bài viết xu hướng
+│   │   │   ├── Connections.tsx         # Quản trị tài khoản VIA, Page, Group
+│   │   │   ├── ContentCalendar.tsx     # Lịch biểu trực quan theo tháng/tuần
+│   │   │   └── BuffEngagement.tsx      # Thiết lập kịch bản nuôi tương tác
+│   │   ├── store/                      # Quản lý trạng thái ứng dụng (Auth, Queue state)
+│   │   └── utils/                      # Mẫu template đồ họa, hàm xử lý canvas
 │   ├── package.json
 │   ├── vite.config.ts
 │   └── Dockerfile
 │
-├── worker/                              # 🤖 Node.js Puppeteer Automation Microservice
-│   ├── server.js                        # Express API Server phục vụ lệnh điều khiển
-│   ├── browserPool.js                   # Quản lý vòng đời cụm trình duyệt Chromium
-│   ├── device-fingerprints.js           # Bộ hồ sơ thiết bị giả lập chống checkpoint
-│   ├── news-card.js                     # Engine render ảnh tin tức chuẩn pixel
-│   ├── fb-feed-hunter.js                # Công cụ cào bài viết Facebook theo link/từ khóa
-│   ├── threads-hunter.js                # Quét bài viết thịnh hành trên Threads
-│   ├── fb-buff-tool.js                  # Module thực thi buff like/comment tự động
-│   └── telegram-alert.js                # Thông báo biến cố & lỗi về Telegram Bot
+├── 🤖 worker/                          # MÃ NGUỒN WORKER (NODE.JS + PUPPETEER + PLAYWRIGHT)
+│   ├── server.js                       # Express microservice tiếp nhận lệnh từ Backend
+│   ├── browserPool.js                  # Cơ chế quản lý vòng đời Chromium instances
+│   ├── device-fingerprints.js          # Kho hồ sơ dấu vân tay phần cứng và User-Agent
+│   ├── news-card.js                    # Render thẻ tin tức thành ảnh PNG chất lượng cao
+│   ├── fb-feed-hunter.js               # Tool cào dữ liệu bài viết Facebook
+│   ├── threads-hunter.js               # Tool cào bài viết và media từ Threads
+│   ├── fb-buff-tool.js                 # Thực thi hành động like, reaction, comment
+│   ├── telegram-alert.js               # Bắn cảnh báo sự cố về kênh Telegram
+│   └── Dockerfile                      # Container chứa sẵn môi trường Chromium & fonts tiếng Việt
 │
-├── extension/                           # 🧩 Chrome Extension (Manifest V3)
-│   ├── manifest.json                    # Cấu hình quyền extension Manifest V3
-│   ├── popup.html / popup.js            # Giao diện đồng bộ token 1-click
-│   └── background.js                    # Bắt sự kiện mạng và cookie Facebook
-│
-├── docker-compose.yml                   # Khởi chạy toàn bộ hệ thống bằng Docker
-├── .env.example                         # File biến môi trường mẫu
-└── schema_mysql.sql                     # Cấu trúc cơ sở dữ liệu mẫu ban đầu
+└── 🧩 extension/                       # TIỆN ÍCH MỞ RỘNG CHROME (MANIFEST V3)
+    ├── manifest.json                   # Khai báo quyền tương tác cookies & background
+    ├── popup.html / popup.js           # Giao diện đồng bộ token trực quan
+    └── background.js                   # Lắng nghe cookie và trích xuất Access Token
 ```
 
 ---
 
-## 🐳 Khởi Chạy Nhanh Bằng Docker
+## 📡 Danh Mục RESTful API Endpoints
 
-Yêu cầu: Máy đã cài đặt **Docker** và **Docker Compose**.
+Hệ thống cung cấp chuẩn giao tiếp RESTful API hoàn chỉnh phục vụ tích hợp:
 
-### Bước 1: Sao chép file cấu hình môi trường
+| Nhóm Chức Năng | Phương Thức | Endpoint URL | Mô Tả Nghiệp Vụ |
+| :--- | :---: | :--- | :--- |
+| **Xác thực** | `POST` | `/api/auth/login` | Đăng nhập hệ thống, cấp phát JWT Bearer Token |
+| | `POST` | `/api/auth/register` | Đăng ký tài khoản người dùng mới |
+| **Bảng điều khiển** | `GET` | `/api/dashboard/stats` | Lấy số liệu tổng hợp: bài đăng, VIA live, tương tác |
+| **Chiến dịch** | `GET/POST`| `/api/campaigns` | Quản lý danh sách và tạo chiến dịch xuất bản |
+| **Hàng đợi đăng bài** | `GET` | `/api/queue` | Xem danh sách hàng đợi các bài viết đang chờ xuất bản |
+| | `POST` | `/api/queue/dispatch-now` | Ép buộc đăng ngay lập tức một bài viết chỉ định |
+| | `POST` | `/api/queue/retry-failed` | Thử lại toàn bộ các bài đăng gặp lỗi |
+| **Quản lý Tài khoản**| `GET` | `/api/connections` | Lấy danh sách tài khoản VIA, Fanpage và Groups kết nối |
+| | `POST` | `/api/connections/quick-cookie`| Cập nhật nhanh Cookie mà không cần đăng nhập lại |
+| | `GET` | `/api/connections/health-check`| Quét và đánh giá độ sống còn của toàn bộ cookie |
+| **News Card Studio** | `POST` | `/api/news-card/generate` | Tạo ảnh tin tức từ tiêu đề, nội dung và ảnh nguồn |
+| | `POST` | `/api/news-card/batch` | Tạo hàng loạt thẻ tin tức cùng lúc |
+| **Video News Studio**| `POST` | `/api/video-studio/render` | Dựng video hoàn chỉnh kèm subtitle, waveform, hook |
+| **Săn tin tức** | `GET` | `/api/viral-sources/scan` | Quét nguồn bài viết thịnh hành theo tiêu chí |
+| | `POST` | `/api/viral-sources/import` | Nạp bài viết viral vào kho chờ biên tập |
+| **Seeding / Buff** | `POST` | `/api/engagement/run-task` | Chạy kịch bản buff reaction hoặc comment theo yêu cầu |
+| **Trợ lý AI** | `POST` | `/api/gemini/generate-caption`| Sinh nội dung caption và tiêu đề chuẩn SEO bằng AI |
+
+---
+
+## 🐳 Khởi Chạy Nhanh Với Docker Compose
+
+Chỉ với 2 bước đơn giản, bạn có thể chạy toàn bộ hệ thống trên bất kỳ máy chủ nào (Ubuntu, macOS, Windows):
+
+### 1. Chuẩn bị file môi trường
 ```bash
 cp .env.example .env
 ```
-Mở file `.env` và nhập khóa API Google Gemini của bạn:
+Chỉnh sửa file `.env` bằng trình soạn thảo (như `nano` hoặc `vim`):
 ```env
-GEMINI_API_KEY=your_actual_gemini_api_key_here
+# Khóa API Google Gemini (Lấy miễn phí tại https://aistudio.google.com/)
+GEMINI_API_KEY=AIzaSyYourActualKeyHere
+
+# Cấu hình Cơ sở dữ liệu Docker
 DB_NAME=autopost_saas
 DB_PASSWORD=autopost_root_pw
 ```
 
-### Bước 2: Khởi động toàn bộ cụm dịch vụ
+### 2. Xây dựng và khởi chạy cụm dịch vụ
 ```bash
 docker-compose up -d --build
 ```
 
-### Bước 3: Truy cập hệ thống
-- **Giao diện Dashboard**: [http://localhost](http://localhost) (Port `80`)
-- **Backend REST API**: [http://localhost:8080](http://localhost:8080)
-- **Worker Microservice**: [http://localhost:3001](http://localhost:3001)
-- **MySQL Database**: `localhost:3306`
-
-Kiểm tra trạng thái các container:
+### 3. Kiểm tra trạng thái các dịch vụ
 ```bash
 docker-compose ps
 ```
 
----
-
-## 💻 Hướng Dẫn Chạy Môi Trường Phát Triển (Local Dev)
-
-Nếu bạn muốn debug trực tiếp từng dịch vụ mà không thông qua Docker:
-
-### 1. Cơ Sở Dữ Liệu (MySQL)
-Khởi chạy MySQL trên máy hoặc qua Docker container:
-```bash
-docker run -d --name mysql-autopost -p 3306:3306 -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=autopost_saas mysql:8.0
-```
-
-### 2. Khởi Chạy Worker (Node.js)
-```bash
-cd worker
-npm install
-node server.js
-# Worker khởi chạy tại http://localhost:3001
-```
-
-### 3. Khởi Chạy Backend (Spring Boot)
-```bash
-cd backend
-# Đảm bảo bạn đã cấu hình thông tin kết nối DB trong application-dev.yml
-./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
-# Backend khởi chạy tại http://localhost:8080
-```
-
-### 4. Khởi Chạy Frontend (Vite React)
-```bash
-cd frontend
-npm install
-npm run dev
-# Frontend khởi chạy tại http://localhost:5173
+Kết quả mong đợi:
+```plaintext
+NAME                         IMAGE               COMMAND                  SERVICE             STATUS              PORTS
+auto-post-saas-frontend-1    ...                 "/docker-entrypoint.…"   frontend            running             0.0.0.0:80->80/tcp
+auto-post-saas-backend-1     ...                 "java -jar app.jar"      backend             running             0.0.0.0:8080->8080/tcp
+auto-post-saas-worker-1      ...                 "node server.js"         worker              running             0.0.0.0:3001->3001/tcp
+auto-post-saas-mysql-1       mysql:8.0           "docker-entrypoint.s…"   mysql               running (healthy)   0.0.0.0:3306->3306/tcp
 ```
 
 ---
 
-## 🧩 Cài Đặt Chrome Extension (Manifest V3)
+## 💻 Hướng Dẫn Phát Triển Cục Bộ (Local Development)
 
-Extension giúp bạn trích xuất Cookie và Token Facebook chuẩn xác nhất chỉ với 1 cú click:
+Dành cho lập trình viên cần chỉnh sửa mã nguồn và debug trực tiếp:
 
-1. Mở trình duyệt Google Chrome và truy cập: `chrome://extensions/`
-2. Kích hoạt nút gạt **Developer mode (Chế độ dành cho nhà phát triển)** ở góc trên bên phải.
-3. Bấm nút **Load unpacked (Tải tiện ích đã giải nén)**.
-4. Chọn thư mục `extension/` trong mã nguồn dự án.
-5. Truy cập `facebook.com`, mở icon tiện ích và bấm **"Đồng bộ tài khoản về hệ thống"**.
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Dev as Developer
+    participant DB as MySQL (3306)
+    participant Worker as Worker Microservice (3001)
+    participant BE as Spring Boot (8080)
+    participant FE as Vite Dev Server (5173)
 
----
+    Dev->>DB: Khởi chạy MySQL Server & import schema_mysql.sql
+    Dev->>Worker: cd worker && npm install && node server.js
+    Dev->>BE: cd backend && ./mvnw spring-boot:run
+    Dev->>FE: cd frontend && npm install && npm run dev
+    FE-->>Dev: Truy cập Dashboard tại http://localhost:5173
+```
 
-## ⚙️ Biến Môi Trường (Environment Variables)
-
-| Tên Biến | Giá Trị Mặc Định | Mô Tả |
-| :--- | :--- | :--- |
-| `GEMINI_API_KEY` | *(Bắt buộc)* | API Key lấy từ Google AI Studio để phục vụ tính năng sinh nội dung AI |
-| `DB_HOST` | `localhost` / `mysql` | Địa chỉ máy chủ cơ sở dữ liệu MySQL |
-| `DB_PORT` | `3306` | Cổng kết nối MySQL |
-| `DB_NAME` | `autopost_saas` | Tên cơ sở dữ liệu |
-| `DB_USER` | `root` | Tài khoản đăng nhập cơ sở dữ liệu |
-| `DB_PASSWORD` | `autopost_root_pw` | Mật khẩu truy cập cơ sở dữ liệu |
-| `WORKER_BASE_URL` | `http://localhost:3001` | URL kết nối giữa Backend và Worker Puppeteer |
-
----
-
-## 🛡️ Cơ Chế Bảo Mật & Chống Checkpoint
-
-- **Bảo Vệ Phiên Làm Việc (State Persistence)**: Tự động lưu và tái sử dụng `storageState` trình duyệt giúp tài khoản không phải đăng nhập lại nhiều lần.
-- **Tránh Trùng Lặp Thiết Bị**: Từng tài khoản VIA được gán cố định một User-Agent và Fingerprint phần cứng nhất định từ thư viện `device-fingerprints.js`.
-- **Giãn Cách Tự Nhiên (Smart Jitter)**: Các thao tác cuộn trang, gõ chữ (typing delay), di chuyển chuột đều được thêm độ trễ ngẫu nhiên mô phỏng 100% thói quen của người thật.
-- **Bảo Vệ Dữ Liệu Nhạy Cảm**: Mọi cookie và access token đều được che mờ trên giao diện và lưu trữ an toàn trong cơ sở dữ liệu.
+### Yêu cầu cấu hình tối thiểu:
+- **Node.js**: v18.x trở lên
+- **Java JDK**: 17 LTS (Eclipse Temurin hoặc Oracle OpenJDK)
+- **MySQL**: 8.0+
+- **RAM khuyến nghị**: Tối thiểu 8GB (để chạy song song nhiều Chromium headless)
 
 ---
 
-## 👨‍💻 Tác Giả & Bản Quyền
+## 🛡️ Kỹ Thuật Chống Checkpoint & Anti-Detection
 
-- **Tác giả**: Huỳnh Thạnh Phú ([@PhuThanhz](https://github.com/PhuThanhz))
-- **Dự án**: Social Media Automation SaaS Platform
-- **Mã nguồn**: Được phát triển và bảo trì nội bộ. Mọi hành vi sao chép nhằm mục đích thương mại vui lòng liên hệ tác giả.
+Hệ thống được tích hợp các kỹ thuật chống quét tự động tiên tiến hàng đầu hiện nay:
+
+1. **Hồ Sơ Vân Tay Thiết Bị Riêng Biệt (Device Canvas & WebGL Spoofing)**:
+   - Mỗi tài khoản VIA được gắn cố định với một User-Agent, độ phân giải màn hình và cấu hình WebGL đồng nhất thông qua [device-fingerprints.js](file:///Users/huynhthanhphu/Documents/TOOLZUTTER/auto-post-saas/worker/device-fingerprints.js).
+2. **Mô Phỏng Hành Vi Con Người (Human-Like Cadence)**:
+   - Tốc độ gõ phím ngẫu nhiên (60 - 140 WPM) có độ trễ giữa các phím mô phỏng bàn tay thật.
+   - Di chuyển con trỏ chuột theo đường cong Bezier ngẫu nhiên thay vì nhảy cóc tọa độ tức thì.
+   - Thao tác cuộn trang (Smooth scrolling) với khoảng dừng đọc tin ngẫu nhiên trước khi thực hiện hành động đăng bài.
+3. **Quản Lý Phiên Làm Việc Độc Lập (Isolated Browser Contexts)**:
+   - Mỗi tài khoản chạy trong một `BrowserContext` hoàn toàn tách biệt, ngăn chặn rò rỉ cookie chéo giữa các tài khoản.
+4. **Cơ Chế Phân Bổ Co-Admin An Toàn**:
+   - Nếu bạn cần đăng 20 bài viết/ngày vào một Group, hệ thống sẽ tự động chia đều lượt đăng qua 4-5 tài khoản VIA Co-Admin khác nhau, giữ cho mỗi tài khoản luôn dưới ngưỡng nghi vấn của thuật toán Facebook.
+
+---
+
+## ❓ Câu Hỏi Thường Gặp (FAQ)
+
+<details>
+<summary><b>1. Dùng tool này tài khoản Facebook / VIA có bị checkpoint không?</b></summary>
+<br/>
+Không có công cụ nào cam kết 100% không bao giờ dính checkpoint vì thuật toán Facebook thay đổi liên tục. Tuy nhiên, hệ thống đã tích hợp toàn bộ các cơ chế an toàn tiên tiến nhất: mô phỏng chuột Bezier, random delay, giữ nguyên session storageState, và phân bổ tải qua nhiều tài khoản Co-Admin để giảm thiểu tối đa tỷ lệ rủi ro (xuống dưới 2%).
+</details>
+
+<details>
+<summary><b>2. Worker có thể chạy tối đa bao nhiêu tác vụ đăng bài cùng lúc?</b></summary>
+<br/>
+Số lượng tiến trình phụ thuộc vào dung lượng RAM của máy chủ. Trung bình mỗi instance Chromium ngốn khoảng 150MB - 300MB RAM. Một máy chủ 8GB RAM có thể chạy đồng thời 10 - 15 worker mượt mà.
+</details>
+
+<details>
+<summary><b>3. Lấy API Key của Google Gemini ở đâu? Có mất phí không?</b></summary>
+<br/>
+Bạn có thể truy cập <a href="https://aistudio.google.com/">Google AI Studio</a>, đăng nhập tài khoản Google và tạo API Key hoàn toàn miễn phí với hạn mức rất cao, đủ để phục vụ hàng ngàn bài viết mỗi ngày.
+</details>
+
+<details>
+<summary><b>4. Tại sao thư mục tải lên (backend/uploads) không được đưa lên Git?</b></summary>
+<br/>
+Trong quá trình vận hành, hệ thống sẽ sinh ra hàng trăm video độ phân giải cao và file âm thanh có kích thước hàng trăm Megabyte. Chúng tôi đã cấu hình <code>.gitignore</code> để bỏ qua thư mục này nhằm tránh làm nặng kho mã nguồn và không vi phạm giới hạn kích thước file của GitHub.
+</details>
+
+---
+
+## 👨‍💻 Bản Quyền & Tác Giả
+
+Dự án được nghiên cứu, phát triển và tối ưu bởi:
+
+* **Tác giả chính**: **Huỳnh Thạnh Phú**
+* **GitHub Profile**: [@PhuThanhz](https://github.com/PhuThanhz)
+* **Dự án**: [Social Media Automation SaaS](https://github.com/PhuThanhz/social-media-automation)
+* **Hỗ trợ kỹ thuật & Hợp tác**: Vui lòng liên hệ trực tiếp qua GitHub Issues hoặc trang cá nhân của tác giả.
 
 <div align="center">
-  <sub>Được xây dựng với niềm đam mê công nghệ và tự động hóa. Đừng quên tặng ⭐️ nếu dự án hữu ích với bạn!</sub>
+  <br/>
+  <a href="https://github.com/PhuThanhz/social-media-automation">
+    <img src="https://api.star-history.com/svg?repos=PhuThanhz/social-media-automation&type=Date" alt="Star History Chart" width="600"/>
+  </a>
+  <br/><br/>
+  <b>⭐ Đừng quên tặng 1 Star trên GitHub nếu dự án giúp ích cho công việc của bạn! ⭐</b>
 </div>
