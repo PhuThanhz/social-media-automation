@@ -3,6 +3,7 @@
 // ở góc trên trái. Dựng bằng HTML rồi chụp lại bằng Playwright (không cần thêm thư viện xử lý ảnh).
 
 const CARD_SIZE = 1440;
+const MAX_HTML_HEIGHT = 2000;
 
 const escapeHtml = (s) => String(s)
   .replace(/&/g, '&amp;')
@@ -106,11 +107,11 @@ async function renderNewsCard({ imageUrl, insetImageUrl, headline }, { browserPo
  */
 async function renderNewsCardHtml(html, { browserPool, downloadMedia }) {
   if (!html || typeof html !== 'string') throw new Error('Thiếu HTML mẫu ảnh');
-  // Khung có thể vuông (1440×1440) hoặc dọc 4:5 (1440×1800) — mở viewport đủ lớn rồi đo #card để cắt
-  const { context, release } = await browserPool.acquireContext({ viewport: { width: CARD_SIZE, height: 1800 } });
+  // Khung có thể vuông (1440×1440), dọc 4:5 (1440×1800) hoặc khung video 9:16 (1080×1920) — mở viewport đủ lớn rồi đo #card để cắt
+  const { context, release } = await browserPool.acquireContext({ viewport: { width: CARD_SIZE, height: MAX_HTML_HEIGHT } });
   try {
     const page = await context.newPage();
-    await page.setViewportSize({ width: CARD_SIZE, height: 1800 });
+    await page.setViewportSize({ width: CARD_SIZE, height: MAX_HTML_HEIGHT });
     await page.route('**/*', async (route) => {
       const req = route.request();
       const url = req.url();
@@ -121,7 +122,8 @@ async function renderNewsCardHtml(html, { browserPool, downloadMedia }) {
           const media = await downloadMedia(null, url);
           return route.fulfill({ status: 200, contentType: media.contentType || 'image/jpeg', body: media.buffer });
         } catch (e) {
-          return route.abort();
+          console.warn('[NewsCard] ⚠️ Lỗi tải ảnh qua downloadMedia:', url, e.message);
+          return route.continue().catch(() => route.abort());
         }
       }
       return route.abort();
@@ -131,16 +133,81 @@ async function renderNewsCardHtml(html, { browserPool, downloadMedia }) {
     await page.waitForFunction(() => Array.from(document.images).every((img) => img.complete), null, { timeout: 15000 }).catch(() => {});
     const box = await page.evaluate(() => {
       const el = document.getElementById('card');
-      return el ? { w: el.offsetWidth, h: el.offsetHeight } : null;
+      if (!el) return null;
+      // Vùng ảnh (#photos) tính theo % khung — Studio Video Tin dùng để đặt video vào đúng chỗ
+      const ph = document.getElementById('photos');
+      const r = ph ? ph.getBoundingClientRect() : null;
+      const c = el.getBoundingClientRect();
+      const photo = r && c.height > 0
+        ? { topPct: ((r.top - c.top) / c.height) * 100, heightPct: (r.height / c.height) * 100 }
+        : null;
+      return { w: el.offsetWidth, h: el.offsetHeight, photo };
     });
     const width = Math.min(box?.w || CARD_SIZE, 2000);
-    const height = Math.min(box?.h || CARD_SIZE, 2500);
+    const height = Math.min(box?.h || CARD_SIZE, MAX_HTML_HEIGHT);
     const png = await page.screenshot({ type: 'png', omitBackground: true, clip: { x: 0, y: 0, width, height } });
     await page.close().catch(() => {});
+    if (box && box.photo) png.photo = box.photo;
     return png;
   } finally {
     await release();
   }
 }
 
-module.exports = { renderNewsCard, renderNewsCardHtml, buildNewsCardHtml, headlineToHtml };
+/**
+ * Studio Video: dựng nhiều lớp (chữ, phụ đề, logo...) trong 1 trang cho nhanh. Mỗi HTML là khung trong suốt đủ cỡ;
+ * chỉ chụp vùng phần tử #layer (cộng lề cho bóng chữ) để FFmpeg chồng ảnh nhỏ thay vì ảnh full khung.
+ * Không có #layer thì chụp cả #card. Trả về [{ png, x, y, w, h }] theo đúng thứ tự.
+ */
+async function renderHtmlLayers(htmls, { browserPool, downloadMedia }) {
+  if (!Array.isArray(htmls) || !htmls.length) return [];
+  const { context, release } = await browserPool.acquireContext({ viewport: { width: CARD_SIZE, height: MAX_HTML_HEIGHT } });
+  try {
+    const page = await context.newPage();
+    await page.setViewportSize({ width: CARD_SIZE, height: MAX_HTML_HEIGHT });
+    await page.route('**/*', async (route) => {
+      const req = route.request();
+      const url = req.url();
+      if (!/^https?:/i.test(url)) return route.continue();
+      if (/fonts\.(googleapis|gstatic)\.com/.test(url)) return route.continue();
+      if (req.resourceType() === 'image') {
+        try {
+          const media = await downloadMedia(null, url);
+          return route.fulfill({ status: 200, contentType: media.contentType || 'image/png', body: media.buffer });
+        } catch (e) {
+          return route.continue().catch(() => route.abort());
+        }
+      }
+      return route.abort();
+    });
+    const out = [];
+    for (const html of htmls) {
+      await page.setContent(String(html || ''), { waitUntil: 'load', timeout: 45000 }).catch(() => {});
+      await page.waitForFunction(() => window.__fitDone === true, null, { timeout: 15000 }).catch(() => {});
+      await page.waitForFunction(() => Array.from(document.images).every((img) => img.complete), null, { timeout: 15000 }).catch(() => {});
+      const box = await page.evaluate(() => {
+        const card = document.getElementById('card');
+        const el = document.getElementById('layer') || card;
+        if (!el || !card) return null;
+        const c = card.getBoundingClientRect();
+        const r = el.getBoundingClientRect();
+        return { cw: card.offsetWidth, ch: card.offsetHeight, x: r.left - c.left, y: r.top - c.top, w: r.width, h: r.height, isCard: el === card };
+      });
+      if (!box || box.w < 1 || box.h < 1) { out.push(null); continue; }
+      const pad = box.isCard ? 0 : 24;
+      const x = Math.max(0, Math.floor(box.x - pad));
+      const y = Math.max(0, Math.floor(box.y - pad));
+      const w = Math.min(box.cw, Math.ceil(box.x + box.w + pad)) - x;
+      const h = Math.min(box.ch, MAX_HTML_HEIGHT, Math.ceil(box.y + box.h + pad)) - y;
+      if (w < 1 || h < 1) { out.push(null); continue; }
+      const png = await page.screenshot({ type: 'png', omitBackground: true, clip: { x, y, width: w, height: h } });
+      out.push({ png, x, y, w, h });
+    }
+    await page.close().catch(() => {});
+    return out;
+  } finally {
+    await release();
+  }
+}
+
+module.exports = { renderNewsCard, renderNewsCardHtml, renderHtmlLayers, buildNewsCardHtml, headlineToHtml };

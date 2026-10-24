@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   Button,
   Card,
@@ -337,11 +337,46 @@ const Connections = () => {
     },
   });
 
+  // Page cookie chạy bằng phiên của Via quản trị (postingIdentityAccountId). Khi cookie riêng của Page
+  // có c_user không phải nick cá nhân nào (VD: bị ghi thành chính ID Page) thì bản sao đó đã hỏng —
+  // Page đi theo Via: nhóm dưới Via và lấy trạng thái của Via (backend tự đồng bộ cookie Via xuống).
+  const followedViaById = useMemo(() => {
+    const list = accounts || [];
+    const isProfile = (a: SocialAccount) => a.platform === 'FACEBOOK_PROFILE' || a.accountType === 'PERSONAL_PROFILE_COOKIE';
+    const byId = new Map(list.map((a) => [a.id, a]));
+    const profileCUsers = new Set(list.filter(isProfile).map((a) => parseCookieString(a.accessToken).cUser).filter(Boolean));
+    const map = new Map<number, SocialAccount>();
+    for (const acc of list) {
+      if (acc.accountType !== 'PERSONAL_COOKIE' || isProfile(acc) || acc.platform === 'FACEBOOK_GROUP' || !acc.postingIdentityAccountId) continue;
+      const via = byId.get(acc.postingIdentityAccountId);
+      if (!via || !isProfile(via) || !parseCookieString(via.accessToken).cUser) continue;
+      const ownCUser = parseCookieString(acc.accessToken).cUser;
+      if (!ownCUser || !profileCUsers.has(ownCUser)) map.set(acc.id, via);
+    }
+    return map;
+  }, [accounts]);
+
+  // c_user của Via mà kết nối này thực sự đi theo
+  const viaCUserOf = useCallback(
+    (acc: SocialAccount) => parseCookieString((followedViaById.get(acc.id) ?? acc).accessToken).cUser,
+    [followedViaById]
+  );
+
+  // Trạng thái hiển thị: Page đi theo Via thì sống/chết theo Via
+  const withEffectiveStatus = useCallback(
+    (acc: SocialAccount): SocialAccount => {
+      const via = followedViaById.get(acc.id);
+      return via ? { ...acc, tokenStatus: via.tokenStatus } : acc;
+    },
+    [followedViaById]
+  );
+
   // Tách danh sách Vias duy nhất theo c_user
   const personalVias = useMemo(() => {
     const uniqueVias = new Map<string, SocialAccount>();
     for (const account of accounts || []) {
       if (!isPersonalCookieType(account.accountType) || account.platform === 'FACEBOOK_GROUP') continue;
+      if (followedViaById.has(account.id)) continue;
       const { cUser } = parseCookieString(account.accessToken);
       if (!cUser) continue;
       const existing = uniqueVias.get(cUser);
@@ -357,7 +392,7 @@ const Connections = () => {
       }
     }
     return Array.from(uniqueVias.entries()).map(([cUser, account]) => ({ cUser, account }));
-  }, [accounts]);
+  }, [accounts, followedViaById]);
 
   // Lookup map theo c_user để lấy tên hiển thị của via (O(1))
   const viaNameMap = useMemo(() => {
@@ -371,8 +406,8 @@ const Connections = () => {
 
   // Danh sách Fanpage / Trang (loại bỏ Profile cá nhân và Group)
   const publishableAccounts = useMemo(
-    () => (accounts || []).filter((a) => a.platform !== 'FACEBOOK_PROFILE' && a.platform !== 'FACEBOOK_GROUP'),
-    [accounts]
+    () => (accounts || []).filter((a) => a.platform !== 'FACEBOOK_PROFILE' && a.platform !== 'FACEBOOK_GROUP').map(withEffectiveStatus),
+    [accounts, withEffectiveStatus]
   );
 
   const groupCount = useMemo(
@@ -382,8 +417,8 @@ const Connections = () => {
 
   // Danh sách các tài khoản hết hạn cookie
   const expiredAccounts = useMemo(
-    () => (accounts || []).filter((a) => isPersonalCookieType(a.accountType) && a.tokenStatus === 'EXPIRED'),
-    [accounts]
+    () => (accounts || []).map(withEffectiveStatus).filter((a) => isPersonalCookieType(a.accountType) && a.tokenStatus === 'EXPIRED'),
+    [accounts, withEffectiveStatus]
   );
 
   // GOM NHÓM: Phân chia chính xác Fanpage nào thuộc Via nào (O(N) siêu nhanh)
@@ -396,7 +431,7 @@ const Connections = () => {
     });
 
     for (const acc of publishableAccounts) {
-      const { cUser } = parseCookieString(acc.accessToken);
+      const cUser = viaCUserOf(acc);
       if (cUser && map.has(cUser)) {
         map.get(cUser)!.push(acc);
       } else {
@@ -413,12 +448,12 @@ const Connections = () => {
       })),
       independentPages: independent,
     };
-  }, [personalVias, publishableAccounts, viaNameMap]);
+  }, [personalVias, publishableAccounts, viaNameMap, viaCUserOf]);
 
   // Lọc client-side mượt mà theo search & filter
   const filteredAccounts = useMemo(() => {
     return publishableAccounts.filter((acc) => {
-      const { cUser } = parseCookieString(acc.accessToken);
+      const cUser = viaCUserOf(acc);
       if (viaFilter !== 'ALL' && cUser !== viaFilter) return false;
       if (statusFilter === 'OK' && acc.tokenStatus !== 'OK') return false;
       if (statusFilter === 'EXPIRED' && acc.tokenStatus !== 'EXPIRED') return false;
@@ -433,7 +468,7 @@ const Connections = () => {
       }
       return true;
     });
-  }, [publishableAccounts, searchText, statusFilter, viaFilter, viaNameMap]);
+  }, [publishableAccounts, searchText, statusFilter, viaFilter, viaNameMap, viaCUserOf]);
 
   // Query danh sách Managed Pages của Via (chỉ fetch khi Drawer mở)
   const managedPagesQuery = useQuery({
@@ -665,7 +700,7 @@ const Connections = () => {
             title: 'Thuộc Via',
             key: 'viaIdentity',
             render: (_: any, record: SocialAccount) => {
-              const { cUser } = parseCookieString(record.accessToken);
+              const cUser = viaCUserOf(record);
               if (!cUser) return <span className="text-xs text-slate-500">—</span>;
               const viaName = viaNameMap.get(cUser) || `Via #${cUser}`;
               return (
@@ -706,7 +741,7 @@ const Connections = () => {
         <StatusBadge
           account={record}
           onQuickUpdate={() => {
-            setQuickCookieTargetId(record.id);
+            setQuickCookieTargetId(followedViaById.get(record.id)?.id ?? record.id);
             setQuickCookieModalOpen(true);
           }}
         />
@@ -1255,7 +1290,7 @@ const Connections = () => {
           ) : (
             <Row gutter={[14, 14]}>
               {filteredAccounts.map((acc) => {
-                const { cUser } = parseCookieString(acc.accessToken);
+                const cUser = viaCUserOf(acc);
                 const viaName = cUser ? viaNameMap.get(cUser) : null;
                 const backupAcc = publishableAccounts.find((a) => a.id === acc.backupAccountId);
 
@@ -1294,7 +1329,7 @@ const Connections = () => {
                             <StatusBadge
                               account={acc}
                               onQuickUpdate={() => {
-                                setQuickCookieTargetId(acc.id);
+                                setQuickCookieTargetId(followedViaById.get(acc.id)?.id ?? acc.id);
                                 setQuickCookieModalOpen(true);
                               }}
                             />

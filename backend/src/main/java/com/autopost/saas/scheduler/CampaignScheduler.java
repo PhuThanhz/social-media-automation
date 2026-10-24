@@ -74,6 +74,7 @@ public class CampaignScheduler {
     private final PostQueueService postQueueService;
     private final FacebookGraphApiService facebookGraphApiService;
     private final PlaywrightHealthCheckService playwrightHealthCheckService;
+    private final com.autopost.saas.service.ViaCookieFollowService viaCookieFollowService;
     private final com.autopost.saas.service.PostingWindowService postingWindowService;
 
     // 1. TẮT HOÀN TOÀN CÀO TỰ ĐỘNG CHẠY NGẦM: Chỉ cào bài khi người dùng trực tiếp yêu cầu hoặc dán link
@@ -656,6 +657,9 @@ public class CampaignScheduler {
     //    Lệch initialDelay với checkTokenHealth() để không mở nhiều browser Playwright cùng lúc.
     @Scheduled(fixedRate = 21600000, initialDelay = 1800000)
     public void checkCookieHealth() {
+        // Page có bản sao cookie hỏng (c_user lạ/EXPIRED) đi theo Via trước, để được kiểm tra chung
+        // nhóm c_user với Via thay vì bị check riêng bằng cookie hỏng rồi báo hết hạn oan.
+        viaCookieFollowService.repairPagesFollowingVias();
         List<SocialAccount> cookieAccounts = socialAccountRepository
                 .findByAccountTypeIn(List.of("PERSONAL_COOKIE", "PERSONAL_PROFILE_COOKIE")).stream()
                 .filter(a -> !"FACEBOOK_GROUP".equalsIgnoreCase(a.getPlatform()))
@@ -689,6 +693,21 @@ public class CampaignScheduler {
             } catch (Exception e) {
                 log.warn("⚠️ Lỗi khi kiểm tra Cookie {}: {}", account.getPageName(), e.getMessage());
             }
+        }
+        viaCookieFollowService.repairPagesFollowingVias();
+    }
+
+    // 5b. Page cookie đi theo Via (chỉ đọc/ghi DB, không mở browser): Page nào có bản sao cookie hỏng
+    //     mà Via quản trị còn sống thì chép cookie Via xuống — Via sống thì Page không bị báo hết hạn oan.
+    @Scheduled(fixedRate = 600000, initialDelay = 60000)
+    public void syncPagesWithVias() {
+        try {
+            int repaired = viaCookieFollowService.repairPagesFollowingVias();
+            if (repaired > 0) {
+                log.info("🔗 [Scheduler] Đã đồng bộ cookie Via xuống {} kết nối Page.", repaired);
+            }
+        } catch (Exception e) {
+            log.warn("⚠️ Lỗi khi đồng bộ cookie Via xuống Page: {}", e.getMessage());
         }
     }
 

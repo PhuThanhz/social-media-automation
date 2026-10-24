@@ -18,6 +18,7 @@ const VideoLibrary = lazy(() => import('./pages/VideoLibrary'));
 const PostStory = lazy(() => import('./pages/PostStory'));
 const PlaywrightPoster = lazy(() => import('./pages/PlaywrightPoster'));
 const NewsCardStudio = lazy(() => import('./pages/NewsCardStudio'));
+const VideoNewsStudio = lazy(() => import('./pages/VideoNewsStudio'));
 const BuffEngagement = lazy(() => import('./pages/BuffEngagement'));
 const SystemLogs = lazy(() => import('./pages/SystemLogs'));
 const NewsRadar = lazy(() => import('./pages/NewsRadar'));
@@ -117,6 +118,7 @@ function App() {
               <Route path="buff" element={<BuffEngagement />} />
               <Route path="news-radar" element={<Navigate to="/dashboard/playwright" replace />} />
               <Route path="news-studio" element={<NewsCardStudio />} />
+              <Route path="video-studio" element={<VideoNewsStudio />} />
               <Route path="viral-hunter" element={<ViralHunter />} />
               <Route path="logs" element={<SystemLogs />} />
             </Route>

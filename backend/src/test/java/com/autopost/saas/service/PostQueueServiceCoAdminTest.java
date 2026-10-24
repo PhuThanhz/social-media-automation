@@ -26,7 +26,7 @@ class PostQueueServiceCoAdminTest {
     private final PostQueueService service = new PostQueueService(
             mock(PostQueueRepository.class), socialAccountRepository, mock(PostQueueGroupResultRepository.class),
             mock(FacebookGraphApiService.class), mock(GeminiService.class), pageAccessRepository,
-            mock(WorkerRouterService.class));
+            mock(WorkerRouterService.class), new ViaCookieFollowService(socialAccountRepository));
 
     @Test
     void coAdminViaWithoutConnectionForThisPageIsNotUsed() {

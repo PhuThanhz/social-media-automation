@@ -244,6 +244,7 @@ export interface CardSpec {
   summary?: string;
   title?: string;
   videoUrl?: string;
+  unmuteVideo?: boolean;
   transparentPhoto?: boolean;
   layout: CardLayout;
   inset?: InsetOptions;
@@ -320,9 +321,10 @@ export function buildNewsCardHtml(spec: CardSpec): string {
   if (spec.transparentPhoto) {
     cells = '<div class="cell" style="background:transparent !important; border:none !important;"></div>';
   } else if (spec.videoUrl) {
+    const mainMuted = spec.unmuteVideo ? '' : 'muted';
     cells = `<div class="cell" data-cell="0" style="grid-column:1/-1;grid-row:1/-1;position:relative;overflow:hidden;background:#090d16;">
       <div class="video-blur"><video src="${esc(spec.videoUrl)}" autoplay loop muted playsinline></video></div>
-      <video class="main-video" src="${esc(spec.videoUrl)}" autoplay loop muted playsinline style="object-fit:${s.fit};"></video>
+      <video class="main-video" src="${esc(spec.videoUrl)}" autoplay loop ${mainMuted} playsinline style="object-fit:${s.fit};"></video>
     </div>`;
   } else if (imgs.length === 0) {
     // Chế độ bài thuần chữ (Text Post / Reddit Story / Confession / Trích dẫn cộng đồng)
@@ -544,6 +546,7 @@ export function buildNewsCardHtml(spec: CardSpec): string {
     flex: 0 0 auto; padding: ${padTop}px 56px ${padBottom}px; text-align: center; color: ${esc(s.textColor)};
     font-family: 'DT Phudu', 'Phudu', 'Montserrat', 'Arial Black', sans-serif; font-size: ${fitStart}px;
     font-weight: 800; text-transform: uppercase; line-height: 1.25; letter-spacing: -0.5px; word-break: break-word;
+    ${spec.transparentPhoto ? `background: ${esc(s.bandBg)};` /* khung trong suốt để ghép video: dải chữ vẫn giữ nền */ : ''}
   }
   #text .hl { color: ${esc(s.accent)}; }
   #footer {

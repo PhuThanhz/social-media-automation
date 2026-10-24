@@ -18,7 +18,7 @@ const { JSDOM } = require('jsdom');
 
 const { bulkUploadReels } = require('./meta-bulk-reels');
 const browserPool = require('./browserPool');
-const { renderNewsCard, renderNewsCardHtml } = require('./news-card');
+const { renderNewsCard, renderNewsCardHtml, renderHtmlLayers } = require('./news-card');
 const { generateSeedingComments } = require('./ai-seeding');
 const { huntFacebookFeed } = require('./fb-feed-hunter');
 
@@ -4941,8 +4941,13 @@ app.post('/api/post-facebook-group', async (req, res) => {
             await profileOption.click({ force: true }).catch(() => {});
             await page.waitForTimeout(3000);
           } else {
-            console.warn(`[Playwright][Group] ⚠️ Không tìm thấy option "${targetProfileName}" trong menu. Đóng menu an toàn (không dùng Escape để tránh đóng Modal).`);
-            await dialog.first().click({ position: { x: 5, y: 5 }, force: true }).catch(() => {});
+            console.warn(`[Playwright][Group] ⚠️ Không tìm thấy option "${targetProfileName}" trong menu danh tính của Nhóm.`);
+            if (req.body.allowPersonalFallback === true) {
+              console.log(`[Playwright][Group] ℹ️ Cho phép fallback cá nhân: tiếp tục đăng bài bằng tài khoản hiện tại.`);
+              await page.mouse.click(10, 10).catch(() => {});
+            } else {
+              throw new Error(`Trang "${targetProfileName}" chưa gia nhập Nhóm hoặc không có quyền đăng bài trong Nhóm này. Vui lòng duyệt Trang vào Nhóm hoặc chọn tài khoản khác.`);
+            }
           }
         }
       }
@@ -7071,6 +7076,20 @@ app.post(['/api/parse-rss', '/api/tools/parse-rss'], async (req, res) => {
 
 // Tạo ảnh "thẻ tin tức" (ảnh gốc + dải tiêu đề in hoa, cụm [[...]] tô đỏ) — xem news-card.js.
 // Không dùng globalPostingLock vì không đụng tới Facebook; trả PNG dạng base64 để backend lưu vào uploads/.
+// Studio Video: dựng nhiều lớp chữ/phụ đề/logo 1 lần (mỗi lớp chụp gọn theo #layer), trả base64 + toạ độ trong khung
+app.post('/api/render-html-layers', async (req, res) => {
+  const { htmls } = req.body || {};
+  if (!Array.isArray(htmls) || !htmls.length) return res.status(400).json({ success: false, error: 'Thiếu danh sách HTML' });
+  if (htmls.length > 400) return res.status(400).json({ success: false, error: 'Quá nhiều lớp (tối đa 400)' });
+  try {
+    const items = await renderHtmlLayers(htmls, { browserPool, downloadMedia: downloadMediaWithRetry });
+    res.json({ success: true, items: items.map((it) => (it ? { pngBase64: it.png.toString('base64'), x: it.x, y: it.y, w: it.w, h: it.h } : null)) });
+  } catch (e) {
+    console.error('[VideoLayers] Lỗi dựng lớp:', e.message);
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
 app.post('/api/render-news-card', async (req, res) => {
   const { imageUrl, insetImageUrl, headline, html } = req.body || {};
   try {
@@ -7079,10 +7098,62 @@ app.post('/api/render-news-card', async (req, res) => {
     const png = html
       ? await renderNewsCardHtml(html, deps)
       : await renderNewsCard({ imageUrl, insetImageUrl, headline }, deps);
-    res.json({ success: true, pngBase64: png.toString('base64') });
+    res.json({ success: true, pngBase64: png.toString('base64'), ...(png.photo ? { photo: png.photo } : {}) });
   } catch (e) {
     console.error('[NewsCard] Lỗi tạo ảnh:', e.message);
     res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+// Giọng đọc miễn phí của Microsoft Edge (Studio Video Tin): Nam Minh (nam) / Hoài My (nữ), trả MP3 base64.
+// Không phải API chính thức → backend tự chuyển sang Gemini / giọng Linh nếu lỗi.
+// Biến thể giọng = giọng gốc + cao độ/tốc độ (vd. Hoài My "trong trẻo, ấm": cao hơn chút, chậm hơn chút)
+const EDGE_TTS_PRESETS = {
+  'vi-VN-NamMinhNeural': { voice: 'vi-VN-NamMinhNeural', rate: '+8%', pitch: '+0%' },
+  'vi-VN-HoaiMyNeural': { voice: 'vi-VN-HoaiMyNeural', rate: '+8%', pitch: '+0%' },
+  'vi-VN-HoaiMyNeural:warm': { voice: 'vi-VN-HoaiMyNeural', rate: '-2%', pitch: '+6%' },
+};
+app.post('/api/tts-edge', async (req, res) => {
+  const { text, voice = 'vi-VN-NamMinhNeural', rate, pitch } = req.body || {};
+  if (!text || !String(text).trim()) return res.status(400).json({ success: false, error: 'Thiếu nội dung cần đọc' });
+  const preset = EDGE_TTS_PRESETS[voice];
+  if (!preset) return res.status(400).json({ success: false, error: `Giọng Edge không hỗ trợ: ${voice}` });
+  const { MsEdgeTTS, OUTPUT_FORMAT } = require('msedge-tts');
+  const dir = await fs.promises.mkdtemp(path.join(require('os').tmpdir(), 'edge-tts-'));
+  const tts = new MsEdgeTTS();
+  try {
+    // Bật mốc thời gian từng từ → Studio Video tự làm phụ đề chạy theo giọng đọc
+    await tts.setMetadata(preset.voice, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3, { wordBoundaryEnabled: true });
+    // rate/pitch người dùng chỉnh (vd. '+15%', '-5Hz'); không hợp lệ thì dùng của preset
+    const okRate = typeof rate === 'string' && /^[+-]?\d{1,3}%$/.test(rate) ? rate : preset.rate;
+    const okPitch = typeof pitch === 'string' && /^[+-]?\d{1,3}(%|Hz)$/.test(pitch) ? pitch : preset.pitch;
+    const { audioFilePath, metadataFilePath } = await Promise.race([
+      tts.toFile(dir, String(text).trim().slice(0, 3000), { rate: okRate, pitch: okPitch }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Edge TTS quá 30s')), 30000)),
+    ]);
+    const buf = await fs.promises.readFile(audioFilePath);
+    if (buf.length < 1000) throw new Error('Edge TTS trả về file rỗng');
+    // Offset/Duration tính theo đơn vị 100ns; file có thể gồm nhiều khối JSON nối nhau nên đọc bằng regex
+    const words = [];
+    try {
+      const meta = metadataFilePath ? await fs.promises.readFile(metadataFilePath, 'utf8') : '';
+      const re = /"Offset"\s*:\s*(\d+)\s*,\s*"Duration"\s*:\s*(\d+)\s*,\s*"text"\s*:\s*\{\s*"Text"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
+      let m;
+      while ((m = re.exec(meta))) {
+        const start = Number(m[1]) / 1e7;
+        words.push({ text: JSON.parse(`"${m[3]}"`), start: Math.round(start * 1000) / 1000, end: Math.round((start + Number(m[2]) / 1e7) * 1000) / 1000 });
+      }
+      words.sort((x, y) => x.start - y.start);
+    } catch (e) {
+      console.warn('[EdgeTTS] Không đọc được mốc từ:', e.message);
+    }
+    res.json({ success: true, mp3Base64: buf.toString('base64'), words });
+  } catch (e) {
+    console.error('[EdgeTTS] Lỗi:', e.message);
+    res.status(502).json({ success: false, error: e.message });
+  } finally {
+    try { tts.close(); } catch (_) {}
+    fs.promises.rm(dir, { recursive: true, force: true }).catch(() => {});
   }
 });
 
@@ -12146,15 +12217,28 @@ app.post('/api/post-tiktok', async (req, res) => {
 
     updateTaskProgress(taskId, 70, 'Đang chọn file video để tải lên TikTok...');
     await page.waitForTimeout(3000);
-    const fileInput = await page.$('input[type="file"]');
+    if (/\/login/i.test(page.url())) {
+      throw new Error('Cookie TikTok đã hết hạn (bị chuyển sang trang đăng nhập) — cập nhật cookie ở Quản lý kết nối');
+    }
+    const fileInput = await page.waitForSelector('input[type="file"]', { state: 'attached', timeout: 30000 }).catch(() => null);
     if (fileInput) {
       await fileInput.setInputFiles(localVideo);
     } else {
-      throw new Error('Không tìm thấy ô chọn file tải lên trên TikTok Creator Center');
+      throw new Error('Không tìm thấy ô chọn file trên TikTok Studio — cookie có thể đã hết hạn hoặc TikTok đổi giao diện');
     }
 
-    updateTaskProgress(taskId, 85, 'Đang điền Caption & chuẩn bị bấm Đăng...');
-    await page.waitForTimeout(6000);
+    updateTaskProgress(taskId, 85, 'Đang chờ TikTok xử lý video...');
+    // Chờ TikTok tải + xử lý xong video: nút Đăng chuyển sang bật (tối đa 4 phút) thay vì chờ cứng vài giây
+    const POST_BTN = 'button:has-text("Post"), button:has-text("Đăng"), button:has-text("Publish")';
+    let readyBtn = null;
+    for (let i = 0; i < 120 && !readyBtn; i++) {
+      await page.waitForTimeout(2000);
+      for (const b of await page.$$(POST_BTN)) {
+        const off = await b.evaluate((el) => el.disabled || el.getAttribute('aria-disabled') === 'true' || el.getAttribute('data-disabled') === 'true').catch(() => true);
+        if (!off && await b.isVisible().catch(() => false)) { readyBtn = b; break; }
+      }
+    }
+    if (!readyBtn) throw new Error('TikTok chưa xử lý xong video sau 4 phút hoặc không thấy nút Đăng');
 
     const captionSelector = 'div[contenteditable="true"], textarea, .notranslate[contenteditable="true"]';
     const captionEl = await page.$(captionSelector);
@@ -12166,15 +12250,22 @@ app.post('/api/post-tiktok', async (req, res) => {
     }
 
     updateTaskProgress(taskId, 95, 'Tự động bấm nút Xuất bản (Publish)...');
-    await page.waitForTimeout(3000);
-    const postButton = await page.$('button:has-text("Post"), button:has-text("Đăng"), button:has-text("Publish")');
-    if (postButton) {
-      await postButton.click();
-      await page.waitForTimeout(5000);
+    await page.waitForTimeout(1500);
+    await readyBtn.click();
+    // Xác nhận đã đăng: TikTok chuyển sang trang quản lý nội dung hoặc hiện thông báo đã đăng
+    const startUrl = page.url();
+    let confirmed = false;
+    for (let i = 0; i < 30 && !confirmed; i++) {
+      await page.waitForTimeout(2000);
+      const url = page.url();
+      if (url !== startUrl && /content|manage|tiktokstudio/i.test(url)) confirmed = true;
+      else if (await page.$('text=/(đã được đăng|đã đăng|has been (uploaded|posted|published)|uploaded|Manage posts|Quản lý bài đăng)/i').catch(() => null)) confirmed = true;
     }
 
-    updateTaskProgress(taskId, 100, 'Tự động đăng bài TikTok thành công!');
-    return res.json({ success: true, message: 'Đã xuất bản thành công bài viết lên Kênh TikTok!' });
+    updateTaskProgress(taskId, 100, confirmed ? 'Đăng TikTok thành công!' : 'Đã bấm Đăng, chưa thấy TikTok xác nhận');
+    return res.json(confirmed
+      ? { success: true, message: 'Đã đăng video lên kênh TikTok!' }
+      : { success: true, message: 'Đã bấm Đăng trên TikTok', warning: 'Chưa thấy TikTok xác nhận — mở TikTok Studio kiểm tra lại bài đăng.' });
   } catch (err) {
     console.error('[TikTok_Post] Lỗi:', err.message);
     return res.status(500).json({ success: false, error: `Lỗi đăng bài TikTok: ${err.message}` });

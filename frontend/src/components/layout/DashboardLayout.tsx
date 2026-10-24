@@ -55,6 +55,7 @@ const navigation = [
   {
     type: 'group' as const, label: 'NỘI DUNG', children: [
       { key: '/dashboard/news-studio', icon: <PictureOutlined />, label: 'Studio Ảnh Tin' },
+      { key: '/dashboard/video-studio', icon: <VideoCameraOutlined />, label: 'Studio Video Tin' },
       { key: '/dashboard/viral-hunter', icon: <FireOutlined className="text-amber-400" />, label: 'Săn bài Viral' },
       { key: '/dashboard/playwright', icon: <PlayCircleOutlined />, label: 'Đăng tự động' },
       { key: '/dashboard/post-story', icon: <PictureOutlined />, label: 'Đăng story' },
@@ -80,6 +81,7 @@ const navigation = [
 const pageMeta: Record<string, { title: string; description: string }> = {
   '/dashboard': { title: 'Tổng quan', description: 'Theo dõi hoạt động đăng bài và tình trạng hệ thống' },
   '/dashboard/news-studio': { title: 'Studio Ảnh Tin', description: 'Cào full bài báo, AI viết tiêu đề, ghép ảnh kiểu page tin tức rồi lên lịch đăng' },
+  '/dashboard/video-studio': { title: 'Studio Video Tin', description: 'Dán link video, thêm khung tiêu đề + giọng AI đọc vài giây đầu, trộn nhạc nền rồi xuất hoặc lên lịch đăng' },
   '/dashboard/viral-hunter': { title: 'Săn Bài Viral (FB & Threads)', description: 'Cào bài Facebook Group & Threads theo từ khoá, lọc tương tác khủng và tích hợp Gemini AI viết lại' },
   '/dashboard/queue': { title: 'Quản lý bài đăng', description: 'Lập lịch, kiểm tra trạng thái và xử lý bài đăng' },
   '/dashboard/playwright': { title: 'Đăng tự động', description: 'Xuất bản nội dung trực tiếp bằng Playwright' },
@@ -119,7 +121,28 @@ const DashboardLayout = () => {
     queryKey: ['socialAccounts'],
     queryFn: async () => (await api.get('/connections')).data as SocialAccountLite[],
   });
-  const expiredCookieAccounts = connections.filter((c) => c.platform !== 'FACEBOOK_GROUP' && c.accountType === 'PERSONAL_COOKIE' && c.tokenStatus === 'EXPIRED');
+  // Lọc các Fanpage bị hết hạn cookie: nếu 1 page được quản lý bởi nhiều Via, chỉ coi là hết hạn nếu TẤT CẢ các Via quản lý page đó đều hết hạn!
+  const pageIdsWithActiveCookie = useMemo(() => new Set(
+    connections
+      .filter((c) => c.platform !== 'FACEBOOK_GROUP' && c.tokenStatus === 'OK')
+      .map((c) => c.platformAccountId || c.pageName)
+      .filter(Boolean)
+  ), [connections]);
+
+  const expiredCookieAccounts = useMemo(() => {
+    const map = new Map<string, SocialAccountLite>();
+    for (const c of connections) {
+      if (c.platform === 'FACEBOOK_GROUP') continue;
+      const key = c.platformAccountId || c.pageName;
+      if (!key) continue;
+      // Nếu page này đã có ít nhất 1 via khác đang hoạt động tốt (OK), thì không tính là expired
+      if (pageIdsWithActiveCookie.has(key)) continue;
+      if (c.accountType === 'PERSONAL_COOKIE' && c.tokenStatus === 'EXPIRED' && !map.has(key)) {
+        map.set(key, c);
+      }
+    }
+    return Array.from(map.values());
+  }, [connections, pageIdsWithActiveCookie]);
   const expiredCookieCount = expiredCookieAccounts.length;
 
   // Global KPI fetch — dùng cho floating button mọi trang

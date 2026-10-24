@@ -90,6 +90,34 @@ public class NewsCardController {
         }
     }
 
+    /**
+     * Tải và ghép video + audio (đặc biệt hữu ích cho video Reddit DASH không có tiếng ở link gốc)
+     * Trả về đường dẫn đầy đủ của file MP4 đã có tiếng để người dùng nghe thử trong Studio.
+     */
+    @PostMapping("/merge-audio")
+    public ResponseEntity<Map<String, Object>> mergeAudio(@RequestBody Map<String, String> body) {
+        String videoUrl = body.get("videoUrl");
+        if (videoUrl == null || videoUrl.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "error", "Thiếu videoUrl"));
+        }
+        try {
+            if (videoUrl.contains("v.redd.it/")) {
+                String relPath = redditService.downloadVideoWithAudio(videoUrl);
+                String fullUrl = ServletUriComponentsBuilder.fromCurrentContextPath().path(relPath).toUriString();
+                return ResponseEntity.ok(Map.of("success", true, "url", fullUrl));
+            } else if (videoUrl.startsWith("/uploads/")) {
+                String fullUrl = ServletUriComponentsBuilder.fromCurrentContextPath().path(videoUrl).toUriString();
+                return ResponseEntity.ok(Map.of("success", true, "url", fullUrl));
+            } else {
+                return ResponseEntity.ok(Map.of("success", true, "url", videoUrl));
+            }
+        } catch (Exception e) {
+            log.error("[NewsCard] Lỗi ghép âm thanh cho video preview: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().body(Map.of("success", false, "error", e.getMessage()));
+        }
+    }
+
+
     /** Soạn trọn gói cho Studio: tiêu đề ảnh + caption hook + tóm tắt chia đoạn có nguồn + nhãn góc */
     @PostMapping("/package")
     public ResponseEntity<Map<String, Object>> buildPackage(@RequestBody Map<String, String> body) {

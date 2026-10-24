@@ -1138,7 +1138,7 @@ const PlaywrightPoster = () => {
   // chọn Page/Nhóm/giờ đăng như bình thường. Giờ đăng giãn theo batchInterval để không dồn cùng lúc.
   const handledStudioImportRef = useRef<string>('');
   useEffect(() => {
-    const incoming = (location.state as any)?.importedStudioPosts as Array<{ caption: string; imageUrl: string; comment?: string }> | undefined;
+    const incoming = (location.state as any)?.importedStudioPosts as Array<{ caption: string; imageUrl: string; comment?: string; mediaType?: string }> | undefined;
     if (!incoming || incoming.length === 0) return;
     const key = incoming.map((p) => p.imageUrl).join('||');
     if (handledStudioImportRef.current === key) return;
@@ -1150,9 +1150,9 @@ const PlaywrightPoster = () => {
       inputType: 'MANUAL',
       manualContent: p.caption,
       manualMediaUrls: [p.imageUrl],
-      manualMediaKinds: ['image'],
+      manualMediaKinds: [p.mediaType === 'VIDEO' || /\.(mp4|mov|webm)(\?|$)/i.test(p.imageUrl) ? 'video' : 'image'],
       isNow: false,
-      scheduledAt: base.add(idx * (batchInterval || 60), 'minute'),
+      scheduledAt: base.add(idx * (batchInterval || 15), 'minute'),
       includeCredit: false,
       // Chế độ "hook + nội dung ở bình luận": nội dung dài thả ở bình luận đầu tiên
       ...(p.comment ? { affiliateLink: p.comment, showCommentBox: true } : {}),
@@ -1163,7 +1163,7 @@ const PlaywrightPoster = () => {
       ...cards,
     ]);
     navigate(location.pathname, { replace: true, state: {} });
-    message.success(`Đã nhận ${cards.length} bài từ Studio Ảnh Tin. Chọn Page/Nhóm rồi bấm đăng.`);
+    message.success(`Đã nhận ${cards.length} bài từ Studio. Chọn Page/Nhóm rồi bấm đăng.`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state]);
 
@@ -1372,7 +1372,10 @@ const PlaywrightPoster = () => {
           // Dùng tên domain (có dấu chấm hoặc .vn) để tránh Facebook tự động popup gợi ý tag trang
           // khi worker gõ từ khóa trùng tên Page (VD: "CafeF" → Facebook gợi ý tag trang CafeF BĐS)
           let cleanSource = 'Báo điện tử';
-          if (rawSource.includes('cafef')) cleanSource = 'cafef.vn';
+          if (rawSource.includes('reddit')) cleanSource = 'Reddit';
+          else if (rawSource.includes('threads')) cleanSource = 'Threads';
+          else if (rawSource.includes('tiktok')) cleanSource = 'TikTok';
+          else if (rawSource.includes('cafef')) cleanSource = 'cafef.vn';
           else if (rawSource.includes('vnexpress')) cleanSource = 'vnexpress.net';
           else if (rawSource.includes('dantri')) cleanSource = 'dantri.com.vn';
           else if (rawSource.includes('tuoitre')) cleanSource = 'tuoitre.vn';
@@ -1381,7 +1384,7 @@ const PlaywrightPoster = () => {
           else if (rawSource.includes('batdongsan.com')) cleanSource = 'batdongsan.com.vn';
           else if (rawSource.includes('chinhphu')) cleanSource = 'chinhphu.vn';
           else if (rawSource.includes('vneconomy')) cleanSource = 'vneconomy.vn';
-          else if (article.siteName) cleanSource = article.siteName;
+          else if (article.siteName) cleanSource = article.siteName.replace(/reddit\.com/gi, 'Reddit');
 
           const pageHashtags = '#vietnamrealestate #batdongsan #radiantvietnam';
           const newsFooter = `Nguồn: ${cleanSource}\n\n${pageHashtags}`;
@@ -1686,6 +1689,23 @@ const PlaywrightPoster = () => {
   const [bulkStartMode, setBulkStartMode] = useState<'NOW' | 'TIME'>('NOW');
   const [bulkStartTime, setBulkStartTime] = useState<Dayjs>(dayjs().add(60, 'minute'));
   const [bulkInterval, setBulkInterval] = useState<number>(60);
+
+  // ── Smart Dispatch State (Phân bổ thông minh 1-Click: Chia bài + Nick + Giờ so le) ──
+  const [smartDispatchInterval, setSmartDispatchInterval] = useState<number>(20);
+  const [smartDispatchStartMode, setSmartDispatchStartMode] = useState<'NOW' | 'TOMORROW_830'>('NOW');
+  const [smartDispatchSummary, setSmartDispatchSummary] = useState<{
+    total: number;
+    nickCounts: Record<string, number>;
+    startTime: string;
+    endTime: string;
+    stepMinutes: number;
+  } | null>(null);
+
+  // ── Auto-Fix Queue State (Tự động xếp lại lịch hàng đợi an toàn) ──
+  const [autoFixQueueModalVisible, setAutoFixQueueModalVisible] = useState(false);
+  const [autoFixInterval, setAutoFixInterval] = useState<number>(20);
+  const [autoFixStartMode, setAutoFixStartMode] = useState<'NOW' | 'TOMORROW_830'>('TOMORROW_830');
+  const [autoFixDistributeVias, setAutoFixDistributeVias] = useState<boolean>(false);
 
   // TikTok Channel & Viral Hunter State
   const [hunterDrawerVisible, setHunterDrawerVisible] = useState(false);
@@ -2816,6 +2836,20 @@ const PlaywrightPoster = () => {
     return map;
   }, [personalAccountTargets, socialAccounts]);
 
+  // Đếm số lượng Fanpage mà mỗi Via (theo c_user) đang quản trị
+  const pageCountByCUser = useMemo(() => {
+    const counts = new Map<string, number>();
+    (socialAccounts || [])
+      .filter((a) => a.platform === 'FACEBOOK_PAGE')
+      .forEach((acc) => {
+        const cUser = acc.accessToken?.match(/c_user=(\d+)/)?.[1];
+        if (cUser) {
+          counts.set(cUser, (counts.get(cUser) || 0) + 1);
+        }
+      });
+    return counts;
+  }, [socialAccounts]);
+
   const viaNameOf = (account: SocialAccount): string | undefined => {
     if (account.platform !== 'FACEBOOK_PAGE') return undefined;
     if (account.postingIdentityAccountId) {
@@ -3069,9 +3103,14 @@ const PlaywrightPoster = () => {
   const twoMainViasDisplayNames = useMemo(() => {
     if (twoMainVias.length === 0) return '';
     return twoMainVias
-      .map((a) => (a.pageName || a.platformAccountId).replace(/^👤\s*Nick Cá Nhân\s*\((.*)\)$/, '$1'))
+      .map((a) => {
+        const rawName = (a.pageName || a.platformAccountId).replace(/^👤\s*Nick Cá Nhân\s*\((.*)\)$/, '$1');
+        const cUser = a.accessToken?.match(/c_user=(\d+)/)?.[1];
+        const pageCount = cUser ? (pageCountByCUser.get(cUser) || 0) : 0;
+        return pageCount > 0 ? `${rawName} (${pageCount} Page)` : rawName;
+      })
       .join(' + ');
-  }, [twoMainVias]);
+  }, [twoMainVias, pageCountByCUser]);
 
   const isTwoViaActive = useMemo(() => {
     if (twoMainViasTargetValues.length < 2) return false;
@@ -3123,6 +3162,56 @@ const PlaywrightPoster = () => {
     setGroupDistributionMode('PAGE_PER_GROUP');
     message.success(`📄 Đã chọn chia đều bài cho tất cả ${playwrightAccounts.length} Fanpage!`);
   }, [playwrightAccounts, form, message]);
+
+  // Danh sách các Page đang được chọn mà có từ 2 Via trở lên cùng quản lý (Co-admin)
+  const selectedCoAdminPageNames = useMemo(() => {
+    const names = new Set<string>();
+    activeSelectedFanpageIds.forEach((val) => {
+      const acc = playwrightAccounts.find((a) => accountTargetValue(a) === val);
+      if (acc) {
+        const norm = (acc.pageName || acc.platformAccountId).trim().toLowerCase();
+        const coAdmins = coAdminViasByPageName.get(norm) || [];
+        if (coAdmins.length > 1) {
+          names.add(acc.pageName || acc.platformAccountId);
+        }
+      }
+    });
+    return Array.from(names);
+  }, [activeSelectedFanpageIds, playwrightAccounts, coAdminViasByPageName]);
+
+  // Kiểm tra xem tất cả các Via của những Page dùng chung đó đã được chọn hết chưa
+  const isAllCoAdminsSelected = useMemo(() => {
+    if (selectedCoAdminPageNames.length === 0) return true;
+    for (const pageName of selectedCoAdminPageNames) {
+      const norm = pageName.trim().toLowerCase();
+      const allAccs = playwrightAccounts.filter(
+        (a) => (a.pageName || a.platformAccountId).trim().toLowerCase() === norm && a.tokenStatus !== 'EXPIRED'
+      );
+      const allVals = allAccs.map((a) => accountTargetValue(a));
+      if (!allVals.every((v) => activeSelectedFanpageIds.includes(v))) {
+        return false;
+      }
+    }
+    return true;
+  }, [selectedCoAdminPageNames, playwrightAccounts, activeSelectedFanpageIds]);
+
+  // Tự động thêm tất cả các Via cùng quản lý Page đó để 2 Worker chạy song song
+  const handleAutoSelectBothViasForSelectedPages = useCallback(() => {
+    const newVals = new Set(activeSelectedFanpageIds);
+    selectedCoAdminPageNames.forEach((name) => {
+      const norm = name.trim().toLowerCase();
+      playwrightAccounts
+        .filter((a) => (a.pageName || a.platformAccountId).trim().toLowerCase() === norm && a.tokenStatus !== 'EXPIRED')
+        .forEach((a) => newVals.add(accountTargetValue(a)));
+    });
+    const result = Array.from(newVals);
+    form.setFieldValue('targetFanpageId', result);
+    setIsMultiDistributeActive(true);
+    setMultiSelectedTargets(result);
+    setDistributionStrategy('ROUND_ROBIN');
+    setGroupDistributionMode('PAGE_PER_GROUP');
+    message.success('⚡ Đã bật chia đều qua cả 2 Via để 2 Worker chạy song song chống spam!');
+  }, [activeSelectedFanpageIds, selectedCoAdminPageNames, playwrightAccounts, form, message]);
 
   const handleToggleFanpageSelection = useCallback((acc: SocialAccount) => {
     const val = accountTargetValue(acc);
@@ -3477,14 +3566,21 @@ const PlaywrightPoster = () => {
       const targetCount = targetObj?.targetCount || acc.maxPostsPerDay || 5;
       const currentCount = (targetObj?.actualCount || 0) + (targetObj?.pendingCount || 0);
       const needed = Math.max(0, targetCount - currentCount);
+      const cUser = acc.accessToken?.match(/c_user=(\d+)/)?.[1];
+      const managedPageCount = cUser ? (pageCountByCUser.get(cUser) || 0) : 0;
 
       return {
         value: val,
-        filterLabel: accountSearchLabel(acc),
+        filterLabel: `${accountSearchLabel(acc)} ${managedPageCount > 0 ? `${managedPageCount} page` : ''}`,
         label: (
           <div className="flex items-center justify-between w-full py-0.5">
-            <span className={isExp ? 'text-red-600 font-bold' : 'text-indigo-400 font-semibold'}>
-              👤 {acc.pageName || acc.platformAccountId}
+            <span className={isExp ? 'text-red-600 font-bold flex items-center gap-1.5' : 'text-indigo-400 font-semibold flex items-center gap-1.5'}>
+              <span>👤 {acc.pageName || acc.platformAccountId}</span>
+              {managedPageCount > 0 && (
+                <span className="text-[10px] font-normal text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/20">
+                  {managedPageCount} Page quản trị
+                </span>
+              )}
             </span>
             <div className="flex items-center gap-1.5 shrink-0 ml-2">
               <Tag color={needed > 0 ? 'orange' : 'success'} className="!rounded-full text-[10px] !mr-0">
@@ -5528,7 +5624,172 @@ const PlaywrightPoster = () => {
 
   const resetEqualDistribution = () => {
     setCustomItemTargets({});
+    setSmartDispatchSummary(null);
     message.info('Đã xóa chia đều! Các bài viết sẽ dùng lại Fanpage mặc định đã chọn ở trên.');
+  };
+
+  // ── SMART DISPATCH: Chia bài tròn đều + So le thời gian an toàn 1-Click ──
+  const handleSmartDispatch = (customNicks?: string[], customInterval?: number) => {
+    const validItems = linkItems.filter((i) =>
+      (i.url && i.url.trim().length > 0) ||
+      (i.manualContent && i.manualContent.trim().length > 0) ||
+      (i.customCaption && i.customCaption.trim().length > 0)
+    );
+    if (validItems.length === 0) {
+      message.warning('Danh sách bài viết đang trống hoặc chưa có link hợp lệ!');
+      return;
+    }
+
+    let targetPool: string[] = [];
+    if (customNicks && customNicks.length > 0) {
+      targetPool = customNicks;
+    } else if (activeSelectedFanpageIds && activeSelectedFanpageIds.length > 0) {
+      // Ưu tiên dùng đúng Fanpage / Nick mà người dùng ĐÃ CHỌN trên Form
+      const expanded: string[] = [];
+      activeSelectedFanpageIds.forEach((targetVal) => {
+        if (!expanded.includes(targetVal)) expanded.push(targetVal);
+        const acc = playwrightAccounts.find((a) => accountTargetValue(a) === targetVal);
+        if (acc) {
+          const normName = (acc.pageName || acc.platformAccountId).trim().toLowerCase();
+          // Tự động bổ sung các Via đồng quản trị của Page này để chạy 2 Worker song song
+          playwrightAccounts
+            .filter((o) => (o.pageName || o.platformAccountId).trim().toLowerCase() === normName && o.tokenStatus !== 'EXPIRED')
+            .forEach((o) => {
+              const oVal = accountTargetValue(o);
+              if (!expanded.includes(oVal)) expanded.push(oVal);
+            });
+        }
+      });
+      targetPool = expanded;
+    } else {
+      targetPool = twoMainViasTargetValues;
+    }
+
+    if (targetPool.length === 0) {
+      targetPool = postingIdentities.slice(0, 2).map(accountTargetValue);
+    }
+    if (targetPool.length === 0) {
+      message.warning('Không tìm thấy Nick hoặc Fanpage nào khả dụng để phân bổ!');
+      return;
+    }
+
+    const interval = customInterval || smartDispatchInterval || 20;
+    const k = targetPool.length;
+    // Bước nhảy giữa 2 bài bất kỳ liên tiếp trong toàn hệ thống (so le)
+    const step = Math.max(5, Math.round(interval / k));
+
+    let start = smartDispatchStartMode === 'TOMORROW_830'
+      ? dayjs().add(1, 'day').hour(8).minute(30).second(0)
+      : dayjs().add(10, 'minute');
+
+    const newTargets: Record<string, string> = { ...customItemTargets };
+    const nickCounts: Record<string, number> = {};
+
+    const updated = linkItems.map((item) => {
+      const idx = validItems.findIndex((v) => v.id === item.id);
+      if (idx === -1) return item;
+
+      const targetVal = targetPool[idx % k];
+      newTargets[item.id] = targetVal;
+
+      const assignedTime = start.add(idx * step, 'minute');
+      const targetObj = postingIdentities.find((a) => accountTargetValue(a) === targetVal);
+      const rawName = (targetObj?.pageName || targetVal).replace(/^👤\s*Nick Cá Nhân\s*\((.*)\)$/, '$1');
+      nickCounts[rawName] = (nickCounts[rawName] || 0) + 1;
+
+      return {
+        ...item,
+        isNow: false,
+        scheduledAt: assignedTime,
+      };
+    });
+
+    setCustomItemTargets(newTargets);
+    setLinkItems(updated);
+
+    const endTime = start.add(Math.max(0, validItems.length - 1) * step, 'minute');
+    setSmartDispatchSummary({
+      total: validItems.length,
+      nickCounts,
+      startTime: start.format('HH:mm DD/MM'),
+      endTime: endTime.format('HH:mm DD/MM'),
+      stepMinutes: step,
+    });
+
+    const summaryStr = Object.entries(nickCounts).map(([name, c]) => `${name}: ${c} bài`).join(' · ');
+    message.success(`⚡ Đã chia đều ${validItems.length} bài (${summaryStr}) từ ${start.format('HH:mm')} đến ${endTime.format('HH:mm')} (so le ${step}p/bài, mỗi nick nghỉ ${interval}p)!`, 6);
+  };
+
+  // ── AUTO-FIX QUEUE: Tự động xếp lại toàn bộ lịch hàng đợi an toàn 1-Click ──
+  const handleAutoFixQueue = async () => {
+    const pendingPosts = (posts || []).filter((p) => p.status === 'PENDING');
+    if (pendingPosts.length === 0) {
+      message.warning('Không có bài viết nào đang ở trạng thái Chờ đăng (PENDING)!');
+      return;
+    }
+
+    setIsBulkProcessing(true);
+    try {
+      const targetPool = twoMainViasTargetValues.length >= 2
+        ? twoMainViasTargetValues
+        : postingIdentities.slice(0, 2).map(accountTargetValue);
+      const k = Math.max(1, targetPool.length);
+      const interval = autoFixInterval || 20;
+      const step = Math.max(5, Math.round(interval / k));
+
+      let start = autoFixStartMode === 'TOMORROW_830'
+        ? dayjs().add(1, 'day').hour(8).minute(30).second(0)
+        : dayjs().add(10, 'minute');
+
+      const sorted = [...pendingPosts].sort((a, b) => dayjs(a.scheduledAt || 0).diff(dayjs(b.scheduledAt || 0)));
+
+      const updates = sorted.map((post, idx) => {
+        let assignedTarget = post.targetFanpageId;
+        // Nếu người dùng bật chia đều tải cho các Via:
+        if (autoFixDistributeVias) {
+          const isPersonal = post.targetFanpageId?.includes('PERSONAL_PROFILE') || post.targetFanpageId === 'PERSONAL_PROFILE';
+          if (isPersonal) {
+            // Nếu bài gốc là đăng dưới tư cách cá nhân, xoay vòng giữa các Via cá nhân
+            assignedTarget = targetPool[idx % k];
+          } else if (post.targetFanpageId) {
+            // Nếu bài gốc là Fanpage (VD Làm Sen), xoay vòng giữa các Via ĐỒNG QUẢN TRỊ CỦA PAGE ĐÓ, tuyệt đối KHÔNG đè bằng nick cá nhân!
+            const curTarget = post.targetFanpageId;
+            const platformId = curTarget.split(':')[0];
+            const coAdminsForPage = playwrightAccounts.filter(
+              (a) => a.platformAccountId === platformId && a.tokenStatus !== 'EXPIRED'
+            );
+            if (coAdminsForPage.length > 1) {
+              assignedTarget = accountTargetValue(coAdminsForPage[idx % coAdminsForPage.length]);
+            }
+          }
+        }
+
+        // Tự động sửa lỗi :113 cũ nếu còn sót
+        if (assignedTarget && assignedTarget.includes(':113')) {
+          assignedTarget = assignedTarget.replace(':113', ':129');
+        }
+        const assignedTime = start.add(idx * step, 'minute');
+        return {
+          id: post.id,
+          scheduledAt: assignedTime.format('YYYY-MM-DDTHH:mm:ss'),
+          targetFanpageId: assignedTarget,
+        };
+      });
+
+      const res = await api.post('/queue/reschedule-batch', { updates });
+      if (res.data?.success) {
+        message.success(`🎉 Đã xếp lại lịch an toàn cho ${updates.length} bài viết PENDING! Các bài đã được rải đều so le, không còn bị trùng giờ.`, 7);
+        setAutoFixQueueModalVisible(false);
+        queryClient.invalidateQueries({ queryKey: ['postQueuePlaywright'] });
+        queryClient.invalidateQueries({ queryKey: ['postQueue'] });
+      } else {
+        message.error('Lỗi khi xếp lại lịch: ' + (res.data?.message || 'Không xác định'));
+      }
+    } catch (err: any) {
+      message.error('Lỗi khi xếp lại lịch: ' + (err.message || 'Lỗi kết nối'));
+    } finally {
+      setIsBulkProcessing(false);
+    }
   };
 
   // Chuyển đổi chữ thường sang chữ in đậm Unicode kiểu Facebook (Sans Bold: 𝗔𝗕𝗖)
@@ -7366,7 +7627,7 @@ const PlaywrightPoster = () => {
                   <Select
                     value={selectedPresetId}
                     placeholder={savedPresets.length === 0 ? "Chưa có cấu hình nào được lưu" : "Chọn cấu hình để áp dụng nhanh..."}
-                    style={{ width: 260 }}
+                    className="min-w-[280px] sm:min-w-[340px] max-w-full flex-1"
                     size="middle"
                     allowClear
                     disabled={savedPresets.length === 0}
@@ -7491,154 +7752,159 @@ const PlaywrightPoster = () => {
                 <div className={postMode !== 'FANPAGE_ONLY' ? 'grid grid-cols-1 xl:grid-cols-2 gap-4 items-stretch' : 'space-y-4'}>
                   {/* NẾU LÀ GROUP_ONLY HOẶC FANPAGE_AND_GROUP: HIỂN THỊ KHUNG CHỌN NHÓM ĐẦU TIÊN ĐỂ LUỒNG TỰ NHIÊN HƠN */}
                   {(postMode === 'GROUP_ONLY' || postMode === 'FANPAGE_AND_GROUP') && (
-                    <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/80 border border-emerald-500/30 shadow-xl space-y-3.5 backdrop-blur-md flex flex-col justify-between">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-800">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-sm shadow-sm shrink-0">
-                            <TeamOutlined />
+                    <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/80 border border-emerald-500/30 shadow-xl backdrop-blur-md flex flex-col justify-between">
+                      <div className="space-y-3.5">
+                        <div className="flex items-start sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-800">
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                            <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-sm shadow-sm shrink-0">
+                              <TeamOutlined />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-sm font-bold text-slate-100 flex items-center gap-2 flex-wrap">
+                                <span>Nhóm Facebook nhận bài</span>
+                                {activeSelectedGroupIds.length > 0 ? (
+                                  <Tag color="emerald" className="!rounded-full font-bold text-xs !m-0 border-0 bg-emerald-500/20 text-emerald-300">
+                                    ✓ Đã chọn {activeSelectedGroupIds.length} nhóm
+                                  </Tag>
+                                ) : (
+                                  <Tag color="warning" className="!rounded-full font-semibold text-xs !m-0 border-0 bg-amber-500/20 text-amber-300">
+                                    ⚠️ Chưa chọn nhóm
+                                  </Tag>
+                                )}
+                              </div>
+                              <div className="text-xs text-slate-400 mt-0.5 truncate" title={`Chọn các nhóm Facebook sẽ nhận bài viết xuất bản (${groupAccountsWithId.length} Nhóm có sẵn)`}>
+                                Chọn nhóm nhận bài ({groupAccountsWithId.length} nhóm có sẵn)
+                              </div>
+                            </div>
                           </div>
-                          <div>
-                            <div className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                              <span>Nhóm Facebook nhận bài</span>
-                            {activeSelectedGroupIds.length > 0 ? (
-                              <Tag color="emerald" className="!rounded-full font-bold text-xs !m-0 border-0 bg-emerald-500/20 text-emerald-300">
-                                ✓ Đã chọn {activeSelectedGroupIds.length} nhóm
-                              </Tag>
-                            ) : (
-                              <Tag color="warning" className="!rounded-full font-semibold text-xs !m-0 border-0 bg-amber-500/20 text-amber-300">
-                                ⚠️ Chưa chọn nhóm
-                              </Tag>
-                            )}
-                          </div>
-                          <div className="text-xs text-slate-400 mt-0.5">
-                            Chọn các nhóm Facebook sẽ nhận bài viết xuất bản ({groupAccountsWithId.length} Nhóm có sẵn)
-                          </div>
+
+                          <Button
+                            size="small"
+                            icon={<SafetyCertificateOutlined className="text-emerald-400" />}
+                            onClick={() => setGroupCheckModalVisible(true)}
+                            className="text-xs text-emerald-300 hover:text-emerald-200 bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 rounded-xl h-8 px-2.5 font-semibold shrink-0 whitespace-nowrap"
+                            title="Kiểm tra tư cách thành viên và sức khỏe nhóm Facebook"
+                          >
+                            Kiểm tra nhóm
+                          </Button>
                         </div>
+
+                        <Form.Item
+                          name={postMode === 'GROUP_ONLY' ? 'targetGroupId' : 'groupNames'}
+                          rules={[{ required: true, message: 'Vui lòng chọn ít nhất 1 nhóm nhận bài' }]}
+                          className="!mb-0"
+                        >
+                          <Select
+                            mode="multiple"
+                            size="large"
+                            placeholder="🔍 Gõ tên hoặc ID nhóm Facebook để tìm kiếm và chọn nhanh..."
+                            showSearch
+                            allowClear
+                            optionFilterProp="filterLabel"
+                            filterOption={(input, option: any) => {
+                              const label = String(option?.filterLabel || option?.label || '').toLowerCase();
+                              const query = input.toLowerCase();
+                              if (label.includes(query)) return true;
+                              const strip = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+                              return strip(label).includes(strip(query));
+                            }}
+                            className="w-full [&_.ant-select-arrow]:!top-4"
+                            options={unifiedGroupOptions}
+                          />
+                        </Form.Item>
                       </div>
 
-                      <Button
-                        size="small"
-                        icon={<SafetyCertificateOutlined className="text-emerald-400" />}
-                        onClick={() => setGroupCheckModalVisible(true)}
-                        className="text-xs text-emerald-300 hover:text-emerald-200 bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 rounded-xl h-8 font-semibold self-start sm:self-auto"
-                      >
-                        Kiểm tra tư cách nhóm
-                      </Button>
-                    </div>
-
-                    <Form.Item
-                      name={postMode === 'GROUP_ONLY' ? 'targetGroupId' : 'groupNames'}
-                      rules={[{ required: true, message: 'Vui lòng chọn ít nhất 1 nhóm nhận bài' }]}
-                      className="!mb-0"
-                    >
-                      <Select
-                        mode="multiple"
-                        size="large"
-                        placeholder="🔍 Gõ tên hoặc ID nhóm Facebook để tìm kiếm và chọn nhanh..."
-                        showSearch
-                        allowClear
-                        optionFilterProp="filterLabel"
-                        filterOption={(input, option: any) => {
-                          const label = String(option?.filterLabel || option?.label || '').toLowerCase();
-                          const query = input.toLowerCase();
-                          if (label.includes(query)) return true;
-                          const strip = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-                          return strip(label).includes(strip(query));
-                        }}
-                        className="w-full"
-                        options={unifiedGroupOptions}
-                      />
-                    </Form.Item>
-
-                    {/* Đăng ẩn danh (chỉ với GROUP_ONLY) */}
-                    {postMode === 'GROUP_ONLY' && (
-                      <div className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 ${isAnonymous
-                          ? 'bg-amber-950/25 border-amber-500/40 shadow-sm'
-                          : 'bg-slate-950/40 border-slate-800 hover:border-slate-700'
-                        }`}>
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm shrink-0 border transition-colors ${isAnonymous
-                              ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
-                              : 'bg-slate-800/80 border-slate-700/60 text-slate-400'
+                      {/* Đăng ẩn danh (chỉ với GROUP_ONLY) */}
+                      {postMode === 'GROUP_ONLY' && (
+                        <div className="mt-4 pt-2">
+                          <div className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 ${isAnonymous
+                              ? 'bg-amber-950/25 border-amber-500/40 shadow-sm'
+                              : 'bg-slate-950/40 border-slate-800 hover:border-slate-700'
                             }`}>
-                            🕵️
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-xs font-bold flex items-center gap-2 flex-wrap">
-                              <span className={isAnonymous ? 'text-amber-200' : 'text-slate-200'}>
-                                Đăng ẩn danh vào Group
-                              </span>
-                              {isAnonymous ? (
-                                <Tag color="warning" className="!rounded-full text-[10px] font-bold !m-0 !px-2 border-0 bg-amber-500/20 text-amber-300">
-                                  Ẩn danh tính {selectedTargetAccount?.pageName ? selectedTargetAccount.pageName.replace(/^👤\s*Nick Cá Nhân\s*\((.*)\)$/, '$1') : 'Nick cá nhân'}
-                                </Tag>
-                              ) : (
-                                <span className="text-[11px] text-slate-500 font-normal">
-                                  Thành viên ẩn danh
-                                </span>
-                              )}
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm shrink-0 border transition-colors ${isAnonymous
+                                  ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                                  : 'bg-slate-800/80 border-slate-700/60 text-slate-400'
+                                }`}>
+                                🕵️
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-xs font-bold flex items-center gap-2 flex-wrap">
+                                  <span className={isAnonymous ? 'text-amber-200' : 'text-slate-200'}>
+                                    Đăng ẩn danh vào Group
+                                  </span>
+                                  {isAnonymous ? (
+                                    <Tag color="warning" className="!rounded-full text-[10px] font-bold !m-0 !px-2 border-0 bg-amber-500/20 text-amber-300">
+                                      Ẩn danh tính {selectedTargetAccount?.pageName ? selectedTargetAccount.pageName.replace(/^👤\s*Nick Cá Nhân\s*\((.*)\)$/, '$1') : 'Nick cá nhân'}
+                                    </Tag>
+                                  ) : (
+                                    <span className="text-[11px] text-slate-500 font-normal">
+                                      Thành viên ẩn danh
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[11px] text-slate-400 truncate">
+                                  Xuất bản bài dưới tư cách "Thành viên ẩn danh", bảo vệ danh tính tài khoản thật.
+                                </div>
+                              </div>
                             </div>
-                            <div className="text-[11px] text-slate-400 truncate">
-                              Xuất bản bài dưới tư cách "Thành viên ẩn danh", bảo vệ danh tính tài khoản thật.
-                            </div>
+                            <Switch
+                              checked={isAnonymous}
+                              onChange={(checked) => setIsAnonymous(checked)}
+                              className={isAnonymous ? '!bg-amber-500' : ''}
+                            />
                           </div>
                         </div>
-                        <Switch
-                          checked={isAnonymous}
-                          onChange={(checked) => setIsAnonymous(checked)}
-                          className={isAnonymous ? '!bg-amber-500' : ''}
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
+                      )}
+                    </div>
+                  )}
 
                 {/* KHUNG CHỌN TÀI KHOẢN ĐẠI DIỆN ĐĂNG BÀI */}
                 <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/80 border border-sky-500/30 shadow-xl space-y-4 backdrop-blur-md flex flex-col justify-between">
                   {/* Header: Tiêu đề & Trạng thái phân bổ đang kích hoạt + Nút reset */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 text-sm shadow-sm shrink-0">
-                        <ShareAltOutlined />
-                      </div>
-                      <div>
-                        <div className="text-sm font-bold text-slate-100 flex items-center gap-2 flex-wrap">
-                          <span>{postMode === 'FANPAGE_ONLY' ? 'Kênh Fanpage / Nick xuất bản' : 'Tài khoản đại diện đăng bài'}</span>
-                          {isTwoViaActive ? (
-                            <Tag className="!rounded-md font-semibold text-xs !m-0 border border-blue-500/30 bg-blue-500/15 text-blue-300">
-                              2 Via song song (50/50)
-                            </Tag>
-                          ) : activeSelectedFanpageIds.length > 1 ? (
-                            <Tag className="!rounded-md font-semibold text-xs !m-0 border border-emerald-500/30 bg-emerald-500/15 text-emerald-300">
-                              Đang chia {activeSelectedFanpageIds.length} tài khoản
-                            </Tag>
-                          ) : activeSelectedFanpageIds.length === 1 ? (
-                            <Tag className="!rounded-md font-semibold text-xs !m-0 border border-slate-700 bg-slate-800 text-slate-300">
-                              1 tài khoản
-                            </Tag>
-                          ) : null}
+                    <div className="flex items-start sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-800">
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div className="w-8 h-8 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 text-sm shadow-sm shrink-0">
+                          <ShareAltOutlined />
                         </div>
-                        <div className="text-xs text-slate-400 mt-0.5">
-                          {postMode === 'FANPAGE_ONLY'
-                            ? 'Chọn 1 hoặc nhiều Fanpage/Via để đăng bài (chọn nhiều sẽ tự động chia đều bài):'
-                            : 'Chọn 1 hoặc nhiều Nick/Page đại diện để đăng vào các Nhóm:'}
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-bold text-slate-100 flex items-center gap-2 flex-wrap">
+                            <span>{postMode === 'FANPAGE_ONLY' ? 'Kênh Fanpage / Nick xuất bản' : 'Tài khoản đại diện đăng bài'}</span>
+                            {isTwoViaActive ? (
+                              <Tag className="!rounded-md font-semibold text-xs !m-0 border border-blue-500/30 bg-blue-500/15 text-blue-300">
+                                2 Via song song (50/50)
+                              </Tag>
+                            ) : activeSelectedFanpageIds.length > 1 ? (
+                              <Tag className="!rounded-md font-semibold text-xs !m-0 border border-emerald-500/30 bg-emerald-500/15 text-emerald-300">
+                                Đang chia {activeSelectedFanpageIds.length} tài khoản
+                              </Tag>
+                            ) : activeSelectedFanpageIds.length === 1 ? (
+                              <Tag className="!rounded-md font-semibold text-xs !m-0 border border-slate-700 bg-slate-800 text-slate-300">
+                                1 tài khoản
+                              </Tag>
+                            ) : null}
+                          </div>
+                          <div className="text-xs text-slate-400 mt-0.5 truncate" title={postMode === 'FANPAGE_ONLY' ? 'Chọn 1 hoặc nhiều Fanpage/Via để đăng bài' : 'Chọn 1 hoặc nhiều Nick/Page đại diện để đăng vào các Nhóm:'}>
+                            {postMode === 'FANPAGE_ONLY'
+                              ? 'Chọn Fanpage/Via để đăng bài:'
+                              : 'Chọn Nick/Page đại diện để đăng vào Nhóm:'}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Nút reset nếu đang chọn nhiều tài khoản */}
-                    {activeSelectedFanpageIds.length > 1 && (
-                      <Button
-                        size="small"
-                        type="text"
-                        icon={<ReloadOutlined />}
-                        onClick={handleResetToSingleTarget}
-                        className="text-xs text-slate-300 hover:text-rose-300 self-start sm:self-auto bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl h-8 px-3"
-                      >
-                        Về 1 tài khoản
-                      </Button>
-                    )}
-                  </div>
+                      {/* Nút reset nếu đang chọn nhiều tài khoản */}
+                      {activeSelectedFanpageIds.length > 1 && (
+                        <Button
+                          size="small"
+                          type="text"
+                          icon={<ReloadOutlined />}
+                          onClick={handleResetToSingleTarget}
+                          className="text-xs text-slate-300 hover:text-rose-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl h-8 px-2.5 shrink-0 whitespace-nowrap"
+                        >
+                          Về 1 tài khoản
+                        </Button>
+                      )}
+                    </div>
 
                   {/* Dòng 1: Chọn nhanh dạng pill gọn gàng */}
                   <div className="flex flex-wrap items-center gap-2">
@@ -7656,6 +7922,16 @@ const PlaywrightPoster = () => {
                     >
                       <ThunderboltOutlined className="text-xs" />
                       <span>2 Via chính (Song song)</span>
+                      {twoMainVias.length >= 2 && (
+                        <span className="text-[10px] text-slate-400 bg-slate-900/80 px-1.5 py-0.5 rounded border border-slate-700/80 font-mono">
+                          {twoMainVias.map((v) => {
+                            const c = v.accessToken?.match(/c_user=(\d+)/)?.[1];
+                            const pCount = c ? (pageCountByCUser.get(c) || 0) : 0;
+                            const short = (v.pageName || '').replace(/^👤\s*Nick Cá Nhân\s*\((.*)\)$/, '$1').trim();
+                            return `${short}: ${pCount}p`;
+                          }).join(' · ')}
+                        </span>
+                      )}
                       {isTwoViaActive && <span className="text-xs font-bold text-blue-400">✓</span>}
                     </button>
 
@@ -7675,6 +7951,34 @@ const PlaywrightPoster = () => {
                     >
                       <FileTextOutlined className="text-xs text-slate-400" />
                       <span>Tất cả {playwrightAccounts.length} Page</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const sharedVals = playwrightAccounts
+                          .filter((a) => {
+                            const norm = (a.pageName || a.platformAccountId).trim().toLowerCase();
+                            const coAdmins = coAdminViasByPageName.get(norm) || [];
+                            return coAdmins.length > 1 && a.tokenStatus !== 'EXPIRED';
+                          })
+                          .map((a) => accountTargetValue(a));
+                        if (sharedVals.length === 0) {
+                          message.warning('Không tìm thấy Page dùng chung nào!');
+                          return;
+                        }
+                        form.setFieldValue('targetFanpageId', sharedVals);
+                        setIsMultiDistributeActive(true);
+                        setMultiSelectedTargets(sharedVals);
+                        setDistributionStrategy('ROUND_ROBIN');
+                        setGroupDistributionMode('PAGE_PER_GROUP');
+                        message.success('⚡ Đã bật chia đều cho các Page dùng chung qua cả 2 Via để chạy 2 Worker!');
+                      }}
+                      className="h-8 px-3 rounded-lg text-xs font-medium transition-all border border-purple-500/50 bg-purple-950/40 text-purple-300 hover:border-purple-400 hover:bg-purple-900/60 hover:text-white cursor-pointer flex items-center gap-1.5"
+                      title="Chọn các Fanpage có 2 Via cùng quản lý (Làm Sen, Làm Phước Hai, Làm Gì Mà Gấp, Làm phước, Làm Kinh Tế...) để 2 Worker chia đều bài chạy song song"
+                    >
+                      <ShareAltOutlined className="text-xs text-purple-400" />
+                      <span>Page dùng chung (2 Via song song)</span>
                     </button>
 
                     <button
@@ -7750,10 +8054,40 @@ const PlaywrightPoster = () => {
                             setGroupDistributionMode('PAGE_PER_GROUP');
                           }
                         }}
-                        className="w-full"
+                        className="w-full [&_.ant-select-arrow]:!top-4"
                         options={unifiedAccountOptions}
                       />
                     </Form.Item>
+
+                    {/* Báo hiệu và nút hỗ trợ thông minh khi chọn Page dùng chung (Co-admin 2 Via) */}
+                    {selectedCoAdminPageNames.length > 0 && !isAllCoAdminsSelected && (
+                      <div className="mt-2.5 p-2.5 rounded-xl bg-purple-950/60 border border-purple-500/40 flex flex-wrap items-center justify-between gap-2 shadow-xs">
+                        <div className="flex items-center gap-2 text-xs text-purple-200">
+                          <ThunderboltFilled className="text-purple-400 text-sm shrink-0" />
+                          <span>
+                            Page <b>{selectedCoAdminPageNames.join(', ')}</b> có <b>2 Via cùng quản lý</b> (Huỳnh Thạnh Phú + Thành An).
+                          </span>
+                        </div>
+                        <Button
+                          size="small"
+                          type="primary"
+                          icon={<ThunderboltOutlined />}
+                          className="bg-purple-600 hover:bg-purple-500 text-xs font-semibold rounded-lg h-7"
+                          onClick={handleAutoSelectBothViasForSelectedPages}
+                        >
+                          ⚡ Bật chia đều 2 Via (2 Worker song song)
+                        </Button>
+                      </div>
+                    )}
+
+                    {selectedCoAdminPageNames.length > 0 && isAllCoAdminsSelected && (
+                      <div className="mt-2 p-2 rounded-xl bg-emerald-950/40 border border-emerald-500/40 flex items-center gap-2 text-xs text-emerald-300">
+                        <span className="text-emerald-400 font-bold shrink-0">✓</span>
+                        <span>
+                          Đang bật <b>chia đều 2 Via cho các Page dùng chung</b> ({selectedCoAdminPageNames.join(', ')}) ➔ 2 Worker sẽ mở 2 trình duyệt chạy song song, giãn cách an toàn chống checkpoint Facebook!
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -8542,6 +8876,124 @@ const PlaywrightPoster = () => {
                   </div>
                 </div>}
               </div>
+              {/* ── BỘ CHIA BÀI & HẸN GIỜ THÔNG MINH (SMART DISPATCH 1-CLICK) ── */}
+              {validLinkCount > 0 && (
+                <div className="mb-4 p-4 rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-950/40 to-slate-900 border border-blue-500/40 shadow-xl backdrop-blur-md">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-base shadow-md shadow-blue-500/20 shrink-0">
+                        ⚡
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-white flex items-center gap-2 flex-wrap">
+                          <span>Phân Bổ Bài & Lịch Trình Tự Động (Smart Dispatch)</span>
+                          <Tag color="cyan" className="!rounded-full font-bold text-[10px] !m-0">1-Click Xong Hết</Tag>
+                        </div>
+                        <div className="text-xs text-slate-400">
+                          Tự động chia đều theo vòng tròn cho các Nick và so le giờ đăng an toàn, chống bị Facebook phạt dồn dập
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-center">
+                      <Button
+                        type="primary"
+                        icon={<ThunderboltFilled />}
+                        onClick={() => handleSmartDispatch()}
+                        className="bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 font-bold text-xs h-9 px-4 rounded-xl shadow-md border-0"
+                      >
+                        {activeSelectedFanpageIds.length > 0 ? (
+                          <span>
+                            ⚡ Phân bổ theo {activeSelectedFanpageIds.map((v) => {
+                              const acc = postingIdentities.find((a) => accountTargetValue(a) === v);
+                              return acc ? (acc.pageName || acc.platformAccountId).replace(/^👤\s*Nick Cá Nhân\s*\((.*)\)$/, '$1') : v;
+                            }).join(', ')}
+                          </span>
+                        ) : (
+                          <span>⚡ Chia đều 2 Via chính ({twoMainViasDisplayNames || 'Thành An + Huỳnh Thạnh Phú'})</span>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <div className="flex items-center gap-1.5 text-xs text-slate-300">
+                        <span className="text-slate-400">Giãn cách mỗi nick:</span>
+                        <Select
+                          size="small"
+                          value={smartDispatchInterval}
+                          onChange={(v) => setSmartDispatchInterval(v)}
+                          className="w-36"
+                          options={[
+                            { value: 15, label: '15p / bài' },
+                            { value: 20, label: '20p / bài (Chuẩn)' },
+                            { value: 30, label: '30p / bài (An toàn)' },
+                            { value: 45, label: '45p / bài' },
+                            { value: 60, label: '60p / bài' },
+                          ]}
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-1.5 text-xs text-slate-300">
+                        <span className="text-slate-400">Thời gian bắt đầu:</span>
+                        <Segmented
+                          size="small"
+                          value={smartDispatchStartMode}
+                          onChange={(v) => setSmartDispatchStartMode(v as any)}
+                          options={[
+                            { value: 'NOW', label: '+10 phút nữa' },
+                            { value: 'TOMORROW_830', label: '8:30 sáng mai' },
+                          ]}
+                          className="bg-slate-900 border border-slate-700 text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="small"
+                        icon={<ShareAltOutlined />}
+                        onClick={() => {
+                          if (selectedDistributePages.length === 0) {
+                            setSelectedDistributePages(postingIdentities.slice(0, 4).map(accountTargetValue));
+                          }
+                          setDistributeModalOpen(true);
+                        }}
+                        className="text-xs bg-slate-800 border-slate-700 text-slate-300 hover:text-white"
+                      >
+                        Chọn Nick/Page khác...
+                      </Button>
+                      {Object.keys(customItemTargets).length > 0 && (
+                        <Button
+                          size="small"
+                          type="text"
+                          danger
+                          onClick={resetEqualDistribution}
+                          className="text-xs text-rose-400 hover:text-rose-300"
+                        >
+                          ✕ Xóa phân bổ ({Object.keys(customItemTargets).length})
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {smartDispatchSummary && (
+                    <div className="mt-2.5 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-emerald-200">
+                      <div className="flex items-center gap-2">
+                        <span className="text-emerald-400 font-bold">✓</span>
+                        <span>
+                          Đã chia đều <b>{smartDispatchSummary.total}</b> bài: {Object.entries(smartDispatchSummary.nickCounts).map(([name, c]) => `${name} (${c} bài)`).join(' · ')}
+                        </span>
+                      </div>
+                      <div className="font-mono text-emerald-300">
+                        Lịch phát: <b>{smartDispatchSummary.startTime}</b> ➔ <b>{smartDispatchSummary.endTime}</b> (so le {smartDispatchSummary.stepMinutes}p/bài)
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Thanh thao tác nhanh hàng loạt nổi bật ngay trên danh sách bài viết (chỉ hiện khi đã có link hợp lệ) */}
               {validLinkCount > 0 && (
                 <div className="poster-bulk-credit mb-4 p-3 sm:p-3.5 bg-slate-900/90 rounded-2xl border border-slate-700/80 flex flex-wrap items-center justify-between gap-3 shadow-lg backdrop-blur-md">
@@ -8679,7 +9131,17 @@ const PlaywrightPoster = () => {
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="poster-post-number">{index + 1}</span>
                           <div className="min-w-0">
-                            <div className="text-sm font-bold text-slate-800">Bài viết {index + 1}</div>
+                            <div className="text-sm font-bold text-slate-800 flex items-center gap-2 flex-wrap">
+                              <span>Bài viết {index + 1}</span>
+                              {customItemTargets[item.id] && (
+                                <Tag color="blue" className="!rounded-md text-[11px] font-semibold !m-0 border-blue-300">
+                                  👤 {(() => {
+                                    const t = postingIdentities.find(a => accountTargetValue(a) === customItemTargets[item.id]);
+                                    return (t?.pageName || customItemTargets[item.id]).replace(/^👤\s*Nick Cá Nhân\s*\((.*)\)$/, '$1');
+                                  })()} · ⏰ {item.scheduledAt ? item.scheduledAt.format('HH:mm') : ''}
+                                </Tag>
+                              )}
+                            </div>
                             <div className={`text-[11px] ${item.inputType === 'MANUAL'
                               ? (item.manualContent?.trim() || (item.manualMediaUrls && item.manualMediaUrls.length > 0) ? 'text-emerald-600 font-semibold' : 'text-slate-400')
                               : (item.url.trim() ? 'text-emerald-600 font-semibold' : 'text-slate-400')
@@ -13083,6 +13545,126 @@ const PlaywrightPoster = () => {
         </div>
       </Modal>
 
+      {/* Modal Tự động xếp lại lịch hàng đợi chống trùng giờ & chia đều 2 Via */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2.5 text-base">
+            <span className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center shrink-0">
+              <ScheduleOutlined />
+            </span>
+            <span className="font-bold text-slate-100">
+              Tự động xếp lại lịch hàng đợi ({currentPendingDistribution.totalPending} bài)
+            </span>
+          </div>
+        }
+        open={autoFixQueueModalVisible}
+        onCancel={() => setAutoFixQueueModalVisible(false)}
+        onOk={handleAutoFixQueue}
+        confirmLoading={isBulkProcessing}
+        okText={`⚡ Xếp lại lịch ngay (${currentPendingDistribution.totalPending} bài)`}
+        cancelText="Hủy"
+        width={580}
+        className="max-w-[calc(100vw-24px)]"
+      >
+        <div className="py-2 space-y-4">
+          <div className="p-3.5 bg-blue-500/10 rounded-xl border border-blue-500/20 text-xs text-blue-200 leading-relaxed">
+            <div className="font-bold mb-1 flex items-center gap-1.5 text-blue-300">
+              <CheckCircleOutlined /> Giải quyết triệt để lỗi trùng giờ & dồn bài:
+            </div>
+            Hệ thống sẽ lấy toàn bộ các bài đang <strong>Chờ đăng (PENDING)</strong>, rải đều thời gian so le
+            tuyệt đối không bị trùng giây/phút, đồng thời luân phiên chia đều tải cho 2 Via chính.
+          </div>
+
+          <div className="p-3.5 bg-slate-900/80 rounded-xl border border-slate-800 space-y-3">
+            <div>
+              <div className="text-xs font-bold text-slate-200 mb-1.5">1. Thời điểm bắt đầu chạy bài đầu tiên:</div>
+              <Segmented
+                block
+                value={autoFixStartMode}
+                onChange={(val) => setAutoFixStartMode(val as any)}
+                options={[
+                  {
+                    label: '⚡ Sau 10 phút nữa',
+                    value: 'NEXT_10MIN',
+                  },
+                  {
+                    label: '🌅 08:30 sáng mai',
+                    value: 'TOMORROW_830',
+                  },
+                ]}
+              />
+            </div>
+
+            <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-bold text-slate-200">2. Khoảng cách nghỉ của từng Nick:</div>
+                <div className="text-[11px] text-slate-400">Thời gian nghỉ giữa 2 bài đăng liên tiếp của cùng 1 nick.</div>
+              </div>
+              <Select
+                value={autoFixInterval}
+                onChange={setAutoFixInterval}
+                className="w-44 rounded-xl font-bold"
+                options={[
+                  { value: 10, label: '10 phút (So le 5p)' },
+                  { value: 15, label: '15 phút (So le 7.5p)' },
+                  { value: 20, label: '20 phút (Khuyên dùng)' },
+                  { value: 30, label: '30 phút (An toàn cao)' },
+                  { value: 45, label: '45 phút (So le 22.5p)' },
+                  { value: 60, label: '60 phút (So le 30p)' },
+                ]}
+              />
+            </div>
+
+            <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-bold text-slate-200">3. Chia đều tải cho 2 Via chính:</div>
+                <div className="text-[11px] text-slate-400">Luân phiên (Round-Robin) giữa Thành An & Huỳnh Thạnh Phú.</div>
+              </div>
+              <Switch
+                checked={autoFixDistributeVias}
+                onChange={setAutoFixDistributeVias}
+              />
+            </div>
+          </div>
+
+          {/* Hộp xem trước kết quả dự kiến */}
+          {(() => {
+            const count = currentPendingDistribution.totalPending || 0;
+            const k = autoFixDistributeVias ? 2 : 1;
+            const interval = autoFixInterval || 20;
+            const step = Math.max(5, Math.round(interval / k));
+            const start = autoFixStartMode === 'TOMORROW_830'
+              ? dayjs().add(1, 'day').hour(8).minute(30).second(0)
+              : dayjs().add(10, 'minute');
+            const end = start.add(Math.max(0, count - 1) * step, 'minute');
+
+            return (
+              <div className="p-3 bg-slate-900/50 rounded-xl border border-slate-800 text-xs text-slate-300 space-y-1">
+                <div className="text-slate-400 font-semibold">📋 Dự kiến sau khi xếp lại:</div>
+                <div className="flex items-center justify-between">
+                  <span>• Tổng số bài:</span>
+                  <span className="font-bold text-white">{count} bài</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>• Nhịp đăng hệ thống:</span>
+                  <span className="font-bold text-emerald-400">{step} phút / bài</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>• Thời gian chạy:</span>
+                  <span className="font-mono text-amber-300">{start.format('HH:mm DD/MM')} ➔ {end.format('HH:mm DD/MM')}</span>
+                </div>
+                {autoFixDistributeVias && (
+                  <div className="flex items-center justify-between text-[11px] text-purple-300 pt-1 border-t border-slate-800/60">
+                    <span>• Phân bổ nick:</span>
+                    <span>Thành An (~{Math.ceil(count / 2)} bài) · Huỳnh Thạnh Phú (~{Math.floor(count / 2)} bài)</span>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+      </Modal>
+
       {/* Modal Chuyển toàn bộ bài lỗi về Chờ đăng (Reset Failed to Pending) */}
       <Modal
         title={
@@ -14036,16 +14618,30 @@ const PlaywrightPoster = () => {
                   ({currentPendingDistribution.pagesList.length} Page/Nick)
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => setHistoryPageFilter('ALL')}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 border cursor-pointer ${historyPageFilter === 'ALL'
-                    ? 'border-blue-500/80 bg-blue-600/30 text-blue-200 shadow-sm ring-1 ring-blue-500/30'
-                    : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-                  }`}
-              >
-                <span>Xem tất cả ({currentPendingDistribution.totalPending.toLocaleString()})</span>
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setHistoryPageFilter('ALL')}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 border cursor-pointer ${historyPageFilter === 'ALL'
+                      ? 'border-blue-500/80 bg-blue-600/30 text-blue-200 shadow-sm ring-1 ring-blue-500/30'
+                      : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                    }`}
+                >
+                  <span>Xem tất cả ({currentPendingDistribution.totalPending.toLocaleString()})</span>
+                </button>
+
+                {currentPendingDistribution.totalPending > 0 && (
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<ThunderboltFilled />}
+                    onClick={() => setAutoFixQueueModalVisible(true)}
+                    className="bg-gradient-to-r from-emerald-600 via-teal-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 font-bold text-xs rounded-lg shadow-md border-0"
+                  >
+                    ⚡ Tự động xếp lại lịch ({currentPendingDistribution.totalPending} bài)
+                  </Button>
+                )}
+              </div>
             </div>
 
             {/* Danh sách các card Page chia lưới ngay hàng thẳng lối (CSS Grid) */}

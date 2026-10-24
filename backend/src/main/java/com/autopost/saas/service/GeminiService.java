@@ -112,7 +112,7 @@ public class GeminiService {
         return true;
     }
 
-    private String postWithModelFallback(Map<String, Object> body, String apiKeyOverride) {
+    public String postWithModelFallback(Map<String, Object> body, String apiKeyOverride) {
         java.util.List<String> keyPool = parseKeys(apiKeyOverride);
         if (keyPool.isEmpty()) {
             throw new IllegalStateException("Chưa cấu hình GEMINI_API_KEY — nhập key ở nút 'Cài đặt AI' trong Studio Ảnh Tin.");
@@ -200,10 +200,118 @@ public class GeminiService {
         throw new IllegalStateException("Tất cả " + keyPool.size() + " Gemini API key đều đã hết Quota (429) hoặc bị lỗi. Vui lòng thêm key mới tại nút 'Cài đặt AI'. Chi tiết: " + String.join("; ", failures), lastException);
     }
 
+    // Model đọc giọng (TTS) — thử lần lượt, model nào 404/429 thì tạm nghỉ như model văn bản
+    private static final List<String> TTS_MODELS = List.of(
+            "gemini-2.5-flash-preview-tts", "gemini-2.5-pro-preview-tts");
+    private static final java.util.Set<String> WARM_TTS_VOICES = java.util.Set.of(
+            "Sulafat", "Achernar", "Vindemiatrix", "Leda", "Aoede", "Despina");
+
+    /**
+     * Đọc văn bản thành giọng nói bằng Gemini TTS (Studio Video Tin).
+     * Trả về PCM thô 16-bit, mono, 24kHz (định dạng Gemini trả) — bên gọi tự đổi sang m4a bằng FFmpeg.
+     */
+    public byte[] generateSpeech(String text, String voiceName, String apiKeyOverride) {
+        java.util.List<String> keyPool = parseKeys(apiKeyOverride);
+        if (keyPool.isEmpty()) {
+            throw new IllegalStateException("Chưa cấu hình GEMINI_API_KEY — nhập key ở nút 'Cài đặt AI'.");
+        }
+        String voice = (voiceName == null || voiceName.isBlank()) ? "Kore" : voiceName.trim();
+        // Giọng nữ ấm (Sulafat "warm", Achernar "soft", Vindemiatrix "gentle"...) → đọc kiểu kể chuyện thân thiện thay vì bản tin
+        String style = WARM_TTS_VOICES.contains(voice)
+                ? "Đọc bằng tiếng Việt, giọng nữ trẻ trong trẻo, ấm áp, thân thiện như đang kể chuyện cho bạn bè, nhịp vừa phải: "
+                : "Đọc bằng tiếng Việt, giọng phát thanh viên tin tức, rõ ràng, nhịp nhanh vừa phải: ";
+        Map<String, Object> body = Map.of(
+                "contents", List.of(Map.of("parts", List.of(Map.of("text", style + text)))),
+                "generationConfig", Map.of(
+                        "responseModalities", List.of("AUDIO"),
+                        "speechConfig", Map.of("voiceConfig", Map.of("prebuiltVoiceConfig", Map.of("voiceName", voice)))));
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+
+        List<String> failures = new ArrayList<>();
+        for (int i = 0; i < keyPool.size(); i++) {
+            String currentKey = keyPool.get(i);
+            String masked = maskKey(currentKey);
+            List<String> ordered = new ArrayList<>();
+            List<String> cooling = new ArrayList<>();
+            for (String m : TTS_MODELS) (isCoolingDown(currentKey, m) ? cooling : ordered).add(m);
+            ordered.addAll(cooling);
+            for (String targetModel : ordered) {
+                String url = "https://generativelanguage.googleapis.com/v1beta/models/" + targetModel + ":generateContent?key=" + currentKey;
+                try {
+                    String responseJson = restTemplate.postForObject(url, request, String.class);
+                    JsonNode parts = objectMapper.readTree(responseJson).path("candidates").path(0).path("content").path("parts");
+                    for (JsonNode part : parts) {
+                        String data = part.path("inlineData").path("data").asText("");
+                        if (!data.isEmpty()) {
+                            log.info("✅ [Gemini TTS] Thành công với Key #{} ({}) model {}, giọng {}", i + 1, masked, targetModel, voice);
+                            recordKeyUsage(currentKey);
+                            return java.util.Base64.getDecoder().decode(data);
+                        }
+                    }
+                    failures.add("Key #" + (i + 1) + " model " + targetModel + " (không có audio)");
+                } catch (org.springframework.web.client.HttpStatusCodeException e) {
+                    int status = e.getStatusCode().value();
+                    failures.add("Key #" + (i + 1) + " [" + masked + "] model " + targetModel + " (HTTP " + status + ")");
+                    log.warn("⚠️ [Gemini TTS] Key #{} model {} gặp HTTP {}: {}", i + 1, targetModel, status, e.getResponseBodyAsString());
+                    if (status == 429 || status == 503 || status == 404) {
+                        modelCooldownUntil.put(cooldownKey(currentKey, targetModel),
+                                System.currentTimeMillis() + (status == 404 ? MODEL_GONE_COOLDOWN_MS : MODEL_COOLDOWN_MS));
+                    }
+                    if (status == 403) break;
+                } catch (Exception e) {
+                    failures.add("Key #" + (i + 1) + " [" + masked + "] (" + targetModel + ": " + e.getClass().getSimpleName() + ")");
+                    log.warn("⚠️ [Gemini TTS] Key #{} model {} lỗi: {}", i + 1, targetModel, e.getMessage());
+                }
+            }
+        }
+        throw new IllegalStateException("Gemini TTS lỗi với mọi key: " + String.join("; ", failures));
+    }
+
     /**
      * Viết tiêu đề cho ảnh "thẻ tin tức" kiểu page tin giật tít: IN HOA, 15-35 từ, 2-4 cụm quan trọng
      * bọc trong [[...]] để tô đỏ khi dựng ảnh (xem worker/news-card.js).
      */
+    /**
+     * Studio Video Tin: xem vài khung hình của clip + caption gốc → viết chữ cho thẻ/bảng trên khung video,
+     * câu cho giọng đọc mở đầu và caption khi đăng bài.
+     * Trả JSON {"headline": "...[[cụm nhấn]]...", "voice": "câu đọc", "caption": "caption đăng bài"}.
+     */
+    public String generateClipPanel(String caption, String sourceName, List<byte[]> frames, String apiKeyOverride) {
+        if (parseKeys(apiKeyOverride).isEmpty()) {
+            throw new IllegalStateException("Chưa cấu hình GEMINI_API_KEY — nhập key ở nút 'Cài đặt AI'.");
+        }
+        String prompt = "Bạn là admin một Fanpage video giải trí/đời sống triệu follow tại Việt Nam (kiểu nexa24h, Theanh28). "
+                + (frames != null && !frames.isEmpty()
+                    ? "Dưới đây là " + frames.size() + " khung hình cắt đều từ đầu đến cuối 1 clip, kèm caption gốc (có thể rất ngắn hoặc trống). Hãy XEM KỸ các khung hình để hiểu chuyện gì xảy ra trong clip.\n"
+                    : "Dưới đây là caption gốc của 1 clip.\n")
+                + "Viết 3 thứ:\n"
+                + "1) \"headline\": chữ in lên thẻ trên video. Tiếng Việt, 12 đến 25 từ, giọng hài hước/bình luận duyên dáng kiểu page giải trí, "
+                + "có thể mở đầu bằng 1 cụm cảm thán ngắn kết thúc bằng dấu hai chấm (vd \"THẾ MÀ LẠI HAY:\", \"CĂNG THẬT SỰ:\"). "
+                + "Bọc 2 đến 4 cụm đắt giá trong [[ và ]] để tô màu. Không hashtag, không emoji.\n"
+                + "2) \"voice\": 1 câu nói tự nhiên, thân thiện như kể cho bạn bè, 8 đến 20 từ, viết thường, không [[ ]], không emoji, đọc khoảng 3 đến 5 giây.\n"
+                + "3) \"caption\": caption đăng kèm video: dòng đầu là câu hook gây tò mò, rồi 1 đến 2 câu kể ngắn nội dung clip, "
+                + "1 câu hỏi kéo bình luận, dòng cuối 3 đến 5 hashtag tiếng Việt không dấu liên quan. Có thể dùng 1 đến 3 emoji hợp ngữ cảnh.\n"
+                + "Quy tắc chung: chỉ kể những gì thấy trong khung hình/caption, không bịa tên người, địa danh, con số. "
+                + "Từ nhạy cảm dễ bị Facebook hạn chế (bia, rượu, ma túy, súng, giết, chết, tự tử, cờ bạc, sex...) thì viết né bằng dấu chấm, ví dụ C.H.Ế.T.\n"
+                + "CHỈ trả về JSON đúng dạng {\"headline\": \"...\", \"voice\": \"...\", \"caption\": \"...\"}, không giải thích.\n\n"
+                + "Nguồn/nhóm: " + (sourceName == null ? "" : sourceName) + "\n"
+                + "Caption gốc: " + (caption == null || caption.isBlank() ? "(trống)" : caption.length() > 1500 ? caption.substring(0, 1500) : caption);
+        List<Map<String, Object>> parts = new ArrayList<>();
+        parts.add(Map.of("text", prompt));
+        if (frames != null) {
+            for (byte[] f : frames) {
+                parts.add(Map.of("inlineData", Map.of("mimeType", "image/jpeg", "data", java.util.Base64.getEncoder().encodeToString(f))));
+            }
+        }
+        Map<String, Object> body = Map.of(
+                "contents", List.of(Map.of("parts", parts)),
+                "generationConfig", Map.of("responseMimeType", "application/json"));
+        String result = postWithModelFallback(body, apiKeyOverride).trim();
+        return result.replaceAll("^```(json)?\\s*|\\s*```$", "");
+    }
+
     public String generateNewsCardHeadline(String title, String sapo, String content, String apiKeyOverride) {
         if (parseKeys(apiKeyOverride).isEmpty()) {
             throw new IllegalStateException("Chưa cấu hình GEMINI_API_KEY — nhập key ở nút 'Cài đặt AI' trong Studio Ảnh Tin.");
@@ -232,6 +340,19 @@ public class GeminiService {
         return result;
     }
 
+    public static String cleanSourceName(String source) {
+        if (source == null || source.isBlank()) return "Báo điện tử";
+        String s = source.trim();
+        String lower = s.toLowerCase();
+        if (lower.contains("reddit")) return "Reddit";
+        if (lower.contains("threads")) return "Threads";
+        if (lower.contains("tiktok")) return "TikTok";
+        if (lower.contains("facebook") || lower.equals("fb.com")) return "Facebook";
+        if (lower.contains("youtube") || lower.equals("youtu.be")) return "YouTube";
+        if (lower.endsWith(".com")) return s.substring(0, s.length() - 4);
+        return s;
+    }
+
     /**
      * "Soạn bài" cho Studio Ảnh Tin trong 1 lần gọi: tiêu đề in lên ảnh (cụm [[...]] tô màu), caption hook
      * ngắn, bản tóm tắt chia đoạn (đặt ở caption hoặc bình luận đầu) và nhãn góc ảnh (con số/chi tiết đắt nhất).
@@ -241,18 +362,26 @@ public class GeminiService {
         if (parseKeys(apiKeyOverride).isEmpty()) {
             throw new IllegalStateException("Chưa có Gemini API key — nhập key ở nút Cài đặt AI trong Studio Ảnh Tin.");
         }
+        String cleanSource = cleanSourceName(sourceName);
         String body = "Tiêu đề: " + (title == null ? "" : title)
                 + "\nTóm tắt: " + (sapo == null ? "" : sapo)
                 + "\nNội dung: " + (content == null ? "" : content.length() > 6000 ? content.substring(0, 6000) : content);
-        String prompt = "Bạn là biên tập viên Fanpage tin tức triệu follow tại Việt Nam. Dựa trên bài báo dưới đây, trả về JSON với đúng 4 trường:\n"
-                + "1. \"headline\": tiêu đề in lên ảnh, 15-35 từ, một câu kể liền mạch gây tò mò mạnh (nhân vật + con số/chi tiết gây sốc + bước ngoặt). "
-                + "Bọc 2-4 cụm quan trọng nhất trong [[ và ]]. Không emoji, không hashtag, không dấu chấm cuối.\n"
-                + "2. \"hook\": caption ngắn 2-3 câu (tối đa 280 ký tự) khơi gợi tò mò, KHÔNG kể hết nội dung, kết bằng một câu mời đọc tiếp ở bình luận "
-                + "hoặc một câu hỏi mở. Có thể dùng 1-2 emoji phù hợp.\n"
-                + "3. \"summary\": tóm tắt bài báo cho người đọc mạng xã hội: dòng đầu là tiêu đề ngắn gọn, sau đó 3-5 đoạn ngắn (mỗi đoạn 1-3 câu) "
-                + "giữ đủ số liệu, tên riêng quan trọng; các đoạn cách nhau 1 dòng trống. Dòng cuối cùng ghi đúng: Nguồn: " + (sourceName == null || sourceName.isBlank() ? "Báo điện tử" : sourceName) + "\n"
-                + "4. \"badge\": nhãn dán góc ảnh tối đa 3 từ, IN HOA, là con số hoặc chi tiết đắt giá nhất (ví dụ \"35.000 TỶ\", \"LÃI 10,5%\", \"NÓNG\").\n"
-                + "Chỉ viết đúng sự thật trong bài, không bịa. Từ nhạy cảm dễ bị Facebook hạn chế (bia, rượu, ma túy, súng, giết, chết, tự tử, cờ bạc...) viết né bằng dấu chấm như B.I.A.\n\n"
+        String prompt = "Bạn là chuyên gia sáng tạo nội dung khoa học, đời sống, lịch sử và tri thức mạng xã hội hàng đầu tại Việt Nam, bậc thầy nghệ thuật Storytelling triệu view. "
+                + "Dựa trên bài viết/tiêu đề dưới đây (thường từ Reddit, mạng xã hội hoặc báo chí quốc tế), hãy biên tập lại thành nội dung CỰC KỲ CUỐN HÚT, GIÀU KIẾN THỨC, HỌC HỎI ĐƯỢC NHIỀU THÔNG TIN MỚI MẺ và trả về JSON với đúng 4 trường:\n"
+                + "1. \"headline\": Tiêu đề in lên ảnh (15-35 từ), một câu kể liền mạch gây tò mò cực mạnh (nhân vật/sự kiện + phát hiện/kết quả bất ngờ nhất). "
+                + "Bọc 2-4 cụm từ khóa đắt giá nhất trong [[ và ]]. Tuyệt đối không emoji, không hashtag, không dấu chấm cuối câu.\n"
+                + "2. \"hook\": Caption mở đầu ngắn 2-3 câu (tối đa 280 ký tự), giật hook khơi gợi sự tò mò cao độ, nêu bật kết quả gây bất ngờ hoặc bài học đắt giá, kích thích người đọc phải xem chi tiết. Có thể dùng 1-2 emoji phù hợp.\n"
+                + "3. \"summary\": BẢN CAPTION CHI TIẾT, GIÀU KIẾN THỨC & CỰC KỲ CUỐN HÚT (Đọc là học hỏi thêm được nhiều thông tin giá trị):\n"
+                + "   - Dòng đầu tiên: Tiêu đề in hoa nổi bật, tóm lược trọn vẹn thông điệp hoặc phát hiện chính.\n"
+                + "   - Thân bài gồm 3 đến 5 đoạn văn mạch lạc, thoáng đãng (mỗi đoạn 2-3 câu, cách nhau 1 dòng trống). Hãy khai thác sâu tri thức thực tế về chủ đề/sự kiện này để cung cấp thông tin hữu ích:\n"
+                + "     + Bối cảnh & Sự việc: Ai thực hiện? Chuyện gì đã xảy ra? Hoàn cảnh đặc biệt ra sao?\n"
+                + "     + Diễn biến & KẾT QUẢ THỰC TẾ CỤ THỂ: Trình bày chi tiết các số liệu, dẫn chứng, kết quả thực nghiệm hoặc tình huống bước ngoặt (ví dụ: con số đo lường cụ thể, sự khác biệt rõ rệt giữa các trường hợp, lý do khoa học/nguyên nhân đằng sau). TUYỆT ĐỐI KHÔNG NÓI CHUNG CHUNG SÁO RỖNG.\n"
+                + "     + Ý nghĩa & Bài học đọng lại: Người đọc học hỏi thêm được kiến thức gì mới, ứng dụng vào thực tế cuộc sống ra sao hoặc bài học nhân văn sâu sắc nào.\n"
+                + "   - Văn phong tự nhiên, truyền cảm, cuốn hút, giàu hình ảnh và thông tin, không cứng nhắc như dịch máy.\n"
+                + "   - TUYỆT ĐỐI KHÔNG dùng dấu sao markdown (*, **). Dùng chữ IN HOA nếu muốn nhấn mạnh.\n"
+                + "   - Dòng cuối cùng của summary ghi đúng: Nguồn: " + cleanSource + "\n"
+                + "4. \"badge\": Nhãn dán góc ảnh tối đa 3 từ, IN HOA, là con số hoặc chi tiết đắt giá nhất (ví dụ \"SỐC\", \"BẤT NGỜ\", \"KIẾN THỨC\", \"HỮU ÍCH\").\n"
+                + "Nếu tiêu đề gốc bằng tiếng Anh hoặc ngắn gọn, hãy dựa vào kiến thức thực tế về sự kiện/nghiên cứu đó để viết thật đầy đủ và chính xác. Từ nhạy cảm dễ bị Facebook hạn chế viết né bằng dấu chấm như B.I.A, C.H.Ế.T.\n\n"
                 + body;
         Map<String, Object> req = Map.of(
                 "contents", List.of(Map.of("parts", List.of(Map.of("text", prompt)))),
@@ -281,10 +410,10 @@ public class GeminiService {
             throw new IllegalStateException("Chưa cấu hình GEMINI_API_KEY — không thể xào lại caption bằng AI.");
         }
 
-        String prompt = "Viết lại đoạn caption mạng xã hội tiếng Việt dưới đây theo cách diễn đạt HOÀN TOÀN KHÁC "
-                + "(đổi từ ngữ, cấu trúc câu, thêm bớt emoji tự nhiên) nhưng GIỮ NGUYÊN ý nghĩa và sắc thái vui vẻ/đáng yêu. "
-                + "Không thêm hashtag, không thêm ghi chú giải thích, không thêm dấu ngoặc kép quanh kết quả. "
-                + "CHỈ trả về đúng đoạn caption đã viết lại, không kèm gì khác.\n\n"
+        String prompt = "Bạn là chuyên gia sáng tạo nội dung mạng xã hội triệu follow. Hãy viết lại đoạn caption tiếng Việt dưới đây thành một bản MỚI TOANH CỰC KỲ CUỐN HÚT, RÕ Ý & CHẠM CẢM XÚC: "
+                + "Diễn đạt bằng ngôn từ tự nhiên, mạch lạc, giàu hình ảnh, giữ nguyên sự thật và các chi tiết cốt lõi nhưng cách kể hấp dẫn hơn gấp bội. "
+                + "Có thể thêm 1-2 emoji phù hợp để bài sinh động. Không dùng dấu sao markdown (*, **). Không thêm hashtag, không thêm lời dẫn giải thích, không bọc trong ngoặc kép. "
+                + "CHỈ trả về đúng đoạn caption đã hoàn thiện.\n\n"
                 + "Caption gốc:\n" + originalCaption;
 
         Map<String, Object> body = Map.of(
@@ -464,13 +593,20 @@ public class GeminiService {
         } else if ("ZALO_TELEGRAM".equals(styleKey)) {
             styleInstructions = "Viết thành BẢN TIN NHANH CHO ZALO / TELEGRAM GROUP: siêu ngắn gọn, 4-6 câu cô đọng nhất, trình bày đẹp mắt.";
         } else {
-            styleInstructions = "Viết theo phong cách BÀI ĐĂNG FANPAGE / GROUP MẠNG XÃ HỘI HẤP DẪN: câu từ giật gân, cuốn hút, dùng icon/emoji hợp lý, bố cục sạch đẹp, kích thích tương tác.";
+            styleInstructions = "Viết theo phong cách BÀI ĐĂNG FANPAGE TRIỆU VIEW CỰC KỲ CUỐN HÚT, RÕ Ý & GIÀU KIẾN THỨC:\n"
+                    + "- Dòng đầu: Tiêu đề IN HOA nổi bật, tóm lược nội dung cốt lõi hoặc câu hỏi lớn gây tò mò.\n"
+                    + "- Thân bài: Gồm 3 đến 5 đoạn văn thoáng đãng (mỗi đoạn 2-3 câu, cách nhau 1 dòng trống). NẾU BÀI GỐC LÀ TIÊU ĐỀ TIẾNG ANH HOẶC NỘI DUNG NGẮN (từ Reddit/mạng xã hội), BẮT BUỘC bạn phải dùng kho kiến thức bách khoa thực tế để giải thích chi tiết: Ai là người thực hiện? Hoàn cảnh lịch sử/khoa học ra sao? Diễn biến thử nghiệm/sự kiện thế nào? Kết quả đo lường và số liệu thực tế cụ thể là gì? Cơ chế hoặc nguyên nhân đằng sau? Đúc kết bài học hữu ích hoặc ý nghĩa nhân văn cho người đọc.\n"
+                    + "- TUYỆT ĐỐI KHÔNG tóm tắt hời hợt, vô thưởng vô phạt hay dùng các câu sáo rỗng chung chung. Phải đem lại giá trị học hỏi thực sự cho người đọc.\n"
+                    + "- Văn phong tự nhiên, truyền cảm, cuốn hút như một chuyên gia kể chuyện, không dùng từ ngữ dịch máy.\n"
+                    + "- TUYỆT ĐỐI KHÔNG dùng dấu sao markdown (*, **). Dùng chữ IN HOA nếu muốn nhấn mạnh.\n"
+                    + "- Dòng cuối cùng ghi đúng: Nguồn: Reddit (hoặc nguồn bài viết tương ứng).";
         }
 
         String prompt = "Bạn là " + roleExpertise + ".\n"
                 + "Nhiệm vụ của bạn: Hãy đọc bài báo/nội dung dưới đây và VIẾT LẠI THÀNH BÀI ĐĂNG HOÀN CHỈNH BẰNG TIẾNG VIỆT.\n\n"
                 + "YÊU CẦU BIÊN TẬP:\n"
                 + "- " + styleInstructions + "\n"
+                + "- Nếu nội dung gốc ngắn hoặc là bài quốc tế/tiếng Anh, hãy khai thác tri thức thực tế về sự kiện/nghiên cứu/nhân vật đó để viết chi tiết, có số liệu và bài học cụ thể.\n"
                 + "- Giữ nguyên các thông số quan trọng (tên người, số liệu, mốc thời gian nếu có).\n"
                 + "- TUYỆT ĐỐI KHÔNG dùng dấu sao markdown (*, **, ***) để in đậm hay gạch đầu dòng. Facebook không hiển thị được markdown. Dùng chữ IN HOA nếu muốn nhấn mạnh.\n"
                 + "- Tuyệt đối không thêm lời dẫn kiểu \"Dưới đây là bài đăng...\", hãy trả về thẳng nội dung bài đăng đã hoàn thiện.\n\n"
@@ -483,7 +619,7 @@ public class GeminiService {
         String origKey = this.apiKey;
         try {
             this.apiKey = effectiveKey;
-            String rewritten = postWithModelFallback(body);
+            String rewritten = postWithModelFallback(body, effectiveKey);
             if (rewritten.startsWith("```")) {
                 rewritten = rewritten.replaceAll("^```(?:markdown|text)?\\n?", "").replaceAll("\\n?```$", "").trim();
             }

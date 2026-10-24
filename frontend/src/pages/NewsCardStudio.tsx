@@ -21,7 +21,7 @@ import {
   Tooltip,
   Upload,
 } from 'antd';
-import { DeleteOutlined, DownloadOutlined, KeyOutlined, ReloadOutlined, ThunderboltOutlined, UploadOutlined, CloudUploadOutlined, UndoOutlined, RedoOutlined, QuestionCircleOutlined, PlusOutlined, PictureOutlined, FilterOutlined, TagsOutlined, AppstoreOutlined, PlayCircleOutlined } from '@ant-design/icons';
+import { DeleteOutlined, DownloadOutlined, KeyOutlined, ReloadOutlined, ThunderboltOutlined, UploadOutlined, CloudUploadOutlined, UndoOutlined, RedoOutlined, QuestionCircleOutlined, PlusOutlined, PictureOutlined, FilterOutlined, TagsOutlined, AppstoreOutlined, PlayCircleOutlined, SoundOutlined, MutedOutlined, EyeInvisibleOutlined } from '@ant-design/icons';
 import FacebookPostPreview from '../components/studio/FacebookPostPreview';
 import api from '../config/axios';
 import { getStoredGeminiKeys, saveStoredGeminiKeys } from '../components/modals/AiSettingsModal';
@@ -284,13 +284,6 @@ const upgradeImageUrl = (url: string): string => {
     .replace(/\/thumb_x\d+x\d+\//, '/')
     .replace(/\/resize\/\d+x\d+\//, '/')
     .replace(/\/w\d{2,4}\//, '/');
-  try {
-    const parsed = new URL(u);
-    if (/vnecdn\.net|vnexpress/.test(parsed.hostname)) {
-      parsed.search = '';
-      u = parsed.toString();
-    }
-  } catch { /* giữ nguyên */ }
   return u;
 };
 
@@ -322,19 +315,28 @@ const sourceName = (url: string) => {
       'cafef.vn': 'CafeF', 'vnexpress.net': 'VnExpress', 'dantri.com.vn': 'Dân Trí', 'tuoitre.vn': 'Tuổi Trẻ',
       'thanhnien.vn': 'Thanh Niên', 'vietnamnet.vn': 'VietNamNet', 'znews.vn': 'ZNews', 'kenh14.vn': 'Kênh 14',
       'cafebiz.vn': 'CafeBiz', 'vneconomy.vn': 'VnEconomy', 'laodong.vn': 'Lao Động', 'tienphong.vn': 'Tiền Phong',
+      'reddit.com': 'Reddit', 'v.redd.it': 'Reddit', 'redd.it': 'Reddit',
+      'threads.net': 'Threads', 'tiktok.com': 'TikTok', 'facebook.com': 'Facebook', 'fb.com': 'Facebook',
+      'youtube.com': 'YouTube', 'youtu.be': 'YouTube',
     };
+    if (host.includes('reddit')) return 'Reddit';
+    if (host.includes('threads')) return 'Threads';
+    if (host.includes('tiktok')) return 'TikTok';
+    if (host.includes('facebook') || host === 'fb.com') return 'Facebook';
+    if (host.includes('youtube') || host === 'youtu.be') return 'YouTube';
     return known[host] || host;
   } catch {
     return 'Báo điện tử';
   }
 };
 
-const specOf = (it: StudioItem, transparentPhoto = false): CardSpec => ({
+const specOf = (it: StudioItem, transparentPhoto = false, unmuteVideo = false): CardSpec => ({
   headline: it.headline,
   summary: it.summary || it.hook || it.caption || it.title,
   title: it.title,
   images: it.selectedImages,
   videoUrl: it.videoUrl,
+  unmuteVideo,
   transparentPhoto,
   layout: it.layout,
   inset: it.inset,
@@ -343,14 +345,19 @@ const specOf = (it: StudioItem, transparentPhoto = false): CardSpec => ({
   style: it.style,
 });
 
-const withSource = (text: string, url: string) =>
-  /Nguồn:/i.test(text) ? text.trim() : `${text.trim()}\n\nNguồn: ${sourceName(url)}`;
+const cleanCreditText = (text: string) =>
+  text.replace(/Nguồn:\s*reddit\.com/gi, 'Nguồn: Reddit');
+
+const withSource = (text: string, url: string) => {
+  const cleaned = cleanCreditText(text.trim());
+  return /Nguồn:/i.test(cleaned) ? cleaned : `${cleaned}\n\nNguồn: ${sourceName(url)}`;
+};
 
 // [[...]] chỉ có nghĩa trong tiêu đề trên ảnh
 const stripMarks = (t: string) => t.replace(/\[\[|\]\]/g, '');
 
-const fullCaptionOf = (it: StudioItem) => it.caption ?? (it.summary || defaultCaption(it));
-const commentOf = (it: StudioItem) => it.comment ?? (it.summary || defaultCaption(it));
+const fullCaptionOf = (it: StudioItem) => cleanCreditText(it.caption ?? (it.summary || defaultCaption(it)));
+const commentOf = (it: StudioItem) => cleanCreditText(it.comment ?? (it.summary || defaultCaption(it)));
 
 // Bản đưa sang Đăng tự động
 const postOf = (it: StudioItem) =>
@@ -360,7 +367,7 @@ const postOf = (it: StudioItem) =>
 
 const estimateBadgeWidth = (b: Pick<BadgeOptions, 'text' | 'size'>) => b.text.length * b.size * 0.72 + b.size * 1.3;
 
-// Dữ liệu cũ trong localStorage (trước khi có vị trí tự do / nhãn / caption hook)
+// Dữ liệu cũ trong localStorage (trước khi có vị trí tự do / nhãn / caption hook / phục hồi link ảnh)
 const migrateItem = (it: any): StudioItem => {
   const { insetImage, ...rest } = it;
   let inset: InsetOptions | undefined = it.inset;
@@ -368,8 +375,32 @@ const migrateItem = (it: any): StudioItem => {
   if (inset && (inset.left === undefined || inset.top === undefined)) {
     inset = { ...inset, left: (inset as any).corner === 'tr' ? 69 : 3, top: 4, size: inset.size || 380 };
   }
+
+  // Khôi phục URL ảnh VnExpress nếu bị mất query param chữ ký (?s=...)
+  let selectedImages: string[] = Array.isArray(it.selectedImages) ? [...it.selectedImages] : [];
+  let wasVneFixed = false;
+  const allImages: string[] = Array.isArray(it.images) ? it.images : [];
+  selectedImages = selectedImages.map((sel) => {
+    if (typeof sel === 'string' && /vnecdn\.net|vnexpress/.test(sel) && !sel.includes('s=')) {
+      const pathPart = sel.split('?')[0];
+      const valid = allImages.find((img) => typeof img === 'string' && img.includes(pathPart) && img.includes('s='));
+      if (valid) {
+        wasVneFixed = true;
+        return valid;
+      }
+    }
+    return sel;
+  });
+
+  // Nếu ảnh VnExpress từng bị cắt query param khiến cardUrl sinh ra bị đen, xóa cardUrl cũ để render lại
+  const cardUrl = wasVneFixed ? undefined : it.cardUrl;
+  const cardHtml = wasVneFixed ? undefined : it.cardHtml;
+
   return {
     ...rest,
+    selectedImages,
+    cardUrl,
+    cardHtml,
     headlineLoading: false,
     captionMode: it.captionMode || 'full',
     style: { ...DEFAULT_CARD_STYLE, ...it.style },
@@ -419,6 +450,21 @@ export default function NewsCardStudio() {
     localStorage.setItem(ITEMS_KEY, JSON.stringify(items));
   }, [items]);
 
+  // Tự động dọn sạch các cardUrl cũ (từng bị sinh ra ảnh đen do lỗi chữ ký CDN)
+  useEffect(() => {
+    setItems((prev) => {
+      let changed = false;
+      const next = prev.map((it) => {
+        if (it.cardUrl && it.cardUrl.includes('/uploads/newscard-')) {
+          changed = true;
+          return { ...it, cardUrl: undefined, cardHtml: undefined };
+        }
+        return it;
+      });
+      return changed ? next : prev;
+    });
+  }, []);
+
   const patchItem = useCallback((id: string, patch: Partial<StudioItem> | ((it: StudioItem) => Partial<StudioItem>)) => {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...(typeof patch === 'function' ? patch(it) : patch) } : it)));
   }, []);
@@ -466,6 +512,8 @@ export default function NewsCardStudio() {
   const [suggestions, setSuggestions] = useState<Record<string, string[]>>({});
   const [suggesting, setSuggesting] = useState(false);
   const [captionAiLoading, setCaptionAiLoading] = useState(false);
+  const [batchCaptionLoading, setBatchCaptionLoading] = useState(false);
+  const [batchCaptionProgress, setBatchCaptionProgress] = useState<string | null>(null);
   const aiError = (e: any) => e?.response?.data?.error || e.message;
 
   const articlePayload = (it: StudioItem) => ({
@@ -567,6 +615,79 @@ export default function NewsCardStudio() {
     } finally {
       setCaptionAiLoading(false);
     }
+  };
+
+  const rewriteBatchCaptions = async (targetItems?: StudioItem[]) => {
+    if (!geminiKey || !geminiKey.trim()) {
+      setKeyDraft('');
+      setAiModalOpen(true);
+      message.warning('Vui lòng nhập ít nhất 1 Gemini API Key để kích hoạt AI!');
+      return;
+    }
+    const targets = targetItems && targetItems.length > 0
+      ? targetItems
+      : (checkedItems.length > 0 ? checkedItems : items);
+
+    if (targets.length === 0) {
+      return message.warning('Không có bài nào trong danh sách để viết lại caption');
+    }
+
+    setBatchCaptionLoading(true);
+    let successCount = 0;
+
+    for (let i = 0; i < targets.length; i++) {
+      const it = targets[i];
+      setBatchCaptionProgress(`Đang viết lại: ${i + 1}/${targets.length}...`);
+      try {
+        const res = await api.post('/news-radar/rewrite', { ...articlePayload(it), style: 'FANPAGE_POST' });
+        if (res.data?.success && res.data.rewrittenContent) {
+          patchItem(it.id, it.captionMode === 'hook' ? { comment: res.data.rewrittenContent } : { caption: res.data.rewrittenContent });
+          successCount++;
+        } else {
+          const pkgRes = await api.post('/news-card/package', articlePayload(it));
+          if (pkgRes.data?.success && (pkgRes.data.summary || pkgRes.data.hook)) {
+            patchItem(it.id, {
+              summary: pkgRes.data.summary ? String(pkgRes.data.summary).replace(/\[\[|\]\]/g, '') : undefined,
+              hook: pkgRes.data.hook ? String(pkgRes.data.hook).replace(/\[\[|\]\]/g, '') : undefined,
+              caption: undefined,
+            });
+            successCount++;
+          }
+        }
+      } catch (err: any) {
+        console.warn(`Lỗi viết lại caption bài ${it.title}:`, err);
+      }
+    }
+
+    setBatchCaptionLoading(false);
+    setBatchCaptionProgress(null);
+    if (successCount > 0) {
+      message.success(`Đã viết lại Caption sâu sắc, giàu thông tin cho ${successCount}/${targets.length} bài thành công!`);
+    } else {
+      message.error('Không thể viết lại caption các bài, vui lòng kiểm tra Gemini API Key.');
+    }
+  };
+
+  const runPackageForAllChecked = async () => {
+    if (!geminiKey || !geminiKey.trim()) {
+      setKeyDraft('');
+      setAiModalOpen(true);
+      message.warning('Vui lòng nhập ít nhất 1 Gemini API Key để kích hoạt AI!');
+      return;
+    }
+    const targets = checkedItems.length > 0 ? checkedItems : items;
+    if (targets.length === 0) return message.warning('Danh sách bài trống');
+    setBatchCaptionLoading(true);
+    let successCount = 0;
+    for (let i = 0; i < targets.length; i++) {
+      const it = targets[i];
+      setBatchCaptionProgress(`Đang AI soạn bài: ${i + 1}/${targets.length}...`);
+      const ok = await runPackage(it, true);
+      if (ok) successCount++;
+    }
+    setBatchCaptionLoading(false);
+    setBatchCaptionProgress(null);
+    message.success(`Đã AI soạn bài hoàn tất cho ${successCount}/${targets.length} bài!`);
   };
 
   // Hàng đợi xử lý: lần lượt cào full bài (nội dung + toàn bộ ảnh) rồi AI soạn bài
@@ -695,8 +816,65 @@ export default function NewsCardStudio() {
     if (activeId === id) setActiveId(items.find((i) => i.id !== id)?.id || null);
   };
 
+  const removeCheckedItems = () => {
+    const checkedIds = new Set(checkedItems.map((i) => i.id));
+    if (checkedIds.size === 0) return;
+    setItems((prev) => prev.filter((i) => !checkedIds.has(i.id)));
+    if (activeId && checkedIds.has(activeId)) {
+      setActiveId(items.find((i) => !checkedIds.has(i.id))?.id || null);
+    }
+    message.success(`Đã xoá ${checkedIds.size} bài được chọn`);
+  };
+
+  const removeAllItems = () => {
+    setItems([]);
+    setActiveId(null);
+    message.success('Đã xoá toàn bộ bài trong Studio');
+  };
+
+  const removeSentItems = () => {
+    const sentIds = new Set(items.filter((i) => i.sentToPoster).map((i) => i.id));
+    if (sentIds.size === 0) {
+      message.info('Không có bài nào đã chuyển đi đăng');
+      return;
+    }
+    setItems((prev) => prev.filter((i) => !sentIds.has(i.id)));
+    if (activeId && sentIds.has(activeId)) {
+      setActiveId(items.find((i) => !sentIds.has(i.id))?.id || null);
+    }
+    message.success(`Đã dọn dẹp ${sentIds.size} bài đã chuyển đi đăng`);
+  };
+
+  const toggleLogoForChecked = (show: boolean) => {
+    const checkedIds = new Set(checkedItems.map((i) => i.id));
+    if (checkedIds.size === 0) return;
+    setItems((prev) =>
+      prev.map((i) =>
+        checkedIds.has(i.id)
+          ? {
+              ...i,
+              cardUrl: undefined,
+              style: {
+                ...i.style,
+                showLogo: show,
+                ...(show === false ? { logoUrl: '' } : {}),
+              },
+            }
+          : i
+      )
+    );
+    message.success(show ? `Đã bật logo cho ${checkedIds.size} bài` : `Đã bỏ/tắt logo cho ${checkedIds.size} bài`);
+  };
+
   // ── Preview (iframe dùng đúng HTML sẽ xuất ảnh) ──
-  const html = useMemo(() => (active ? buildNewsCardHtml(specOf(active)) : ''), [active]);
+  const [previewSoundOn, setPreviewSoundOn] = useState(false);
+  const [loadingAudio, setLoadingAudio] = useState(false);
+
+  useEffect(() => {
+    setPreviewSoundOn(false);
+  }, [activeId]);
+
+  const html = useMemo(() => (active ? buildNewsCardHtml(specOf(active, false, previewSoundOn)) : ''), [active, previewSoundOn]);
   const [debouncedHtml, setDebouncedHtml] = useState(html);
   useEffect(() => {
     const t = setTimeout(() => setDebouncedHtml(html), 300);
@@ -1096,6 +1274,69 @@ export default function NewsCardStudio() {
       message.error({ content: 'Xuất video lỗi: ' + aiError(e), key: 'export-video' });
     } finally {
       setExporting(false);
+    }
+  };
+
+  const togglePreviewSound = async () => {
+    if (!active || !active.videoUrl) return;
+    if (previewSoundOn) {
+      setPreviewSoundOn(false);
+      try {
+        const doc = iframeRef.current?.contentDocument;
+        const v = doc?.querySelector<HTMLVideoElement>('video.main-video');
+        if (v) v.muted = true;
+      } catch (err) {
+        console.warn(err);
+      }
+      return;
+    }
+
+    if (active.videoUrl.includes('v.redd.it/')) {
+      setLoadingAudio(true);
+      message.loading({ content: 'Đang tải và ghép âm thanh từ Reddit...', key: 'merge-audio', duration: 0 });
+      try {
+        const res = await api.post('/news-card/merge-audio', { videoUrl: active.videoUrl });
+        if (res.data?.success && res.data.url) {
+          patchItem(active.id, { videoUrl: res.data.url });
+          setPreviewSoundOn(true);
+          message.success({ content: 'Đã bật âm thanh video!', key: 'merge-audio' });
+          setTimeout(() => {
+            try {
+              const doc = iframeRef.current?.contentDocument;
+              const v = doc?.querySelector<HTMLVideoElement>('video.main-video');
+              if (v) {
+                v.muted = false;
+                v.volume = 1;
+                v.play().catch(console.warn);
+              }
+            } catch (err) {
+              console.warn(err);
+            }
+          }, 300);
+        } else {
+          throw new Error(res.data?.error || 'Không tải được tiếng');
+        }
+      } catch (err: any) {
+        message.error({ content: 'Không thể phát tiếng: ' + aiError(err), key: 'merge-audio' });
+      } finally {
+        setLoadingAudio(false);
+      }
+    } else {
+      setPreviewSoundOn(true);
+      message.success('Đã bật tiếng video');
+      setTimeout(() => {
+        try {
+          const doc = iframeRef.current?.contentDocument;
+          const v = doc?.querySelector<HTMLVideoElement>('video.main-video');
+          if (v) {
+            v.muted = false;
+            v.volume = 1;
+            v.play().catch(console.warn);
+          }
+        } catch (err) {
+          console.warn(err);
+        }
+      }, 150);
     }
   };
 
@@ -1673,20 +1914,49 @@ export default function NewsCardStudio() {
 
           <div className="flex items-center justify-between pt-1 border-t border-slate-800">
             <span className={`${sectionTitle} pt-2`}>Bài trong Studio ({displayedItems.length}/{items.length})</span>
-            {displayedItems.length > 0 && (
-              <Checkbox
-                className="pt-2 text-xs"
-                checked={displayedItems.length > 0 && displayedItems.every((i) => i.checked)}
-                indeterminate={displayedItems.some((i) => i.checked) && !displayedItems.every((i) => i.checked)}
-                onChange={(e) => {
-                  const on = e.target.checked;
-                  const ids = new Set(displayedItems.map((i) => i.id));
-                  setItems((prev) => prev.map((i) => (ids.has(i.id) ? { ...i, checked: on } : i)));
-                }}
-              >
-                Tất cả
-              </Checkbox>
-            )}
+            <div className="flex items-center gap-2 pt-2">
+              {items.some((i) => i.sentToPoster) && (
+                <Popconfirm
+                  title="Xoá tất cả bài đã chuyển đi đăng?"
+                  description="Dọn sạch các bài đã chuyển sang Lịch đăng để danh sách gọn gàng."
+                  onConfirm={removeSentItems}
+                  okText="Dọn dẹp"
+                  cancelText="Hủy"
+                >
+                  <Button size="small" type="text" className="!p-0 !h-auto text-[11px] text-slate-400 hover:text-amber-400">
+                    Dọn đã đăng
+                  </Button>
+                </Popconfirm>
+              )}
+              {items.length > 0 && (
+                <Popconfirm
+                  title={`Xoá toàn bộ ${items.length} bài trong Studio?`}
+                  description="Thao tác này sẽ xoá sạch danh sách bài hiện tại trong Studio."
+                  onConfirm={removeAllItems}
+                  okText="Xoá hết"
+                  cancelText="Hủy"
+                  okButtonProps={{ danger: true }}
+                >
+                  <Button size="small" type="text" danger className="!p-0 !h-auto text-[11px] hover:underline">
+                    Xoá tất cả
+                  </Button>
+                </Popconfirm>
+              )}
+              {displayedItems.length > 0 && (
+                <Checkbox
+                  className="text-xs"
+                  checked={displayedItems.length > 0 && displayedItems.every((i) => i.checked)}
+                  indeterminate={displayedItems.some((i) => i.checked) && !displayedItems.every((i) => i.checked)}
+                  onChange={(e) => {
+                    const on = e.target.checked;
+                    const ids = new Set(displayedItems.map((i) => i.id));
+                    setItems((prev) => prev.map((i) => (ids.has(i.id) ? { ...i, checked: on } : i)));
+                  }}
+                >
+                  Tất cả
+                </Checkbox>
+              )}
+            </div>
           </div>
 
           {/* Lọc theo Kênh */}
@@ -1710,12 +1980,36 @@ export default function NewsCardStudio() {
             </div>
           )}
 
-          {/* Thanh gán Kênh & Mẫu hàng loạt khi tick chọn bài */}
+          {/* Thanh gán Kênh, Mẫu, Logo & Xoá hàng loạt khi tick chọn bài */}
           {checkedItems.length > 0 && (
-            <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/30 space-y-1.5 mt-1">
+            <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/30 space-y-2 mt-1 shadow-sm">
               <div className="flex items-center justify-between text-[11px] font-semibold text-blue-300">
                 <span>⚡ Áp dụng cho {checkedItems.length} bài chọn:</span>
+                <Popconfirm
+                  title={`Xoá ${checkedItems.length} bài đã chọn?`}
+                  description="Bạn có chắc chắn muốn xoá các bài này khỏi Studio?"
+                  onConfirm={removeCheckedItems}
+                  okText="Xoá"
+                  cancelText="Hủy"
+                  okButtonProps={{ danger: true }}
+                >
+                  <Button size="small" type="text" danger icon={<DeleteOutlined />} className="!p-0 !h-auto text-xs font-semibold hover:underline">
+                    Xoá {checkedItems.length} bài
+                  </Button>
+                </Popconfirm>
               </div>
+
+              <Button
+                size="small"
+                type="primary"
+                icon={<ThunderboltOutlined />}
+                loading={batchCaptionLoading}
+                onClick={() => rewriteBatchCaptions(checkedItems)}
+                className="w-full text-xs font-semibold bg-gradient-to-r from-indigo-600 to-blue-600 border-none shadow-sm"
+              >
+                {batchCaptionProgress || `⚡ AI viết lại Caption ${checkedItems.length} bài`}
+              </Button>
+
               <div className="grid grid-cols-2 gap-1.5">
                 <Select
                   size="small"
@@ -1750,6 +2044,33 @@ export default function NewsCardStudio() {
                   }))}
                 />
               </div>
+
+              {/* Hàng thao tác Logo hàng loạt */}
+              <div className="pt-1.5 border-t border-blue-500/20 flex items-center justify-between gap-1.5">
+                <span className="text-[11px] text-slate-300 font-medium shrink-0 flex items-center gap-1">
+                  <PictureOutlined className="text-sky-400" /> Logo ({checkedItems.length} bài):
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    size="small"
+                    icon={<EyeInvisibleOutlined />}
+                    onClick={() => toggleLogoForChecked(false)}
+                    className="text-[11px] h-6 px-2.5 bg-slate-800/80 border-slate-700 text-rose-300 hover:text-rose-200 hover:border-rose-500 rounded-md"
+                    title="Ẩn / bỏ logo cho toàn bộ các bài đang chọn"
+                  >
+                    Bỏ logo
+                  </Button>
+                  <Button
+                    size="small"
+                    icon={<PictureOutlined />}
+                    onClick={() => toggleLogoForChecked(true)}
+                    className="text-[11px] h-6 px-2.5 bg-slate-800/80 border-slate-700 text-sky-300 hover:text-sky-200 hover:border-sky-500 rounded-md"
+                    title="Bật lại logo cho toàn bộ các bài đang chọn"
+                  >
+                    Bật logo
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -1765,8 +2086,8 @@ export default function NewsCardStudio() {
                 >
                   <Checkbox checked={it.checked} onClick={(e) => e.stopPropagation()} onChange={(e) => patchItem(it.id, { checked: e.target.checked })} />
                   <div className="w-14 h-14 rounded-md bg-slate-900 border border-slate-800 overflow-hidden shrink-0 flex items-center justify-center">
-                    {(it.cardUrl || it.selectedImages[0]) ? (
-                      <img src={it.cardUrl || it.selectedImages[0]} referrerPolicy="no-referrer" alt="" className="w-full h-full object-cover" />
+                    {(it.selectedImages[0] || it.images[0] || it.cardUrl) ? (
+                      <img src={it.selectedImages[0] || it.images[0] || it.cardUrl} referrerPolicy="no-referrer" alt="" className="w-full h-full object-cover" />
                     ) : (
                       <div className="flex flex-col items-center justify-center text-center p-1">
                         <span className="text-base leading-none">💬</span>
@@ -1861,16 +2182,29 @@ export default function NewsCardStudio() {
                     <Button size="small" type="text" icon={<QuestionCircleOutlined />} aria-label="Phím tắt" />
                   </Popover>
                   {active.videoUrl && (
-                    <Button
-                      size="small"
-                      type="primary"
-                      className="!bg-purple-600 hover:!bg-purple-500 !border-purple-500 font-semibold shadow-sm"
-                      icon={<PlayCircleOutlined />}
-                      loading={exporting}
-                      onClick={exportActiveVideo}
-                    >
-                      Tải Video MP4
-                    </Button>
+                    <>
+                      <Button
+                        size="small"
+                        type={previewSoundOn ? 'primary' : 'default'}
+                        className={previewSoundOn ? '!bg-emerald-600 hover:!bg-emerald-500 !border-emerald-500 font-semibold shadow-sm' : '!border-slate-600 text-slate-300 hover:text-white'}
+                        icon={previewSoundOn ? <SoundOutlined /> : <MutedOutlined />}
+                        loading={loadingAudio}
+                        onClick={togglePreviewSound}
+                        title={previewSoundOn ? 'Đang phát tiếng clip (nhấn để tắt)' : 'Bật tiếng để nghe clip'}
+                      >
+                        {previewSoundOn ? 'Đang bật tiếng' : 'Bật tiếng preview'}
+                      </Button>
+                      <Button
+                        size="small"
+                        type="primary"
+                        className="!bg-purple-600 hover:!bg-purple-500 !border-purple-500 font-semibold shadow-sm"
+                        icon={<PlayCircleOutlined />}
+                        loading={exporting}
+                        onClick={exportActiveVideo}
+                      >
+                        Tải Video MP4
+                      </Button>
+                    </>
                   )}
                   <Button size="small" type={active.videoUrl ? 'default' : 'primary'} icon={<DownloadOutlined />} loading={exporting} onClick={exportActive}>
                     {active.videoUrl ? 'Tải Thumbnail' : 'Tải ảnh'}
@@ -1939,6 +2273,27 @@ export default function NewsCardStudio() {
                         <span className="text-xs text-cyan-200/80 mt-0.5">Hỗ trợ ảnh PNG, JPG, WebP...</span>
                       </div>
                     )}
+
+                    {active.videoUrl && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          togglePreviewSound();
+                        }}
+                        className="absolute bottom-3 right-3 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/85 hover:bg-black text-white text-xs font-semibold backdrop-blur-md border border-white/20 shadow-xl cursor-pointer transition-all hover:scale-105 active:scale-95"
+                        title={previewSoundOn ? 'Nhấn để tắt tiếng' : 'Nhấn để nghe âm thanh clip'}
+                      >
+                        {loadingAudio ? (
+                          <Spin size="small" />
+                        ) : previewSoundOn ? (
+                          <SoundOutlined className="text-emerald-400 text-sm animate-pulse" />
+                        ) : (
+                          <MutedOutlined className="text-slate-300 text-sm" />
+                        )}
+                        <span>{loadingAudio ? 'Đang tải tiếng...' : previewSoundOn ? 'Tắt tiếng' : '🔊 Nghe tiếng'}</span>
+                      </button>
+                    )}
                   </div>
                 );
                 if (previewMode !== 'facebook') return canvas;
@@ -1982,9 +2337,22 @@ export default function NewsCardStudio() {
                     onChange={(v) => patchItem(active.id, { captionMode: v as CaptionMode })}
                     options={[{ value: 'full', label: 'Caption đầy đủ' }, { value: 'hook', label: 'Hook ngắn + nội dung ở bình luận' }]}
                   />
-                  <Button size="small" icon={<ReloadOutlined />} loading={captionAiLoading} onClick={() => rewriteCaption(active)}>
-                    AI viết lại nội dung
-                  </Button>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <Button size="small" icon={<ReloadOutlined />} loading={captionAiLoading} onClick={() => rewriteCaption(active)}>
+                      AI viết lại nội dung
+                    </Button>
+                    <Button
+                      size="small"
+                      type="primary"
+                      icon={<ThunderboltOutlined />}
+                      loading={batchCaptionLoading}
+                      onClick={() => rewriteBatchCaptions()}
+                      title="AI viết lại caption sâu sắc, giàu thông tin và số liệu cho toàn bộ các bài"
+                      className="bg-gradient-to-r from-blue-600 to-indigo-600 border-none text-white font-medium shadow-sm hover:from-blue-500 hover:to-indigo-500"
+                    >
+                      {batchCaptionProgress || `⚡ Viết lại TẤT CẢ Caption (${checkedItems.length > 0 ? checkedItems.length : items.length} bài)`}
+                    </Button>
+                  </div>
                 </div>
 
                 {active.captionMode === 'full' ? (
@@ -2118,6 +2486,18 @@ export default function NewsCardStudio() {
               <Button type="primary" block icon={<ThunderboltOutlined />} loading={active.headlineLoading} onClick={() => runPackage(active)}>
                 AI soạn bài (tiêu đề, caption, tóm tắt, nhãn)
               </Button>
+              {checkedItems.length > 1 && (
+                <Button
+                  block
+                  size="small"
+                  icon={<ThunderboltOutlined />}
+                  loading={batchCaptionLoading}
+                  onClick={runPackageForAllChecked}
+                  className="mt-1 text-xs text-blue-300 border-blue-500/30 hover:border-blue-400"
+                >
+                  {batchCaptionProgress || `AI soạn bài cho tất cả ${checkedItems.length} bài chọn`}
+                </Button>
+              )}
               <div className="flex-1 min-h-0 flex flex-col">
                 <Tabs
                   size="small"

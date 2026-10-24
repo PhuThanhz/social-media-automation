@@ -46,6 +46,7 @@ public class PostQueueService {
     private final GeminiService geminiService;
     private final FacebookPageAccessRepository facebookPageAccessRepository;
     private final WorkerRouterService workerRouterService;
+    private final ViaCookieFollowService viaCookieFollowService;
     // 10s connect, 600s (10 phút) read — đăng bài thật qua Playwright (mở Modal tối đa 4 lần thử x tới
     // 45s/lần, rồi chờ xác nhận đã xuất bản tới 2 phút, có bài còn tự động comment link sau đó tới 2
     // phút nữa) cộng dồn dễ vượt quá các mốc ngắn hơn, gây lỗi "Read timed out" dù worker vẫn đang xử
@@ -276,6 +277,11 @@ public class PostQueueService {
                             .findFirst()
                             .orElse(null);
                     if (matchedById != null) {
+                        if ("EXPIRED".equalsIgnoreCase(matchedById.getTokenStatus())
+                                && viaCookieFollowService.followIdentityVia(matchedById)) {
+                            log.info("🔗 Post ID {}: kết nối '{}' (ID: {}) có cookie riêng hết hạn nhưng Via quản trị còn sống — đã đồng bộ cookie Via, đăng tiếp bằng kết nối này.",
+                                    postId, matchedById.getPageName(), matchedById.getId());
+                        }
                         if ("EXPIRED".equalsIgnoreCase(matchedById.getTokenStatus())) {
                             log.warn("⚠️ Post ID {} chọn tài khoản '{}' (ID: {}) nhưng tài khoản này đã HẾT HẠN COOKIE (EXPIRED). Đang tìm Via đồng quản trị thay thế...",
                                     postId, matchedById.getPageName(), matchedById.getId());
@@ -548,6 +554,13 @@ public class PostQueueService {
                 if (isCredentialFailure(e.getMessage())) {
                     currentAccount.setTokenStatus("EXPIRED");
                     socialAccountRepository.save(currentAccount);
+                    // Page chạy bằng bản sao cookie cũ của Via: chép cookie hiện tại của Via xuống rồi thử lại
+                    // chính kết nối này, trước khi nghĩ tới chuyển sang tài khoản dự phòng.
+                    if (viaCookieFollowService.followIdentityVia(currentAccount)) {
+                        log.warn("🔗 Cookie riêng của Page {} hỏng — đã đồng bộ cookie Via quản trị, thử lại Post ID {}.",
+                                currentAccount.getPageName(), postId);
+                        continue;
+                    }
 
                     boolean isAnonOrSpecificPersonal = (post.getTargetGroupNames() != null && post.getTargetGroupNames().contains("GROUP_ONLY_ANON"))
                             || "FACEBOOK_PROFILE".equalsIgnoreCase(currentAccount.getPlatform())

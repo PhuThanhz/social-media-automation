@@ -258,12 +258,21 @@ public class SocialAccountController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<SocialAccount> updateConnection(@PathVariable Long id, @RequestBody SocialAccount request, Authentication authentication) {
+    public ResponseEntity<?> updateConnection(@PathVariable Long id, @RequestBody SocialAccount request, Authentication authentication) {
         User user = resolveUser(authentication);
         SocialAccount existing = socialAccountService.getAccountsByUserId(user.getId()).stream().filter(a -> a.getId().equals(id)).findFirst().orElse(null);
         if (existing == null) return ResponseEntity.notFound().build();
         if (request.getAccessToken() != null) {
             String newCookie = request.getAccessToken();
+            // c_user luôn là UID nick cá nhân. Cookie có c_user = ID của chính Fanpage là cookie lai (xs của Via
+            // ghép với ID Page) — Facebook từ chối, Page bị báo hết hạn và tách khỏi Via. Chặn từ đầu.
+            String incomingCUser = extractCUser(newCookie);
+            if ("FACEBOOK_PAGE".equals(existing.getPlatform()) && incomingCUser != null
+                    && incomingCUser.equals(existing.getPlatformAccountId())) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message",
+                        "c_user trong cookie đang là ID của chính Fanpage (" + incomingCUser + "), không phải UID nick Via. "
+                                + "Hãy dán cookie đầy đủ của nick Via quản trị Page (hoặc cập nhật cookie ngay ở Via sở hữu)."));
+            }
             existing.setAccessToken(newCookie);
             existing.setTokenStatus("OK");
             existing.setTokenCheckedAt(java.time.LocalDateTime.now());

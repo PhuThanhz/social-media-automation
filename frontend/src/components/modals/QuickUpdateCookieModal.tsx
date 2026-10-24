@@ -25,6 +25,7 @@ export interface QuickCookieAccount {
   accountType?: string;
   tokenStatus?: string;
   accessToken?: string;
+  postingIdentityAccountId?: number;
 }
 
 interface QuickUpdateCookieModalProps {
@@ -97,14 +98,23 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
     [cookieAccounts, selectedAccountId]
   );
 
+  // c_user mặc định phải là UID nick cá nhân. Với kết nối Fanpage, platformAccountId là ID Page —
+  // dùng nó làm c_user sẽ tạo cookie lai (xs của Via + ID Page) khiến Page bị báo hết hạn oan.
   const existingCUser = useMemo(() => {
     if (!currentAccount) return '';
-    if (currentAccount.platformAccountId && /^\d+$/.test(currentAccount.platformAccountId)) {
+    const isProfile = currentAccount.platform === 'FACEBOOK_PROFILE' || currentAccount.accountType === 'PERSONAL_PROFILE_COOKIE';
+    if (isProfile && currentAccount.platformAccountId && /^\d+$/.test(currentAccount.platformAccountId)) {
       return currentAccount.platformAccountId;
     }
+    const identityVia = currentAccount.postingIdentityAccountId
+      ? allAccounts.find((a) => a.id === currentAccount.postingIdentityAccountId)
+      : undefined;
+    const viaCUser = identityVia?.accessToken?.match(/c_user=([^;]+)/)?.[1]?.trim();
+    if (viaCUser) return viaCUser;
     const match = currentAccount.accessToken?.match(/c_user=([^;]+)/);
-    return match ? match[1].trim() : '';
-  }, [currentAccount]);
+    const ownCUser = match ? match[1].trim() : '';
+    return ownCUser && ownCUser !== currentAccount.platformAccountId ? ownCUser : '';
+  }, [currentAccount, allAccounts]);
 
   // Khởi tạo account và c_user được chọn khi mở modal
   useEffect(() => {
