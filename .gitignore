@@ -2,10 +2,17 @@
 .env
 **/.env
 *.env
+updater_key
+*.key
+target/
+src-tauri/target/
 
 # Backups
 _backup_*
 **/_backup_*
+backups/
+*.sql.gz
+*.app/
 
 # Dependencies
 node_modules/

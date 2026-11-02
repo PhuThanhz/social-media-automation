@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Modal, Input, Button, Tag, Progress, Tabs, Spin, Alert, Tooltip, message } from 'antd';
+import { Modal, Input, Button, Tag, Progress, Tabs, Spin, Alert, Tooltip, message, Flex } from 'antd';
 import {
   RobotOutlined,
   CheckCircleOutlined,
@@ -152,15 +152,15 @@ const AiSettingsModal: React.FC<AiSettingsModalProps> = ({ open, onClose }) => {
   return (
     <Modal
       title={
-        <div className="flex items-center justify-between pr-6 text-slate-100">
-          <div className="flex items-center gap-2">
-            <RobotOutlined className="text-cyan-400 text-lg" />
-            <span className="font-bold">Cấu hình & Giám sát Hạn mức AI (Gemini)</span>
-          </div>
-          <Tag color="cyan" className="font-mono text-xs">
+        <Flex align="center" justify="space-between" className="ai-title-row">
+          <Flex align="center" gap={8}>
+            <RobotOutlined className="ai-title-ic" />
+            <span className="ai-bold">Cấu hình & Giám sát Hạn mức AI (Gemini)</span>
+          </Flex>
+          <Tag color="cyan" className="ai-mono-xs">
             {parsedKeys.length} {parsedKeys.length > 1 ? 'Keys xoay vòng' : 'Key'}
           </Tag>
-        </div>
+        </Flex>
       }
       open={open}
       onCancel={onClose}
@@ -184,32 +184,32 @@ const AiSettingsModal: React.FC<AiSettingsModalProps> = ({ open, onClose }) => {
         ),
       ]}
     >
-      <div className="space-y-4 py-1 text-xs text-slate-300">
+      <div className="ai-body">
         {/* Dashboard tóm tắt hạn ngạch */}
-        <div className="grid grid-cols-3 gap-2.5 bg-slate-900/90 border border-slate-800 p-3 rounded-2xl">
-          <div className="bg-slate-800/60 p-2.5 rounded-xl border border-slate-700/60">
-            <div className="text-[11px] text-slate-400">Đã gọi hôm nay</div>
-            <div className="text-lg font-bold text-cyan-400 font-mono mt-0.5">
-              {totalUsedToday.toLocaleString()} <span className="text-xs text-slate-400 font-normal">/ {totalLimitToday.toLocaleString()}</span>
+        <div className="ai-stats">
+          <div className="ai-stat">
+            <div className="ai-stat-label">Đã gọi hôm nay</div>
+            <div className="ai-stat-value-cyan">
+              {totalUsedToday.toLocaleString()} <span className="ai-stat-unit">/ {totalLimitToday.toLocaleString()}</span>
             </div>
-            <div className="text-[10px] text-slate-500 mt-0.5">Ước tính theo mốc 1.500/key</div>
+            <div className="ai-stat-note">Ước tính theo mốc 1.500/key</div>
           </div>
 
-          <div className="bg-slate-800/60 p-2.5 rounded-xl border border-slate-700/60">
-            <div className="text-[11px] text-slate-400">Trạng thái Pool Keys</div>
-            <div className="text-lg font-bold text-emerald-400 font-mono mt-0.5 flex items-center gap-1.5">
+          <div className="ai-stat">
+            <div className="ai-stat-label">Trạng thái Pool Keys</div>
+            <div className="ai-stat-value-emerald">
               <span>{keyHealthList.filter((k) => k.status === 'HEALTHY').length}</span>
-              <span className="text-xs text-slate-400 font-normal">/ {Math.max(keyHealthList.length, parsedKeys.length)} online</span>
+              <span className="ai-stat-unit">/ {Math.max(keyHealthList.length, parsedKeys.length)} online</span>
             </div>
-            <div className="text-[10px] text-slate-500 mt-0.5">Tự động failover khi 429</div>
+            <div className="ai-stat-note">Tự động failover khi 429</div>
           </div>
 
-          <div className="bg-slate-800/60 p-2.5 rounded-xl border border-slate-700/60">
-            <div className="text-[11px] text-slate-400">Thời gian Reset Quota</div>
-            <div className="text-base font-bold text-amber-400 font-mono mt-0.5">
+          <div className="ai-stat">
+            <div className="ai-stat-label">Thời gian Reset Quota</div>
+            <div className="ai-stat-value-amber">
               07:00 Sáng
             </div>
-            <div className="text-[10px] text-slate-500 mt-0.5">Google reset hạn mức ngày</div>
+            <div className="ai-stat-note">Google reset hạn mức ngày</div>
           </div>
         </div>
 
@@ -221,37 +221,37 @@ const AiSettingsModal: React.FC<AiSettingsModalProps> = ({ open, onClose }) => {
             {
               key: 'monitor',
               label: (
-                <span className="flex items-center gap-1.5">
+                <span className="ai-tab-label">
                   <DashboardOutlined /> Giám sát & Hạn ngạch từng Key
                 </span>
               ),
               children: (
-                <div className="space-y-3 pt-1">
+                <div className="ai-monitor">
                   {checking && keyHealthList.length === 0 ? (
-                    <div className="py-8 text-center text-slate-400 space-y-2">
+                    <div className="ai-loading">
                       <Spin size="small" />
                       <div>Đang kiểm tra tình trạng từng API Key...</div>
                     </div>
                   ) : keyHealthList.length === 0 ? (
-                    <div className="p-6 text-center border border-dashed border-slate-700 rounded-xl text-slate-400">
+                    <div className="ai-empty">
                       Chưa có API key nào được cấu hình.{' '}
                       <Button type="link" size="small" onClick={() => setActiveTab('edit')}>
                         Chuyển sang tab Thêm Key →
                       </Button>
                     </div>
                   ) : (
-                    <div className="space-y-2.5 max-h-[320px] overflow-y-auto pr-1">
+                    <div className="ai-key-list">
                       {keyHealthList.map((item, idx) => {
                         const pct = Math.min(100, Math.round(((item.callsToday || 0) / (item.dailyLimitEstimate || 1500)) * 100));
                         const isExhausted = item.status === 'RATE_LIMITED' || pct >= 100;
                         const isWarning = pct >= 80 && !isExhausted;
                         const isInvalid = item.status === 'INVALID' || item.status === 'ERROR';
 
-                        let statusBadge = <Tag color="success" className="!m-0">🟢 Hoạt động tốt</Tag>;
+                        let statusBadge = <Tag color="success" className="ai-m0">🟢 Hoạt động tốt</Tag>;
                         if (item.status === 'RATE_LIMITED') {
-                          statusBadge = <Tag color="warning" className="!m-0">🟡 Hết hạn ngạch (429)</Tag>;
+                          statusBadge = <Tag color="warning" className="ai-m0">🟡 Hết hạn ngạch (429)</Tag>;
                         } else if (isInvalid) {
-                          statusBadge = <Tag color="error" className="!m-0">🔴 Key lỗi / Không hợp lệ</Tag>;
+                          statusBadge = <Tag color="error" className="ai-m0">🔴 Key lỗi / Không hợp lệ</Tag>;
                         }
 
                         let progressColor = '#06b6d4'; // cyan
@@ -261,31 +261,31 @@ const AiSettingsModal: React.FC<AiSettingsModalProps> = ({ open, onClose }) => {
                         return (
                           <div
                             key={idx}
-                            className={`p-3 rounded-xl border transition-all ${
+                            className={`ai-key-card ${
                               isExhausted
-                                ? 'bg-amber-950/20 border-amber-500/30'
+                                ? 'ai-key-card-exhausted'
                                 : isInvalid
-                                ? 'bg-red-950/20 border-red-500/30'
-                                : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                                ? 'ai-key-card-invalid'
+                                : 'ai-key-card-ok'
                             }`}
                           >
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-2">
-                                <span className="font-mono font-bold text-slate-200">
+                            <Flex align="center" justify="space-between" className="ai-key-head">
+                              <Flex align="center" gap={8}>
+                                <span className="ai-key-name">
                                   Key #{idx + 1}:
                                 </span>
-                                <span className="font-mono text-cyan-300 text-xs bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
+                                <span className="ai-key-mask">
                                   {item.masked}
                                 </span>
-                              </div>
+                              </Flex>
                               <div>{statusBadge}</div>
-                            </div>
+                            </Flex>
 
                             {/* Hạn mức gọi trong ngày */}
-                            <div className="space-y-1">
-                              <div className="flex items-center justify-between text-[11px] text-slate-400">
-                                <span>Đã dùng hôm nay: <b className="text-slate-200">{item.callsToday} / {item.dailyLimitEstimate}</b> lượt</span>
-                                <span className="font-mono font-semibold" style={{ color: progressColor }}>
+                            <div className="ai-stack-1">
+                              <div className="ai-quota-row">
+                                <span>Đã dùng hôm nay: <b className="ai-text-strong">{item.callsToday} / {item.dailyLimitEstimate}</b> lượt</span>
+                                <span className="ai-mono-semibold" style={{ color: progressColor }}>
                                   {pct}%
                                 </span>
                               </div>
@@ -298,15 +298,15 @@ const AiSettingsModal: React.FC<AiSettingsModalProps> = ({ open, onClose }) => {
                             </div>
 
                             {/* Lời nhắc trạng thái */}
-                            <div className="mt-2 text-[11px] flex items-center justify-between">
-                              <span className="text-slate-400">{item.message}</span>
+                            <div className="ai-key-foot">
+                              <span className="ai-muted">{item.message}</span>
                               {isExhausted && (
-                                <span className="text-amber-400 font-medium">
+                                <span className="ai-warn">
                                   ⚠️ Hệ thống đang chuyển sang Key khác
                                 </span>
                               )}
                               {isWarning && (
-                                <span className="text-amber-300">
+                                <span className="ai-warn-light">
                                   ⚠️ Sắp chạm trần (còn ~{item.dailyLimitEstimate - item.callsToday} lượt)
                                 </span>
                               )}
@@ -317,8 +317,8 @@ const AiSettingsModal: React.FC<AiSettingsModalProps> = ({ open, onClose }) => {
                     </div>
                   )}
 
-                  <div className="flex justify-between items-center pt-2 border-t border-slate-800">
-                    <span className="text-[11px] text-slate-400">
+                  <div className="ai-monitor-foot">
+                    <span className="ai-stat-label">
                       💡 Cần thêm key dự phòng? Bấm tab <b>"Quản lý danh sách Key"</b>.
                     </span>
                     <Button
@@ -336,16 +336,16 @@ const AiSettingsModal: React.FC<AiSettingsModalProps> = ({ open, onClose }) => {
             {
               key: 'edit',
               label: (
-                <span className="flex items-center gap-1.5">
+                <span className="ai-tab-label">
                   <KeyOutlined /> Quản lý danh sách Key ({parsedKeys.length})
                 </span>
               ),
               children: (
-                <div className="space-y-3 pt-1">
+                <div className="ai-monitor">
                   <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="font-semibold text-slate-200">Dán danh sách API Keys (mỗi dòng 1 key):</span>
-                      <Tag color="cyan" className="!m-0">
+                    <div className="ai-edit-head">
+                      <span className="ai-edit-title">Dán danh sách API Keys (mỗi dòng 1 key):</span>
+                      <Tag color="cyan" className="ai-m0">
                         {parsedKeys.length} key được nhận diện
                       </Tag>
                     </div>
@@ -357,27 +357,30 @@ const AiSettingsModal: React.FC<AiSettingsModalProps> = ({ open, onClose }) => {
                         setTestResult(null);
                       }}
                       placeholder={
-                        "Dán các Gemini API key vào đây, mỗi dòng 1 key:\nAIzaSyA_abcdef123456...\nAIzaSyB_abcdef123456...\nAIzaSyC_abcdef123456..."
+                        "Dán các Gemini API key vào đây, mỗi dòng 1 key:\nAIzaSyA_abcdef123456...\nAQ.Ab8RN6KMnIOVi...\nAIzaSyB_abcdef123456..."
                       }
-                      className="font-mono text-xs bg-slate-900 border-slate-700 text-slate-100 placeholder-slate-600 focus:border-cyan-500"
+                      className="ai-textarea"
                       autoComplete="off"
                       spellCheck={false}
                     />
                   </div>
 
-                  <div className="text-[11px] text-slate-400 bg-slate-800/60 p-2.5 rounded-xl border border-slate-700 space-y-1">
+                  <div className="ai-help">
                     <div>
                       🔗 <b>Lấy API Key miễn phí tại:</b>{' '}
                       <a
                         href="https://aistudio.google.com/app/apikey"
                         target="_blank"
                         rel="noreferrer"
-                        className="text-cyan-400 underline font-medium hover:text-cyan-300"
+                        className="ai-help-link"
                       >
                         aistudio.google.com/app/apikey
                       </a>
                     </div>
-                    <div>• Bạn có thể tạo 3–5 key trên 1 tài khoản Google hoặc gom key từ nhiều tài khoản khác nhau rồi dán vào đây.</div>
+                    <div>
+                      💡 <b>Lưu ý quan trọng:</b> Khi bấm <i>Create API key</i>, hãy chọn <b>"Create API key in new project"</b> (Tạo trong dự án mới) để Google tự động kích hoạt sẵn Generative Language API.
+                    </div>
+                    <div>• Bạn có thể tạo nhiều key hoặc gom key từ nhiều tài khoản Google khác nhau để xoay vòng hạn ngạch.</div>
                     <div>• Hệ thống tự động lưu vào trình duyệt và đồng bộ cho mọi trang (Studio Ảnh Tin, Radar Tin Tức, Đăng Playwright...).</div>
                   </div>
                 </div>
@@ -388,18 +391,14 @@ const AiSettingsModal: React.FC<AiSettingsModalProps> = ({ open, onClose }) => {
 
         {testResult && (
           <div
-            className={`p-2.5 rounded-lg border text-xs flex items-start gap-2 ${
-              testResult.success
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                : 'bg-red-500/10 border-red-500/30 text-red-300'
-            }`}
+            className={`ai-result ${testResult.success ? 'ai-result-ok' : 'ai-result-bad'}`}
           >
             {testResult.success ? (
-              <CheckCircleOutlined className="mt-0.5 text-emerald-400" />
+              <CheckCircleOutlined className="ai-result-ic-ok" />
             ) : (
-              <ExclamationCircleOutlined className="mt-0.5 text-red-400" />
+              <ExclamationCircleOutlined className="ai-result-ic-bad" />
             )}
-            <span className="break-all">{testResult.message}</span>
+            <span className="ai-break">{testResult.message}</span>
           </div>
         )}
       </div>

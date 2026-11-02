@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Button, Input, Modal, Upload, message } from 'antd';
+import { Button, Input, Modal, Upload, message, Flex } from 'antd';
 import { ReloadOutlined, UploadOutlined } from '@ant-design/icons';
 import api from '../../config/axios';
 
@@ -171,16 +171,16 @@ export default function NewsCardModal({ open, source, onClose, onApply }: Props)
       open={open}
       onCancel={onClose}
       width={980}
-      className="max-w-[calc(100vw-24px)]"
+      className="ncm-modal"
       footer={[
         <Button key="cancel" onClick={onClose}>Hủy</Button>,
         <Button key="ok" type="primary" loading={rendering} onClick={handleCreate}>Tạo ảnh và dùng cho bài này</Button>,
       ]}
     >
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 py-2">
+      <div className="ncm-grid">
         {/* Preview */}
         <div>
-          <div ref={previewBoxRef} className="relative w-full aspect-square overflow-hidden rounded-lg border border-slate-700 bg-white">
+          <div ref={previewBoxRef} className="ncm-preview">
             <div
               style={{
                 width: CARD, height: CARD, transform: `scale(${scale})`, transformOrigin: 'top left',
@@ -213,19 +213,19 @@ export default function NewsCardModal({ open, source, onClose, onApply }: Props)
               )}
             </div>
           </div>
-          <div className="text-[11px] text-slate-500 mt-2">Xem trước gần đúng. Ảnh thật 1440×1440 do hệ thống dựng khi bấm Tạo ảnh.</div>
+          <div className="ncm-note">Xem trước gần đúng. Ảnh thật 1440×1440 do hệ thống dựng khi bấm Tạo ảnh.</div>
         </div>
 
         {/* Controls */}
-        <div className="space-y-4">
+        <div className="ncm-form">
           <div>
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-semibold text-slate-300">Tiêu đề trên ảnh</span>
-              <div className="flex gap-2">
+            <Flex align="center" justify="space-between" className="ncm-field-head">
+              <span className="ncm-label">Tiêu đề trên ảnh</span>
+              <Flex gap={8} className="ncm-actions">
                 <Button size="small" onClick={highlightSelection}>Tô đỏ đoạn đang chọn</Button>
                 <Button size="small" icon={<ReloadOutlined />} loading={aiLoading} onClick={() => generateHeadline(source)}>AI viết lại</Button>
-              </div>
-            </div>
+              </Flex>
+            </Flex>
             <Input.TextArea
               ref={textAreaRef}
               value={headline}
@@ -233,13 +233,13 @@ export default function NewsCardModal({ open, source, onClose, onApply }: Props)
               autoSize={{ minRows: 4, maxRows: 8 }}
               placeholder="Ví dụ: Từng kiếm [[45.000 NDT/tháng]], [[nữ giám đốc 45 tuổi]] giờ đi bán hoa quả..."
             />
-            <div className="text-[11px] text-slate-500 mt-1">Phần nằm trong [[ ]] sẽ in màu đỏ. Chữ tự in hoa và tự co cho vừa khung.</div>
+            <div className="ncm-hint">Phần nằm trong [[ ]] sẽ in màu đỏ. Chữ tự in hoa và tự co cho vừa khung.</div>
           </div>
 
           <div>
-            <div className="text-xs font-semibold text-slate-300 mb-1">Ảnh chính</div>
+            <div className="ncm-label-block">Ảnh chính</div>
             {candidates.length > 0 && (
-              <div className="flex gap-2 flex-wrap mb-2">
+              <Flex gap={8} wrap className="ncm-thumbs">
                 {candidates.slice(0, 12).map((u) => (
                   <button
                     key={u}
@@ -249,27 +249,27 @@ export default function NewsCardModal({ open, source, onClose, onApply }: Props)
                     className={`w-14 h-14 rounded-md overflow-hidden border-2 cursor-pointer p-0 ${imageUrl === u ? 'border-blue-500' : insetUrl === u ? 'border-red-500' : 'border-slate-700'}`}
                     title="Bấm: làm ảnh chính · Chuột phải: làm ảnh tròn"
                   >
-                    <img src={u} referrerPolicy="no-referrer" alt="" className="w-full h-full object-cover" />
+                    <img src={u} referrerPolicy="no-referrer" alt="" className="ncm-thumb-img" />
                   </button>
                 ))}
-              </div>
+              </Flex>
             )}
-            <div className="flex gap-2">
+            <Flex gap={8} className="ncm-actions">
               <Input size="small" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="URL ảnh chính" />
               <Upload accept="image/*" showUploadList={false} beforeUpload={(f) => handleUpload(f, 'main')}>
                 <Button size="small" icon={<UploadOutlined />}>Tải lên</Button>
               </Upload>
-            </div>
+            </Flex>
           </div>
 
           <div>
-            <div className="text-xs font-semibold text-slate-300 mb-1">Ảnh tròn ở góc (không bắt buộc)</div>
-            <div className="flex gap-2">
+            <div className="ncm-label-block">Ảnh tròn ở góc (không bắt buộc)</div>
+            <Flex gap={8} className="ncm-actions">
               <Input size="small" value={insetUrl} onChange={(e) => setInsetUrl(e.target.value)} placeholder="URL ảnh nhỏ, hoặc chuột phải vào ảnh ở trên" allowClear />
               <Upload accept="image/*" showUploadList={false} beforeUpload={(f) => handleUpload(f, 'inset')}>
                 <Button size="small" icon={<UploadOutlined />}>Tải lên</Button>
               </Upload>
-            </div>
+            </Flex>
           </div>
         </div>
       </div>

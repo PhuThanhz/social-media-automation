@@ -1,0 +1,55 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "ToolZutter",
+  "version": "1.0.0",
+  "identifier": "com.phusocial.autopost",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "ToolZutter Pro — Social Automation Studio",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 720,
+        "center": true,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "android": {
+      "debugApplicationIdSuffix": ".debug"
+    },
+    "resources": {
+      "sidecar/": "sidecar/"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDUxMjdFQzExQzk5MzVBMTIKUldRU1dwUEpFZXduVWZwbEx2dzdsV0VkUCthcks5THc1TUZHTFhyekdqbWpDa0t6ZWhzOVVPRkcK",
+      "endpoints": [
+        "https://github.com/PhuThanhz/social-media-automation/releases/latest/download/latest.json"
+      ]
+    }
+  }
+}

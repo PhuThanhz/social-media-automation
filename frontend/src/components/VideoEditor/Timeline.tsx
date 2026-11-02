@@ -7,8 +7,10 @@ import { usePlayerClock, useEditor, timelineDuration, voiceEnd, voiceIn, voiceLe
 import type { Project, Selection } from './store';
 import { VideoThumbs, Waveform } from './media';
 import { TRANSITIONS, captionShown, layoutUntil } from './layers';
-import { Blend, Maximize2 } from 'lucide-react';
-import { AudioLines, Captions, Film, ImageIcon, LayoutTemplate, Music, Type } from 'lucide-react';
+import {
+  FontSizeOutlined, PictureOutlined, AppstoreOutlined, SwapOutlined,
+  CommentOutlined, VideoCameraOutlined, SoundOutlined, CustomerServiceOutlined, FullscreenOutlined,
+} from '@ant-design/icons';
 
 const HEADER_W = 116;
 const ROW_H = 40;
@@ -196,7 +198,7 @@ export default function Timeline({ hasAudio, seek }: Props) {
   project.overlays.forEach((l) => {
     rows.push({
       key: l.id,
-      label: <span className="flex items-center gap-1.5 min-w-0">{l.kind === 'text' ? <Type size={13} /> : <ImageIcon size={13} />}<span className="truncate">{l.name}</span></span>,
+      label: <span className="flex items-center gap-1.5 min-w-0">{l.kind === 'text' ? <FontSizeOutlined /> : <PictureOutlined />}<span className="truncate">{l.name}</span></span>,
       color: l.kind === 'text' ? '#b45309' : '#0e7490',
       content: (
         <Clip
@@ -216,7 +218,7 @@ export default function Timeline({ hasAudio, seek }: Props) {
 
   rows.push({
     key: 'frame',
-    label: <span className="flex items-center gap-1.5"><LayoutTemplate size={13} />Khung</span>,
+    label: <span className="flex items-center gap-1.5"><AppstoreOutlined />Khung</span>,
     color: '#6d28d9',
     content: (
       <>
@@ -252,7 +254,7 @@ export default function Timeline({ hasAudio, seek }: Props) {
               <button type="button" onPointerDown={(e) => { e.stopPropagation(); select({ type: 'transition' }); }}
                 className={`absolute z-20 top-1/2 -translate-y-1/2 -translate-x-1/2 w-6 h-6 rounded-md flex items-center justify-center shadow-md border transition ${isSel(selected, 'transition') ? 'bg-blue-500 border-white text-white' : 'bg-white border-slate-300 text-slate-800 hover:bg-blue-50'}`}
                 style={{ left: lu * pps }}>
-                <Blend size={13} />
+                <SwapOutlined />
               </button>
             </Tooltip>
           );
@@ -263,7 +265,7 @@ export default function Timeline({ hasAudio, seek }: Props) {
 
   rows.push({
     key: 'captions',
-    label: <span className={`flex items-center gap-1.5 ${project.captionStyle.enabled ? '' : 'opacity-50'}`}><Captions size={13} />Phụ đề</span>,
+    label: <span className={`flex items-center gap-1.5 ${project.captionStyle.enabled ? '' : 'opacity-50'}`}><CommentOutlined />Phụ đề</span>,
     color: '#be185d',
     content: project.captions.map((c) => (
       <Clip
@@ -294,7 +296,7 @@ export default function Timeline({ hasAudio, seek }: Props) {
   rows.push({
     key: 'video',
     h: VIDEO_ROW_H,
-    label: <span className="flex items-center gap-1.5"><Film size={13} />Video</span>,
+    label: <span className="flex items-center gap-1.5"><VideoCameraOutlined />Video</span>,
     color: '#1d4ed8',
     content: (
       <Clip
@@ -323,7 +325,7 @@ export default function Timeline({ hasAudio, seek }: Props) {
 
   rows.push({
     key: 'voices',
-    label: <span className="flex items-center gap-1.5"><AudioLines size={13} />Giọng đọc</span>,
+    label: <span className="flex items-center gap-1.5"><SoundOutlined />Giọng đọc</span>,
     color: '#2563eb',
     content: project.voices.map((vc) => (
       <Clip
@@ -365,7 +367,7 @@ export default function Timeline({ hasAudio, seek }: Props) {
   const b = project.bgm;
   rows.push({
     key: 'bgm',
-    label: <span className="flex items-center gap-1.5"><Music size={13} />Nhạc nền</span>,
+    label: <span className="flex items-center gap-1.5"><CustomerServiceOutlined />Nhạc nền</span>,
     color: '#7e22ce',
     content: b && (
       <Clip
@@ -395,7 +397,7 @@ export default function Timeline({ hasAudio, seek }: Props) {
             <Tooltip title="Phóng to timeline (Ctrl + cuộn chuột)">
               <Slider className="!m-0 flex-1" min={1} max={40} step={0.1} value={zoom} onChange={setZoom} tooltip={{ open: false }} />
             </Tooltip>
-            <Tooltip title="Vừa khung nhìn"><button type="button" className="text-slate-400 hover:text-white" onClick={() => setZoom(1)}><Maximize2 size={12} /></button></Tooltip>
+            <Tooltip title="Vừa khung nhìn"><button type="button" className="text-slate-400 hover:text-white" onClick={() => setZoom(1)}><FullscreenOutlined /></button></Tooltip>
           </div>
           <div className="overflow-hidden">
             {rows.map((r) => (

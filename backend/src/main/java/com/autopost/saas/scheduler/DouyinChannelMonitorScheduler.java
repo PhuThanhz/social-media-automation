@@ -1,5 +1,6 @@
 package com.autopost.saas.scheduler;
 
+import com.autopost.saas.util.LocalServices;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -17,8 +18,8 @@ import java.util.Map;
 @Slf4j
 public class DouyinChannelMonitorScheduler {
 
-    private final RestTemplate restTemplate = new RestTemplate();
-    private final String WORKER_BASE_URL = "http://localhost:3001";
+    private final RestTemplate restTemplate = com.autopost.saas.util.LocalServices.withSessionToken(new RestTemplate());
+    private final String WORKER_BASE_URL = LocalServices.WORKER_BASE;
 
     // @Scheduled(fixedRate = 7_200_000, initialDelay = 180_000)
     public void monitorDouyinChannels() {

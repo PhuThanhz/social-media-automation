@@ -1,5 +1,6 @@
 package com.autopost.saas.controller;
 
+import com.autopost.saas.util.LocalServices;
 import com.autopost.saas.service.FacebookGraphApiService;
 import com.autopost.saas.util.PooledRestTemplateFactory;
 import lombok.RequiredArgsConstructor;
@@ -87,7 +88,7 @@ public class VideoToolController {
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<Map<String, String>> request = new HttpEntity<>(payload, headers);
             Map<String, Object> response = restTemplate.postForObject(
-                    "http://localhost:3001/api/extract-video", request, Map.class);
+                    LocalServices.WORKER_BASE + "/api/extract-video", request, Map.class);
             if (response != null && Boolean.TRUE.equals(response.get("success"))) {
                 String sourceType = String.valueOf(response.get("sourceType"));
                 String caption = (String) response.get("content");
@@ -159,7 +160,7 @@ public class VideoToolController {
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<Map<String, String>> request = new HttpEntity<>(body, headers);
             Map<String, Object> response = restTemplate.postForObject(
-                    "http://localhost:3001/api/scrape-article", request, Map.class);
+                    LocalServices.WORKER_BASE + "/api/scrape-article", request, Map.class);
             return ResponseEntity.ok(response);
         } catch (HttpStatusCodeException e) {
             log.warn("Worker trả lỗi khi cào bài báo: {}", e.getResponseBodyAsString());
@@ -178,7 +179,7 @@ public class VideoToolController {
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
             Map<String, Object> response = restTemplate.postForObject(
-                    "http://localhost:3001/api/scrape-category-links", request, Map.class);
+                    LocalServices.WORKER_BASE + "/api/scrape-category-links", request, Map.class);
             return ResponseEntity.ok(response);
         } catch (HttpStatusCodeException e) {
             log.warn("Worker trả lỗi khi quét chuyên mục bài báo: {}", e.getResponseBodyAsString());
@@ -197,7 +198,7 @@ public class VideoToolController {
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
             Map<String, Object> response = restTemplate.postForObject(
-                    "http://localhost:3001/api/parse-rss", request, Map.class);
+                    LocalServices.WORKER_BASE + "/api/parse-rss", request, Map.class);
             return ResponseEntity.ok(response);
         } catch (HttpStatusCodeException e) {
             log.warn("Worker trả lỗi khi đọc RSS feed: {}", e.getResponseBodyAsString());
@@ -292,7 +293,7 @@ public class VideoToolController {
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
             Map<String, Object> response = restTemplate.postForObject(
-                    "http://localhost:3001/api/hunt-threads", request, Map.class);
+                    LocalServices.WORKER_BASE + "/api/hunt-threads", request, Map.class);
             if (response != null && Boolean.TRUE.equals(response.get("success")) && response.get("items") instanceof List) {
                 List<Map<String, Object>> items = (List<Map<String, Object>>) response.get("items");
                 try {
@@ -350,7 +351,7 @@ public class VideoToolController {
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
             Map<String, Object> response = restTemplate.postForObject(
-                    "http://localhost:3001/api/hunt-facebook-groups-by-keyword", request, Map.class);
+                    LocalServices.WORKER_BASE + "/api/hunt-facebook-groups-by-keyword", request, Map.class);
             return ResponseEntity.ok(response != null ? response : Map.of("success", false, "error", "Không nhận được phản hồi từ Worker"));
         } catch (Exception e) {
             log.error("Lỗi khi gọi Worker hunt-groups-by-keyword: {}", e.getMessage());
@@ -391,7 +392,7 @@ public class VideoToolController {
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(reqBody, headers);
             Map<String, Object> response = restTemplate.postForObject(
-                    "http://localhost:3001/api/hunt-tiktok-channel", request, Map.class);
+                    LocalServices.WORKER_BASE + "/api/hunt-tiktok-channel", request, Map.class);
 
             if (response != null && Boolean.TRUE.equals(response.get("success")) && response.get("items") instanceof List) {
                 List<Map<String, Object>> items = (List<Map<String, Object>>) response.get("items");
@@ -444,7 +445,7 @@ public class VideoToolController {
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
             Map<String, Object> response = restTemplate.postForObject(
-                    "http://localhost:3001/api/post-tiktok", request, Map.class);
+                    LocalServices.WORKER_BASE + "/api/post-tiktok", request, Map.class);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             log.error("Lỗi gọi Worker post-tiktok: {}", e.getMessage());
@@ -535,7 +536,7 @@ public class VideoToolController {
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(reqBody, headers);
             Map<String, Object> response = restTemplate.postForObject(
-                    "http://localhost:3001/api/hunt-facebook-group", request, Map.class);
+                    LocalServices.WORKER_BASE + "/api/hunt-facebook-group", request, Map.class);
 
             if (response != null && Boolean.TRUE.equals(response.get("success")) && response.get("items") instanceof List) {
                 List<Map<String, Object>> items = (List<Map<String, Object>>) response.get("items");

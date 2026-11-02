@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import {
   Card, Typography, Tag, Drawer, Descriptions, Space, Button,
-  Calendar, Badge, Modal, DatePicker, Popconfirm, Select, Tooltip, App, Grid, InputNumber, Empty, Alert, Divider
+  Calendar, Badge, Modal, DatePicker, Popconfirm, Select, Tooltip, App, Grid, InputNumber, Empty, Alert, Divider, Flex
 } from 'antd';
 import type { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
@@ -129,7 +129,7 @@ export default function ContentCalendar() {
     queryFn: async () => (await api.get('/connections')).data || [],
   });
 
-  // Gộp các kết nối trùng platformAccountId (VD "Làm Sen" có 2 cookie id=3 và id=7) về 1 dòng duy nhất
+  // Gộp các kết nối trùng platformAccountId (VD cùng 1 Fanpage có 2 cookie id=3 và id=7) về 1 dòng duy nhất
   // (giữ kết nối mới nhất), tránh hiện 1 trang 2 lần khiến đặt KPI nhầm 1 trong 2 dòng, gây đếm KPI
   // như đang thiếu dù đã đăng đủ lên đúng trang đó qua kết nối còn lại.
   const kpiFanpageAccounts = useMemo(() => Array.from(
@@ -297,7 +297,7 @@ export default function ContentCalendar() {
           <div
             key={t.socialAccountId}
             onClick={(e) => { e.stopPropagation(); openTargetModal(current); }}
-            className={`text-[9px] px-1 py-0.5 rounded truncate cursor-pointer flex items-center gap-0.5 ${t.achieved ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}
+            className={`text-[9px] px-1 py-0.5 rounded truncate cursor-pointer flex items-center gap-0.5 ${t.achieved ? 'bg-emerald-950/50 text-emerald-400 border border-emerald-800/50' : 'bg-amber-950/50 text-amber-400 border border-amber-800/50'}`}
             title={`${t.platform === 'FACEBOOK_GROUP' ? 'Group' : 'Trang'} ${t.accountName}: ${t.actualCount}/${t.targetCount} — bấm để sửa KPI`}
           >
             {t.platform === 'FACEBOOK_GROUP' ? <TeamOutlined /> : <FileTextOutlined />}
@@ -319,9 +319,9 @@ export default function ContentCalendar() {
               }}
               className={`px-1 py-0.5 sm:px-1.5 rounded cursor-pointer truncate transition-all hover:opacity-80 flex items-center gap-1 shadow-xs ${isMobile ? 'text-[9px]' : 'text-[11px]'}`}
               style={{
-                backgroundColor: isStory ? '#f3e8ff' : '#eff6ff',
+                backgroundColor: isStory ? 'rgba(168, 85, 247, 0.16)' : 'rgba(59, 130, 246, 0.16)',
                 borderLeft: `3px solid ${cfg.color}`,
-                color: isStory ? '#6b21a8' : '#1e40af'
+                color: isStory ? '#d8b4fe' : '#93c5fd'
               }}
               title={`${isStory ? '📱 Story' : '📝 Bài viết'}: ${p.title} (${cfg.label})`}
             >
@@ -337,7 +337,7 @@ export default function ContentCalendar() {
               e.stopPropagation();
               setSelectedDayPosts({ date: current, posts: dayPosts });
             }}
-            className="text-[9px] sm:text-[10px] text-slate-500 font-bold text-center cursor-pointer hover:text-blue-600 bg-slate-100 rounded py-0.5"
+            className="text-[9px] sm:text-[10px] text-slate-400 font-bold text-center cursor-pointer hover:text-blue-400 bg-white/5 rounded py-0.5"
           >
             +{dayPosts.length - maxChipsPerDay} bài khác
           </div>
@@ -357,69 +357,70 @@ export default function ContentCalendar() {
   return (
     <div className="app-page space-y-4">
       {/* Header & Bộ lọc */}
-      <div className="app-surface app-page-header flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <Title level={4} className="!mb-1 text-slate-800 flex items-center gap-2">
-            <CalendarOutlined className="text-purple-600" /> Lịch Đăng Bài & Story
-          </Title>
-          <Text className="text-xs text-slate-500 font-medium">
-            Xem lịch trực quan các bài đăng & Story đã lên lịch hoặc đã xuất bản
-          </Text>
-        </div>
+      <Card variant="borderless">
+        <Flex justify="space-between" align="center" wrap="wrap" gap="middle">
+          <Flex align="center" gap="middle">
+            <div className="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 text-lg">
+              <CalendarOutlined />
+            </div>
+            <div>
+              <Title level={4} className="!mb-0.5 !text-slate-100">Lịch Đăng Bài & Story</Title>
+              <Text className="text-xs text-slate-400">Xem lịch trực quan các bài đăng & Story đã lên lịch hoặc đã xuất bản</Text>
+            </div>
+          </Flex>
 
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Lọc loại bài */}
-          <Select
-            value={filterType}
-            onChange={setFilterType}
-            size="middle"
-            className="w-36 rounded-xl"
-            options={[
-              { value: 'ALL', label: 'Tất cả loại' },
-              { value: 'STORY', label: '📱 Chỉ Story' },
-              { value: 'POST', label: '📝 Chỉ bài viết' },
-            ]}
-          />
-
-          {/* Lọc trạng thái */}
-          <Select
-            value={filterStatus}
-            onChange={setFilterStatus}
-            size="middle"
-            className="w-36 rounded-xl"
-            options={[
-              { value: 'ALL', label: 'Tất cả trạng thái' },
-              { value: 'PENDING', label: '🗓️ Chờ đăng' },
-              { value: 'PUBLISHED', label: '✅ Đã đăng' },
-              { value: 'FAILED', label: '❌ Thất bại' },
-            ]}
-          />
-
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={() => refetch()}
-            loading={isFetching}
-            className="rounded-xl font-semibold"
-          >
-            Làm mới
-          </Button>
-        </div>
-      </div>
+          <Flex wrap="wrap" align="center" gap="small">
+            <Select
+              value={filterType}
+              onChange={setFilterType}
+              className="w-36 rounded-xl"
+              options={[
+                { value: 'ALL', label: 'Tất cả loại' },
+                { value: 'STORY', label: '📱 Chỉ Story' },
+                { value: 'POST', label: '📝 Chỉ bài viết' },
+              ]}
+            />
+            <Select
+              value={filterStatus}
+              onChange={setFilterStatus}
+              className="w-36 rounded-xl"
+              options={[
+                { value: 'ALL', label: 'Tất cả trạng thái' },
+                { value: 'PENDING', label: '🗓️ Chờ đăng' },
+                { value: 'PUBLISHED', label: '✅ Đã đăng' },
+                { value: 'FAILED', label: '❌ Thất bại' },
+              ]}
+            />
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={() => refetch()}
+              loading={isFetching}
+              className="rounded-xl font-semibold"
+            >
+              Làm mới
+            </Button>
+          </Flex>
+        </Flex>
+      </Card>
 
       {/* Legend chú thích */}
-      <div className="flex items-center gap-4 px-4 py-2 bg-white rounded-xl border border-slate-200/80 text-xs flex-wrap">
-        <span className="font-bold text-slate-700">Chú thích:</span>
-        <span className="flex items-center gap-1.5"><Badge color="#2563eb" /> Chờ đăng</span>
-        <span className="flex items-center gap-1.5"><Badge color="#16a34a" /> Đã đăng</span>
-        <span className="flex items-center gap-1.5"><Badge color="#7c3aed" /> Đang xử lý</span>
-        <span className="flex items-center gap-1.5"><Badge color="#dc2626" /> Thất bại</span>
-        <span className="ml-auto text-slate-400">💡 Nhấp vào bài viết bất kỳ trên lịch để xem chi tiết hoặc đổi giờ đăng</span>
-      </div>
+      <Card variant="borderless" styles={{ body: { padding: '10px 16px' } }}>
+        <Flex justify="space-between" align="center" wrap="wrap" gap="middle" className="text-xs">
+          <Flex align="center" gap="middle" wrap="wrap">
+            <span className="font-semibold text-slate-300">Chú thích:</span>
+            <span className="flex items-center gap-1.5 text-slate-300"><Badge color="#2563eb" /> Chờ đăng</span>
+            <span className="flex items-center gap-1.5 text-slate-300"><Badge color="#16a34a" /> Đã đăng</span>
+            <span className="flex items-center gap-1.5 text-slate-300"><Badge color="#7c3aed" /> Đang xử lý</span>
+            <span className="flex items-center gap-1.5 text-slate-300"><Badge color="#dc2626" /> Thất bại</span>
+          </Flex>
+          <span className="text-slate-400">💡 Nhấp vào bài viết bất kỳ trên lịch để xem chi tiết hoặc đổi giờ đăng</span>
+        </Flex>
+      </Card>
 
       {/* Lịch Calendar — lưới tháng đầy đủ cho tablet/desktop trở lên. Trên điện thoại, lưới 7 cột
           quá chật để hiện badge bài viết dễ đọc, nên thay bằng danh sách theo ngày (agenda) bên dưới. */}
       {!isMobile && (
-        <Card variant="borderless" className="shadow-sm rounded-2xl border border-slate-200/80 bg-white p-4">
+        <Card variant="borderless" className="shadow-sm">
           <Calendar
             value={selectedDate}
             onChange={(date) => setSelectedDate(date)}
@@ -438,7 +439,7 @@ export default function ContentCalendar() {
       )}
 
       {isMobile && (
-        <Card variant="borderless" className="shadow-sm rounded-2xl border border-slate-200/80 bg-white p-4 space-y-3">
+        <Card variant="borderless" className="shadow-sm space-y-3">
           <div className="flex items-center justify-between gap-2">
             <Button
               size="small"
@@ -471,9 +472,11 @@ export default function ContentCalendar() {
 
             if (daysWithPosts.length === 0) {
               return (
-                <div className="text-center text-slate-400 text-xs py-8">
-                  Không có bài nào trong tháng {selectedDate.format('MM/YYYY')}
-                </div>
+                <Empty
+                  description={`Không có bài nào trong tháng ${selectedDate.format('MM/YYYY')}`}
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  className="py-6"
+                />
               );
             }
 
@@ -481,32 +484,37 @@ export default function ContentCalendar() {
               <div className="space-y-3">
                 {daysWithPosts.map(([dateKey, dayPosts]) => (
                   <div key={dateKey}>
-                    <div className="text-xs font-bold text-slate-500 mb-1.5">
+                    <Text strong className="text-xs text-slate-400 mb-1.5 block">
                       {VI_WEEKDAYS[dayjs(dateKey).day()]}, {dayjs(dateKey).format('DD/MM')}
-                    </div>
+                    </Text>
                     <div className="space-y-1.5">
                       {dayPosts.map((p) => {
                         const isStory = p.postType === 'STORY';
                         const cfg = STATUS_CONFIG[p.status] || STATUS_CONFIG.PENDING;
                         return (
-                          <div
+                          <Card
                             key={p.id}
+                            size="small"
+                            hoverable
                             onClick={() => setViewingPost(p)}
-                            className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 active:bg-purple-50/60 cursor-pointer flex items-center justify-between gap-2"
+                            className="cursor-pointer !bg-[rgba(255,255,255,0.03)] !border-[#202a3a]"
+                            styles={{ body: { padding: '8px 12px' } }}
                           >
-                            <div className="flex items-center gap-2 overflow-hidden min-w-0">
-                              {isStory ? <PlayCircleOutlined className="text-purple-600 shrink-0" /> : <PictureOutlined className="text-blue-600 shrink-0" />}
-                              <div className="min-w-0">
-                                <span className="font-bold text-xs text-slate-800 block truncate">{p.title || `#${p.id}`}</span>
-                                <span className="text-[11px] text-slate-500 font-mono">
-                                  {dayjs(p.scheduledAt || p.publishedAt || p.createdAt).format('HH:mm')}
-                                </span>
-                              </div>
-                            </div>
-                            <Tag color={cfg.tagColor} className="font-bold text-[10px] !m-0 shrink-0">
-                              {cfg.label}
-                            </Tag>
-                          </div>
+                            <Flex justify="space-between" align="center" gap={8}>
+                              <Flex align="center" gap={8} className="overflow-hidden min-w-0">
+                                {isStory ? <PlayCircleOutlined className="text-purple-400 shrink-0" /> : <PictureOutlined className="text-blue-400 shrink-0" />}
+                                <div className="min-w-0">
+                                  <Text strong className="text-xs block truncate">{p.title || `#${p.id}`}</Text>
+                                  <Text type="secondary" className="text-[11px] font-mono">
+                                    {dayjs(p.scheduledAt || p.publishedAt || p.createdAt).format('HH:mm')}
+                                  </Text>
+                                </div>
+                              </Flex>
+                              <Tag color={cfg.tagColor} className="font-bold text-[10px] !m-0 shrink-0">
+                                {cfg.label}
+                              </Tag>
+                            </Flex>
+                          </Card>
                         );
                       })}
                     </div>
@@ -581,49 +589,55 @@ export default function ContentCalendar() {
 
             <Descriptions column={1} size="small" bordered className="rounded-xl overflow-hidden">
               <Descriptions.Item label="Tiêu đề / Fanpage">
-                <span className="font-bold text-slate-800">{viewingPost.title || '—'}</span>
+                <Text strong>{viewingPost.title || '—'}</Text>
               </Descriptions.Item>
               <Descriptions.Item label="Giờ lên lịch">
-                <span className="font-mono text-slate-700">
+                <Text code>
                   {viewingPost.scheduledAt ? dayjs(viewingPost.scheduledAt).format('HH:mm · DD/MM/YYYY') : '—'}
-                </span>
+                </Text>
               </Descriptions.Item>
               {viewingPost.publishedAt && (
                 <Descriptions.Item label="Giờ đã đăng">
-                  <span className="font-mono text-emerald-700 font-bold">
+                  <Text type="success" strong>
                     {dayjs(viewingPost.publishedAt).format('HH:mm · DD/MM/YYYY')}
-                  </span>
+                  </Text>
                 </Descriptions.Item>
               )}
             </Descriptions>
 
             {/* Nội dung / Link bài viết */}
             <div>
-              <span className="font-bold text-slate-700 block mb-1">Nội dung / Link gốc:</span>
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs break-all whitespace-pre-wrap">
+              <Text strong className="block mb-1">Nội dung / Link gốc:</Text>
+              <Card size="small" className="font-mono text-xs break-all whitespace-pre-wrap !bg-[rgba(255,255,255,0.03)] !border-[#202a3a]">
                 {viewingPost.originalUrl || viewingPost.content || 'Không có nội dung văn bản'}
-              </div>
+              </Card>
             </div>
 
             {/* Media URLs nếu có */}
             {viewingPost.mediaUrls && (
               <div>
-                <span className="font-bold text-slate-700 block mb-1">Đường dẫn Media (.mp4 / ảnh):</span>
-                <a
-                  href={viewingPost.mediaUrls}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-blue-600 hover:underline break-all block p-2 bg-blue-50/60 rounded-lg text-[11px]"
-                >
-                  🔗 {viewingPost.mediaUrls}
-                </a>
+                <Text strong className="block mb-1">Đường dẫn Media (.mp4 / ảnh):</Text>
+                <Card size="small" className="!bg-[rgba(255,255,255,0.03)] !border-[#202a3a]">
+                  <Typography.Link
+                    href={viewingPost.mediaUrls}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="break-all block text-xs"
+                  >
+                    🔗 {viewingPost.mediaUrls}
+                  </Typography.Link>
+                </Card>
               </div>
             )}
 
             {viewingPost.errorMessage && (
-              <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs">
-                <b>❌ Chi tiết lỗi:</b> {viewingPost.errorMessage}
-              </div>
+              <Alert
+                type="error"
+                showIcon
+                message="Chi tiết lỗi"
+                description={viewingPost.errorMessage}
+                className="text-xs"
+              />
             )}
           </div>
         )}
@@ -641,27 +655,31 @@ export default function ContentCalendar() {
             const isStory = p.postType === 'STORY';
             const cfg = STATUS_CONFIG[p.status] || STATUS_CONFIG.PENDING;
             return (
-              <div
+              <Card
                 key={p.id}
+                size="small"
+                hoverable
                 onClick={() => {
                   setViewingPost(p);
                   setSelectedDayPosts(null);
                 }}
-                className="p-3 rounded-xl border border-slate-200 hover:border-purple-400 bg-slate-50 hover:bg-purple-50/40 cursor-pointer transition-all flex items-center justify-between"
+                className="cursor-pointer !bg-[rgba(255,255,255,0.03)] !border-[#202a3a]"
               >
-                <div className="flex items-center gap-2 overflow-hidden">
-                  {isStory ? <PlayCircleOutlined className="text-purple-600" /> : <PictureOutlined className="text-blue-600" />}
-                  <div>
-                    <span className="font-bold text-xs text-slate-800 block truncate max-w-xs">{p.title}</span>
-                    <span className="text-[11px] text-slate-500 font-mono">
-                      {dayjs(p.scheduledAt || p.publishedAt || p.createdAt).format('HH:mm')}
-                    </span>
-                  </div>
-                </div>
-                <Tag color={cfg.tagColor} className="font-bold text-xs !m-0">
-                  {cfg.label}
-                </Tag>
-              </div>
+                <Flex justify="space-between" align="center">
+                  <Flex align="center" gap={8} className="overflow-hidden">
+                    {isStory ? <PlayCircleOutlined className="text-purple-400" /> : <PictureOutlined className="text-blue-400" />}
+                    <div className="overflow-hidden">
+                      <Text strong className="text-xs block truncate max-w-xs">{p.title}</Text>
+                      <Text type="secondary" className="text-[11px] font-mono">
+                        {dayjs(p.scheduledAt || p.publishedAt || p.createdAt).format('HH:mm')}
+                      </Text>
+                    </div>
+                  </Flex>
+                  <Tag color={cfg.tagColor} className="font-bold text-xs !m-0">
+                    {cfg.label}
+                  </Tag>
+                </Flex>
+              </Card>
             );
           })}
         </div>

@@ -7,6 +7,7 @@
  */
 
 const { chromium } = require('playwright');
+const browserPool = require('./browserPool');
 const { getDeviceForUid, applyFingerprintToContext } = require('./device-fingerprints');
 const {
   filterAvailablePagesForPost,
@@ -303,9 +304,14 @@ async function getManagedPages(cookieStr, options = {}) {
   }
 
   const proxy = parseProxy(proxyUrl);
-  const browser = await chromium.launch({
-    headless: true,
-    args: [
+  // Không proxy → context từ browserPool; có proxy → acquireScrapeContext vẫn mở Chromium riêng như cũ.
+  const { context, release: releaseContext } = await browserPool.acquireScrapeContext({
+    userAgent:
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    viewport: { width: 1280, height: 800 },
+  }, {
+    proxy: proxy ? { server: proxy.server, username: proxy.username, password: proxy.password } : null,
+    launchArgs: [
       '--disable-blink-features=AutomationControlled',
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -313,15 +319,9 @@ async function getManagedPages(cookieStr, options = {}) {
       '--mute-audio',
       '--disable-gpu',
     ],
-    proxy: proxy ? { server: proxy.server, username: proxy.username, password: proxy.password } : undefined,
   });
 
   try {
-    const context = await browser.newContext({
-      userAgent:
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      viewport: { width: 1280, height: 800 },
-    });
     await context.addCookies(cookies);
     const page = await context.newPage();
 
@@ -477,7 +477,7 @@ async function getManagedPages(cookieStr, options = {}) {
     }
     return pageList;
   } finally {
-    await browser.close().catch(() => {});
+    await releaseContext();
   }
 }
 
@@ -1572,14 +1572,19 @@ async function scanTargetForPosts(targetUrl, options = {}) {
   const proxy = parseProxy(proxyUrl);
   console.log(`[FB-Hunter] 🔍 Đang quét bài viết mới từ: ${cleanTarget} (Max: ${maxPosts})`);
 
-  let browser = null;
   let context = null;
+  let releaseContext = null;
   const discoveredPosts = [];
 
   try {
-    browser = await chromium.launch({
-      headless: true,
-      args: [
+    // Không proxy → context từ browserPool; có proxy → acquireScrapeContext vẫn mở Chromium riêng như cũ.
+    const acquired = await browserPool.acquireScrapeContext({
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+      viewport: { width: 1280, height: 800 },
+      locale: 'vi-VN',
+    }, {
+      proxy: proxy ? { server: proxy.server, username: proxy.username, password: proxy.password } : null,
+      launchArgs: [
         '--disable-blink-features=AutomationControlled',
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -1587,14 +1592,9 @@ async function scanTargetForPosts(targetUrl, options = {}) {
         '--mute-audio',
         '--disable-gpu',
       ],
-      proxy: proxy ? { server: proxy.server, username: proxy.username, password: proxy.password } : undefined,
     });
-
-    context = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-      viewport: { width: 1280, height: 800 },
-      locale: 'vi-VN',
-    });
+    context = acquired.context;
+    releaseContext = acquired.release;
 
     // Chặn ảnh/video/font để quét cực nhanh, tiết kiệm 80% RAM & mạng
     await context.route('**/*.{png,jpg,jpeg,webp,gif,svg,ico,mp4,webm,woff,woff2,ttf,otf}', (route) => {
@@ -1700,8 +1700,7 @@ async function scanTargetForPosts(targetUrl, options = {}) {
   } catch (err) {
     console.error(`[FB-Hunter] ❌ Lỗi quét mục tiêu ${cleanTarget}:`, err.message);
   } finally {
-    if (context) await context.close().catch(() => {});
-    if (browser) await browser.close().catch(() => {});
+    await releaseContext?.();
   }
 
   return discoveredPosts;
@@ -1723,13 +1722,18 @@ async function validateViaSession(cookieStr, options = {}) {
   const device = getDeviceForUid(uid);
   const proxy = parseProxy(proxyUrl);
 
-  let browser = null;
   let context = null;
+  let releaseContext = null;
 
   try {
-    browser = await chromium.launch({
-      headless: true,
-      args: [
+    // Không proxy → context từ browserPool; có proxy → acquireScrapeContext vẫn mở Chromium riêng như cũ.
+    const acquired = await browserPool.acquireScrapeContext({
+      userAgent: device.userAgent,
+      viewport: { width: 1280, height: 720 },
+      locale: 'vi-VN',
+    }, {
+      proxy: proxy ? { server: proxy.server, username: proxy.username, password: proxy.password } : null,
+      launchArgs: [
         '--disable-blink-features=AutomationControlled',
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -1737,14 +1741,9 @@ async function validateViaSession(cookieStr, options = {}) {
         '--mute-audio',
         '--disable-gpu',
       ],
-      proxy: proxy ? { server: proxy.server, username: proxy.username, password: proxy.password } : undefined,
     });
-
-    context = await browser.newContext({
-      userAgent: device.userAgent,
-      viewport: { width: 1280, height: 720 },
-      locale: 'vi-VN',
-    });
+    context = acquired.context;
+    releaseContext = acquired.release;
 
     await context.route('**/*.{png,jpg,jpeg,webp,gif,svg,ico,mp4,webm,woff,woff2,ttf,otf}', (route) => {
       route.abort();
@@ -1784,8 +1783,7 @@ async function validateViaSession(cookieStr, options = {}) {
   } catch (err) {
     return { isLive: false, status: 'ERROR', uid, error: err.message };
   } finally {
-    if (context) await context.close().catch(() => {});
-    if (browser) await browser.close().catch(() => {});
+    await releaseContext?.();
   }
 }
 

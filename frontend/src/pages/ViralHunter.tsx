@@ -55,7 +55,6 @@ import {
   FileExcelOutlined,
   DownloadOutlined,
 } from '@ant-design/icons';
-import * as XLSX from 'xlsx';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
@@ -705,7 +704,7 @@ export default function ViralHunter() {
   };
 
   // Xuất trực tiếp file Excel (.xlsx) tải về máy tính
-  const handleExportExcelFile = () => {
+  const handleExportExcelFile = async () => {
     if (filteredGroups.length === 0) {
       message.warning('Danh sách nhóm đang trống để xuất file!');
       return;
@@ -721,7 +720,9 @@ export default function ViralHunter() {
         'Phân Loại / Huy Hiệu': g.qualityBadge || (g.category === 'PHIM' ? 'Phim & Điện Ảnh' : g.category === 'PETS' ? 'Thú Cưng' : 'Cộng đồng'),
       }));
 
-      const worksheet = XLSX.utils.json_to_sheet(data);
+      // Nạp xlsx khi cần để không kéo cả thư viện vào chunk ViralHunter
+      const { utils, writeFile } = await import('xlsx');
+      const worksheet = utils.json_to_sheet(data);
       worksheet['!cols'] = [
         { wch: 6 },  // STT
         { wch: 40 }, // Tên Nhóm Facebook
@@ -732,12 +733,12 @@ export default function ViralHunter() {
         { wch: 24 }, // Phân Loại / Huy Hiệu
       ];
 
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'DS_Group_Facebook');
+      const workbook = utils.book_new();
+      utils.book_append_sheet(workbook, worksheet, 'DS_Group_Facebook');
 
       const safeKw = (groupKeyword || 'groups').trim().replace(/[^\p{L}\p{N}_-]/gu, '_');
       const filename = `DS_Group_${safeKw}_${dayjs().format('YYYYMMDD_HHmm')}.xlsx`;
-      XLSX.writeFile(workbook, filename);
+      writeFile(workbook, filename);
       message.success(`📥 Đã xuất file Excel thành công: ${filename} (${filteredGroups.length} nhóm)!`);
     } catch (err: any) {
       message.error(`Lỗi khi xuất file Excel: ${err?.message || 'Không thể tạo file'}`);

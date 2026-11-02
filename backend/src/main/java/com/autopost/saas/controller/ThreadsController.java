@@ -1,5 +1,6 @@
 package com.autopost.saas.controller;
 
+import com.autopost.saas.util.LocalServices;
 import com.autopost.saas.entity.Campaign;
 import com.autopost.saas.entity.PostQueue;
 import com.autopost.saas.entity.SocialAccount;
@@ -152,7 +153,7 @@ public class ThreadsController {
         }
         Map<?, ?> info;
         try {
-            info = restTemplate.postForObject("http://localhost:3001/api/threads-account-info",
+            info = restTemplate.postForObject(LocalServices.WORKER_BASE + "/api/threads-account-info",
                     Map.of("cookieString", account.getAccessToken() == null ? "" : account.getAccessToken()), Map.class);
         } catch (Exception e) {
             log.warn("🧵 Kiểm tra nick Threads {} thất bại: {}", id, e.getMessage());
@@ -215,7 +216,7 @@ public class ThreadsController {
     }
 
     private Map<?, ?> fetchAccountInfo(String cookieString) {
-        return restTemplate.postForObject("http://localhost:3001/api/threads-account-info",
+        return restTemplate.postForObject(LocalServices.WORKER_BASE + "/api/threads-account-info",
                 Map.of("cookieString", cookieString), Map.class);
     }
 
@@ -295,7 +296,7 @@ public class ThreadsController {
             profileKey = "acc" + acc.getId();
         }
         try {
-            Map<?, ?> resp = restTemplate.postForObject("http://localhost:3001/api/threads-login/start", Map.of("profileKey", profileKey), Map.class);
+            Map<?, ?> resp = restTemplate.postForObject(LocalServices.WORKER_BASE + "/api/threads-login/start", Map.of("profileKey", profileKey), Map.class);
             return ResponseEntity.ok(Map.of("success", true, "sessionId", String.valueOf(resp != null ? resp.get("sessionId") : "")));
         } catch (org.springframework.web.client.HttpClientErrorException e) {
             return ResponseEntity.status(e.getStatusCode()).body(Map.of("success", false, "message", "Đang có 1 cửa sổ đăng nhập Threads mở sẵn — hoàn tất hoặc đóng nó trước."));
@@ -310,7 +311,7 @@ public class ThreadsController {
                                                            Authentication authentication) {
         Map<?, ?> resp;
         try {
-            resp = restTemplate.getForObject("http://localhost:3001/api/threads-login/" + sessionId, Map.class);
+            resp = restTemplate.getForObject(LocalServices.WORKER_BASE + "/api/threads-login/" + sessionId, Map.class);
         } catch (Exception e) {
             return ResponseEntity.status(502).body(Map.of("success", false, "message", "Không lấy được trạng thái đăng nhập: " + e.getMessage()));
         }
@@ -337,7 +338,7 @@ public class ThreadsController {
     @PostMapping("/login/{sessionId}/cancel")
     public ResponseEntity<Map<String, Object>> cancelLogin(@PathVariable String sessionId) {
         try {
-            restTemplate.postForObject("http://localhost:3001/api/threads-login/" + sessionId + "/cancel", Map.of(), Map.class);
+            restTemplate.postForObject(LocalServices.WORKER_BASE + "/api/threads-login/" + sessionId + "/cancel", Map.of(), Map.class);
         } catch (Exception ignored) { }
         return ResponseEntity.ok(Map.of("success", true));
     }

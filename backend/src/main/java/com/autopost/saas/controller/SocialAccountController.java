@@ -1,5 +1,6 @@
 package com.autopost.saas.controller;
 
+import com.autopost.saas.util.LocalServices;
 import com.autopost.saas.entity.SocialAccount;
 import com.autopost.saas.entity.User;
 import com.autopost.saas.dto.FacebookPageAccessDto;
@@ -9,6 +10,7 @@ import com.autopost.saas.repository.UserRepository;
 import com.autopost.saas.service.FacebookPageAuditService;
 import com.autopost.saas.service.SocialAccountService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -17,17 +19,21 @@ import com.autopost.saas.util.PooledRestTemplateFactory;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 
 @RestController
 @RequestMapping("/api/connections")
 @RequiredArgsConstructor
 @CrossOrigin(originPatterns = "*")
+@Slf4j
 public class SocialAccountController {
 
     private final SocialAccountService socialAccountService;
     private final FacebookPageAuditService facebookPageAuditService;
     private final com.autopost.saas.service.GroupHealthService groupHealthService;
+    private final com.autopost.saas.service.PlaywrightHealthCheckService playwrightHealthCheckService;
     private final UserRepository userRepository;
     private final RestTemplate workerRestTemplate = PooledRestTemplateFactory.create(10000, 30000);
     /** Kết quả đã lưu của từng phiên đăng nhập Facebook — các lượt poll sau SUCCESS không lưu lại DB lần nữa. */
@@ -56,9 +62,15 @@ public class SocialAccountController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteConnection(@PathVariable Long id) {
-        socialAccountService.deleteAccount(id);
-        return ResponseEntity.ok().build();
+    public ResponseEntity<?> deleteConnection(@PathVariable Long id) {
+        try {
+            socialAccountService.deleteAccount(id);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("Lỗi khi xóa kết nối/group ID {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Không thể xóa: " + e.getMessage()));
+        }
     }
 
     public static String extractCUser(String cookieStr) {
@@ -87,7 +99,7 @@ public class SocialAccountController {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Không tìm thấy c_user (UID) trong Cookie!"));
         }
 
-        List<String> updatedNames = applyCookieToSameCUser(user, cUser, cookie);
+        List<String> updatedNames = socialAccountService.applyCookieToSameCUser(user.getId(), cUser, cookie);
 
         return ResponseEntity.ok(Map.of(
                 "success", true,
@@ -95,25 +107,6 @@ public class SocialAccountController {
                 "cUser", cUser,
                 "updatedNames", updatedNames
         ));
-    }
-
-    /** Ghi cookie mới cho MỌI kết nối của user có cùng c_user (Via + các Page/Group dùng cookie của Via đó). */
-    private List<String> applyCookieToSameCUser(User user, String cUser, String cookie) {
-        List<String> updatedNames = new java.util.ArrayList<>();
-        java.time.LocalDateTime now = java.time.LocalDateTime.now();
-        for (SocialAccount acc : socialAccountService.getAccountsByUserId(user.getId())) {
-            String accCUser = extractCUser(acc.getAccessToken());
-            boolean matchCUser = accCUser != null && accCUser.equalsIgnoreCase(cUser);
-            boolean matchPlatform = cUser.equalsIgnoreCase(acc.getPlatformAccountId());
-            if (matchCUser || matchPlatform) {
-                acc.setAccessToken(cookie);
-                acc.setTokenStatus("OK");
-                acc.setTokenCheckedAt(now);
-                socialAccountService.saveAccount(acc);
-                updatedNames.add(acc.getPageName() != null ? acc.getPageName() : acc.getPlatformAccountId());
-            }
-        }
-        return updatedNames;
     }
 
     /**
@@ -136,7 +129,7 @@ public class SocialAccountController {
             cUser = fromCookie != null ? fromCookie : String.valueOf(acc.getPlatformAccountId());
         }
         try {
-            Map<?, ?> resp = workerRestTemplate.postForObject("http://localhost:3001/api/fb-login/start", Map.of("cUser", cUser), Map.class);
+            Map<?, ?> resp = workerRestTemplate.postForObject(LocalServices.WORKER_BASE + "/api/fb-login/start", Map.of("cUser", cUser), Map.class);
             return ResponseEntity.ok(Map.of("success", true, "sessionId", String.valueOf(resp != null ? resp.get("sessionId") : "")));
         } catch (org.springframework.web.client.HttpClientErrorException e) {
             return ResponseEntity.status(e.getStatusCode()).body(Map.of("success", false, "message", "Đang có 1 cửa sổ đăng nhập Facebook mở sẵn — hoàn tất hoặc đóng nó trước."));
@@ -152,7 +145,7 @@ public class SocialAccountController {
         if (done != null) return ResponseEntity.ok(done);
         Map<?, ?> resp;
         try {
-            resp = workerRestTemplate.getForObject("http://localhost:3001/api/fb-login/" + sessionId, Map.class);
+            resp = workerRestTemplate.getForObject(LocalServices.WORKER_BASE + "/api/fb-login/" + sessionId, Map.class);
         } catch (Exception e) {
             return ResponseEntity.status(502).body(Map.of("success", false, "message", "Không lấy được trạng thái đăng nhập: " + e.getMessage()));
         }
@@ -172,7 +165,7 @@ public class SocialAccountController {
             User user = resolveUser(authentication);
             String cUser = extractCUser(cookie);
             String name = resp.get("name") instanceof String n && !n.isBlank() ? n.trim() : null;
-            List<String> updatedNames = applyCookieToSameCUser(user, cUser, cookie);
+            List<String> updatedNames = socialAccountService.applyCookieToSameCUser(user.getId(), cUser, cookie);
             SocialAccount via = socialAccountService.getAccountsByUserId(user.getId()).stream()
                     .filter(a -> "FACEBOOK_PROFILE".equals(a.getPlatform()) && cUser.equals(a.getPlatformAccountId()))
                     .findFirst().orElse(null);
@@ -203,7 +196,7 @@ public class SocialAccountController {
     @PostMapping("/fb-login/{sessionId}/cancel")
     public ResponseEntity<Map<String, Object>> cancelFacebookLogin(@PathVariable String sessionId) {
         try {
-            workerRestTemplate.postForObject("http://localhost:3001/api/fb-login/" + sessionId + "/cancel", Map.of(), Map.class);
+            workerRestTemplate.postForObject(LocalServices.WORKER_BASE + "/api/fb-login/" + sessionId + "/cancel", Map.of(), Map.class);
         } catch (Exception ignored) { }
         return ResponseEntity.ok(Map.of("success", true));
     }
@@ -221,11 +214,22 @@ public class SocialAccountController {
         }
         User user = resolveUser(authentication);
         String name = body.get("name") instanceof String n && !n.isBlank() ? n.trim() : null;
-        List<String> updatedNames = applyCookieToSameCUser(user, cUser, cookie);
+        List<String> updatedNames = socialAccountService.applyCookieToSameCUser(user.getId(), cUser, cookie);
         SocialAccount via = socialAccountService.getAccountsByUserId(user.getId()).stream()
                 .filter(a -> "FACEBOOK_PROFILE".equals(a.getPlatform()) && cUser.equals(a.getPlatformAccountId()))
                 .findFirst().orElse(null);
         boolean created = false;
+        // Extension tự đồng bộ (onlyExisting=true): chỉ cập nhật nick đã có, không tự tạo Via mới.
+        boolean onlyExisting = Boolean.TRUE.equals(body.get("onlyExisting"));
+        if (via == null && onlyExisting) {
+            Map<String, Object> result = new java.util.LinkedHashMap<>();
+            result.put("success", true);
+            result.put("cUser", cUser);
+            result.put("created", false);
+            result.put("updatedCount", updatedNames.size());
+            result.put("updatedNames", updatedNames);
+            return ResponseEntity.ok(result);
+        }
         if (via == null) {
             SocialAccount fresh = new SocialAccount();
             fresh.setUser(user);
@@ -413,6 +417,136 @@ public class SocialAccountController {
         User user = resolveUser(authentication);
         facebookPageAuditService.deleteManagedPage(user.getId(), id, pageId);
         return ResponseEntity.ok(Map.of("message", "Đã xóa Page thành công", "pageId", pageId));
+    }
+
+    /**
+     * Kiểm tra trực tiếp tình trạng sống/chết (Live Health Check) của Cookie tài khoản/Via qua Playwright Worker.
+     */
+    @PostMapping("/{id}/check-cookie-health")
+    public ResponseEntity<Map<String, Object>> checkCookieHealth(@PathVariable Long id, Authentication authentication) {
+        User user = resolveUser(authentication);
+        SocialAccount account = socialAccountService.getAccountsByUserId(user.getId()).stream()
+                .filter(a -> a.getId().equals(id))
+                .findFirst().orElse(null);
+        if (account == null) {
+            return ResponseEntity.status(404).body(Map.of("success", false, "message", "Không tìm thấy tài khoản"));
+        }
+        if (account.getAccessToken() == null || account.getAccessToken().isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Tài khoản chưa có cookie/token"));
+        }
+
+        String status = playwrightHealthCheckService.checkCookieStatus(account.getAccessToken());
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        account.setTokenStatus(status);
+        account.setTokenCheckedAt(now);
+        socialAccountService.saveAccount(account);
+
+        // Nếu đây là Via, tự động đồng bộ trạng thái kiểm tra cho toàn bộ Fanpage trực thuộc
+        boolean isVia = "FACEBOOK_PROFILE".equals(account.getPlatform()) || "PERSONAL_PROFILE_COOKIE".equals(account.getAccountType());
+        String cUser = extractCUser(account.getAccessToken());
+        int updatedChildren = 0;
+        if (isVia) {
+            for (SocialAccount acc : socialAccountService.getAccountsByUserId(user.getId())) {
+                if (!acc.getId().equals(account.getId())) {
+                    boolean isChild = account.getId().equals(acc.getPostingIdentityAccountId());
+                    String accCUser = extractCUser(acc.getAccessToken());
+                    boolean sameCUser = cUser != null && cUser.equalsIgnoreCase(accCUser);
+                    if (isChild || sameCUser) {
+                        acc.setTokenStatus(status);
+                        acc.setTokenCheckedAt(now);
+                        socialAccountService.saveAccount(acc);
+                        updatedChildren++;
+                    }
+                }
+            }
+        }
+
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "status", status,
+                "checkedAt", now.toString(),
+                "updatedChildren", updatedChildren,
+                "message", "OK".equals(status) ? "Cookie hoạt động tốt!" : "EXPIRED".equals(status) ? "Cookie đã hết hạn hoặc phiên bị đăng xuất!" : "Worker trả về trạng thái không xác định"
+        ));
+    }
+
+    /**
+     * Đồng bộ / Thêm nhanh các Fanpage đã kiểm kê từ Via vào bảng kết nối (social_accounts) để xuất bản.
+     */
+    @PostMapping("/{id}/import-managed-pages")
+    public ResponseEntity<Map<String, Object>> importManagedPages(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, Object> body,
+            Authentication authentication
+    ) {
+        User user = resolveUser(authentication);
+        SocialAccount via = socialAccountService.getAccountsByUserId(user.getId()).stream()
+                .filter(a -> a.getId().equals(id))
+                .findFirst().orElse(null);
+        if (via == null) {
+            return ResponseEntity.status(404).body(Map.of("success", false, "message", "Không tìm thấy nick Via"));
+        }
+
+        List<String> selectedPageIds = null;
+        if (body != null && body.get("pageIds") instanceof List<?> list) {
+            selectedPageIds = list.stream().map(String::valueOf).toList();
+        }
+
+        List<FacebookPageAccessDto> managedPages = facebookPageAuditService.getManagedPages(user.getId(), id);
+        List<SocialAccount> userAccounts = socialAccountService.getAccountsByUserId(user.getId());
+        Map<String, SocialAccount> existingByPageId = userAccounts.stream()
+                .filter(a -> a.getPlatformAccountId() != null)
+                .collect(Collectors.toMap(SocialAccount::getPlatformAccountId, Function.identity(), (a, b) -> a));
+
+        int added = 0;
+        int updated = 0;
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+
+        for (FacebookPageAccessDto p : managedPages) {
+            String pageId = p.getPageId();
+            if (pageId == null || pageId.isBlank()) continue;
+            if (selectedPageIds != null && !selectedPageIds.isEmpty() && !selectedPageIds.contains(pageId)) continue;
+            // Bỏ qua nếu là chính UID của Via
+            if (pageId.equals(via.getPlatformAccountId())) continue;
+
+            SocialAccount existing = existingByPageId.get(pageId);
+            if (existing != null) {
+                // Đã có trong danh sách -> Cập nhật Via sở hữu và cookie mới
+                existing.setPostingIdentityAccountId(via.getId());
+                if (via.getAccessToken() != null && !via.getAccessToken().isBlank()) {
+                    existing.setAccessToken(via.getAccessToken());
+                }
+                existing.setTokenStatus(via.getTokenStatus() != null ? via.getTokenStatus() : "OK");
+                existing.setTokenCheckedAt(now);
+                if (p.getPageName() != null && !p.getPageName().isBlank()) {
+                    existing.setPageName(p.getPageName());
+                }
+                socialAccountService.saveAccount(existing);
+                updated++;
+            } else {
+                // Tạo mới SocialAccount kết nối Fanpage
+                SocialAccount fresh = new SocialAccount();
+                fresh.setUser(user);
+                fresh.setPlatform("FACEBOOK_PAGE");
+                fresh.setPlatformAccountId(pageId);
+                fresh.setPageName(p.getPageName() != null && !p.getPageName().isBlank() ? p.getPageName() : "Page " + pageId);
+                fresh.setAccountType("PERSONAL_COOKIE");
+                fresh.setAccessToken(via.getAccessToken());
+                fresh.setPostingIdentityAccountId(via.getId());
+                fresh.setTokenStatus(via.getTokenStatus() != null ? via.getTokenStatus() : "OK");
+                fresh.setTokenCheckedAt(now);
+                socialAccountService.saveAccount(fresh);
+                added++;
+            }
+        }
+
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "addedCount", added,
+                "updatedCount", updated,
+                "totalCount", added + updated,
+                "message", String.format("Đã đồng bộ %d Fanpage vào hệ thống (thêm mới %d, cập nhật %d).", added + updated, added, updated)
+        ));
     }
 }
 

@@ -2,7 +2,7 @@
 // kèm mở đầu hiện dần từ đen / kết thúc tối dần.
 import { useEffect, useState } from 'react';
 import { Button, Slider, Switch } from 'antd';
-import { Play } from 'lucide-react';
+import { PlayCircleOutlined } from '@ant-design/icons';
 import { timelineDuration, useEditor } from './store';
 import type { Project } from './store';
 import { TRANSITIONS, frameOutFor, layoutFade, layoutUntil, transitionStyle } from './layers';
@@ -69,7 +69,7 @@ export default function TransitionPanel({ seekAndPlay }: { seekAndPlay: (t: numb
         <>
           <div className="flex items-center justify-between">
             <span className="text-[11px] text-slate-400">Khi khung ẩn lúc <span className="font-mono text-slate-200">{lu.toFixed(1)}s</span></span>
-            <Button size="small" type="text" icon={<Play size={12} />} onClick={() => seekAndPlay(Math.max(0, lu - dur - 0.8))}>Xem thử</Button>
+            <Button size="small" type="text" icon={<PlayCircleOutlined />} onClick={() => seekAndPlay(Math.max(0, lu - dur - 0.8))}>Xem thử</Button>
           </div>
           {groups.map((g) => (
             <section key={g}>

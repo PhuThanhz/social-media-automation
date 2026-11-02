@@ -19,7 +19,7 @@ import {
   Typography,
   Avatar,
   Select,
-  App,
+  App, Flex, Alert, Statistic,
 } from 'antd';
 import {
   AimOutlined,
@@ -68,13 +68,6 @@ interface SocialAccount {
   accessToken?: string;
 }
 
-interface Campaign {
-  id: number;
-  name: string;
-  sourceUrl: string;
-  status: string;
-}
-
 interface PostQueue {
   id: number;
   title: string;
@@ -102,11 +95,11 @@ interface PostTargetItem {
 }
 
 const statusMeta: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-  PENDING: { label: 'Chờ đăng', color: 'processing', icon: <ClockCircleFilled className="text-amber-400" /> },
-  PROCESSING: { label: 'Đang đăng', color: 'purple', icon: <SyncOutlined spin className="text-blue-400" /> },
-  PUBLISHED: { label: 'Đã xuất bản', color: 'success', icon: <CheckCircleFilled className="text-emerald-400" /> },
-  FAILED: { label: 'Đăng lỗi', color: 'error', icon: <CloseCircleFilled className="text-red-400" /> },
-  CANCELLED: { label: 'Đã hủy', color: 'default', icon: <CloseCircleFilled className="text-slate-500" /> },
+  PENDING: { label: 'Chờ đăng', color: 'processing', icon: <ClockCircleFilled className="dash-ic-amber" /> },
+  PROCESSING: { label: 'Đang đăng', color: 'purple', icon: <SyncOutlined spin className="dash-ic-blue" /> },
+  PUBLISHED: { label: 'Đã xuất bản', color: 'success', icon: <CheckCircleFilled className="dash-ic-emerald" /> },
+  FAILED: { label: 'Đăng lỗi', color: 'error', icon: <CloseCircleFilled className="dash-ic-red" /> },
+  CANCELLED: { label: 'Đã hủy', color: 'default', icon: <CloseCircleFilled className="dash-ic-slate" /> },
 };
 
 const getPostDate = (post: PostQueue) => post.publishedAt || post.scheduledAt || post.createdAt;
@@ -129,25 +122,19 @@ const Dashboard = () => {
     queryFn: async () => (await api.get('/connections')).data as SocialAccount[],
   });
 
-  // 2. Fetch danh sách bài đăng
+  const daysParam = period === 'MONTH' ? 30 : period === 'WEEK' ? 7 : 3;
+
+  // 2. Fetch danh sách bài đăng (tối ưu: tải theo kỳ thời gian và cache 60s)
   const { data: posts = [], isLoading: loadingPosts, refetch, isFetching } = useQuery({
-    queryKey: ['postQueue'],
+    queryKey: ['postQueue', daysParam],
     queryFn: async () => {
-      const campaignList = (await api.get('/campaigns')).data as Campaign[];
-      const results = await Promise.all(
-        campaignList.map(async (campaign) => {
-          try {
-            const items = (await api.get(`/queue/campaign/${campaign.id}`)).data as PostQueue[];
-            return items.map((item) => ({ ...item, campaign: { id: campaign.id, name: campaign.name } }));
-          } catch {
-            return [] as PostQueue[];
-          }
-        })
-      );
-      return results
-        .flat()
+      // 1 request cho mọi campaign (mỗi item đã kèm `campaign`)
+      const items = ((await api.get('/queue/recent', { params: { days: daysParam } })).data || []) as PostQueue[];
+      return items
         .sort((a, b) => (dayjs(getPostDate(b)).valueOf() || b.id) - (dayjs(getPostDate(a)).valueOf() || a.id));
     },
+    staleTime: 60000,
+    refetchInterval: 120000,
   });
 
   // 3. Fetch KPI ngày hôm nay
@@ -286,25 +273,24 @@ const Dashboard = () => {
   }, [connections]);
 
   return (
-    <div className="app-page space-y-6">
+    <div className="app-page dash-page">
       {/* 1. EMERGENCY COOKIE BANNER (HIỂN THỊ NẾU CÓ COOKIE HẾT HẠN) */}
       {expiredCookieAccounts.length > 0 && (
-        <div className="rounded-2xl border border-red-500/30 bg-gradient-to-r from-red-950/30 via-slate-900/60 to-red-950/20 p-4 shadow-[0_4px_24px_rgba(239,68,68,0.14)] backdrop-blur-md">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 flex items-center justify-center shrink-0 mt-0.5">
-                <ExclamationCircleFilled className="text-base" />
-              </div>
-              <div>
-                <div className="font-semibold text-sm text-red-200 flex items-center gap-2">
-                  <span>Có {expiredCookieAccounts.length} kết nối Facebook Cookie đã hết hạn!</span>
-                  <span className="w-2 h-2 rounded-full bg-red-400 animate-ping" />
-                </div>
-                <div className="text-xs text-red-400/80 mt-0.5">
-                  Các Fanpage: <b>{expiredCookieAccounts.map((a) => a.pageName || a.platformAccountId).join(', ')}</b> đang bị gián đoạn xuất bản.
-                </div>
-              </div>
-            </div>
+        <Alert
+          type="error"
+          showIcon
+          className="mb-4 shadow-xl border border-red-500/40"
+          message={
+            <Typography.Text strong className="text-red-300">
+              Có {expiredCookieAccounts.length} kết nối Facebook Cookie đã hết hạn!
+            </Typography.Text>
+          }
+          description={
+            <Typography.Text className="text-slate-300 text-xs">
+              Các Fanpage: <b>{expiredCookieAccounts.map((a) => a.pageName || a.platformAccountId).join(', ')}</b> đang bị gián đoạn xuất bản.
+            </Typography.Text>
+          }
+          action={
             <Button
               type="primary"
               danger
@@ -313,30 +299,26 @@ const Dashboard = () => {
                 setQuickCookieTargetId(expiredCookieAccounts[0]?.id);
                 setQuickCookieModalOpen(true);
               }}
-              className="font-bold text-xs h-9 px-4 rounded-xl shrink-0 shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all"
             >
-              Cập nhật Cookie (1-Chạm Đồng Bộ)
+              Cập nhật Cookie (1-Chạm)
             </Button>
-          </div>
-        </div>
+          }
+        />
       )}
 
       {/* 2. CONSOLE HUD & CONTROL BAR */}
-      <div className="rounded-2xl border border-slate-800/90 bg-slate-900/95 p-4 sm:p-5 shadow-lg backdrop-blur-xl">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-100 tracking-tight flex items-center gap-2">
-              Bảng điều khiển xuất bản
-            </h1>
-          </div>
+      <Card variant="borderless" className="mb-4 shadow-xl border border-slate-800/80 bg-[#111a28]">
+        <Flex justify="space-between" align="center" wrap gap="middle">
+          <Typography.Title level={4} className="!mb-0 !text-white flex items-center gap-2">
+            <CompassOutlined className="text-blue-500" /> Bảng điều khiển xuất bản
+          </Typography.Title>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            {/* Lọc theo kênh */}
+          <Flex wrap align="center" gap={10}>
             <Select
               value={selectedChannelId}
               onChange={setSelectedChannelId}
               options={channelOptions}
-              className="w-48 text-xs"
+              style={{ minWidth: 220 }}
               placeholder="Tất cả kênh xuất bản"
             />
 
@@ -348,12 +330,10 @@ const Dashboard = () => {
                 { label: 'Tuần này', value: 'WEEK' },
                 { label: 'Tháng này', value: 'MONTH' },
               ]}
-              className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-0.5 text-xs"
             />
             <Button
               icon={<SyncOutlined spin={isFetching} />}
               onClick={() => refetch()}
-              className="h-9 px-3.5 rounded-xl bg-slate-800/60 border border-slate-700/80 text-slate-200 hover:text-white hover:bg-slate-700/80 text-xs font-medium transition-colors"
             >
               Làm mới
             </Button>
@@ -361,199 +341,184 @@ const Dashboard = () => {
               type="primary"
               icon={<PlusOutlined />}
               onClick={() => navigate('/dashboard/playwright')}
-              className="h-9 px-4 rounded-xl !bg-gradient-to-r !from-blue-600 !to-indigo-600 hover:!from-blue-500 hover:!to-indigo-500 text-xs font-bold text-white shadow-md shadow-blue-600/30 border-0 hover:scale-[1.02] active:scale-[0.98] transition-all"
             >
               Tạo bài viết mới
             </Button>
-          </div>
-        </div>
+          </Flex>
+        </Flex>
 
         {/* Shortcut Dock */}
-        <div className="mt-4 pt-3.5 border-t border-slate-800/80 flex flex-wrap items-center gap-2 text-xs">
-          <span className="text-slate-400 font-semibold flex items-center gap-1.5 mr-1">
-            <CompassOutlined className="text-sky-400 text-xs" />
-            <span>Lối tắt nhanh:</span>
-          </span>
-          <button
+        <Flex align="center" wrap gap={8} className="mt-4 pt-3 border-t border-slate-800/80">
+          <Typography.Text className="text-xs text-slate-400 font-semibold flex items-center gap-1.5 mr-2">
+            <CompassOutlined /> Lối tắt nhanh:
+          </Typography.Text>
+          <Button
+            type="dashed"
+            size="small"
+            icon={<PlayCircleOutlined className="text-blue-400" />}
             onClick={() => navigate('/dashboard/playwright')}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/60 hover:bg-slate-700/80 text-slate-200 hover:text-white border border-slate-700/60 transition-all font-medium cursor-pointer"
           >
-            <PlayCircleOutlined className="text-blue-400" />
-            <span>Đăng tự động</span>
-          </button>
-          <button
+            Đăng tự động
+          </Button>
+          <Button
+            type="dashed"
+            size="small"
+            icon={<RadarChartOutlined className="text-cyan-400" />}
             onClick={() => navigate('/dashboard/news-radar')}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/60 hover:bg-slate-700/80 text-slate-200 hover:text-white border border-slate-700/60 transition-all font-medium cursor-pointer"
           >
-            <RadarChartOutlined className="text-cyan-400" />
-            <span>Radar tin tức</span>
-          </button>
-          <button
+            Radar tin tức
+          </Button>
+          <Button
+            type="dashed"
+            size="small"
+            icon={<PictureOutlined className="text-purple-400" />}
             onClick={() => navigate('/dashboard/post-story')}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/60 hover:bg-slate-700/80 text-slate-200 hover:text-white border border-slate-700/60 transition-all font-medium cursor-pointer"
           >
-            <PictureOutlined className="text-purple-400" />
-            <span>Đăng Story</span>
-          </button>
-          <button
+            Đăng Story
+          </Button>
+          <Button
+            type="dashed"
+            size="small"
+            icon={<span className="font-extrabold text-blue-400">@</span>}
             onClick={() => navigate('/dashboard/threads')}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/60 hover:bg-slate-700/80 text-slate-200 hover:text-white border border-slate-700/60 transition-all font-medium cursor-pointer"
           >
-            <span className="font-bold">@</span>
-            <span>Đăng Threads</span>
-          </button>
-          <button
+            Đăng Threads
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            icon={<GlobalOutlined className="text-emerald-400" />}
             onClick={() => navigate('/dashboard/connections')}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/60 hover:bg-slate-700/80 text-slate-200 hover:text-emerald-300 border border-slate-700/60 transition-all font-medium ml-auto cursor-pointer"
+            className="ml-auto"
           >
-            <GlobalOutlined className="text-emerald-400" />
-            <span>Quản lý kênh & Via</span>
-            <ArrowRightOutlined className="text-[10px]" />
-          </button>
-        </div>
-      </div>
+            Quản lý kênh & Via <ArrowRightOutlined />
+          </Button>
+        </Flex>
+      </Card>
 
-      {/* 3. HERO METRIC CARDS (DOUBLE-BEZEL BENTO METRICS) */}
-      <Row gutter={[14, 14]}>
+      {/* 3. HERO METRIC CARDS */}
+      <Row gutter={[14, 14]} className="mb-4">
         {/* Card 1: Tổng bài đăng */}
         <Col xs={24} sm={12} xl={6}>
-          <div className="rounded-2xl border border-slate-800/90 bg-slate-900/95 p-4 shadow-lg hover:border-slate-700 transition-all flex flex-col justify-between h-full backdrop-blur-xl">
-            <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-              <span className="font-medium text-slate-300">Tổng bài xuất bản</span>
-              <span className="px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[10px] font-semibold">
-                {range.label}
-              </span>
-            </div>
-            <div className="flex items-baseline justify-between mt-1">
-              <span className="text-3xl font-extrabold text-slate-100 tracking-tight">{counts.total}</span>
-              <div className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-400 flex items-center justify-center">
-                <UnorderedListOutlined className="text-base" />
+          <Card variant="borderless" className="shadow-lg border border-slate-800/80 bg-[#111a28] h-full">
+            <Flex justify="space-between" align="start">
+              <div>
+                <Typography.Text className="text-xs text-slate-400 block mb-1">Tổng bài xuất bản</Typography.Text>
+                <Typography.Title level={2} className="!mb-0 !text-white font-bold">
+                  {counts.total}
+                </Typography.Title>
               </div>
-            </div>
-            <div className="text-[11px] text-slate-400 mt-2.5 pt-2 border-t border-slate-800/60 flex items-center justify-between">
+              <Tag color="blue" className="!m-0">{range.label}</Tag>
+            </Flex>
+            <Flex justify="space-between" align="center" className="mt-4 pt-2 border-t border-slate-800 text-xs text-slate-400">
               <span>Đã lên lịch trong kỳ</span>
-              <span className="text-slate-300 font-semibold">{periodPosts.length} bài</span>
-            </div>
-          </div>
+              <Typography.Text strong className="text-slate-200">{periodPosts.length} bài</Typography.Text>
+            </Flex>
+          </Card>
         </Col>
 
         {/* Card 2: Thành công */}
         <Col xs={24} sm={12} xl={6}>
-          <div className="rounded-2xl border border-slate-800/90 bg-slate-900/95 p-4 shadow-lg hover:border-slate-700 transition-all flex flex-col justify-between h-full backdrop-blur-xl">
-            <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-              <span className="font-medium text-slate-300">Đã đăng thành công</span>
-              <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-semibold">
-                {counts.total ? `${Math.round((counts.published / counts.total) * 100)}%` : '0%'}
-              </span>
-            </div>
-            <div className="flex items-baseline justify-between mt-1">
-              <span className="text-3xl font-extrabold text-emerald-400 tracking-tight">{counts.published}</span>
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center">
-                <CheckCircleFilled className="text-base" />
+          <Card variant="borderless" className="shadow-lg border border-slate-800/80 bg-[#111a28] h-full">
+            <Flex justify="space-between" align="start">
+              <div>
+                <Typography.Text className="text-xs text-slate-400 block mb-1">Đã đăng thành công</Typography.Text>
+                <Typography.Title level={2} className="!mb-0 !text-emerald-400 font-bold">
+                  {counts.published}
+                </Typography.Title>
               </div>
-            </div>
-            <div className="text-[11px] text-slate-400 mt-2.5 pt-2 border-t border-slate-800/60 flex items-center justify-between">
+              <Tag color="success" className="!m-0">
+                {counts.total ? `${Math.round((counts.published / counts.total) * 100)}%` : '0%'}
+              </Tag>
+            </Flex>
+            <Flex justify="space-between" align="center" className="mt-4 pt-2 border-t border-slate-800 text-xs text-slate-400">
               <span>Hiệu suất đăng tải</span>
-              <span className="text-emerald-400 font-semibold">Tự động 100%</span>
-            </div>
-          </div>
+              <Typography.Text strong className="text-emerald-400">Tự động 100%</Typography.Text>
+            </Flex>
+          </Card>
         </Col>
 
         {/* Card 3: Đang chờ */}
         <Col xs={24} sm={12} xl={6}>
-          <div className="rounded-2xl border border-slate-800/90 bg-slate-900/95 p-4 shadow-lg hover:border-slate-700 transition-all flex flex-col justify-between h-full backdrop-blur-xl">
-            <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-              <span className="font-medium text-slate-300">Đang chờ xuất bản</span>
-              <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-semibold">
-                Hàng đợi
-              </span>
-            </div>
-            <div className="flex items-baseline justify-between mt-1">
-              <span className="text-3xl font-extrabold text-amber-400 tracking-tight">{counts.pending}</span>
-              <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center">
-                <ClockCircleFilled className="text-base" />
+          <Card variant="borderless" className="shadow-lg border border-slate-800/80 bg-[#111a28] h-full">
+            <Flex justify="space-between" align="start">
+              <div>
+                <Typography.Text className="text-xs text-slate-400 block mb-1">Đang chờ xuất bản</Typography.Text>
+                <Typography.Title level={2} className="!mb-0 !text-amber-400 font-bold">
+                  {counts.pending}
+                </Typography.Title>
               </div>
-            </div>
-            <div className="text-[11px] text-slate-400 mt-2.5 pt-2 border-t border-slate-800/60 flex items-center justify-between">
+              <Tag color="warning" className="!m-0">Hàng đợi</Tag>
+            </Flex>
+            <Flex justify="space-between" align="center" className="mt-4 pt-2 border-t border-slate-800 text-xs text-slate-400">
               <span>Lịch hẹn tự động</span>
-              <span className="text-amber-400 font-semibold">{upcomingPosts.length} bài sắp xuất bản</span>
-            </div>
-          </div>
+              <Typography.Text strong className="text-amber-400">{upcomingPosts.length} bài sắp đăng</Typography.Text>
+            </Flex>
+          </Card>
         </Col>
 
         {/* Card 4: Cần kiểm tra */}
         <Col xs={24} sm={12} xl={6}>
-          <div className="rounded-2xl border border-slate-800/90 bg-slate-900/95 p-4 shadow-lg hover:border-slate-700 transition-all flex flex-col justify-between h-full backdrop-blur-xl">
-            <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-              <span className="font-medium text-slate-300">Cần kiểm tra / Lỗi</span>
-              <span
-                className={`px-2 py-0.5 rounded-md text-[10px] font-semibold ${
-                  counts.failed > 0
-                    ? 'bg-red-500/15 text-red-400 border border-red-500/30'
-                    : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                }`}
-              >
-                {counts.failed > 0 ? `${counts.failed} lỗi` : 'Ổn định 100%'}
-              </span>
-            </div>
-            <div className="flex items-baseline justify-between mt-1">
-              <span className={`text-3xl font-extrabold tracking-tight ${counts.failed > 0 ? 'text-red-400' : 'text-slate-100'}`}>
-                {counts.failed}
-              </span>
-              <div
-                className={`w-9 h-9 rounded-xl flex items-center justify-center border ${
-                  counts.failed > 0
-                    ? 'bg-red-500/15 border-red-500/30 text-red-400'
-                    : 'bg-slate-800 border-slate-700 text-slate-400'
-                }`}
-              >
-                <CloseCircleFilled className="text-base" />
+          <Card variant="borderless" className="shadow-lg border border-slate-800/80 bg-[#111a28] h-full">
+            <Flex justify="space-between" align="start">
+              <div>
+                <Typography.Text className="text-xs text-slate-400 block mb-1">Cần kiểm tra / Lỗi</Typography.Text>
+                <Typography.Title level={2} className={`!mb-0 font-bold ${counts.failed > 0 ? '!text-red-400' : '!text-slate-100'}`}>
+                  {counts.failed}
+                </Typography.Title>
               </div>
-            </div>
-            <div className="text-[11px] text-slate-400 mt-2.5 pt-2 border-t border-slate-800/60 flex items-center justify-between">
+              <Tag color={counts.failed > 0 ? 'error' : 'success'} className="!m-0">
+                {counts.failed > 0 ? `${counts.failed} lỗi` : 'Ổn định 100%'}
+              </Tag>
+            </Flex>
+            <Flex justify="space-between" align="center" className="mt-4 pt-2 border-t border-slate-800 text-xs text-slate-400">
               <span>Trạng thái rủi ro</span>
-              <span className={counts.failed > 0 ? 'text-red-400 font-semibold' : 'text-slate-400'}>
+              <Typography.Text strong className={counts.failed > 0 ? 'text-red-400' : 'text-emerald-400'}>
                 {counts.failed > 0 ? 'Cần xử lý lại' : 'Hoàn toàn ổn định'}
-              </span>
-            </div>
-          </div>
+              </Typography.Text>
+            </Flex>
+          </Card>
         </Col>
       </Row>
 
       {/* 4. KPI BENTO SECTION (TIẾN ĐỘ MỤC TIÊU HÔM NAY) */}
-      <div className="rounded-2xl border border-slate-800/90 bg-slate-900/95 p-5 shadow-lg backdrop-blur-xl">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-400 flex items-center justify-center">
-              <AimOutlined className="text-sm" />
+      <Card variant="borderless" className="mb-4 shadow-xl border border-slate-800/80 bg-[#111a28]">
+        <Flex align="center" justify="space-between" className="mb-4">
+          <Flex align="center" gap={10}>
+            <div className="w-8 h-8 rounded-lg bg-blue-500/10 grid place-items-center text-blue-400">
+              <AimOutlined />
             </div>
             <div>
-              <span className="font-bold text-slate-100 text-sm">
+              <Typography.Text strong className="text-base text-slate-100 block">
                 Tiến độ KPI hôm nay ({dayjs().format('DD/MM/YYYY')})
-              </span>
-              <span className="text-xs text-slate-400 ml-2 hidden sm:inline">
+              </Typography.Text>
+              <Typography.Text className="text-xs text-slate-400">
                 Đã đạt {kpiSummary.completedCount}/{kpiSummary.totalCount} kênh mục tiêu
-              </span>
+              </Typography.Text>
             </div>
-          </div>
+          </Flex>
 
           <Button
             type="link"
             size="small"
             onClick={() => navigate('/dashboard/calendar')}
-            className="text-xs text-blue-400 hover:text-blue-300 p-0 font-medium"
           >
             Tùy chỉnh KPI →
           </Button>
-        </div>
+        </Flex>
 
         {kpiSummary.activeTargets.length === 0 ? (
-          <div className="py-6 text-center text-xs text-slate-500 bg-slate-950/30 rounded-xl border border-slate-800/60">
-            Chưa thiết lập KPI cho ngày hôm nay.{' '}
-            <a onClick={() => navigate('/dashboard/calendar')} className="text-blue-400 underline font-medium cursor-pointer">
-              Bấm vào đây để đặt KPI số lượng bài cho từng Fanpage/Nhóm.
-            </a>
-          </div>
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description={
+              <Typography.Text className="text-slate-400 text-xs">
+                Chưa thiết lập KPI cho ngày hôm nay.{' '}
+                <Button type="link" size="small" onClick={() => navigate('/dashboard/calendar')} className="!p-0">
+                  Đặt KPI số lượng bài cho từng kênh
+                </Button>
+              </Typography.Text>
+            }
+          />
         ) : (
           <Row gutter={[12, 12]}>
             {kpiSummary.activeTargets.map((t) => {
@@ -562,35 +527,29 @@ const Dashboard = () => {
 
               return (
                 <Col xs={24} sm={12} lg={8} key={t.socialAccountId}>
-                  <div className="p-3.5 rounded-xl border border-slate-800/90 bg-slate-900/90 hover:border-slate-700 transition-all flex flex-col justify-between h-full">
-                    <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
-                      <div className="flex items-center gap-2 min-w-0">
+                  <Card size="small" variant="borderless" className="bg-[#0e1726] border border-slate-800 h-full">
+                    <Flex align="center" justify="space-between" gap={8} className="mb-2">
+                      <Flex align="center" gap={8} className="min-w-0">
                         {t.platform === 'FACEBOOK_GROUP' ? (
-                          <TeamOutlined className="text-purple-400 shrink-0 text-xs" />
+                          <TeamOutlined className="text-purple-400 shrink-0" />
                         ) : (
-                          <FacebookFilled className="text-blue-400 shrink-0 text-xs" />
+                          <FacebookFilled className="text-blue-500 shrink-0" />
                         )}
-                        <span className="text-xs font-semibold text-slate-200 truncate" title={t.accountName}>
+                        <Typography.Text strong className="text-slate-200 text-xs truncate" title={t.accountName}>
                           {t.accountName}
-                        </span>
-                      </div>
-                      <span
-                        className={`text-[11px] font-mono px-2 py-0.5 rounded-md font-semibold shrink-0 ${
-                          t.achieved
-                            ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                            : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-                        }`}
-                      >
+                        </Typography.Text>
+                      </Flex>
+                      <Tag color={t.achieved ? 'success' : 'warning'} className="!m-0 !text-[11px]">
                         {t.actualCount}/{t.targetCount}
                         {isOverachieved && ' 🚀'}
-                      </span>
-                    </div>
+                      </Tag>
+                    </Flex>
 
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-[10px] text-slate-400">
+                    <div>
+                      <Flex justify="space-between" className="text-[11px] text-slate-400 mb-1">
                         <span>{t.achieved ? (isOverachieved ? 'Vượt chỉ tiêu' : 'Đạt chỉ tiêu') : 'Đang thực hiện'}</span>
-                        <span className="font-mono">{percent}%</span>
-                      </div>
+                        <Typography.Text strong className="text-slate-300">{percent}%</Typography.Text>
+                      </Flex>
                       <Progress
                         percent={percent}
                         size="small"
@@ -599,112 +558,112 @@ const Dashboard = () => {
                         showInfo={false}
                       />
                     </div>
-                  </div>
+                  </Card>
                 </Col>
               );
             })}
           </Row>
         )}
-      </div>
+      </Card>
 
       {/* 5. TIMELINE CHART & UPCOMING SCHEDULE BENTO */}
       <Row gutter={[16, 16]}>
         {/* Left: Posting Activity Histogram */}
         <Col xs={24} xl={16}>
-          <div className="rounded-2xl border border-slate-800/90 bg-slate-900/95 p-5 shadow-lg flex flex-col justify-between h-full backdrop-blur-xl">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <RiseOutlined className="text-blue-400" />
-                <span className="font-bold text-slate-100 text-sm">
+          <div className="dash-panel-fill">
+            <Flex align="center" justify="space-between" className="dash-panel-head">
+              <Flex align="center" gap={8}>
+                <RiseOutlined className="dash-ic-blue" />
+                <span className="dash-panel-title">
                   Hoạt động xuất bản · {range.label}
                 </span>
-              </div>
-              <div className="flex items-center gap-3 text-xs text-slate-400">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-sm bg-blue-500" />
+              </Flex>
+              <Flex align="center" gap={12} className="dash-legend">
+                <span className="dash-legend-item">
+                  <span className="dash-legend-dot-blue" />
                   Đã đăng
                 </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-sm bg-slate-700" />
+                <span className="dash-legend-item">
+                  <span className="dash-legend-dot-slate" />
                   Chưa đăng
                 </span>
-              </div>
-            </div>
+              </Flex>
+            </Flex>
 
             {periodPosts.length === 0 ? (
-              <div className="h-60 flex items-center justify-center text-xs text-slate-500">
+              <Flex align="center" justify="center" className="dash-chart-empty">
                 Chưa có dữ liệu bài đăng trong khoảng thời gian này
-              </div>
+              </Flex>
             ) : (
-              <div className="h-60 flex items-end gap-2 pt-6">
+              <Flex align="end" gap={8} className="dash-chart">
                 {chartData.map((item, index) => (
-                  <div key={`${item.label}-${index}`} className="flex-1 h-full flex flex-col justify-end items-center min-w-0 group relative">
+                  <Flex vertical justify="flex-end" align="center" key={`${item.label}-${index}`} className="dash-chart-col">
                     <Tooltip title={`${item.label}: ${item.published}/${item.total} bài đã đăng`}>
-                      <div className="w-full max-w-7 h-[200px] flex flex-col justify-end rounded-t-lg overflow-hidden bg-slate-800/40 border border-slate-700/40 group-hover:border-blue-500/50 transition-all cursor-pointer">
+                      <Flex vertical justify="flex-end" className="group-hover:border-blue-500/50 dash-chart-bar">
                         <div
-                          className="w-full bg-gradient-to-t from-blue-600 to-cyan-400 rounded-t-md transition-all duration-500"
+                          className="dash-chart-bar-done"
                           style={{ height: `${Math.max(item.total ? 10 : 0, (item.published / chartMax) * 100)}%` }}
                         />
                         <div
-                          className="w-full bg-slate-700/60"
+                          className="dash-chart-bar-rest"
                           style={{ height: `${Math.max(item.total ? 5 : 0, ((item.total - item.published) / chartMax) * 100)}%` }}
                         />
-                      </div>
+                      </Flex>
                     </Tooltip>
-                    <span className="text-[10px] text-slate-400 mt-2 font-mono truncate">{item.label}</span>
-                  </div>
+                    <span className="dash-chart-label">{item.label}</span>
+                  </Flex>
                 ))}
-              </div>
+              </Flex>
             )}
           </div>
         </Col>
 
         {/* Right: Upcoming Posts with Quick Publish */}
         <Col xs={24} xl={8}>
-          <div className="rounded-2xl border border-slate-800/90 bg-slate-900/95 p-5 shadow-lg flex flex-col justify-between h-full backdrop-blur-xl">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <ClockCircleFilled className="text-amber-400" />
-                <span className="font-bold text-slate-100 text-sm">Bài sắp xuất bản</span>
-              </div>
+          <div className="dash-panel-fill">
+            <Flex align="center" justify="space-between" className="dash-panel-head">
+              <Flex align="center" gap={8}>
+                <ClockCircleFilled className="dash-ic-amber" />
+                <span className="dash-panel-title">Bài sắp xuất bản</span>
+              </Flex>
               <Button
                 type="link"
                 size="small"
                 onClick={() => navigate('/dashboard/playwright')}
-                className="text-xs text-blue-400 hover:text-blue-300 p-0"
+                className="dash-link-btn-plain"
               >
                 Xem tất cả ({counts.pending})
               </Button>
-            </div>
+            </Flex>
 
             {upcomingPosts.length === 0 ? (
-              <div className="py-12 text-center text-xs text-slate-500">
-                <CalendarOutlined className="text-2xl text-slate-600 mb-2 block" />
+              <div className="dash-upcoming-empty">
+                <CalendarOutlined className="dash-upcoming-empty-ic" />
                 Không có bài viết nào đang xếp hàng chờ
               </div>
             ) : (
-              <div className="space-y-2.5">
+              <div className="dash-upcoming-list">
                 {upcomingPosts.map((post) => (
                   <div
                     key={post.id}
-                    className="p-3 rounded-xl border border-slate-800/80 bg-slate-900/90 hover:border-slate-700 transition-all flex items-start justify-between gap-3 group"
+                    className="dash-upcoming-item"
                   >
                     <div
-                      className="min-w-0 flex-1 cursor-pointer"
+                      className="dash-upcoming-main"
                       onClick={() => setViewingPost(post as PostQueueItem)}
                     >
-                      <div className="text-xs font-semibold text-slate-200 truncate group-hover:text-blue-400 transition-colors">
+                      <div className="group-hover:text-blue-400 dash-upcoming-title">
                         {post.title || post.content || `Bài đăng #${post.id}`}
                       </div>
-                      <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-1.5">
-                        <CalendarOutlined className="text-[10px]" />
+                      <Flex align="center" gap={6} className="dash-upcoming-meta">
+                        <CalendarOutlined className="dash-ic-10" />
                         <span>{post.scheduledAt ? dayjs(post.scheduledAt).format('HH:mm · DD/MM') : 'Xử lý ngay'}</span>
                         {post.scheduledAt && (
-                          <span className="text-amber-400/80 font-mono text-[10px]">
+                          <span className="dash-upcoming-rel">
                             ({dayjs(post.scheduledAt).fromNow()})
                           </span>
                         )}
-                      </div>
+                      </Flex>
                     </div>
 
                     <Tooltip title="Đăng ngay lập tức không cần chờ hẹn giờ">
@@ -714,7 +673,7 @@ const Dashboard = () => {
                         icon={<ThunderboltOutlined />}
                         loading={publishNowMutation.isPending && publishingId === post.id}
                         onClick={() => publishNowMutation.mutate(post.id)}
-                        className="text-[11px] h-7 px-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 shrink-0 font-medium"
+                        className="dash-publish-btn"
                       >
                         Đăng ngay
                       </Button>
@@ -728,21 +687,21 @@ const Dashboard = () => {
       </Row>
 
       {/* 6. RECENT POSTS TABLE WITH INSTANT RETRY & PREVIEW */}
-      <div className="rounded-2xl border border-slate-800/90 bg-slate-900/95 p-5 shadow-lg backdrop-blur-xl">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <HistoryOutlined className="text-blue-400" />
-            <span className="font-bold text-slate-100 text-sm">Nhật ký bài đăng gần đây</span>
-          </div>
+      <div className="dash-panel">
+        <Flex align="center" justify="space-between" className="dash-panel-head">
+          <Flex align="center" gap={8}>
+            <HistoryOutlined className="dash-ic-blue" />
+            <span className="dash-panel-title">Nhật ký bài đăng gần đây</span>
+          </Flex>
           <Button
             type="link"
             size="small"
             onClick={() => navigate('/dashboard/playwright')}
-            className="text-xs text-blue-400 hover:text-blue-300 p-0 font-medium"
+            className="dash-link-btn"
           >
             Quản lý hàng đợi →
           </Button>
-        </div>
+        </Flex>
 
         <Table<PostQueue>
           rowKey="id"
@@ -758,13 +717,13 @@ const Dashboard = () => {
               key: 'post',
               render: (_, record) => (
                 <div
-                  className="max-w-md py-1 cursor-pointer group"
+                  className="dash-table-post"
                   onClick={() => setViewingPost(record as PostQueueItem)}
                 >
-                  <div className="text-xs font-semibold text-slate-200 truncate group-hover:text-blue-400 transition-colors">
+                  <div className="group-hover:text-blue-400 dash-upcoming-title">
                     {record.title || `Bài đăng #${record.id}`}
                   </div>
-                  <div className="text-[11px] text-slate-500 truncate mt-0.5">
+                  <div className="dash-table-desc">
                     {record.content || 'Không có mô tả chi tiết'}
                   </div>
                 </div>
@@ -777,10 +736,10 @@ const Dashboard = () => {
               render: (_, record) => {
                 const targetChannel = connections.find((c) => c.platformAccountId === record.targetFanpageId);
                 return (
-                  <div className="text-xs text-slate-400">
-                    <div className="truncate font-medium">{record.campaign?.name || 'Mặc định'}</div>
+                  <div className="dash-table-campaign">
+                    <div className="dash-truncate-medium">{record.campaign?.name || 'Mặc định'}</div>
                     {targetChannel && (
-                      <div className="text-[10px] text-slate-500 font-mono truncate">{targetChannel.pageName || targetChannel.platformAccountId}</div>
+                      <div className="dash-table-channel">{targetChannel.pageName || targetChannel.platformAccountId}</div>
                     )}
                   </div>
                 );
@@ -793,7 +752,7 @@ const Dashboard = () => {
               render: (_, record) => {
                 const dateVal = getPostDate(record);
                 return (
-                  <span className="text-xs text-slate-400 font-mono">
+                  <span className="dash-table-date">
                     {dateVal ? dayjs(dateVal).format('HH:mm · DD/MM/YYYY') : '—'}
                   </span>
                 );
@@ -807,13 +766,13 @@ const Dashboard = () => {
                 const meta = statusMeta[status] || statusMeta.CANCELLED;
                 return (
                   <span
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium border ${
+                    className={
                       status === 'PUBLISHED'
-                        ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
+                        ? 'dash-status-ok'
                         : status === 'FAILED'
-                        ? 'bg-red-500/10 text-red-300 border-red-500/20'
-                        : 'bg-slate-800 text-slate-300 border-slate-700'
-                    }`}
+                        ? 'dash-status-fail'
+                        : 'dash-status-other'
+                    }
                   >
                     {meta.icon}
                     <span>{meta.label}</span>
@@ -833,7 +792,7 @@ const Dashboard = () => {
                       size="small"
                       icon={<EyeOutlined />}
                       onClick={() => setViewingPost(record as PostQueueItem)}
-                      className="text-slate-400 hover:text-blue-400"
+                      className="dash-view-btn"
                     />
                   </Tooltip>
                   {record.status === 'FAILED' && (
@@ -845,7 +804,7 @@ const Dashboard = () => {
                         icon={<ReloadOutlined />}
                         loading={publishNowMutation.isPending && publishingId === record.id}
                         onClick={() => publishNowMutation.mutate(record.id)}
-                        className="text-[11px] h-6 px-2 font-medium rounded"
+                        className="dash-retry-btn"
                       >
                         Thử lại
                       </Button>
@@ -856,10 +815,10 @@ const Dashboard = () => {
                       <Button
                         type="text"
                         size="small"
-                        icon={<ThunderboltOutlined className="text-amber-400" />}
+                        icon={<ThunderboltOutlined className="dash-ic-amber" />}
                         loading={publishNowMutation.isPending && publishingId === record.id}
                         onClick={() => publishNowMutation.mutate(record.id)}
-                        className="hover:bg-amber-950/40 rounded"
+                        className="dash-bolt-btn"
                       />
                     </Tooltip>
                   )}

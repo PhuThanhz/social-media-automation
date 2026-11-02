@@ -1,8 +1,7 @@
 // Đăng video vừa xuất thẳng lên kênh TikTok đã kết nối (cookie) — chọn kênh, sửa caption, bấm đăng.
 import { useEffect, useState } from 'react';
 import { Alert, Button, Input, Select } from 'antd';
-import { LoadingOutlined } from '@ant-design/icons';
-import { CheckCircle2 } from 'lucide-react';
+import { LoadingOutlined, CheckCircleFilled } from '@ant-design/icons';
 import api from '../../config/axios';
 
 interface Channel { id: number; name: string }
@@ -57,7 +56,7 @@ export default function TikTokPublish({ videoUrl, defaultCaption, onOpenConnecti
         <Alert type="info" showIcon className="!text-[12px]" message="Chưa kết nối kênh TikTok nào"
           description={<Button size="small" onClick={onOpenConnections}>Kết nối kênh TikTok</Button>} />
       ) : state.status === 'done' ? (
-        <Alert type={state.warning ? 'warning' : 'success'} showIcon icon={state.warning ? undefined : <CheckCircle2 size={16} />} message={state.text} description={state.warning} />
+        <Alert type={state.warning ? 'warning' : 'success'} showIcon icon={state.warning ? undefined : <CheckCircleFilled className="text-emerald-400" />} message={state.text} description={state.warning} />
       ) : (
         <>
           <Select size="small" className="w-full" value={channelId ?? undefined} onChange={setChannelId} options={channels.map((c) => ({ value: c.id, label: c.name }))} disabled={state.status === 'running'} />

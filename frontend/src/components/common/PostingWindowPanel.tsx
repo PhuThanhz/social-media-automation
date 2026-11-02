@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Alert, Button, InputNumber, Popconfirm, Switch, Table, TimePicker, Tooltip, message } from 'antd';
-import { ClockCircleOutlined, FieldTimeOutlined, SwapOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { Alert, Button, Card, InputNumber, Popconfirm, Switch, Table, TimePicker, Tooltip, message } from 'antd';
+import { ClockCircleOutlined, FieldTimeOutlined, ScheduleOutlined, SwapOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs, { Dayjs } from 'dayjs';
 import api from '../../config/axios';
@@ -55,7 +55,8 @@ export const POSTING_WINDOW_QUERY_KEY = ['postingWindowPlan'];
  * xếp trong khung. Nick nào không kịp đăng hết trong ngày → hiện đề xuất chuyển bài sang nick khác
  * (người dùng bấm Duyệt mới chuyển).
  */
-export default function PostingWindowPanel() {
+// onReschedule: mở modal "Phân bổ lại giờ đăng" của trang cha — lối vào duy nhất để xếp lại giờ hàng đợi
+export default function PostingWindowPanel({ onReschedule }: { onReschedule?: () => void }) {
   const queryClient = useQueryClient();
   const { data: plan } = useQuery<WindowPlan>({
     queryKey: POSTING_WINDOW_QUERY_KEY,
@@ -68,7 +69,6 @@ export default function PostingWindowPanel() {
   const [minGapMinutes, setMinGapMinutes] = useState(2);
   const [dirty, setDirty] = useState(false);
   const [showLanes, setShowLanes] = useState(false);
-  const [isPacking, setIsPacking] = useState(false);
 
   useEffect(() => {
     if (!plan || dirty) return;
@@ -108,32 +108,6 @@ export default function PostingWindowPanel() {
     onError: (err: any) => message.error(err?.response?.data?.message || 'Không lưu được khung giờ đăng'),
   });
 
-  const handlePackNow = async () => {
-    setIsPacking(true);
-    try {
-      await api.put('/queue/posting-window', {
-        enabled: true,
-        start: range[0].format('HH:mm'),
-        end: range[1].format('HH:mm'),
-        minGapSeconds: minGapMinutes * 60,
-      });
-      const res = await api.post('/queue/pack-continuous', { gapSeconds: Math.round(minGapMinutes * 60) });
-      const finish = res.data?.estimatedFinishAt ? dayjs(res.data.estimatedFinishAt).format('HH:mm DD/MM') : '';
-      const deferred = Number(res.data?.deferredCount) || 0;
-      message.success(
-        `⚡ Đã phân bổ lại ${res.data?.updated ?? 0} bài chờ (giãn ${minGapMinutes}'/bài)${finish ? `, dự kiến xong lúc ${finish}` : ''}`
-        + (deferred > 0 ? `. ${deferred} bài không kịp, dời sang hôm sau.` : ' · Tất cả xong hôm nay!'),
-        6
-      );
-      setDirty(false);
-      refreshQueue();
-    } catch (err: any) {
-      message.error(err?.response?.data?.message || 'Không thể dồn hàng đợi');
-    } finally {
-      setIsPacking(false);
-    }
-  };
-
   const applyMutation = useMutation({
     mutationFn: async (s: WindowSuggestion) => (await api.post('/queue/window-plan/apply', {
       postIds: s.postIds,
@@ -156,7 +130,7 @@ export default function PostingWindowPanel() {
   const queue = plan?.queue;
 
   return (
-    <div className="app-surface posting-window-panel">
+    <Card variant="borderless" className="posting-window-panel">
       <div className="posting-window-row">
         <div className="posting-window-title">
           <ClockCircleOutlined />
@@ -206,23 +180,16 @@ export default function PostingWindowPanel() {
         >
           Lưu
         </Button>
-        <Popconfirm
-          title="Phân bổ lại toàn bộ hàng đợi ngay?"
-          description={`Toàn bộ ${queue?.totalPending || 0} bài chờ sẽ được xếp nối tiếp nhau từ bây giờ (nghỉ ${minGapMinutes} phút/bài) trong khung giờ ${range[0].format('HH:mm')} - ${range[1].format('HH:mm')}.`}
-          onConfirm={handlePackNow}
-          okText="Phân bổ ngay"
-          cancelText="Hủy"
-        >
+        {onReschedule && (
           <Button
             size="small"
-            icon={<ThunderboltOutlined className="text-amber-300" />}
-            loading={isPacking}
-            disabled={!enabled || (queue?.totalPending || 0) === 0}
-            className="bg-amber-600/30 hover:bg-amber-600/40 text-amber-200 border-amber-500/50 font-bold"
+            icon={<ScheduleOutlined />}
+            disabled={(queue?.totalPending || 0) === 0}
+            onClick={onReschedule}
           >
-            ⚡ Phân bổ ngay ({queue?.totalPending || 0} bài)
+            Phân bổ lại giờ ({queue?.totalPending || 0})
           </Button>
-        </Popconfirm>
+        )}
         <span className="posting-window-hint">
           {enabled
             ? `Ngoài ${range[0].format('HH:mm')}–${range[1].format('HH:mm')} không tự đăng theo lịch; bấm "Đăng ngay" vẫn đăng ngay.`
@@ -332,6 +299,6 @@ export default function PostingWindowPanel() {
           )}
         />
       )}
-    </div>
+    </Card>
   );
 }

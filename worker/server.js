@@ -1,6 +1,49 @@
 const express = require('express');
 const cors = require('cors');
 const { chromium } = require('playwright');
+
+// Tối ưu hóa bộ nhớ và hiệu năng toàn bộ Chromium process chạy trên Worker:
+// Giảm từ ~400MB RAM/browser xuống ~80MB, tắt GPU/audio/telemetry, khống chế V8 heap 256MB.
+const CHROMIUM_OPTIMIZED_ARGS = [
+  '--no-sandbox',
+  '--disable-setuid-sandbox',
+  '--disable-dev-shm-usage',
+  '--disable-gpu',
+  '--disable-software-rasterizer',
+  '--mute-audio',
+  '--disable-background-networking',
+  '--disable-default-apps',
+  '--disable-extensions',
+  '--disable-translate',
+  '--disable-sync',
+  '--js-flags=--max-old-space-size=256'
+];
+
+const _origChromiumLaunch = chromium.launch.bind(chromium);
+chromium.launch = function(options = {}) {
+  const mergedArgs = Array.from(new Set([
+    ...CHROMIUM_OPTIMIZED_ARGS,
+    ...(options.args || [])
+  ]));
+  return _origChromiumLaunch({
+    headless: true,
+    ...options,
+    args: mergedArgs
+  });
+};
+
+const _origLaunchPersistent = chromium.launchPersistentContext.bind(chromium);
+chromium.launchPersistentContext = function(userDataDir, options = {}) {
+  const mergedArgs = Array.from(new Set([
+    ...CHROMIUM_OPTIMIZED_ARGS,
+    ...(options.args || [])
+  ]));
+  return _origLaunchPersistent(userDataDir, {
+    headless: true,
+    ...options,
+    args: mergedArgs
+  });
+};
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
@@ -16,6 +59,7 @@ const RssParser = require('rss-parser');
 const { Readability } = require('@mozilla/readability');
 const { JSDOM } = require('jsdom');
 
+const desktop = require('./desktop-mode');
 const { bulkUploadReels } = require('./meta-bulk-reels');
 const browserPool = require('./browserPool');
 const { renderNewsCard, renderNewsCardHtml, renderHtmlLayers } = require('./news-card');
@@ -24,6 +68,7 @@ const { huntFacebookFeed } = require('./fb-feed-hunter');
 
 const app = express();
 app.use(cors());
+app.use(desktop.sessionTokenMiddleware);
 app.use(express.json({ limit: '2mb' }));
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -95,6 +140,56 @@ function watchFacebookRateLimit(page) {
 }
 function rateLimitError(originalMessage) {
   return new Error(`FB_RATE_LIMITED: Facebook đang giới hạn tốc độ nick này (Rate limit exceeded, mã 1675004) nên không mở được hộp đăng bài. Cần cho nick nghỉ vài giờ. (${originalMessage})`);
+}
+
+// Thông báo chặn spam ("Để bảo vệ cộng đồng khỏi spam, chúng tôi giới hạn tần suất bạn đăng bài...") có thể
+// hiện ở dialog riêng, alert hay toast — KHÔNG nằm trong modal soạn bài — và còn hiện cả khi modal đã đóng.
+// Nick Thành An từng bị chặn suốt mà mọi bài vẫn báo PUBLISHED vì chỉ đọc chữ trong modal composer.
+// Quét MỌI dialog/alert/toast đang hiển thị (bỏ phần chữ người dùng gõ trong ô soạn bài để không báo nhầm
+// khi nội dung bài có chứa các cụm này). Trả về đoạn text chứa thông báo, hoặc null nếu không thấy.
+const FB_SPAM_BLOCK_PHRASES = ['giới hạn tần suất', 'để bảo vệ cộng đồng', 'we limit how often', 'tạm thời bị chặn', "you're temporarily blocked", 'lạm dụng tính năng', 'misusing this feature'];
+// "thử lại sau" quá chung chung (lỗi tải ảnh cũng có) — chỉ tính khi đi kèm từ khoá giới hạn, tránh
+// khoá nick 6h oan vì 1 toast lỗi upload.
+const FB_SPAM_BLOCK_WEAK_PHRASES = ['thử lại sau', 'try again later'];
+const FB_SPAM_BLOCK_WEAK_CONTEXT = ['spam', 'giới hạn', 'hạn chế', 'limit', 'chặn', 'blocked'];
+async function detectFacebookSpamBlock(page) {
+  return page.evaluate(({ strong, weak, weakContext }) => {
+    const selector = [
+      'div[role="dialog"]', '[role="alertdialog"]', '[role="alert"]', '[role="status"]', '[aria-live]',
+      '[data-testid*="toast" i]', '[class*="toast" i]',
+    ].join(', ');
+    const isVisible = (el) => {
+      if (!el.getClientRects().length) return false;
+      const style = getComputedStyle(el);
+      return style.visibility !== 'hidden' && style.display !== 'none' && Number(style.opacity) !== 0;
+    };
+    for (const el of document.querySelectorAll(selector)) {
+      if (!isVisible(el)) continue;
+      const clone = el.cloneNode(true);
+      clone.querySelectorAll('[contenteditable="true"], [role="textbox"], textarea, input').forEach((n) => n.remove());
+      clone.querySelectorAll('*').forEach((n) => n.append(' '));
+      const text = (clone.textContent || '').replace(/\s+/g, ' ').trim();
+      // Bỏ vùng chữ quá dài (feed/khung lớn có aria-live) — thông báo chặn chỉ vài trăm ký tự.
+      if (!text || text.length > (el.matches('div[role="dialog"], [role="alertdialog"]') ? 3000 : 1000)) continue;
+      const lower = text.toLowerCase();
+      const hit = strong.find((p) => lower.includes(p))
+        || (weakContext.some((c) => lower.includes(c)) && weak.find((p) => lower.includes(p)));
+      if (!hit) continue;
+      const idx = lower.indexOf(hit);
+      return text.slice(Math.max(0, idx - 120), idx + 280);
+    }
+    return null;
+  }, { strong: FB_SPAM_BLOCK_PHRASES, weak: FB_SPAM_BLOCK_WEAK_PHRASES, weakContext: FB_SPAM_BLOCK_WEAK_CONTEXT }).catch(() => null);
+}
+// Gọi detectFacebookSpamBlock; nếu thấy thì lưu ảnh bằng chứng rồi ném lỗi tiền tố FB_SPAM_BLOCK (backend
+// dựa vào tiền tố này để đánh FAILED + cho cả nick nghỉ).
+async function assertNoFacebookSpamBlock(page, postQueueId, stage) {
+  const spamText = await detectFacebookSpamBlock(page);
+  if (!spamText) return;
+  const shotName = `debug_spam_block_${postQueueId || 'na'}_${Date.now()}.png`;
+  await page.screenshot({ path: path.join(DEBUG_OUTPUT_DIR, shotName) }).catch(() => { });
+  console.error(`[Playwright] ⛔ Facebook chặn spam (${stage}): "${spamText}" — xem ${shotName}`);
+  throw new Error(`FB_SPAM_BLOCK: Facebook chặn đăng tạm thời do đăng quá nhanh (${stage}): "${spamText.slice(0, 250)}". Cần giãn cách thời gian đăng! (xem ${shotName})`);
 }
 
 // Fanpage mặc định dùng khi request không chỉ định targetFanpageId (VD: Quick Post qua Extension).
@@ -1095,36 +1190,33 @@ function extractFacebookNumericId(url) {
   }
 }
 
-// Hàm tải và lưu vĩnh viễn clip video mèo vào máy dùng Playwright request
+// Hàm tải và lưu vĩnh viễn clip video mèo vào máy dùng fetch (không spawn Chromium, tiết kiệm 300MB RAM)
 async function downloadAndSaveVideoPermanently(videoUrl, title = 'clip_meo') {
-  let browser = null;
   try {
     if (!videoUrl || !videoUrl.startsWith('http')) return videoUrl;
     const filename = `clip_meo_${Date.now()}_${Math.floor(Math.random() * 1000)}.mp4`;
     const filePath = path.join(CLIP_MEO_DIR, filename);
 
-    browser = await chromium.launch({ headless: true });
-    const context = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+    const resp = await fetch(videoUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+      }
     });
-    const resp = await context.request.get(videoUrl);
-    const buffer = await resp.body();
+    if (!resp.ok) {
+      console.warn(`[MediaLibrary] ⚠️ Fetch video status ${resp.status}: ${resp.statusText}`);
+      return videoUrl;
+    }
+    const buffer = Buffer.from(await resp.arrayBuffer());
 
     if (buffer && buffer.length > 5000) {
       fs.writeFileSync(filePath, buffer);
       console.log(`[MediaLibrary] 💾 Đã lưu VĨNH VIỄN clip mèo (${(buffer.length / 1024 / 1024).toFixed(2)} MB) vào kho: ${filename}`);
-      return `http://localhost:3001/downloads/clip_meo/${filename}`;
+      return `${desktop.WORKER_PUBLIC_URL}/downloads/clip_meo/${filename}`;
     }
     return videoUrl;
   } catch (e) {
     console.warn(`[MediaLibrary] ⚠️ Lỗi khi lưu vĩnh viễn video: ${e.message}`);
     return videoUrl;
-  } finally {
-    // Trước đây chỉ đóng browser ở nhánh thành công — nếu context.request.get/resp.body() lỗi (link
-    // hỏng, timeout CDN...) thì browser bị bỏ lại chạy mãi, tích tụ dần thành hàng chục tiến trình
-    // Chromium mồ côi ăn hết RAM khiến các lần đăng bài SAU đó bị timeout dù không liên quan. Đóng ở
-    // finally để luôn dọn dẹp bất kể thành công hay lỗi.
-    if (browser) await browser.close().catch(() => { });
   }
 }
 
@@ -1938,7 +2030,7 @@ async function clickVisibleButtonByText(page, targetTextRegex, maxY = 1050, scop
 // và 2 phiên cùng cookie sẽ tranh nhau danh tính Page. Các nick KHÁC nhau được đăng song song, tối đa
 // MAX_PARALLEL_POSTING phiên Chromium cùng lúc để không quá tải RAM.
 // =============================================================================
-const MAX_PARALLEL_POSTING = Math.max(1, Number(process.env.MAX_PARALLEL_POSTING || 2));
+const MAX_PARALLEL_POSTING = Math.max(1, Number(process.env.MAX_PARALLEL_POSTING || 3));
 
 function postingIdentityKey(cookieString, fallback = 'default') {
   const match = String(cookieString || '').match(/c_user=(\d+)/);
@@ -2775,6 +2867,8 @@ app.post('/api/post-facebook', async (req, res) => {
 
     const dialog = page.locator('div[role="dialog"]').filter({ has: page.locator('div[role="textbox"], div[contenteditable="true"]') }).last();
     console.log('[Playwright] ✅ Đã mở Modal Tạo bài viết!');
+    const postQueueId = req.headers['x-post-queue-id'];
+    await assertNoFacebookSpamBlock(page, postQueueId, 'Page: vừa mở modal');
 
     // 🌐 Đảm bảo đối tượng người xem của bài viết luôn là CÔNG KHAI (Public)
     try {
@@ -2919,7 +3013,9 @@ app.post('/api/post-facebook', async (req, res) => {
       await page.waitForTimeout(2000);
     } else {
       console.log('[Playwright] ✅ Đã bấm nút "Đăng" trực tiếp ở Bước 1. Đang chờ Facebook xử lý bài...');
+      await page.waitForTimeout(2000);
     }
+    await assertNoFacebookSpamBlock(page, postQueueId, 'Page: sau khi bấm Đăng');
     // Cờ chặn click đúp/click lặp lại làm đăng 2 bài giống nhau
     let postAlreadySubmitted = true;
 
@@ -2982,14 +3078,16 @@ app.post('/api/post-facebook', async (req, res) => {
     console.log('[Playwright] ⏳ Đang chờ Facebook xuất bản & đóng Modal bài viết (tối đa 2 phút)...');
     const composerDialog = activeDialog;
     let modalClosed = false;
-    for (let i = 0; i < 24; i++) {
-      await dismissPromoModal();
+    for (let i = 0; i < 120; i++) {
+      if (i % 3 === 0) await dismissPromoModal();
+      // Dialog chặn spam giữ composer mở — phát hiện sớm thay vì chờ hết 2 phút rồi báo "kẹt Modal".
+      await assertNoFacebookSpamBlock(page, postQueueId, 'Page: đang chờ xuất bản');
       modalClosed = !(await composerDialog.isVisible().catch(() => false));
       if (modalClosed) break;
-      if (i > 0 && i % 4 === 0) {
-        console.log(`[Playwright] ⏳ Vẫn đang chờ Facebook xử lý video... (${i * 5}s)`);
+      if (i > 0 && i % 10 === 0) {
+        console.log(`[Playwright] ⏳ Vẫn đang chờ Facebook xử lý video... (${i}s)`);
       }
-      await page.waitForTimeout(5000);
+      await page.waitForTimeout(1000);
     }
 
     // Xác nhận bài THỰC SỰ đã xuất bản: Modal "Tạo bài viết" phải đóng hẳn. Nếu vẫn còn mở sau 2 phút
@@ -3000,6 +3098,9 @@ app.post('/api/post-facebook', async (req, res) => {
       await page.screenshot({ path: debugPath }).catch(() => { });
       throw new Error(`Modal "Tạo bài viết" vẫn còn mở sau khi bấm Đăng — bài CHƯA thực sự được xuất bản. Xem ${path.basename(debugPath)}.`);
     }
+    // Modal đóng chưa chắc đã đăng: Facebook có thể đóng composer rồi mới bật dialog/toast chặn spam.
+    await page.waitForTimeout(1000);
+    await assertNoFacebookSpamBlock(page, postQueueId, 'Page: sau khi modal đóng');
     console.log('[Playwright] 🎉 Modal đã đóng! Bài viết xuất bản thành công!');
 
     // Nếu bài viết áp dụng mẹo Nền đỏ + Kèm ảnh (RED_PHOTO_TRICK):
@@ -3019,7 +3120,8 @@ app.post('/api/post-facebook', async (req, res) => {
     const commentResult = await commentLinkOnFanpagePost(
       page,
       targetFanpageId,
-      hasAffiliateLink ? safeAffiliateLink.trim() : null
+      hasAffiliateLink ? safeAffiliateLink.trim() : null,
+      hasAffiliateLink ? 60000 : 10000
     ).catch((e) => {
       console.log('[Playwright][Fanpage][Comment] ⚠️ Lỗi khi tìm/bình luận:', e.message);
       return { success: false, postUrl: null };
@@ -3033,6 +3135,7 @@ app.post('/api/post-facebook', async (req, res) => {
         : 'Đã đăng bài lên Fanpage nhưng chưa kịp bình luận tự động.';
     }
 
+    const refreshedCookieString = await refreshedFbCookieForSameUser(context, cookieString);
     await browser.close();
     for (const downloadedFilePath of downloadedFilePaths) {
       if (fs.existsSync(downloadedFilePath)) fs.unlinkSync(downloadedFilePath);
@@ -3045,6 +3148,7 @@ app.post('/api/post-facebook', async (req, res) => {
       message: `Đã đăng bài mới thành công lên Fanpage ${targetFanpageId}!`,
       ...(fanpagePostUrl ? { publishedPostUrl: fanpagePostUrl, fanpagePostUrl } : {}),
       ...(commentWarning ? { warning: commentWarning } : {}),
+      ...(refreshedCookieString ? { cookieString: refreshedCookieString } : {}),
     });
   } catch (error) {
     console.error('[Playwright] ❌ Lỗi đăng bài Facebook:', error.message);
@@ -3063,7 +3167,7 @@ app.post('/api/post-facebook', async (req, res) => {
 // Tái dùng luồng chuyển danh tính Fanpage + soạn bài + upload Video giống /api/post-facebook,
 // chỉ thêm bước tick chọn nhóm chia sẻ trước khi bấm "Đăng". Trả về {success, message, groupNames}
 // hoặc throw Error — dùng chung bởi endpoint gọi trực tiếp và bởi hàng đợi đăng theo lịch bên dưới.
-async function postReelWithGroups({ cookieString, targetFanpageId = DEFAULT_FANPAGE_PLATFORM_ACCOUNT_ID, socialAccountId, content, threadsUrl, mediaUrls, groupNames = ['Đảo Mèo'], proxyUrl, userAgent }) {
+async function postReelWithGroups({ cookieString, targetFanpageId = DEFAULT_FANPAGE_PLATFORM_ACCOUNT_ID, socialAccountId, content, threadsUrl, mediaUrls, groupNames = ['Đảo Mèo'], proxyUrl, userAgent, postQueueId }) {
   // Tự động inject i_user=cleanTargetId vào cookie → Playwright mở thẳng danh tính Fanpage
   const cleanTargetIdEarly = (targetFanpageId || '').split(':')[0].trim();
   const cookies = parseCookies(cookieString, cleanTargetIdEarly);
@@ -3223,6 +3327,7 @@ async function postReelWithGroups({ cookieString, targetFanpageId = DEFAULT_FANP
       throw new Error(`Không thể mở Modal "Tạo bài viết" trên giao diện Fanpage sau ${REEL_COMPOSER_MAX_ATTEMPTS} lần thử`);
     }
     console.log('[Playwright][ReelGroups] ✅ Đã mở Modal Tạo bài viết, gõ caption...');
+    await assertNoFacebookSpamBlock(page, postQueueId, 'Reel: vừa mở modal');
 
     const editor = dialog.first().locator('div[role="textbox"]').first();
     await editor.click({ force: true }).catch(() => { });
@@ -3346,6 +3451,7 @@ async function postReelWithGroups({ cookieString, targetFanpageId = DEFAULT_FANP
       throw new Error('[Bước 3] Không tìm thấy nút "Đăng" đang hiển thị trong viewport sau khi chọn nhóm');
     }
     await page.waitForTimeout(3000);
+    await assertNoFacebookSpamBlock(page, postQueueId, 'Reel: sau khi bấm Đăng');
 
     // Facebook thỉnh thoảng chèn thêm 1 Modal quảng bá tính năng (VD: "Trò chuyện trực tiếp với mọi
     // người" mời thêm nút "Gọi ngay") ngay sau khi bấm Đăng, che trên Modal thật và CHẶN việc xuất
@@ -3366,10 +3472,14 @@ async function postReelWithGroups({ cookieString, targetFanpageId = DEFAULT_FANP
 
     // Xác nhận bài THỰC SỰ đã xuất bản: Modal "Tạo bài viết" phải đóng hẳn. Nếu vẫn còn mở nghĩa là
     // luồng bị chặn giữa chừng (Modal phụ chưa xử lý hết, hoặc lỗi khác) — không được báo thành công.
+    await assertNoFacebookSpamBlock(page, postQueueId, 'Reel: sau khi bấm Đăng');
     const stillOpen = await dialog.first().isVisible().catch(() => false);
     if (stillOpen) {
       throw new Error('Modal "Tạo bài viết" vẫn còn mở sau khi bấm Đăng — bài CHƯA thực sự được xuất bản (có thể bị chặn bởi 1 Modal phụ của Facebook). Xem debug_reel_groups_09_after_publish.png.');
     }
+    // Modal đóng chưa chắc đã đăng: Facebook có thể đóng composer rồi mới bật dialog/toast chặn spam.
+    await page.waitForTimeout(3000);
+    await assertNoFacebookSpamBlock(page, postQueueId, 'Reel: sau khi modal đóng');
 
     console.log(`[Playwright][ReelGroups] 🎉 Đã đăng Reel + chia sẻ ${selectedGroupNames.length} nhóm lên Fanpage ${cleanTargetId}!`);
     return {
@@ -3411,7 +3521,7 @@ app.post('/api/post-facebook-reel-groups', async (req, res) => {
   }
 
   try {
-    const result = await postReelWithGroups({ cookieString, targetFanpageId, socialAccountId, content, threadsUrl, mediaUrls, groupNames });
+    const result = await postReelWithGroups({ cookieString, targetFanpageId, socialAccountId, content, threadsUrl, mediaUrls, groupNames, postQueueId: req.headers['x-post-queue-id'] });
     res.json(result);
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -3598,7 +3708,8 @@ app.post('/api/post-story', async (req, res) => {
     if ((!targetMediaUrl || targetMediaUrl.endsWith('.jpg') || targetMediaUrl.includes('.jpg?')) && originalUrl) {
       console.log(`[Playwright Story] 🔍 Đang giải mã video MP4 từ link gốc: ${originalUrl}...`);
       try {
-        const extractData = await extractVideoDirectly(originalUrl);
+        // Dùng lại browser của route (context mới, sạch cookie) thay vì bật thêm 1 Chromium để cào nguồn.
+        const extractData = await extractVideoDirectly(originalUrl, { browser });
         if (extractData.success && extractData.videoUrl) {
           targetMediaUrl = extractData.videoUrl;
           console.log(`[Playwright Story] 🎬 Đã tìm thấy Video MP4 Story: ${targetMediaUrl}`);
@@ -3620,7 +3731,6 @@ app.post('/api/post-story', async (req, res) => {
       }
     }
     if (!downloadedFilePath || !fs.existsSync(downloadedFilePath)) {
-      if (browser) await browser.close();
       return res.status(400).json({ success: false, error: 'Không thể tải file media để tạo Story' });
     }
 
@@ -3815,26 +3925,24 @@ app.post('/api/post-story', async (req, res) => {
           console.log('[Playwright Story] ✅ Đã đăng Facebook Story thành công!');
         } else {
           console.warn('[Playwright Story] ⚠️ Không tìm thấy nút Chia sẻ lên tin sau khi upload.');
-          await browser.close();
           if (downloadedFilePath && fs.existsSync(downloadedFilePath)) fs.unlinkSync(downloadedFilePath);
           return res.status(500).json({ success: false, error: 'Không tìm thấy nút Chia sẻ lên tin sau khi upload.' });
         }
       } else {
         console.warn(`[Playwright Story] ⚠️ Không tìm thấy input[type=file] trên trang tạo tin.`);
-        await browser.close();
         if (downloadedFilePath && fs.existsSync(downloadedFilePath)) fs.unlinkSync(downloadedFilePath);
         return res.status(500).json({ success: false, error: 'Không tìm thấy ô upload file Story trên Facebook.' });
       }
     }
 
-    await browser.close();
     if (downloadedFilePath && fs.existsSync(downloadedFilePath)) fs.unlinkSync(downloadedFilePath);
     res.json({ success: true, message: 'Đã xuất bản Story Facebook thành công!' });
   } catch (error) {
     console.error('[Playwright Story] ❌ Lỗi tạo Story:', error.message);
-    if (browser) await browser.close();
     if (downloadedFilePath && fs.existsSync(downloadedFilePath)) fs.unlinkSync(downloadedFilePath);
     res.status(500).json({ success: false, error: error.message });
+  } finally {
+    await browser?.close().catch(() => { });
   }
 });
 
@@ -4105,24 +4213,25 @@ async function commentLinkOnFanpagePost(page, targetFanpageId, linkToComment, ma
   const cleanTargetId = (targetFanpageId || '').split(':')[0].trim();
   const pageUrl = `https://www.facebook.com/profile.php?id=${cleanTargetId}`;
   const start = Date.now();
-  console.log(`[Playwright][Fanpage][Comment] ⏳ Chờ 10s để Facebook cập nhật và hiển thị bài viết lên tường Fanpage ID: ${cleanTargetId}...`);
-  await page.waitForTimeout(10000);
+  const waitMs = linkToComment ? 3000 : 1000;
+  console.log(`[Playwright][Fanpage][Comment] ⏳ Chờ ${waitMs / 1000}s để Facebook cập nhật và hiển thị bài viết lên tường Fanpage ID: ${cleanTargetId}...`);
+  await page.waitForTimeout(waitMs);
 
   while (Date.now() - start < maxWaitMs) {
     await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => { });
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(1500);
 
     const processingCard = page.locator('text=/Đang xử lý video/i').first();
     if (await processingCard.isVisible().catch(() => false)) {
       console.log('[Playwright][Fanpage][Comment] ⏳ Video vẫn đang xử lý, chờ rồi tải lại...');
-      await page.waitForTimeout(6000);
+      await page.waitForTimeout(5000);
       continue;
     }
 
     // Cuộn xuống qua phần Tin nổi bật / Đáng chú ý để bài viết đầu tiên và khung bình luận hiện vào tầm nhìn
-    for (let scrollAttempt = 0; scrollAttempt < 3; scrollAttempt++) {
+    for (let scrollAttempt = 0; scrollAttempt < 2; scrollAttempt++) {
       await page.evaluate(() => window.scrollBy(0, 500)).catch(() => { });
-      await page.waitForTimeout(800);
+      await page.waitForTimeout(400);
       const postVisible = await page.evaluate(() => {
         return !!document.querySelector('div[data-pagelet*="FeedUnit_"], div[role="feed"] div[role="article"], div[role="textbox"]');
       }).catch(() => false);
@@ -4136,7 +4245,7 @@ async function commentLinkOnFanpagePost(page, targetFanpageId, linkToComment, ma
     ).first();
     if (await commentActionBtn.isVisible().catch(() => false)) {
       await commentActionBtn.click().catch(() => { });
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(600);
     }
 
     const commentBox = page.locator(
@@ -4159,7 +4268,7 @@ async function commentLinkOnFanpagePost(page, targetFanpageId, linkToComment, ma
       return { success: verifyResult.success, postUrl, error: verifyResult.error };
     }
 
-    await page.waitForTimeout(4000);
+    await page.waitForTimeout(linkToComment ? 4000 : 2000);
   }
   console.log('[Playwright][Fanpage][Comment] ⚠️ Hết thời gian chờ, không tìm thấy ô bình luận trên Fanpage.');
   return { success: false, postUrl: null };
@@ -4174,8 +4283,9 @@ async function commentLinkOnGroupPost(page, groupId, pageId, linkToComment = nul
   const filteredUrl = isNumericPageId ? `https://www.facebook.com/groups/${groupId}/user/${cleanPageId}` : null;
   const mainGroupUrl = `https://www.facebook.com/groups/${groupId}`;
   const start = Date.now();
-  console.log(`[Playwright][Group][Comment] ⏳ Chờ 10s để Facebook cập nhật bài vừa đăng trong Group ID: ${groupId}...`);
-  await page.waitForTimeout(10000);
+  const waitMs = linkToComment ? 3000 : 1000;
+  console.log(`[Playwright][Group][Comment] ⏳ Chờ ${waitMs / 1000}s để Facebook cập nhật bài vừa đăng trong Group ID: ${groupId}...`);
+  await page.waitForTimeout(waitMs);
 
   let attemptUrls = filteredUrl ? [filteredUrl, mainGroupUrl] : [mainGroupUrl];
   let urlIdx = 0;
@@ -4184,18 +4294,18 @@ async function commentLinkOnGroupPost(page, groupId, pageId, linkToComment = nul
     const currentUrlToTry = attemptUrls[urlIdx % attemptUrls.length];
     urlIdx++;
     await page.goto(currentUrlToTry, { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => { });
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(1500);
 
     const processingCard = page.locator('text=/Đang xử lý video/i').first();
     if (await processingCard.isVisible().catch(() => false)) {
       console.log('[Playwright][Group][Comment] ⏳ Video vẫn đang xử lý, chờ rồi tải lại...');
-      await page.waitForTimeout(10000);
+      await page.waitForTimeout(5000);
       continue;
     }
 
     // Cuộn nhẹ xuống để bài viết đầu tiên trong Group hiện vào tầm nhìn
     await page.evaluate(() => window.scrollBy(0, 400)).catch(() => { });
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(500);
 
     // Nếu ô nhập chưa mở, bấm vào nút "Bình luận" ở dưới bài viết trong Group
     const commentActionBtn = page.locator(
@@ -4204,7 +4314,7 @@ async function commentLinkOnGroupPost(page, groupId, pageId, linkToComment = nul
     ).first();
     if (await commentActionBtn.isVisible().catch(() => false)) {
       await commentActionBtn.click().catch(() => { });
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(600);
     }
 
     const commentBox = page.locator(
@@ -4227,7 +4337,7 @@ async function commentLinkOnGroupPost(page, groupId, pageId, linkToComment = nul
       return { success: verifyResult.success, postUrl, error: verifyResult.error };
     }
 
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(linkToComment ? 4000 : 2000);
   }
   console.log('[Playwright][Group][Comment] ⚠️ Hết thời gian chờ, không tìm thấy ô bình luận của bài vừa đăng.');
   return { success: false, postUrl: null };
@@ -4702,68 +4812,82 @@ app.post('/api/post-facebook-group', async (req, res) => {
 
       // 1. Kiểm tra nút chuyển đổi danh tính riêng bên trong Group (Group Interacting Switcher)
       const groupSwitcherBtn = page.locator('div[role="button"][aria-label*="Đang tương tác"], div[role="button"][aria-label*="tương tác"], div[role="button"][aria-label*="Interacting as"], div[role="button"][aria-label*="Chuyển sang trang cá nhân"]').first();
+      let identityAlreadyCorrect = false;
       if (await groupSwitcherBtn.isVisible().catch(() => false)) {
-        console.log(`[Playwright][Group] 🎯 Bấm nút chuyển danh tính trong Group...`);
-        await groupSwitcherBtn.click({ force: true }).catch(() => { });
-        await page.waitForTimeout(1500);
-        const groupPageOption = page.locator(`div[role="button"]:has-text("${cleanTargetName}"), div[role="option"]:has-text("${cleanTargetName}")`).first();
-        if (await groupPageOption.isVisible().catch(() => false)) {
-          await groupPageOption.click({ force: true }).catch(() => { });
-          await page.waitForTimeout(3000);
+        const switcherText = await groupSwitcherBtn.innerText().catch(() => '');
+        const ariaLabel = (await groupSwitcherBtn.getAttribute('aria-label').catch(() => '')) || '';
+        if (
+          (switcherText && switcherText.toLowerCase().includes(cleanTargetName.toLowerCase())) ||
+          (ariaLabel && ariaLabel.toLowerCase().includes(cleanTargetName.toLowerCase()))
+        ) {
+          console.log(`[Playwright][Group] ✅ Đang tương tác đúng danh tính Trang "${cleanTargetName}", không cần chuyển đổi.`);
+          identityAlreadyCorrect = true;
         } else {
-          await page.keyboard.press('Escape').catch(() => { });
+          console.log(`[Playwright][Group] 🎯 Bấm nút chuyển danh tính trong Group...`);
+          await groupSwitcherBtn.click({ force: true }).catch(() => { });
+          await page.waitForTimeout(1200);
+          const groupPageOption = page.locator(`div[role="button"]:has-text("${cleanTargetName}"), div[role="option"]:has-text("${cleanTargetName}")`).first();
+          if (await groupPageOption.isVisible().catch(() => false)) {
+            await groupPageOption.click({ force: true }).catch(() => { });
+            await page.waitForTimeout(2000);
+            identityAlreadyCorrect = true;
+          } else {
+            await page.keyboard.press('Escape').catch(() => { });
+          }
         }
       }
 
-      // 2. Kiểm tra nút switcher chính trên Header nếu chưa chuyển được
-      const accountSwitcherBtn = page.locator(
-        'div[role="button"][aria-label="Trang cá nhân của bạn"], ' +
-        'div[role="button"][aria-label*="Trang cá nhân"], ' +
-        'div[role="button"][aria-label*="Tài khoản"], ' +
-        'div[role="button"][aria-label*="Account"], ' +
-        'div[role="button"][aria-label*="Your profile"], ' +
-        'svg[aria-label*="Trang cá nhân"]'
-      ).first();
-
-      if (await accountSwitcherBtn.isVisible().catch(() => false)) {
-        console.log(`[Playwright][Group] 🎯 Bấm nút switcher Tài khoản trên Header Facebook...`);
-        await accountSwitcherBtn.click({ force: true }).catch(async () => {
-          await accountSwitcherBtn.dispatchEvent('click').catch(() => { });
-        });
-
-        await page.waitForTimeout(2000);
-
-        // Bấm nút "Xem tất cả trang cá nhân" hoặc "Xem tất cả các Trang" hoặc "Chuyển sang trang cá nhân khác"
-        const seeAllProfilesBtn = page.locator(
-          'div[role="button"]:has-text("Xem tất cả trang cá nhân"), ' +
-          'div[role="button"]:has-text("Xem tất cả các Trang"), ' +
-          'div[role="button"]:has-text("Chuyển sang trang cá nhân khác"), ' +
-          'div[role="button"]:has-text("See all profiles")'
+      // 2. Chỉ kiểm tra nút switcher chính trên Header nếu chưa chuyển được
+      if (!identityAlreadyCorrect) {
+        const accountSwitcherBtn = page.locator(
+          'div[role="button"][aria-label="Trang cá nhân của bạn"], ' +
+          'div[role="button"][aria-label*="Trang cá nhân"], ' +
+          'div[role="button"][aria-label*="Tài khoản"], ' +
+          'div[role="button"][aria-label*="Account"], ' +
+          'div[role="button"][aria-label*="Your profile"], ' +
+          'svg[aria-label*="Trang cá nhân"]'
         ).first();
 
-        if (await seeAllProfilesBtn.isVisible().catch(() => false)) {
-          console.log(`[Playwright][Group] 🎯 Bấm "Xem tất cả trang cá nhân"...`);
-          await seeAllProfilesBtn.click({ force: true }).catch(() => { });
-          await page.waitForTimeout(1500);
-        }
-
-        const pageIdentityOption = page.locator(`div[role="button"]:has-text("${cleanTargetName}"), div[role="option"]:has-text("${cleanTargetName}"), span:has-text("${cleanTargetName}")`).first();
-        if (await pageIdentityOption.isVisible().catch(() => false)) {
-          console.log(`[Playwright][Group] 🎯 Bấm chuyển sang danh tính Trang "${cleanTargetName}"...`);
-          await pageIdentityOption.click({ force: true }).catch(async () => {
-            await pageIdentityOption.dispatchEvent('click').catch(() => { });
+        if (await accountSwitcherBtn.isVisible().catch(() => false)) {
+          console.log(`[Playwright][Group] 🎯 Bấm nút switcher Tài khoản trên Header Facebook...`);
+          await accountSwitcherBtn.click({ force: true }).catch(async () => {
+            await accountSwitcherBtn.dispatchEvent('click').catch(() => { });
           });
-          await page.waitForTimeout(3500);
 
-          if (!page.url().includes(`/groups/${targetGroupId}`)) {
-            console.log(`[Playwright][Group] 🔄 Đã chuyển danh tính thành công, đang điều hướng lại về Group: ${groupUrl}`);
-            await navigateFacebookSurface(page, groupUrl, `Group ${targetGroupId}`).catch(() => { });
-            await page.waitForTimeout(3000);
+          await page.waitForTimeout(1500);
+
+          // Bấm nút "Xem tất cả trang cá nhân" hoặc "Xem tất cả các Trang" hoặc "Chuyển sang trang cá nhân khác"
+          const seeAllProfilesBtn = page.locator(
+            'div[role="button"]:has-text("Xem tất cả trang cá nhân"), ' +
+            'div[role="button"]:has-text("Xem tất cả các Trang"), ' +
+            'div[role="button"]:has-text("Chuyển sang trang cá nhân khác"), ' +
+            'div[role="button"]:has-text("See all profiles")'
+          ).first();
+
+          if (await seeAllProfilesBtn.isVisible().catch(() => false)) {
+            console.log(`[Playwright][Group] 🎯 Bấm "Xem tất cả trang cá nhân"...`);
+            await seeAllProfilesBtn.click({ force: true }).catch(() => { });
+            await page.waitForTimeout(1200);
           }
-        } else {
-          console.log(`[Playwright][Group] ℹ️ Không tìm thấy option "${cleanTargetName}" trong switcher Header. Đóng switcher.`);
-          await page.keyboard.press('Escape').catch(() => { });
-          await page.waitForTimeout(1000);
+
+          const pageIdentityOption = page.locator(`div[role="button"]:has-text("${cleanTargetName}"), div[role="option"]:has-text("${cleanTargetName}"), span:has-text("${cleanTargetName}")`).first();
+          if (await pageIdentityOption.isVisible().catch(() => false)) {
+            console.log(`[Playwright][Group] 🎯 Bấm chuyển sang danh tính Trang "${cleanTargetName}"...`);
+            await pageIdentityOption.click({ force: true }).catch(async () => {
+              await pageIdentityOption.dispatchEvent('click').catch(() => { });
+            });
+            await page.waitForTimeout(3000);
+
+            if (!page.url().includes(`/groups/${targetGroupId}`)) {
+              console.log(`[Playwright][Group] 🔄 Đã chuyển danh tính thành công, đang điều hướng lại về Group: ${groupUrl}`);
+              await navigateFacebookSurface(page, groupUrl, `Group ${targetGroupId}`).catch(() => { });
+              await page.waitForTimeout(2500);
+            }
+          } else {
+            console.log(`[Playwright][Group] ℹ️ Không tìm thấy option "${cleanTargetName}" trong switcher Header. Đóng switcher.`);
+            await page.keyboard.press('Escape').catch(() => { });
+            await page.waitForTimeout(800);
+          }
         }
       }
     } else {
@@ -4913,6 +5037,8 @@ app.post('/api/post-facebook-group', async (req, res) => {
     }
     console.log('[Playwright][Group] ✅ Đã mở Modal đăng bài trong Group!');
     await debugShot(page, 'dialog_opened');
+    const postQueueId = req.headers['x-post-queue-id'];
+    await assertNoFacebookSpamBlock(page, postQueueId, 'Group: vừa mở modal');
 
     // Kiểm tra & Ép chuyển đổi danh tính bên trong Modal "Tạo bài viết"
     // CHỈ áp dụng nếu KHÔNG phải ẩn danh và KHÔNG phải cá nhân (đăng bằng Fanpage)
@@ -5219,7 +5345,9 @@ app.post('/api/post-facebook-group', async (req, res) => {
 
     if (isDirectPost) {
       console.log('[Playwright][Group] ⏳ Nút "Đăng" đã được bấm. Đang chờ Facebook xử lý và đóng Modal...');
-      await page.waitForTimeout(5000);
+      await page.waitForTimeout(2000);
+      await assertNoFacebookSpamBlock(page, postQueueId, 'Group: sau khi bấm Đăng');
+      await page.waitForTimeout(3000);
       await dialog.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => { });
     } else {
       await page.waitForTimeout(3000);
@@ -5231,10 +5359,12 @@ app.post('/api/post-facebook-group', async (req, res) => {
           await confirmBtn.click().catch(async () => {
             await confirmBtn.click({ force: true }).catch(() => { });
           });
+          await page.waitForTimeout(2000);
         }
       }
-      await page.waitForTimeout(10000);
-      await dialog.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => { });
+      await assertNoFacebookSpamBlock(page, postQueueId, 'Group: sau khi bấm Đăng');
+      // Chờ modal đóng thay vì ngủ cố định 10s — timeout 25s giữ nguyên tổng thời gian chờ tối đa như trước (10s + 15s).
+      await dialog.waitFor({ state: 'hidden', timeout: 25000 }).catch(() => { });
     }
     await debugShot(page, 'after_submit');
 
@@ -5258,6 +5388,9 @@ app.post('/api/post-facebook-group', async (req, res) => {
         throw new Error(`FB_MODAL_STUCK: Modal Tạo bài viết không đóng sau khi bấm Đăng (Bài CHƯA được đăng lên Nhóm). Lỗi: ${remainingText.replace(/\n+/g, ' ').slice(0, 200)}`);
       }
     }
+    // Modal đóng chưa chắc đã đăng: Facebook có thể đóng composer rồi mới bật dialog/toast chặn spam.
+    await page.waitForTimeout(1000);
+    await assertNoFacebookSpamBlock(page, postQueueId, 'Group: sau khi modal đóng');
 
     // Tìm lại link bài vừa đăng (luôn chạy, kể cả không có bình luận affiliate) — dùng để lưu vào
     // Lịch sử/Báo cáo. Nếu có affiliateLink thì cùng lượt tìm này sẽ bình luận luôn link vào bài.
@@ -5285,7 +5418,7 @@ app.post('/api/post-facebook-group', async (req, res) => {
       console.log(`[Playwright][Group] 🔎 Đang tìm lại bài vừa đăng${hasAffiliateLink ? ' để bình luận link' : ' để lấy link lưu Lịch sử'}...`);
       const commentResult = await commentLinkOnGroupPost(
         page, targetGroupId, pageId, hasAffiliateLink ? affiliateLink.trim() : null,
-        hasAffiliateLink ? 120000 : 45000
+        hasAffiliateLink ? 60000 : 10000
       ).catch((e) => {
         console.log('[Playwright][Group][Comment] ⚠️ Lỗi khi tìm/bình luận bài:', e.message);
         return { success: false, postUrl: null };
@@ -5298,6 +5431,7 @@ app.post('/api/post-facebook-group', async (req, res) => {
       }
     }
 
+    const refreshedCookieString = await refreshedFbCookieForSameUser(context, cookieString);
     await browser.close();
     for (const filePath of downloadedFilePaths) {
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
@@ -5316,6 +5450,7 @@ app.post('/api/post-facebook-group', async (req, res) => {
       ...(groupPostUrl ? { groupPostUrl, publishedPostUrl: groupPostUrl } : {}),
       ...(isAnonReq ? { anonymousRequested: true, anonymousSucceeded } : {}),
       ...(combinedWarning ? { warning: combinedWarning } : {}),
+      ...(refreshedCookieString ? { cookieString: refreshedCookieString } : {}),
     });
   } catch (error) {
     console.error('[Playwright][Group] ❌ Lỗi đăng bài vào Group:', error.message);
@@ -5406,14 +5541,14 @@ app.post('/api/enqueue-urls', async (req, res) => {
     // Backend cào bài (Playwright) hoặc đăng ngay (publishNow) đồng bộ trên chính request này — live test
     // xác nhận riêng bước cào 1 bài đã tốn 22-79s tuỳ loại, đăng bài Fanpage còn lâu hơn (nhiều lần retry
     // mở Modal, mỗi lần chờ 15s). Timeout 30s cũ khiến proxy báo lỗi dù backend vẫn đang xử lý bình thường.
-    const backendResp = await axios.post('http://localhost:8081/api/queue/add-from-urls', {
+    const backendResp = await axios.post(`${desktop.BACKEND_URL}/api/queue/add-from-urls`, {
       urls,
       publishNow: Boolean(publishNow),
       targetFanpageId: targetFanpageId || null,
       groupNames: groupNames || [],
       affiliateLink: affiliateLink || null
     }, {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...desktop.backendHeaders() },
       timeout: 180000
     });
 
@@ -5434,12 +5569,14 @@ app.post('/api/crawl-page-links', async (req, res) => {
     return res.status(400).json({ success: false, error: 'Thiếu url' });
   }
 
-  let browser = null;
+  let releaseContext = null;
   try {
-    browser = await chromium.launch({ headless: true });
-    const context = await browser.newContext({
+    // Context từ browserPool (chung process Chromium) thay vì chromium.launch() riêng mỗi request.
+    const acquired = await browserPool.acquireContext({
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     });
+    releaseContext = acquired.release;
+    const context = acquired.context;
 
     if (cookieString) {
       const cookies = cookieString.split(';')
@@ -5510,14 +5647,12 @@ app.post('/api/crawl-page-links', async (req, res) => {
       await page.waitForTimeout(2000);
     }
 
-    await browser.close();
-    browser = null;
-
     const results = Array.from(foundLinks).slice(0, maxLimit);
     return res.json({ success: true, count: results.length, urls: results });
   } catch (err) {
-    if (browser) await browser.close().catch(() => { });
     return res.status(500).json({ success: false, error: err.message });
+  } finally {
+    await releaseContext?.();
   }
 });
 
@@ -7246,12 +7381,14 @@ app.post('/api/scrape-content', async (req, res) => {
         return res.json({ ...cachedThreads.result, cached: true });
       }
     }
-    let browser = null;
+    let releaseContext = null;
     try {
-      browser = await chromium.launch({ headless: true });
-      const context = await browser.newContext({
+      // Context từ browserPool (chung process Chromium) thay vì chromium.launch() riêng mỗi request.
+      const acquired = await browserPool.acquireContext({
         userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
       });
+      releaseContext = acquired.release;
+      const context = acquired.context;
       const page = await context.newPage();
       page.on('console', msg => console.log(`[BrowserConsole] 💬 ${msg.text()}`));
       // Kiểm tra xem URL có chứa nhiều từ khóa tìm kiếm phân cách bằng dấu phẩy không
@@ -7869,7 +8006,8 @@ app.post('/api/scrape-content', async (req, res) => {
         });
       }
 
-      await browser.close();
+      await releaseContext();
+      releaseContext = null;
       const seenUrls = new Set();
       const dedupedItems = [];
       for (const item of items) {
@@ -7891,8 +8029,9 @@ app.post('/api/scrape-content', async (req, res) => {
       return res.json(threadsResult);
     } catch (err) {
       console.error('[Threads] ❌ Lỗi:', err.message);
-      if (browser) await browser.close();
       return res.status(500).json({ success: false, error: err.message });
+    } finally {
+      await releaseContext?.();
     }
   }
 
@@ -7980,6 +8119,26 @@ app.post('/api/scrape-content', async (req, res) => {
   // ── 3. FB_PAGE & FB_GROUP & FB_SINGLE — Cào bài từ Facebook (Link bài đơn / Album ảnh / Video / Feed Group) ─────
   if (sourceType === 'FB_PAGE' || sourceType === 'FB_GROUP' || (sourceUrl && sourceUrl.includes('facebook.com')) || (sourceUrl && sourceUrl.includes('fb.watch'))) {
     sourceUrl = normalizeFacebookSourceUrl(sourceUrl);
+
+    // Resolve shortlink Facebook nếu là link rút gọn fb.watch, fb.me hoặc link /share/
+    if (sourceUrl.includes('fb.watch') || sourceUrl.includes('fb.me') || sourceUrl.includes('/share/')) {
+      try {
+        const headRes = await axios.get(sourceUrl, {
+          maxRedirects: 5,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+          },
+          validateStatus: () => true,
+          timeout: 8000
+        });
+        if (headRes.request?.res?.responseUrl && headRes.request.res.responseUrl !== sourceUrl) {
+          sourceUrl = normalizeFacebookSourceUrl(headRes.request.res.responseUrl);
+          console.log(`[FB_Scraper] 🔄 Resolved Facebook shortlink: ${sourceUrl}`);
+        }
+      } catch (_) { }
+    }
+
     const scrapeCacheKey = getScrapeCacheKey(sourceUrl, scrapeLimit, minViewsThreshold, shouldIncludeCredit, scrapeIdentityKey);
     if (shouldForceRefresh) {
       delete scrapeCache[scrapeCacheKey];
@@ -7997,13 +8156,15 @@ app.post('/api/scrape-content', async (req, res) => {
       ? fetchFacebookPublicAnchor(sourceUrl).catch(() => null)
       : Promise.resolve(null);
 
-    let browser = null;
+    let releaseContext = null;
     try {
-      browser = await chromium.launch({ headless: true });
-      const context = await browser.newContext({
+      // Context từ browserPool (chung process Chromium) thay vì chromium.launch() riêng mỗi request.
+      const acquired = await browserPool.acquireContext({
         viewport: { width: 1280, height: 1024 },
         userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
       });
+      releaseContext = acquired.release;
+      const context = acquired.context;
 
       // Nếu có cookieString (tài khoản Facebook đã kết nối), nạp Cookie vào context
       if (req.body.cookieString) {
@@ -8044,18 +8205,24 @@ app.post('/api/scrape-content', async (req, res) => {
       // thay vì phải đi cào lại nhiều đoạn rồi tự nối file.
       const videoTotalBytesByBaseUrl = new Map();
       const page = await context.newPage();
-      // Tăng tốc: Chặn nạp các tài nguyên không cần thiết (fonts, tracking pixels, ads, stories) để cào nhanh hơn
+      // Tăng tốc: Chặn nạp các tài nguyên không cần thiết (fonts, tracking pixels, ads, stories, beacons) để cào nhanh hơn
       await page.route('**/*', (route) => {
         const resourceType = route.request().resourceType();
         const url = route.request().url();
         if (
           resourceType === 'font' ||
+          (resourceType === 'media' && !url.includes('.mp4')) ||
           url.includes('/privacy/sandbox/pixel') ||
           url.includes('google-analytics') ||
           url.includes('/ajax/bz') ||
           url.includes('doubleclick') ||
           url.includes('/stories/') ||
-          url.includes('story_tray')
+          url.includes('story_tray') ||
+          url.includes('facebook.com/tr/') ||
+          url.includes('connect.facebook.net/signals/') ||
+          url.includes('graph.facebook.com/logging/') ||
+          url.includes('/logging/') ||
+          url.includes('bat.bing.com')
         ) {
           return route.abort().catch(() => {});
         }
@@ -8084,8 +8251,12 @@ app.post('/api/scrape-content', async (req, res) => {
 
       console.log(`[FB_Scraper] 🌐 Đang cào bài Facebook: ${sourceUrl}...`);
       await page.goto(sourceUrl, { waitUntil: 'commit', timeout: 30000 }).catch(() => { });
-      await page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => { });
-      await page.waitForTimeout(3500);
+      await page.waitForLoadState('domcontentloaded', { timeout: 8000 }).catch(() => { });
+      // Tối ưu hiệu năng: Race giữa việc phần tử bài viết xuất hiện và timeout ngắn thay vì sleep cố định 3500ms
+      await Promise.race([
+        page.waitForSelector('[role="article"], div[data-ad-preview="message"], video, div[data-visualcompletion="media-vc-image"], div[role="main"]', { timeout: 2500 }),
+        page.waitForTimeout(1600)
+      ]).catch(() => { });
 
       // Phát hiện sớm bài private/đã xóa/cần đăng nhập lại — nếu không check, các bước cào phía dưới
       // vẫn chạy hết rồi âm thầm trả về media rỗng, khiến người dùng tưởng lỗi tool chứ không phải link chết.
@@ -8157,10 +8328,14 @@ app.post('/api/scrape-content', async (req, res) => {
       if (isSinglePostUrl) {
         // Tự động tìm và bấm toàn bộ nút "Xem thêm" / "See more" để lấy trọn vẹn 100% Caption không bị cắt ngắn
         await page.evaluate(() => {
-          const seeMoreRegex = /(?:…|\.{2,})?\s*(?:Xem\s+thêm|See\s+more|Hiển\s+thị\s+thêm)\b/i;
-          const btns = Array.from(document.querySelectorAll('div[role="button"], span[role="button"], [role="article"] span, [role="article"] div, span[dir="auto"], div[dir="auto"]'));
+          const seeMoreRegex = /(?:…|\.{2,})?\s*(?:Xem\s+thêm|See\s+more|Hiển\s+thị\s+thêm|Show\s+more)\b/i;
+          const btns = Array.from(document.querySelectorAll(
+            'div[role="button"], span[role="button"], a[role="button"], [role="button"], ' +
+            '[aria-label*="Xem thêm" i], [aria-label*="See more" i], ' +
+            '[role="article"] span, [role="article"] div, span[dir="auto"], div[dir="auto"]'
+          ));
           for (const b of btns) {
-            const text = (b.innerText || b.textContent || '').trim();
+            const text = (b.innerText || b.textContent || b.getAttribute('aria-label') || '').trim();
             if (text && text.length <= 40 && seeMoreRegex.test(text)) {
               try {
                 b.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
@@ -8174,11 +8349,11 @@ app.post('/api/scrape-content', async (req, res) => {
             }
           }
         }).catch(() => { });
-        await page.waitForTimeout(800);
+        await page.waitForTimeout(500);
 
         // Cuộn nhẹ để nạp đầy đủ ảnh và video
         await page.evaluate(() => window.scrollBy(0, 800)).catch(() => { });
-        await page.waitForTimeout(1500);
+        await page.waitForTimeout(600);
 
         // Chủ động bấm Play video nếu có (chỉ tìm video trong bài viết chính, loại bỏ 100% story tray, comment và sidebar gợi ý)
         const hasMainVideo = await page.evaluate(() => {
@@ -8450,13 +8625,57 @@ app.post('/api/scrape-content', async (req, res) => {
 
         // 3. Trích xuất Caption & Tên tác giả (Cre)
         const postData = await page.evaluate(() => {
-          // Bóc tách tên Group và tên Tác giả riêng biệt
+          // Bóc tách tên Group và tên Tác giả riêng biệt một cách chuẩn xác
           const groupEl = document.querySelector('a[href*="/groups/"]:not([href*="/user/"]) strong, a[href*="/groups/"]:not([href*="/user/"]) span, h2 a[href*="/groups/"]');
           const detectedGroupName = (groupEl?.innerText || '').trim();
 
-          const authorEl = document.querySelector('a[href*="/user/"]')
-            || document.querySelector('h2 strong, h3 strong, h2 a, h3 a, a[role="link"] strong, [role="article"] h2 a, [role="article"] h3 a');
-          const author = (authorEl?.innerText || '').trim();
+          // Tìm tác giả trong phạm vi bài viết chính (không lấy nhầm tên Group hoặc thanh sidebar)
+          let detectedAuthor = '';
+          const authorCandidates = [
+            document.querySelector('[role="article"] a[href*="/user/"]:not([href*="/groups/"])'),
+            document.querySelector('[role="article"] a[href*="profile.php"]:not([href*="/groups/"])'),
+            document.querySelector('[role="article"] a[role="link"][tabindex="0"]:not([href*="/groups/"]):not([href*="/posts/"]):not([href*="/share/"])'),
+            document.querySelector('[role="article"] h2 a:not([href*="/groups/"]), [role="article"] h3 a:not([href*="/groups/"]), [role="article"] h4 a:not([href*="/groups/"])'),
+            document.querySelector('a[href*="/user/"]:not([href*="/groups/"])'),
+            document.querySelector('a[href*="profile.php"]:not([href*="/groups/"])'),
+          ];
+
+          for (const cand of authorCandidates) {
+            if (cand) {
+              const text = (cand.innerText || cand.textContent || '').trim();
+              if (text && text.length > 1 && !/^(Facebook|Home|Trang chủ|Group|Nhóm|Theo dõi|Follow)$/i.test(text)) {
+                if (!detectedGroupName || text.toLowerCase() !== detectedGroupName.toLowerCase()) {
+                  detectedAuthor = text;
+                  break;
+                }
+              }
+            }
+          }
+
+          if (!detectedAuthor) {
+            const hStrong = document.querySelector('[role="article"] h2 strong, [role="article"] h3 strong, h2 strong, h3 strong');
+            const hText = (hStrong?.innerText || '').trim();
+            if (hText && (!detectedGroupName || hText.toLowerCase() !== detectedGroupName.toLowerCase())) {
+              detectedAuthor = hText;
+            }
+          }
+
+          // Làm sạch triệt để các badge đính kèm của Facebook như " · Theo dõi", " · Quản trị viên"
+          const cleanAuthorName = (raw) => {
+            if (!raw) return '';
+            let a = raw.trim();
+            a = a
+              .replace(/[\s\u00A0]*[·•|–—-][\s\u00A0]*(?:Theo dõi|Follow|Following|Đã theo dõi|Quản trị viên|Admin|Người điều hành|Moderator|Người đóng góp hàng đầu|Top Contributor|Tác giả|Author).*$/i, '')
+              .replace(/\s*\((?:Admin|Quản trị viên|Tác giả|Author|Mod|Người kiểm duyệt)\)\s*/gi, '')
+              .replace(/^bài viết của\s+/i, '')
+              .replace(/^post by\s+/i, '')
+              .trim();
+            if (detectedGroupName && a.toLowerCase() === detectedGroupName.toLowerCase()) return '';
+            if (/^(Facebook|Bài viết Facebook|Video Facebook|Group|Nhóm|Trang chủ|Home|Feed|Reels?|Watch)$/i.test(a)) return '';
+            return a;
+          };
+
+          const author = cleanAuthorName(detectedAuthor);
 
           const cleanDomText = (t) => {
             if (!t) return '';
@@ -8686,8 +8905,41 @@ app.post('/api/scrape-content', async (req, res) => {
           // 1. Text lấy trực tiếp từ DOM bài viết (đầy đủ nhiều dòng, có Cre, không bị cắt ngắn bởi thẻ meta)
           // 2. og:description (đã được lọc sạch prefix Group)
           // 3. og:title (đã được lọc sạch prefix Group)
+          // Ghép nối thông minh: Nếu bài viết có nhiều đoạn văn bản trong các thẻ div/span riêng lẻ
+          let bestCombinedText = '';
+          if (msgCandidates.length > 0) {
+            // Nếu candidate đầu tiên là container cha chứa tất cả các candidate khác (VD data-ad-preview="message")
+            const rootCandidate = msgCandidates[0];
+            const isRootOfAll = msgCandidates.length > 1 && msgCandidates.slice(1).every(c => rootCandidate.contains(c));
+            if (isRootOfAll) {
+              bestCombinedText = cleanDomText(extractFormattedNodeText(rootCandidate));
+            } else {
+              // Lấy các element không lồng nhau theo thứ tự xuất hiện trên trang để không bị mất đoạn
+              const topLevelElements = [];
+              for (const el of msgCandidates) {
+                if (!topLevelElements.some(t => t.contains(el))) {
+                  topLevelElements.push(el);
+                }
+              }
+              const extractedParts = topLevelElements
+                .map(el => cleanDomText(extractFormattedNodeText(el)))
+                .filter(t => t.length > 2 && !isNoiseText(t));
+
+              // Khử các đoạn trùng lặp hoặc lặp chuỗi con
+              const uniqueSegments = [];
+              for (const part of extractedParts) {
+                if (!uniqueSegments.some(s => s.includes(part) || part.includes(s))) {
+                  uniqueSegments.push(part);
+                }
+              }
+              bestCombinedText = uniqueSegments.join('\n\n').trim();
+            }
+          }
+
           let caption = '';
-          if (textList.length > 0) {
+          if (bestCombinedText && bestCombinedText.length > 3 && !isNoiseText(bestCombinedText)) {
+            caption = bestCombinedText;
+          } else if (textList.length > 0) {
             caption = textList[0];
           } else if (ogDesc && ogDesc.length > 3 && !isNoiseText(ogDesc)) {
             caption = ogDesc;
@@ -8738,7 +8990,8 @@ app.post('/api/scrape-content', async (req, res) => {
           postData.caption = '';
         }
 
-        await browser.close();
+        await releaseContext();
+        releaseContext = null;
 
         // Facebook phát video dạng DASH bằng nhiều request byte-range (bytestart=/byteend=) cho CÙNG
         // 1 video khi trình duyệt buffer/tua — mỗi request vẫn có content-type video/mp4 nên bị bắt
@@ -8962,7 +9215,8 @@ app.post('/api/scrape-content', async (req, res) => {
         return results;
       }, scrapeLimit);
 
-      await browser.close();
+      await releaseContext();
+      releaseContext = null;
       // Dedup theo NỘI DUNG đã chuẩn hoá thay vì originalUrl: khi Playwright không tìm thấy
       // link /posts/, /permalink/, /share/p/ trong 1 bài (rất hay gặp với bài share lại),
       // originalUrl bị fallback về chính sourceUrl (URL của Group) — nếu dedup theo URL thì mọi
@@ -8996,8 +9250,9 @@ app.post('/api/scrape-content', async (req, res) => {
       return res.json(bulkResult);
     } catch (err) {
       console.error('[FB_Scraper] ❌ Lỗi:', err.message);
-      if (browser) await browser.close();
       return res.status(500).json({ success: false, error: err.message });
+    } finally {
+      await releaseContext?.();
     }
   }
 
@@ -9139,12 +9394,14 @@ app.post('/api/scrape-content', async (req, res) => {
     console.warn(`[Website_Crawler] Fast article scrape fallback: ${e.message}`);
   }
 
-  let browser = null;
+  let releaseContext = null;
   try {
-    browser = await chromium.launch({ headless: true });
-    const context = await browser.newContext({
+    // Context từ browserPool (chung process Chromium) thay vì chromium.launch() riêng mỗi request.
+    const acquired = await browserPool.acquireContext({
       userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36',
     });
+    releaseContext = acquired.release;
+    const context = acquired.context;
     const page = await context.newPage();
     await page.goto(sourceUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForTimeout(2000);
@@ -9255,13 +9512,13 @@ app.post('/api/scrape-content', async (req, res) => {
       return items;
     }, scrapeLimit);
 
-    await browser.close();
     console.warn(`[Website] ⚠️ Đã dùng nhánh dự phòng cào yếu (scrapeNewsArticle/category đều không ra kết quả) — độ chính xác thấp hơn bình thường. Cào được ${articles.length} bài từ ${sourceUrl}`);
     return res.json({ success: true, items: articles, usedWeakFallback: true });
   } catch (err) {
     console.error('[Website] ❌ Lỗi:', err.message);
-    if (browser) await browser.close();
     return res.status(500).json({ success: false, error: err.message });
+  } finally {
+    await releaseContext?.();
   }
 });
 
@@ -9275,15 +9532,17 @@ app.post('/api/get-account-name', async (req, res) => {
   }
 
   const cookies = parseCookies(cookieString);
-  let browser = null;
+  let releaseContext = null;
 
   try {
     console.log('[Playwright] Đang kiểm tra cookie & lấy thông tin tài khoản Facebook...');
-    browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
-    const context = await browser.newContext({
+    // Context từ browserPool (chung process Chromium) thay vì chromium.launch() riêng mỗi request.
+    const acquired = await browserPool.acquireContext({
       viewport: { width: 1920, height: 1080 },
       userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     });
+    releaseContext = acquired.release;
+    const context = acquired.context;
     await context.addCookies(cookies);
     const page = await context.newPage();
 
@@ -9307,7 +9566,6 @@ app.post('/api/get-account-name', async (req, res) => {
     }).catch(() => false);
 
     if (isLoginUrl || isLoggedOut) {
-      await browser.close();
       console.warn('[Playwright] ⚠️ Cookie hết hạn — Facebook chuyển hướng đến trang đăng nhập/checkpoint.');
       return res.status(401).json({ success: false, error: 'Cookie đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại và cập nhật cookie.' });
     }
@@ -9333,14 +9591,13 @@ app.post('/api/get-account-name', async (req, res) => {
       return 'Tài khoản Facebook';
     }).catch(() => 'Tài khoản Facebook');
 
-    await browser.close();
-
     console.log(`[Playwright] ✅ Cookie hợp lệ — URL: ${currentUrl} | Tên Facebook: "${name || 'Tài khoản Facebook'}"`);
     res.json({ success: true, name: name || 'Tài khoản Facebook' });
   } catch (error) {
     console.error('[Playwright] Lỗi lấy tên:', error.message);
-    if (browser) await browser.close();
     res.status(500).json({ success: false, error: error.message });
+  } finally {
+    await releaseContext?.();
   }
 });
 
@@ -9533,7 +9790,7 @@ async function getFallbackFbCookie() {
   }
   try {
     const mysql = require('mysql2/promise');
-    const conn = await mysql.createConnection(getMysqlConfig(4000));
+    const conn = await desktop.openDb(getMysqlConfig(4000));
     const [rows] = await conn.execute(
       "SELECT access_token FROM social_accounts WHERE account_type = 'PERSONAL_COOKIE' AND token_status = 'OK' AND access_token IS NOT NULL ORDER BY updated_at DESC LIMIT 1"
     );
@@ -9631,13 +9888,16 @@ async function extractVideoDirectly(url, options = {}) {
     cookieString = await getFallbackFbCookie();
   }
 
-  let browser = null;
+  // Context sạch từ browserPool (chờ tối đa 10s, pool đầy thì tự mở Chromium riêng — route đăng bài
+  // gọi hàm này không bị chặn lâu). options.browser: caller đã có sẵn browser → mở context mới trong đó.
+  let releaseContext = null;
   try {
-    browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
-    const context = await browser.newContext({
+    const acquired = await browserPool.acquireScrapeContext({
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
       viewport: { width: 1440, height: 900 }
-    });
+    }, { browser: options.browser || null, waitTimeoutMs: 10000, launchArgs: ['--no-sandbox', '--disable-setuid-sandbox'] });
+    releaseContext = acquired.release;
+    const context = acquired.context;
 
     if (cookieString && isFb) {
       const cookies = cookieString.split(';').map(pair => {
@@ -9910,7 +10170,8 @@ async function extractVideoDirectly(url, options = {}) {
       mediaUrls = videoUrl ? [videoUrl] : (fbData.ogImage ? [fbData.ogImage] : []);
     }
 
-    await browser.close().catch(() => { });
+    await releaseContext();
+    releaseContext = null;
 
     if (!videoUrl && mediaUrls.length === 0 && !thumbnail && (!title || title === 'Video Threads' || title === 'Video Facebook' || title === 'Video Instagram')) {
       return {
@@ -9932,8 +10193,9 @@ async function extractVideoDirectly(url, options = {}) {
     };
   } catch (error) {
     console.error('[ExtractVideo] Lỗi:', error.message);
-    if (browser) await browser.close().catch(() => { });
     return { success: false, error: error.message };
+  } finally {
+    await releaseContext?.();
   }
 }
 
@@ -9945,16 +10207,30 @@ app.post('/api/extract-video', async (req, res) => {
 });
 
 const taskProgressStore = new Map();
+const taskProgressCleanupTimers = new Map();
+const TASK_PROGRESS_DONE_TTL_MS = 10 * 60 * 1000;
+// Route lỗi không cập nhật trạng thái failed → entry kẹt ở processing; dọn sau 30 phút không có cập nhật.
+const TASK_PROGRESS_STALE_TTL_MS = 30 * 60 * 1000;
 
 function updateTaskProgress(taskId, percent, stage, details = {}) {
   if (!taskId) return;
-  taskProgressStore.set(taskId, {
+  const entry = {
     percent: Math.min(Math.max(Math.round(percent), 0), 100),
     stage,
     status: percent >= 100 ? 'completed' : 'processing',
     updatedAt: Date.now(),
     ...details
-  });
+  };
+  taskProgressStore.set(taskId, entry);
+
+  clearTimeout(taskProgressCleanupTimers.get(taskId));
+  const isDone = entry.status === 'completed' || entry.status === 'failed';
+  const timer = setTimeout(() => {
+    taskProgressCleanupTimers.delete(taskId);
+    if (taskProgressStore.get(taskId) === entry) taskProgressStore.delete(taskId);
+  }, isDone ? TASK_PROGRESS_DONE_TTL_MS : TASK_PROGRESS_STALE_TTL_MS);
+  timer.unref?.();
+  taskProgressCleanupTimers.set(taskId, timer);
 }
 
 app.get('/api/tools/progress/:taskId', (req, res) => {
@@ -10370,9 +10646,7 @@ app.get('/api/download-video', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 app.post('/api/hunt-facebook-group', async (req, res) => {
   try {
-    delete require.cache[require.resolve('./fb-feed-hunter')];
-    const { huntFacebookFeed: freshHunt } = require('./fb-feed-hunter');
-    const result = await freshHunt(req.body, { removeFacebookLoginOverlays });
+    const result = await huntFacebookFeed(req.body, { removeFacebookLoginOverlays });
     return res.status(result.status).json(result.body);
   } catch (err) {
     console.error('[Worker] Lỗi hunt-facebook-group:', err);
@@ -10446,7 +10720,7 @@ async function resolveViaProxy(cookieString, explicitProxy = '') {
   let conn = null;
   try {
     const mysql = require('mysql2/promise');
-    conn = await mysql.createConnection(getMysqlConfig(3000));
+    conn = await desktop.openDb(getMysqlConfig(3000));
     const [rows] = await conn.execute(
       "SELECT access_token, proxy_url FROM social_accounts WHERE access_token LIKE ? AND proxy_url IS NOT NULL AND proxy_url != '' ORDER BY id DESC",
       [`%c_user=${uid}%`]
@@ -10674,47 +10948,107 @@ app.post('/api/buff-view', async (req, res) => {
 const BUFF_QUEUE_FILE = path.join(__dirname, 'buff_queue.json');
 const BUFF_HISTORY_FILE = path.join(__dirname, 'buff_history.json');
 
-function loadBuffQueue() {
-  try {
-    if (fs.existsSync(BUFF_QUEUE_FILE)) {
-      const data = JSON.parse(fs.readFileSync(BUFF_QUEUE_FILE, 'utf-8'));
-      if (Array.isArray(data.items)) return data;
+// Cache RAM + ghi gom (debounce, async) cho buff_queue.json / buff_history.json — trước đây mỗi
+// request list/check đều readFileSync + JSON.parse cả file, mỗi lần save đều writeFileSync chặn event loop.
+// Worker 3001 & 3002 dùng CHUNG 2 file này nên cache được kiểm tra theo mtime: khi không có lần ghi
+// nào đang chờ, statSync (rẻ) và đọc lại nếu process kia đã ghi đè file.
+function createCachedJsonStore(filePath, label, parse, empty) {
+  let cache = null;
+  let cacheMtimeMs = -1;
+  let saveTimer = null;
+  let inFlight = false;
+  let closed = false;
+  let writing = Promise.resolve();
+
+  const statMtime = () => { try { return fs.statSync(filePath).mtimeMs; } catch (_) { return -1; } };
+
+  function load() {
+    // Đang có thay đổi chưa ghi xong xuống đĩa → bản trong RAM là mới nhất.
+    if (cache && (saveTimer || inFlight)) return cache;
+    const mtimeMs = statMtime();
+    if (cache && mtimeMs === cacheMtimeMs) return cache;
+    let data = null;
+    try {
+      if (mtimeMs >= 0) data = parse(JSON.parse(fs.readFileSync(filePath, 'utf-8')));
+    } catch (e) {
+      console.warn(`[${label}] ⚠️ Không đọc được file, khởi tạo lại:`, e.message);
     }
-  } catch (e) {
-    console.warn('[BuffQueue] ⚠️ Không đọc được queue, khởi tạo lại:', e.message);
+    cache = data || empty();
+    cacheMtimeMs = mtimeMs;
+    return cache;
   }
-  return { items: [] };
+
+  async function writeNow() {
+    inFlight = true;
+    try {
+      const tmp = `${filePath}.tmp`;
+      await fs.promises.writeFile(tmp, JSON.stringify(cache, null, 2));
+      if (closed) return; // flush() lúc tắt đã ghi bản mới nhất, không rename đè bản cũ hơn
+      await fs.promises.rename(tmp, filePath);
+      if (!saveTimer) cacheMtimeMs = statMtime();
+    } finally {
+      inFlight = false;
+    }
+  }
+
+  function save(data) {
+    cache = data;
+    if (saveTimer) return;
+    saveTimer = setTimeout(() => {
+      saveTimer = null;
+      writing = writing.then(writeNow).catch((e) => console.warn(`[${label}] ⚠️ Lỗi lưu file:`, e.message));
+    }, 500);
+  }
+
+  // Ghi đồng bộ ngay khi worker tắt để không mất thay đổi còn nằm trong debounce.
+  function flush() {
+    const hasPending = Boolean(saveTimer) || inFlight;
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    closed = true;
+    if (!hasPending) return;
+    try {
+      const tmp = `${filePath}.flush.tmp`;
+      fs.writeFileSync(tmp, JSON.stringify(cache, null, 2));
+      fs.renameSync(tmp, filePath);
+    } catch (e) {
+      console.warn(`[${label}] ⚠️ Lỗi flush file:`, e.message);
+    }
+  }
+
+  return { load, save, flush };
+}
+
+const buffQueueStore = createCachedJsonStore(
+  BUFF_QUEUE_FILE, 'BuffQueue',
+  (data) => (data && Array.isArray(data.items) ? data : null),
+  () => ({ items: [] }),
+);
+const buffHistoryStore = createCachedJsonStore(
+  BUFF_HISTORY_FILE, 'BuffHistory',
+  (data) => (data && typeof data === 'object' ? data : null),
+  () => ({}),
+);
+
+function loadBuffQueue() {
+  return buffQueueStore.load();
 }
 
 function saveBuffQueue(queueData) {
-  try {
-    const tmp = `${BUFF_QUEUE_FILE}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify(queueData, null, 2));
-    fs.renameSync(tmp, BUFF_QUEUE_FILE);
-  } catch (e) {
-    console.warn('[BuffQueue] ⚠️ Lỗi lưu file hàng đợi:', e.message);
-  }
+  buffQueueStore.save(queueData);
 }
 
 function loadBuffHistory() {
-  try {
-    if (fs.existsSync(BUFF_HISTORY_FILE)) {
-      return JSON.parse(fs.readFileSync(BUFF_HISTORY_FILE, 'utf-8'));
-    }
-  } catch (e) {
-    console.warn('[BuffHistory] ⚠️ Không đọc được history:', e.message);
-  }
-  return {};
+  return buffHistoryStore.load();
 }
 
 function saveBuffHistory(historyData) {
-  try {
-    const tmp = `${BUFF_HISTORY_FILE}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify(historyData, null, 2));
-    fs.renameSync(tmp, BUFF_HISTORY_FILE);
-  } catch (e) {
-    console.warn('[BuffHistory] ⚠️ Lỗi lưu file history:', e.message);
-  }
+  buffHistoryStore.save(historyData);
+}
+
+function flushBuffStores() {
+  buffQueueStore.flush();
+  buffHistoryStore.flush();
 }
 
 // activeBuffTaskIds và activeBuffVias quản lý tối đa MAX_PARALLEL_BUFF worker song song
@@ -10725,7 +11059,7 @@ async function loadLiveVias() {
   const vias = [];
   try {
     const mysql = require('mysql2/promise');
-    const conn = await mysql.createConnection(getMysqlConfig(3000));
+    const conn = await desktop.openDb(getMysqlConfig(3000));
     const [rows] = await conn.execute(
       "SELECT id, page_name as viaName, access_token as cookieString, proxy_url, token_status FROM social_accounts WHERE platform IN ('FACEBOOK', 'FACEBOOK_PAGE', 'FACEBOOK_PROFILE') AND access_token LIKE '%c_user%' AND (token_status IS NULL OR (token_status != 'EXPIRED' AND token_status != 'CHECKPOINT')) ORDER BY id DESC"
     );
@@ -11772,7 +12106,7 @@ app.post('/api/buff-vias/health-check', async (req, res) => {
   try {
     const { cookieString, viaId } = req.body;
     const mysql = require('mysql2/promise');
-    conn = await mysql.createConnection(getMysqlConfig(3000));
+    conn = await desktop.openDb(getMysqlConfig(3000));
 
     let targetVias = [];
 
@@ -11887,7 +12221,7 @@ app.get('/api/buff-vias/overview', async (req, res) => {
     let viaRows = [];
 
     try {
-      const conn = await mysql.createConnection(getMysqlConfig(3000));
+      const conn = await desktop.openDb(getMysqlConfig(3000));
       const [rows] = await conn.execute(
         "SELECT id, page_name as viaName, access_token as cookieString, proxy_url, token_status, token_checked_at FROM social_accounts WHERE platform IN ('FACEBOOK', 'FACEBOOK_PAGE', 'FACEBOOK_PROFILE') AND access_token LIKE '%c_user%' ORDER BY id DESC"
       );
@@ -12177,7 +12511,7 @@ app.post('/api/post-tiktok', async (req, res) => {
   const tempId = `tiktok_upload_${Date.now()}`;
 
   try {
-    if (videoUrl.startsWith('http://localhost:3001/downloads/clip_meo/')) {
+    if (videoUrl.startsWith(`${desktop.WORKER_PUBLIC_URL}/downloads/clip_meo/`)) {
       const fileName = path.basename(videoUrl.split('?')[0]);
       localVideo = path.join(CLIP_MEO_DIR, fileName);
     } else if (videoUrl.startsWith('http')) {
@@ -12354,8 +12688,8 @@ async function threadsCookieStringFromContext(context) {
 }
 
 async function downloadThreadsMedia(url, tempPrefix, index) {
-  if (url.startsWith('http://localhost:3001/downloads/')) {
-    const relPath = decodeURIComponent(url.split('?')[0].replace('http://localhost:3001/downloads/', ''));
+  if (url.startsWith(`${desktop.WORKER_PUBLIC_URL}/downloads/`)) {
+    const relPath = decodeURIComponent(url.split('?')[0].replace(`${desktop.WORKER_PUBLIC_URL}/downloads/`, ''));
     const localPath = path.join(__dirname, 'downloads', relPath);
     if (fs.existsSync(localPath)) return { filePath: localPath, isTemp: false };
   }
@@ -12488,6 +12822,19 @@ app.post('/api/threads-login/:id/cancel', async (req, res) => {
 const fbLoginSessions = new Map();
 const FB_LOGIN_TIMEOUT_MS = 10 * 60 * 1000;
 
+// Cookie mới nhất sau phiên đăng bài (Facebook xoay xs/fr...) — chỉ trả khi cùng c_user với cookie gửi
+// vào, để backend lưu lại và nick đăng đều đặn tự gia hạn cookie mà không lưu nhầm sang nick khác.
+async function refreshedFbCookieForSameUser(context, sentCookieString) {
+  try {
+    const sentCUser = (String(sentCookieString || '').match(/(?:^|;\s*)c_user=(\d+)/) || [])[1];
+    const found = await fbCookieStringFromContext(context);
+    if (!sentCUser || !found || found.cUser !== sentCUser) return null;
+    return found.cookieString;
+  } catch (_) {
+    return null;
+  }
+}
+
 async function fbCookieStringFromContext(context) {
   const cookies = await context.cookies(['https://www.facebook.com', 'https://facebook.com']).catch(() => []);
   const byName = new Map();
@@ -12616,9 +12963,9 @@ app.post('/api/fb-login/sync-cookie', async (req, res) => {
     return res.status(400).json({ success: false, error: 'Thiếu cookie hoặc thiếu xs/c_user' });
   }
   try {
-    const backendRes = await fetch('http://localhost:8081/api/connections/sync-fb-cookie', {
+    const backendRes = await fetch(`${desktop.BACKEND_URL}/api/connections/sync-fb-cookie`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...desktop.backendHeaders() },
       body: JSON.stringify({ cookieString, cUser }),
     });
     const data = await backendRes.json().catch(() => ({}));
@@ -12634,13 +12981,15 @@ app.post('/api/threads-account-info', async (req, res) => {
   if (!cookieString) {
     return res.status(400).json({ success: false, error: 'Thiếu cookie tài khoản Threads' });
   }
-  let browser = null;
+  let releaseContext = null;
   try {
-    browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
-    const context = await browser.newContext({
+    // Context từ browserPool (chung process Chromium) thay vì chromium.launch() riêng mỗi request.
+    const acquired = await browserPool.acquireContext({
       locale: 'vi-VN',
       userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
     });
+    releaseContext = acquired.release;
+    const context = acquired.context;
     await context.addCookies(parseThreadsCookieString(cookieString));
     const page = await context.newPage();
     await page.goto('https://www.threads.com/', { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -12696,9 +13045,7 @@ app.post('/api/threads-account-info', async (req, res) => {
     console.error('[Threads_Info] Lỗi:', err.message);
     return res.status(500).json({ success: false, error: `Lỗi kiểm tra tài khoản Threads: ${err.message}` });
   } finally {
-    if (browser) {
-      try { await browser.close(); } catch (_) {}
-    }
+    await releaseContext?.();
   }
 });
 
@@ -13231,10 +13578,12 @@ app.post('/api/check-and-delete-flop-post', async (req, res) => {
   return res.json({ success: false, deleted: false, message: 'Tính năng FlopCheck đã tắt hoàn toàn theo yêu cầu người dùng.' });
 });
 
-const httpServer = app.listen(PORT, () => {
+// Bản Desktop chỉ nghe trên 127.0.0.1 (BIND_HOST); bản thường giữ nguyên như cũ
+const listenArgs = desktop.BIND_HOST ? [PORT, desktop.BIND_HOST] : [PORT];
+const httpServer = app.listen(...listenArgs, () => {
   console.log(`🤖 Playwright Worker đang chạy ở cổng http://localhost:${PORT}`);
-  // Chỉ Worker chính (port 3001) mới chạy các vòng lặp cron ngầm để tránh chạy trùng lặp 2 bản
-  if (PORT === 3001) {
+  // Chỉ Worker chính (port 3001, hoặc worker duy nhất của bản Desktop) mới chạy các vòng lặp cron ngầm để tránh chạy trùng lặp 2 bản
+  if (PORT === 3001 || desktop.DESKTOP) {
     setInterval(processQueueTick, 30000);
     processQueueTick(); // Chạy ngay để không phải chờ hết 30s đầu nếu file hàng đợi đã có sẵn bài chờ
 
@@ -13269,6 +13618,7 @@ httpServer.on('error', (err) => {
 async function shutdownGracefully(signal) {
   console.log(`\n🛑 Nhận tín hiệu ${signal} — đang đóng Browser Pool trước khi thoát...`);
   flushRegistry();
+  flushBuffStores();
   try {
     await browserPool.closeAll();
   } catch (e) {
@@ -13277,6 +13627,7 @@ async function shutdownGracefully(signal) {
   process.exit(0);
 }
 process.on('SIGTERM', () => shutdownGracefully('SIGTERM'));
+desktop.startParentWatchdog(() => shutdownGracefully('PARENT_GONE'));
 process.on('SIGINT', () => shutdownGracefully('SIGINT'));
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-const { chromium } = require('playwright');
+const browserPool = require('./browserPool');
 
 /**
  * Săn bài viết Viral từ Threads (threads.net) theo từ khoá hoặc theo trang cá nhân (@username)
@@ -39,18 +39,16 @@ async function huntThreads({
 
   console.log(`[ThreadsHunter] 🧵 Bắt đầu quét Threads: ${searchUrl} | Limit: ${targetLimit}`);
 
-  let browser = null;
+  // Dùng context từ browserPool (chung process Chromium) thay vì chromium.launch() riêng mỗi lần quét.
+  let releaseContext = null;
   try {
-    browser = await chromium.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
-    });
-
-    const context = await browser.newContext({
+    const acquired = await browserPool.acquireContext({
       viewport: { width: 1280, height: 900 },
       userAgent:
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     });
+    releaseContext = acquired.release;
+    const context = acquired.context;
 
     const page = await context.newPage();
 
@@ -218,9 +216,7 @@ async function huntThreads({
       items: [],
     };
   } finally {
-    if (browser) {
-      await browser.close().catch(() => {});
-    }
+    await releaseContext?.();
   }
 }
 

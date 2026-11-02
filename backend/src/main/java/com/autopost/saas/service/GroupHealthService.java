@@ -1,5 +1,6 @@
 package com.autopost.saas.service;
 
+import com.autopost.saas.util.LocalServices;
 import com.autopost.saas.entity.SocialAccount;
 import com.autopost.saas.repository.SocialAccountRepository;
 import com.autopost.saas.util.PooledRestTemplateFactory;
@@ -19,7 +20,7 @@ import java.util.Map;
 @Slf4j
 public class GroupHealthService {
 
-    private static final String WORKER_URL = "http://localhost:3001/api/check-group-health";
+    private static final String WORKER_URL = LocalServices.WORKER_BASE + "/api/check-group-health";
 
     private final SocialAccountRepository socialAccountRepository;
     private final RestTemplate restTemplate = PooledRestTemplateFactory.create(10000, 60000);
@@ -128,7 +129,7 @@ public class GroupHealthService {
 
             log.info("🤝 [GroupJoin] Đang gửi yêu cầu tham gia Group '{}' (ID: {})...", account.getPageName(), account.getPlatformAccountId());
             @SuppressWarnings("unchecked")
-            Map<String, Object> response = WorkerRetryHelper.postWithConnectionRetry(restTemplate, "http://localhost:3001/api/join-group", body, Map.class);
+            Map<String, Object> response = WorkerRetryHelper.postWithConnectionRetry(restTemplate, LocalServices.WORKER_BASE + "/api/join-group", body, Map.class);
 
             if (response != null && Boolean.TRUE.equals(response.get("success"))) {
                 account.setGroupHealthStatus("PENDING_APPROVAL");

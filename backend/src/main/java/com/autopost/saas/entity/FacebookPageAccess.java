@@ -32,10 +32,12 @@ public class FacebookPageAccess {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "source_account_id", nullable = false)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private SocialAccount sourceAccount;
 
     @Column(name = "personal_profile_id", nullable = false, length = 100)

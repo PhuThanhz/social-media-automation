@@ -1,5 +1,6 @@
 package com.autopost.saas.controller;
 
+import com.autopost.saas.util.LocalServices;
 import com.autopost.saas.entity.Campaign;
 import com.autopost.saas.entity.PostQueue;
 import com.autopost.saas.entity.SocialAccount;
@@ -44,6 +45,10 @@ public class PostQueueController {
     private final PostQueueRepository postQueueRepository;
     private final FacebookGraphApiService facebookGraphApiService;
     private final com.autopost.saas.service.PostingWindowService postingWindowService;
+    private final com.autopost.saas.publishing.service.PublishingPreflightService publishingPreflightService;
+    // Có timeout + kèm session token của worker (new RestTemplate() trước đây có thể treo vô hạn).
+    private final org.springframework.web.client.RestTemplate extractVideoClient =
+            com.autopost.saas.util.PooledRestTemplateFactory.create(10000, 180000);
 
     private User resolveUser(Authentication authentication) {
         if (authentication != null && authentication.getName() != null) {
@@ -170,6 +175,16 @@ public class PostQueueController {
     public ResponseEntity<Map<String, Object>> getQueueCounts(Authentication authentication) {
         User user = resolveUser(authentication);
         return ResponseEntity.ok(postQueueService.getQueueCountsForUser(user.getId()));
+    }
+
+    /** Hàng đợi active + bài đã đăng trong `days` ngày của mọi campaign của user (thay cho 1 + N request /campaign/{id}). */
+    @GetMapping("/recent")
+    public ResponseEntity<List<PostQueue>> getRecentQueue(
+            Authentication authentication,
+            @RequestParam(required = false, defaultValue = "2") int days,
+            @RequestParam(required = false) String excludeType) {
+        User user = resolveUser(authentication);
+        return ResponseEntity.ok(postQueueService.getRecentQueueForUser(user.getId(), days, excludeType));
     }
 
     @GetMapping("/campaign/{campaignId}")
@@ -438,7 +453,9 @@ public class PostQueueController {
         List<?> rawTargetGroupNamesList = requestBody.get("targetGroupNamesList") instanceof List<?> tgnList ? tgnList : null;
 
         List<PostQueue> allCreated = new ArrayList<>();
+        List<PostQueue> manualPostsToSave = new ArrayList<>();
         List<String> allCachedUrls = new ArrayList<>();
+        Map<String, String> cachedGroupDisplayNames = null;
         // Chặn trùng: cùng 1 bài gốc (so theo ID bài) đã có trong Lịch đăng cho cùng nhóm đích thì bỏ qua.
         // Gửi allowDuplicates=true để cố ý đăng lại.
         boolean allowDuplicates = Boolean.TRUE.equals(requestBody.get("allowDuplicates")) || "true".equals(String.valueOf(requestBody.get("allowDuplicates")));
@@ -476,11 +493,14 @@ public class PostQueueController {
             if (!allowDuplicates) {
                 List<String> duplicateGroups = findDuplicateGroupTargets(user.getId(), urls.get(i), itemTargetGroupNames, queuedInThisRequest);
                 if (!duplicateGroups.isEmpty()) {
+                    if (cachedGroupDisplayNames == null) {
+                        cachedGroupDisplayNames = loadGroupDisplayNamesMap();
+                    }
                     log.info("⏭️ Bỏ qua bài trùng {} → nhóm {}", urls.get(i), duplicateGroups);
                     skippedDuplicates.add(Map.of(
                             "index", i,
                             "url", urls.get(i),
-                            "groups", resolveGroupDisplayNames(duplicateGroups)));
+                            "groups", resolveGroupDisplayNames(duplicateGroups, cachedGroupDisplayNames)));
                     continue;
                 }
                 String postId = com.autopost.saas.util.FacebookPostIds.extractPostId(urls.get(i));
@@ -587,8 +607,18 @@ public class PostQueueController {
                         .status("PENDING")
                         .retryCount(0)
                         .build();
-                manualPost = postQueueRepository.save(manualPost);
-                allCreated.add(manualPost);
+
+                if (publishingPreflightService != null && itemTargetFanpageId != null) {
+                    SocialAccount targetAcc = resolvePersonalCookieAccount(user, itemTargetFanpageId, null);
+                    com.autopost.saas.publishing.model.PreflightResult preflight = publishingPreflightService.validatePost(targetAcc, manualPost);
+                    if (!preflight.isValid()) {
+                        manualPost.setStatus("FAILED");
+                        manualPost.setErrorMessage("Preflight chặn xuất bản: " + String.join(" | ", preflight.getErrors()));
+                        log.warn("🛑 [addFromUrls] Bài viết #{} không đạt tiêu chuẩn Preflight: {}", i, manualPost.getErrorMessage());
+                    }
+                }
+
+                manualPostsToSave.add(manualPost);
                 continue;
             }
 
@@ -675,6 +705,11 @@ public class PostQueueController {
             }
         }
 
+        if (!manualPostsToSave.isEmpty()) {
+            List<PostQueue> saved = postQueueRepository.saveAll(manualPostsToSave);
+            allCreated.addAll(saved);
+        }
+
         if (publishNow && !allCreated.isEmpty()) {
             boolean anyFailed = false;
             String firstErrorMessage = null;
@@ -717,11 +752,12 @@ public class PostQueueController {
                 : " Bỏ qua " + skippedDuplicates.size() + " bài trùng đã có trong Lịch đăng cho cùng nhóm.";
         if (appendToQueue && !publishNow && !allCreated.isEmpty()) {
             int gapSeconds = parseGapSeconds(requestBody.get("gapSeconds"));
+            // Chỉ xếp nối đuôi cho các bài MỚI tạo (allCreated), giữ nguyên giờ các bài cũ đang chờ
             Map<String, Object> packed = campaignScheduler.packContinuous(
                     allCreated.stream().map(PostQueue::getId).toList(), gapSeconds);
             return ResponseEntity.ok(Map.of(
                     "success", true,
-                    "message", "Đã nối đuôi " + allCreated.size() + " bài vào hàng đợi, dự kiến xong lúc "
+                    "message", "Đã thêm " + allCreated.size() + " bài và rải đều lịch đăng trong ngày, dự kiến xong lúc "
                             + LocalDateTime.parse(packed.get("estimatedFinishAt").toString())
                                     .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm dd/MM")) + "." + skippedNote
                             + (((Number) packed.getOrDefault("deferredCount", 0)).intValue() > 0
@@ -762,6 +798,9 @@ public class PostQueueController {
      */
     private List<String> findDuplicateGroupTargets(Long userId, String url, String targetGroupNames,
                                                    Map<String, java.util.Set<String>> queuedInThisRequest) {
+        if (com.autopost.saas.util.FacebookPostIds.isDuplicateExemptGroup(targetGroupNames)) {
+            return List.of(); // Nhóm Đảo & Tinder Pet: cho phép đăng lại thoải mái
+        }
         java.util.Set<String> targetGroups = com.autopost.saas.util.FacebookPostIds.targetGroupKeys(targetGroupNames);
         if (targetGroups.isEmpty() || url == null || url.startsWith("manual://")) return List.of();
         String postId = com.autopost.saas.util.FacebookPostIds.extractPostId(url);
@@ -786,13 +825,22 @@ public class PostQueueController {
 
     /** Đổi ID nhóm sang tên nhóm đã khai báo (nếu có) để thông báo dễ đọc. */
     private List<String> resolveGroupDisplayNames(List<String> groupKeys) {
+        return resolveGroupDisplayNames(groupKeys, loadGroupDisplayNamesMap());
+    }
+
+    private List<String> resolveGroupDisplayNames(List<String> groupKeys, Map<String, String> names) {
+        if (names == null || names.isEmpty()) return groupKeys;
+        return groupKeys.stream().map(k -> names.getOrDefault(k.trim().toLowerCase(), k)).toList();
+    }
+
+    private Map<String, String> loadGroupDisplayNamesMap() {
         Map<String, String> names = new java.util.HashMap<>();
         for (SocialAccount a : socialAccountRepository.findAll()) {
             if ("FACEBOOK_GROUP".equals(a.getPlatform()) && a.getPlatformAccountId() != null && a.getPageName() != null) {
                 names.put(a.getPlatformAccountId().trim().toLowerCase(), a.getPageName());
             }
         }
-        return groupKeys.stream().map(k -> names.getOrDefault(k, k)).toList();
+        return names;
     }
 
     private static boolean appendToQueueRequested(Map<String, Object> requestBody) {
@@ -820,15 +868,16 @@ public class PostQueueController {
             java.time.LocalTime end = body.get("end") != null ? java.time.LocalTime.parse(body.get("end").toString()) : current.end();
             long minGap = body.get("minGapSeconds") != null ? Long.parseLong(body.get("minGapSeconds").toString()) : current.minGapSeconds();
             com.autopost.saas.scheduler.PostingWindow saved = postingWindowService.save(
-                    new com.autopost.saas.scheduler.PostingWindow(enabled, start, end, Math.max(60, minGap)));
+                    new com.autopost.saas.scheduler.PostingWindow(enabled, start, end, Math.max(0, minGap)));
             Map<String, Object> result = new java.util.LinkedHashMap<>();
             result.put("success", true);
             result.put("enabled", saved.enabled());
             result.put("start", saved.start().toString());
             result.put("end", saved.end().toString());
             result.put("minGapSeconds", saved.minGapSeconds());
-            if (saved.enabled()) {
-                Map<String, Object> fitted = campaignScheduler.fitIntoWindow(null);
+            boolean rescheduleExisting = Boolean.parseBoolean(String.valueOf(body.get("rescheduleExisting")));
+            if (saved.enabled() && rescheduleExisting) {
+                Map<String, Object> fitted = campaignScheduler.spreadEvenly((int) saved.minGapSeconds());
                 result.put("movedIntoWindow", fitted.get("updated"));
                 result.put("deferredCount", fitted.get("deferredCount"));
             }
@@ -859,6 +908,61 @@ public class PostQueueController {
             return ResponseEntity.ok(result);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+
+    /**
+     * Chuyển nick / chia đều sang nhiều Nick (Cân bằng tải) cho danh sách bài được chọn.
+     * Body: { postIds: [...], targetFanpageIds: [...], rescheduleToday: true }
+     */
+    @PostMapping("/reassign-nicks")
+    public ResponseEntity<Map<String, Object>> reassignNicks(@RequestBody Map<String, Object> body) {
+        try {
+            List<Long> postIds = body.get("postIds") instanceof List<?> l
+                    ? l.stream().map(o -> Long.valueOf(o.toString())).toList()
+                    : List.of();
+            List<String> targetFanpageIds = body.get("targetFanpageIds") instanceof List<?> l
+                    ? l.stream().map(Object::toString).filter(s -> !s.isBlank()).toList()
+                    : List.of();
+            if (postIds.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Vui lòng chọn ít nhất 1 bài viết để chuyển"));
+            }
+            if (targetFanpageIds.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Vui lòng chọn ít nhất 1 Nick / Via đích"));
+            }
+            boolean rescheduleToday = body.get("rescheduleToday") == null
+                    || Boolean.parseBoolean(body.get("rescheduleToday").toString());
+
+            List<PostQueue> posts = postQueueRepository.findAllById(postIds);
+            List<PostQueue> updated = new ArrayList<>();
+            for (int i = 0; i < posts.size(); i++) {
+                PostQueue p = posts.get(i);
+                if (!"PENDING".equals(p.getStatus())) continue;
+                String assignedTarget = targetFanpageIds.get(i % targetFanpageIds.size());
+                p.setTargetFanpageId(assignedTarget);
+                p.setWindowDeferred(null); // Gỡ cờ bị hoãn sang ngày mai
+                updated.add(p);
+            }
+            postQueueRepository.saveAll(updated);
+
+            Map<String, Object> result = new java.util.LinkedHashMap<>();
+            result.put("success", true);
+            result.put("updatedCount", updated.size());
+            result.put("targetCount", targetFanpageIds.size());
+
+            if (rescheduleToday && !updated.isEmpty()) {
+                int gapSeconds = postingWindowService.get().minGapSeconds() > 0 ? (int) postingWindowService.get().minGapSeconds() : 120;
+                // Chỉ dồn lịch cho các bài vừa chuyển nick vào làn mới, không xáo trộn toàn bộ hàng đợi
+                Map<String, Object> packed = campaignScheduler.packContinuous(
+                        updated.stream().map(PostQueue::getId).toList(), gapSeconds);
+                result.putAll(packed);
+            }
+            log.info("🔀 [Cân bằng tải] Đã chuyển {} bài sang {} Nick (rescheduleToday={})",
+                    updated.size(), targetFanpageIds.size(), rescheduleToday);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("❌ Lỗi reassign-nicks: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().body(Map.of("success", false, "message", e.getMessage()));
         }
     }
 
@@ -1335,12 +1439,12 @@ public class PostQueueController {
             if (!isDirectMedia) {
                 log.info("🔍 Link Story không phải media trực tiếp, gọi Worker extract-video từ: {}", inputUrl);
                 try {
-                    org.springframework.web.client.RestTemplate rt = new org.springframework.web.client.RestTemplate();
+                    org.springframework.web.client.RestTemplate rt = extractVideoClient;
                     org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
                     headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
                     org.springframework.http.HttpEntity<Map<String, String>> req = new org.springframework.http.HttpEntity<>(Map.of("url", inputUrl), headers);
                     @SuppressWarnings("unchecked")
-                    Map<String, Object> extractResp = rt.postForObject("http://localhost:3001/api/extract-video", req, Map.class);
+                    Map<String, Object> extractResp = rt.postForObject(LocalServices.WORKER_BASE + "/api/extract-video", req, Map.class);
                     if (extractResp != null && Boolean.TRUE.equals(extractResp.get("success")) && extractResp.get("videoUrl") != null) {
                         resolvedMediaUrl = extractResp.get("videoUrl").toString();
                         mediaType = "video"; // Link bài thì luôn là video
@@ -1595,12 +1699,12 @@ public class PostQueueController {
             if (!isDirectMedia) {
                 log.info("🔍 [schedule-story] Link không phải media trực tiếp, gọi Worker extract-video từ: {}", inputUrl);
                 try {
-                    org.springframework.web.client.RestTemplate rt = new org.springframework.web.client.RestTemplate();
+                    org.springframework.web.client.RestTemplate rt = extractVideoClient;
                     org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
                     headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
                     org.springframework.http.HttpEntity<Map<String, String>> req = new org.springframework.http.HttpEntity<>(Map.of("url", inputUrl), headers);
                     @SuppressWarnings("unchecked")
-                    Map<String, Object> extractResp = rt.postForObject("http://localhost:3001/api/extract-video", req, Map.class);
+                    Map<String, Object> extractResp = rt.postForObject(LocalServices.WORKER_BASE + "/api/extract-video", req, Map.class);
                     if (extractResp != null && Boolean.TRUE.equals(extractResp.get("success")) && extractResp.get("videoUrl") != null) {
                         resolvedMediaUrl = extractResp.get("videoUrl").toString();
                         log.info("🎬 [schedule-story] Đã giải mã ra MP4: {}", resolvedMediaUrl.substring(0, Math.min(80, resolvedMediaUrl.length())));
@@ -1697,10 +1801,12 @@ public class PostQueueController {
                                         newTime = LocalDateTime.parse(timeStr.replace(" ", "T"));
                                     }
                                     post.setScheduledAt(newTime);
+                                    post.setWindowDeferred(null);
                                 }
                                 if (targetFanpageIdObj != null && !targetFanpageIdObj.toString().trim().isEmpty()) {
                                     post.setTargetFanpageId(targetFanpageIdObj.toString().trim());
                                 }
+                                post.setWindowDeferred(null);
                                 postQueueRepository.save(post);
                                 count++;
                             }

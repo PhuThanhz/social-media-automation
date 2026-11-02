@@ -1,5 +1,6 @@
 package com.autopost.saas.controller;
 
+import com.autopost.saas.util.LocalServices;
 import com.autopost.saas.service.GeminiService;
 import com.autopost.saas.service.RedditService;
 import com.autopost.saas.util.PooledRestTemplateFactory;
@@ -42,7 +43,7 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public class VideoStudioController {
 
-    private static final String WORKER = "http://localhost:3001";
+    private static final String WORKER = LocalServices.WORKER_BASE;
     private static final int OUT_W = 1080;
 
     private final GeminiService geminiService;
@@ -94,7 +95,7 @@ public class VideoStudioController {
                 // Tải qua worker (có Referer/UA phù hợp từng nền tảng, hiểu cả file cache cục bộ của worker)
                 String proxy = WORKER + "/api/download-video?url=" + URLEncoder.encode(directUrl, StandardCharsets.UTF_8) + "&filename=video";
                 HttpResponse<Path> resp = httpClient.send(
-                        HttpRequest.newBuilder(URI.create(proxy)).timeout(Duration.ofSeconds(180)).build(),
+                        LocalServices.withSessionToken(HttpRequest.newBuilder(URI.create(proxy)), URI.create(proxy)).timeout(Duration.ofSeconds(180)).build(),
                         HttpResponse.BodyHandlers.ofFile(local));
                 if (resp.statusCode() != 200 || Files.size(local) < 1024) {
                     String err = Files.exists(local) && Files.size(local) < 4096 ? Files.readString(local) : "";
@@ -557,7 +558,7 @@ public class VideoStudioController {
             Path outFile = uploadDir.resolve(outName);
             cmd.addAll(List.of("-filter_complex", fc.toString(), "-map", "[vout]"));
             if (hasAudioOut) cmd.addAll(List.of("-map", "[aout]", "-c:a", "aac", "-b:a", "192k", "-ar", "48000"));
-            cmd.addAll(List.of("-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
+            cmd.addAll(List.of("-c:v", "libx264", "-threads", "0", "-preset", "faster", "-crf", "20", "-pix_fmt", "yuv420p",
                     "-movflags", "+faststart",
                     "-sws_flags", "lanczos",
                     "-t", String.format(Locale.ROOT, "%.3f", duration), outFile.toString()));
@@ -906,7 +907,7 @@ public class VideoStudioController {
             Files.writeString(script, fc.toString());
             cmd.addAll(List.of("-/filter_complex", script.toString(), "-map", "[vout]"));
             if (hasAudio) cmd.addAll(List.of("-map", "[aout]", "-c:a", "aac", "-b:a", "192k", "-ar", "48000"));
-            cmd.addAll(List.of("-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
+            cmd.addAll(List.of("-c:v", "libx264", "-threads", "0", "-preset", "faster", "-crf", "20", "-pix_fmt", "yuv420p",
                     "-r", "30", "-movflags", "+faststart", "-t", f(D), outFile.toString()));
             runFfmpegProgress(cmd, D, job, 900);
             return outName;

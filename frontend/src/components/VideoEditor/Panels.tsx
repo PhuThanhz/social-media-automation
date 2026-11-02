@@ -4,8 +4,11 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import AiSettingsModal from '../modals/AiSettingsModal';
 import { Alert, Button, Collapse, ColorPicker, Input, InputNumber, Segmented, Select, Slider, Switch, Tooltip, Upload, message } from 'antd';
-import { DeleteOutlined, PlusOutlined, UploadOutlined, CopyOutlined, ArrowUpOutlined, ArrowDownOutlined, ScissorOutlined, SendOutlined, LoadingOutlined } from '@ant-design/icons';
-import { Pause, Play, RotateCcw, Sparkles, Wand2 } from 'lucide-react';
+import {
+  DeleteOutlined, PlusOutlined, UploadOutlined, CopyOutlined, ArrowUpOutlined, ArrowDownOutlined,
+  ScissorOutlined, SendOutlined, LoadingOutlined, ReloadOutlined, ThunderboltOutlined, RobotOutlined,
+  PauseOutlined, CaretRightOutlined,
+} from '@ant-design/icons';
 import api from '../../config/axios';
 import { ANIM_OPTIONS, CAPTION_PRESETS, buildCaptions, newId, timelineDuration, useEditor, usePlayerClock, voiceEnd, voiceLen } from './store';
 import type { Anim, Caption, ImageLayer, OverlayLayer, Project, TextLayer, VoiceClip } from './store';
@@ -183,7 +186,7 @@ function VideoProps({ deps }: { deps: PanelDeps }) {
         <Field label="Khi có giọng đọc" value={`${Math.round(v.duckVolume * 100)}%`}><Slider className="!my-1" min={0} max={1} step={0.05} disabled={!deps.hasAudio} value={v.duckVolume} onChange={(x) => setV({ duckVolume: x }, 'duck')} /></Field>
       </Block>
       <Block>
-        <Title extra={<Tooltip title="Đặt lại màu"><Button size="small" type="text" icon={<RotateCcw size={13} />} onClick={() => setV({ brightness: 0, contrast: 1, saturation: 1 }, 'eq')} /></Tooltip>}>Màu sắc</Title>
+        <Title extra={<Tooltip title="Đặt lại màu"><Button size="small" type="text" icon={<ReloadOutlined />} onClick={() => setV({ brightness: 0, contrast: 1, saturation: 1 }, 'eq')} /></Tooltip>}>Màu sắc</Title>
         <Field label="Độ sáng"><Slider className="!my-1" min={-0.3} max={0.3} step={0.01} value={v.brightness} onChange={(x) => setV({ brightness: x }, 'br')} /></Field>
         <Field label="Tương phản"><Slider className="!my-1" min={0.6} max={1.6} step={0.01} value={v.contrast} onChange={(x) => setV({ contrast: x }, 'ct')} /></Field>
         <Field label="Bão hoà"><Slider className="!my-1" min={0} max={2} step={0.01} value={v.saturation} onChange={(x) => setV({ saturation: x }, 'sat')} /></Field>
@@ -293,7 +296,7 @@ function CaptionsPanel({ deps }: { deps: PanelDeps }) {
       <Block>
         <Title extra={<Switch size="small" checked={cs.enabled} onChange={(x) => setCs({ enabled: x }, 'en')} />}>Phụ đề tự động</Title>
         <div className="grid grid-cols-2 gap-2">
-          <Button type="primary" size="small" icon={<Wand2 size={13} />} onClick={regenerate}>{p.captions.length ? 'Tạo lại' : 'Tạo từ giọng đọc'}</Button>
+          <Button type="primary" size="small" icon={<RobotOutlined />} onClick={regenerate}>{p.captions.length ? 'Tạo lại' : 'Tạo từ giọng đọc'}</Button>
           <Button size="small" icon={<PlusOutlined />} onClick={() => {
             const t = usePlayerClock.getState().time;
             const c: Caption = { id: newId(), start: t, end: Math.min(timelineDuration(p), t + 2), text: 'Phụ đề mới' };
@@ -405,7 +408,7 @@ function VoiceComposer({ deps, clip, onDone }: { deps: PanelDeps; clip?: VoiceCl
       <TextArea value={text} onChange={(e) => setText(e.target.value)} autoSize={{ minRows: 3, maxRows: 8 }} placeholder="Nội dung cần đọc" />
       <div className="flex flex-wrap gap-1">
         {['Tự nhiên hơn', 'Ngắn gọn hơn', 'Kể chuyện cuốn hút', 'Hài hước'].map((st) => (
-          <Button key={st} size="small" type="text" className="!px-1.5 !text-[11px] !text-violet-300" loading={aiBusy === st} icon={aiBusy === st ? undefined : <Sparkles size={11} />} onClick={() => aiRewrite(st)}>{st}</Button>
+          <Button key={st} size="small" type="text" className="!px-1.5 !text-[11px] !text-violet-300" loading={aiBusy === st} icon={aiBusy === st ? undefined : <ThunderboltOutlined />} onClick={() => aiRewrite(st)}>{st}</Button>
         ))}
       </div>
       <Select size="small" className="w-full" value={voice} options={VOICES} onChange={setVoice} />
@@ -430,7 +433,7 @@ function VoiceProps({ v, deps }: { v: VoiceClip; deps: PanelDeps }) {
       <Block>
         <Title extra={
           <div className="flex">
-            <Tooltip title="Nghe đoạn này"><Button size="small" type="text" icon={playing ? <Pause size={13} /> : <Play size={13} />} onClick={() => toggle(v.url, v.trimIn ?? 0, v.trimOut)} /></Tooltip>
+            <Tooltip title="Nghe đoạn này"><Button size="small" type="text" icon={playing ? <PauseOutlined /> : <CaretRightOutlined />} onClick={() => toggle(v.url, v.trimIn ?? 0, v.trimOut)} /></Tooltip>
             <Tooltip title="Tách tại đầu phát (S)"><Button size="small" type="text" icon={<ScissorOutlined />} onClick={() => splitVoiceAt(v.id, usePlayerClock.getState().time)} /></Tooltip>
             <Tooltip title="Xoá"><Button size="small" type="text" danger icon={<DeleteOutlined />} onClick={() => { removeVoice(v.id); select(null); }} /></Tooltip>
           </div>
@@ -473,7 +476,7 @@ function AudioPanel({ deps }: { deps: PanelDeps }) {
           {p.voices.map((v) => (
             <div key={v.id} className={`flex items-center gap-2 rounded px-2 py-1.5 border cursor-pointer ${sel?.type === 'voice' && sel.id === v.id ? 'border-blue-500 bg-blue-500/10' : 'border-slate-700 hover:border-slate-500'}`}
               onClick={() => { select({ type: 'voice', id: v.id }); deps.seek(v.start); }}>
-              <button type="button" className="text-blue-300" onClick={(e) => { e.stopPropagation(); toggle(v.url, v.trimIn ?? 0, v.trimOut); }}>{playing === v.url ? <Pause size={13} /> : <Play size={13} />}</button>
+              <button type="button" className="text-blue-300" onClick={(e) => { e.stopPropagation(); toggle(v.url, v.trimIn ?? 0, v.trimOut); }}>{playing === v.url ? <PauseOutlined /> : <CaretRightOutlined />}</button>
               <span className="text-[12px] text-slate-200 flex-1 truncate">{v.text}</span>
               <span className="text-[10px] text-slate-500 font-mono">{fmtTime(v.start)}</span>
             </div>
@@ -497,7 +500,7 @@ function AudioPanel({ deps }: { deps: PanelDeps }) {
         <div className="space-y-1">
           {deps.bgmPresets.map((m) => (
             <div key={m.url} className={`flex items-center gap-2 rounded px-2 py-1.5 border cursor-pointer ${p.bgm?.url === m.url ? 'border-blue-500 bg-blue-500/10' : 'border-slate-700 hover:border-slate-500'}`} onClick={() => setBgm(m)}>
-              <button type="button" className="text-violet-300" onClick={(e) => { e.stopPropagation(); toggle(m.url); }}>{playing === m.url ? <Pause size={13} /> : <Play size={13} />}</button>
+              <button type="button" className="text-violet-300" onClick={(e) => { e.stopPropagation(); toggle(m.url); }}>{playing === m.url ? <PauseOutlined /> : <CaretRightOutlined />}</button>
               <span className="text-[12px] text-slate-200 flex-1 truncate">{m.name}</span>
             </div>
           ))}
@@ -634,7 +637,7 @@ export function AiPanel({ deps, autoPrompt, onAutoDone }: { deps: PanelDeps; aut
     <div className="flex flex-col h-full">
       <div className="flex flex-wrap gap-1.5 pb-3 border-b border-slate-800/80">
         {AI_QUICK.map((q, i) => (
-          <Button key={q.label} size="small" type={i === 0 ? 'primary' : 'default'} disabled={busy} icon={i === 0 ? <Sparkles size={12} /> : undefined} onClick={() => send(q.prompt)}>{q.label}</Button>
+          <Button key={q.label} size="small" type={i === 0 ? 'primary' : 'default'} disabled={busy} icon={i === 0 ? <ThunderboltOutlined /> : undefined} onClick={() => send(q.prompt)}>{q.label}</Button>
         ))}
       </div>
       <div className="flex-1 overflow-y-auto py-3 space-y-2 min-h-[120px]">

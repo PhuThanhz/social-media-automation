@@ -21,7 +21,7 @@ import {
   Tooltip,
   Upload,
 } from 'antd';
-import { DeleteOutlined, DownloadOutlined, KeyOutlined, ReloadOutlined, ThunderboltOutlined, UploadOutlined, CloudUploadOutlined, UndoOutlined, RedoOutlined, QuestionCircleOutlined, PlusOutlined, PictureOutlined, FilterOutlined, TagsOutlined, AppstoreOutlined, PlayCircleOutlined, SoundOutlined, MutedOutlined, EyeInvisibleOutlined } from '@ant-design/icons';
+import { DeleteOutlined, DownloadOutlined, KeyOutlined, ReloadOutlined, UploadOutlined, CloudUploadOutlined, UndoOutlined, RedoOutlined, QuestionCircleOutlined, PlusOutlined, PictureOutlined, FilterOutlined, TagsOutlined, AppstoreOutlined, PlayCircleOutlined, SoundOutlined, MutedOutlined, EyeInvisibleOutlined, RobotOutlined } from '@ant-design/icons';
 import FacebookPostPreview from '../components/studio/FacebookPostPreview';
 import api from '../config/axios';
 import { getStoredGeminiKeys, saveStoredGeminiKeys } from '../components/modals/AiSettingsModal';
@@ -1984,7 +1984,7 @@ export default function NewsCardStudio() {
           {checkedItems.length > 0 && (
             <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/30 space-y-2 mt-1 shadow-sm">
               <div className="flex items-center justify-between text-[11px] font-semibold text-blue-300">
-                <span>⚡ Áp dụng cho {checkedItems.length} bài chọn:</span>
+                <span>Áp dụng cho {checkedItems.length} bài đã chọn:</span>
                 <Popconfirm
                   title={`Xoá ${checkedItems.length} bài đã chọn?`}
                   description="Bạn có chắc chắn muốn xoá các bài này khỏi Studio?"
@@ -2002,12 +2002,12 @@ export default function NewsCardStudio() {
               <Button
                 size="small"
                 type="primary"
-                icon={<ThunderboltOutlined />}
+                icon={<RobotOutlined />}
                 loading={batchCaptionLoading}
                 onClick={() => rewriteBatchCaptions(checkedItems)}
                 className="w-full text-xs font-semibold bg-gradient-to-r from-indigo-600 to-blue-600 border-none shadow-sm"
               >
-                {batchCaptionProgress || `⚡ AI viết lại Caption ${checkedItems.length} bài`}
+                {batchCaptionProgress || `AI viết lại Caption (${checkedItems.length} bài)`}
               </Button>
 
               <div className="grid grid-cols-2 gap-1.5">
@@ -2046,16 +2046,17 @@ export default function NewsCardStudio() {
               </div>
 
               {/* Hàng thao tác Logo hàng loạt */}
-              <div className="pt-1.5 border-t border-blue-500/20 flex items-center justify-between gap-1.5">
-                <span className="text-[11px] text-slate-300 font-medium shrink-0 flex items-center gap-1">
-                  <PictureOutlined className="text-sky-400" /> Logo ({checkedItems.length} bài):
-                </span>
-                <div className="flex items-center gap-1.5">
+              <div className="pt-2 border-t border-blue-500/20 space-y-1.5">
+                <div className="text-[11px] text-slate-300 font-medium flex items-center gap-1.5">
+                  <PictureOutlined className="text-sky-400 text-xs" />
+                  <span>Logo ({checkedItems.length} bài):</span>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
                   <Button
                     size="small"
                     icon={<EyeInvisibleOutlined />}
                     onClick={() => toggleLogoForChecked(false)}
-                    className="text-[11px] h-6 px-2.5 bg-slate-800/80 border-slate-700 text-rose-300 hover:text-rose-200 hover:border-rose-500 rounded-md"
+                    className="w-full !text-[11px] !h-7 bg-slate-800/90 border-slate-700 text-rose-300 hover:text-rose-200 hover:border-rose-500 rounded-lg flex items-center justify-center gap-1"
                     title="Ẩn / bỏ logo cho toàn bộ các bài đang chọn"
                   >
                     Bỏ logo
@@ -2064,7 +2065,7 @@ export default function NewsCardStudio() {
                     size="small"
                     icon={<PictureOutlined />}
                     onClick={() => toggleLogoForChecked(true)}
-                    className="text-[11px] h-6 px-2.5 bg-slate-800/80 border-slate-700 text-sky-300 hover:text-sky-200 hover:border-sky-500 rounded-md"
+                    className="w-full !text-[11px] !h-7 bg-slate-800/90 border-slate-700 text-sky-300 hover:text-sky-200 hover:border-sky-500 rounded-lg flex items-center justify-center gap-1"
                     title="Bật lại logo cho toàn bộ các bài đang chọn"
                   >
                     Bật logo
@@ -2344,13 +2345,13 @@ export default function NewsCardStudio() {
                     <Button
                       size="small"
                       type="primary"
-                      icon={<ThunderboltOutlined />}
+                      icon={<RobotOutlined />}
                       loading={batchCaptionLoading}
                       onClick={() => rewriteBatchCaptions()}
                       title="AI viết lại caption sâu sắc, giàu thông tin và số liệu cho toàn bộ các bài"
                       className="bg-gradient-to-r from-blue-600 to-indigo-600 border-none text-white font-medium shadow-sm hover:from-blue-500 hover:to-indigo-500"
                     >
-                      {batchCaptionProgress || `⚡ Viết lại TẤT CẢ Caption (${checkedItems.length > 0 ? checkedItems.length : items.length} bài)`}
+                      {batchCaptionProgress || `Viết lại TẤT CẢ Caption (${checkedItems.length > 0 ? checkedItems.length : items.length} bài)`}
                     </Button>
                   </div>
                 </div>
@@ -2483,14 +2484,14 @@ export default function NewsCardStudio() {
                 </div>
               </div>
 
-              <Button type="primary" block icon={<ThunderboltOutlined />} loading={active.headlineLoading} onClick={() => runPackage(active)}>
+              <Button type="primary" block icon={<RobotOutlined />} loading={active.headlineLoading} onClick={() => runPackage(active)}>
                 AI soạn bài (tiêu đề, caption, tóm tắt, nhãn)
               </Button>
               {checkedItems.length > 1 && (
                 <Button
                   block
                   size="small"
-                  icon={<ThunderboltOutlined />}
+                  icon={<RobotOutlined />}
                   loading={batchCaptionLoading}
                   onClick={runPackageForAllChecked}
                   className="mt-1 text-xs text-blue-300 border-blue-500/30 hover:border-blue-400"
@@ -2790,43 +2791,51 @@ export default function NewsCardStudio() {
                             )}
                           </div>
                           <div className="text-[11px] text-slate-400 leading-relaxed">
-                            Chèn chữ ký bản quyền <b className="text-cyan-400">Thạnh Phú</b> lên video/ảnh hoặc di chuyển để che logo watermark cũ.
+                            Chèn chữ ký bản quyền thương hiệu lên video/ảnh hoặc di chuyển để che logo watermark cũ.
                           </div>
                           <div className="space-y-1.5">
                             <Input
                               size="small"
-                              placeholder="Nhập tên thương hiệu: Thạnh Phú, @thanhphu..."
+                              placeholder="Nhập tên thương hiệu: @channel, Tin Tức 24h..."
                               value={s.videoWatermark || ''}
                               onChange={(e) => setStyle({ videoWatermark: e.target.value })}
                               allowClear
                             />
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="text-[10px] text-slate-500 font-medium">Chọn nhanh:</span>
-                              {[
-                                'Thạnh Phú',
-                                '@thanhphu',
-                                'Huỳnh Thạnh Phú',
-                                'Thạnh Phú Studio',
-                                '⚡ Thạnh Phú',
-                                'Thạnh Phú Official',
-                              ].map((chip) => (
-                                <Button
-                                  key={chip}
-                                  size="small"
-                                  type={s.videoWatermark === chip ? 'primary' : 'dashed'}
-                                  className={`!text-[10px] !h-6 !px-2 font-medium ${
-                                    s.videoWatermark === chip
-                                      ? 'bg-blue-600 text-white border-blue-400'
-                                      : 'bg-slate-900/60 text-slate-300 hover:!text-cyan-300 hover:!border-cyan-400'
-                                  }`}
-                                  onClick={() => {
-                                    const currentPos = (s.videoWatermarkX === undefined || s.videoWatermarkX === 74) ? { videoWatermarkPos: 'center' as const, videoWatermarkX: 35, videoWatermarkY: 46 } : {};
-                                    setStyle({ videoWatermark: chip, ...currentPos });
-                                  }}
-                                >
-                                  {chip}
-                                </Button>
-                              ))}
+                              {(() => {
+                                const currentUserName = (() => {
+                                  try {
+                                    return JSON.parse(localStorage.getItem('user') || '{}')?.username || '';
+                                  } catch { return ''; }
+                                })();
+                                const chips = [
+                                  currentUserName,
+                                  currentUserName ? `@${currentUserName.toLowerCase().replace(/\s+/g, '')}` : '',
+                                  '@channel',
+                                  'Official Studio',
+                                  '⚡ Breaking News',
+                                  'Bản Tin 24h',
+                                ].filter(Boolean);
+                                return chips.map((chip) => (
+                                  <Button
+                                    key={chip}
+                                    size="small"
+                                    type={s.videoWatermark === chip ? 'primary' : 'dashed'}
+                                    className={`!text-[10px] !h-6 !px-2 font-medium ${
+                                      s.videoWatermark === chip
+                                        ? 'bg-blue-600 text-white border-blue-400'
+                                        : 'bg-slate-900/60 text-slate-300 hover:!text-cyan-300 hover:!border-cyan-400'
+                                    }`}
+                                    onClick={() => {
+                                      const currentPos = (s.videoWatermarkX === undefined || s.videoWatermarkX === 74) ? { videoWatermarkPos: 'center' as const, videoWatermarkX: 35, videoWatermarkY: 46 } : {};
+                                      setStyle({ videoWatermark: chip, ...currentPos });
+                                    }}
+                                  >
+                                    {chip}
+                                  </Button>
+                                ));
+                              })()}
                               {s.videoWatermark && (
                                 <Button
                                   size="small"

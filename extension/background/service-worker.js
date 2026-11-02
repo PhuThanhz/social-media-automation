@@ -260,7 +260,69 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 });
 chrome.runtime.onStartup.addListener(() => { syncThreadsCookie().catch(() => {}); });
 
-// Đồng bộ Cookie Facebook của profile Chrome hiện tại vào ToolZutter
+// ─────────────────────────────────────────────────────────────────────────────
+// Tự đồng bộ cookie Facebook (giống Threads): Facebook xoay vòng xs/fr/datr → gửi cookie mới nhất cho mọi
+// kết nối cùng c_user trong ToolZutter, mỗi khi cookie đổi + định kỳ 30 phút + khi mở Chrome.
+// Chỉ cập nhật nick ĐÃ có trong hệ thống (onlyExisting) — không tự tạo Via mới.
+// ─────────────────────────────────────────────────────────────────────────────
+const FB_SYNC_ALARM = 'fb-cookie-sync';
+
+async function autoSyncFacebookCookie() {
+  const { fbAutoSync = true, fbLastHash = '' } = await chrome.storage.local.get(['fbAutoSync', 'fbLastHash']);
+  if (!fbAutoSync) return { success: false, skipped: true, message: 'Tự động đồng bộ đang tắt' };
+
+  const cookieData = await getFacebookCookies();
+  if (!cookieData.success || !cookieData.hasAuth) {
+    await chrome.storage.local.set({ fbLastSync: { at: Date.now(), ok: false, message: 'Chrome chưa đăng nhập Facebook' } });
+    return { success: false, message: 'Chrome chưa đăng nhập Facebook' };
+  }
+  // Bỏ i_user (danh tính Page đang chọn trên Chrome) — worker tự gắn i_user theo Page đích khi đăng.
+  const cookieString = cookieData.cookieString.split('; ').filter((p) => !p.startsWith('i_user=')).join('; ');
+  const hash = `${cookieData.userId}|${cookieString.length}|${cookieString.slice(-40)}`;
+  if (hash === fbLastHash) return { success: true, skipped: true, message: 'Cookie chưa đổi' };
+
+  const config = await getConfig();
+  try {
+    const res = await fetch(`${config.backendUrl}/api/connections/sync-fb-cookie`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(config.authToken ? { Authorization: `Bearer ${config.authToken}` } : {}),
+      },
+      body: JSON.stringify({ cookieString, cUser: cookieData.userId, onlyExisting: true }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.success) throw new Error(json.message || `HTTP ${res.status}`);
+    const count = json.updatedCount || 0;
+    await chrome.storage.local.set({
+      fbLastHash: hash,
+      fbLastSync: {
+        at: Date.now(), ok: true, cUser: cookieData.userId,
+        message: count > 0 ? `Đã cập nhật ${count} kết nối` : 'Nick này chưa có trong ToolZutter',
+      },
+    });
+    return { success: true, cUser: cookieData.userId, updatedCount: count };
+  } catch (err) {
+    await chrome.storage.local.set({ fbLastSync: { at: Date.now(), ok: false, cUser: cookieData.userId, message: err.message } });
+    return { success: false, message: `Không gửi được cookie: ${err.message}` };
+  }
+}
+
+let fbSyncTimer = null;
+chrome.cookies.onChanged.addListener(({ cookie, removed }) => {
+  if (removed || !/(^|\.)facebook\.com$/.test(cookie.domain.replace(/^\./, ''))) return;
+  if (!['c_user', 'xs', 'fr', 'datr'].includes(cookie.name)) return;
+  clearTimeout(fbSyncTimer);
+  fbSyncTimer = setTimeout(() => autoSyncFacebookCookie().catch(() => {}), 5000);
+});
+
+chrome.alarms.create(FB_SYNC_ALARM, { periodInMinutes: 30 });
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === FB_SYNC_ALARM) autoSyncFacebookCookie().catch(() => {});
+});
+chrome.runtime.onStartup.addListener(() => { autoSyncFacebookCookie().catch(() => {}); });
+
+// Đồng bộ Cookie Facebook của profile Chrome hiện tại vào ToolZutter (nút bấm tay — được phép tạo Via mới)
 async function syncFacebookCookie() {
   const cookieData = await getFacebookCookies();
   if (!cookieData.success || !cookieData.hasAuth) {
@@ -345,6 +407,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.action === 'GET_FB_AUTOSYNC_STATUS') {
+    chrome.storage.local.get(['fbAutoSync', 'fbLastSync'])
+      .then((st) => sendResponse({ autoSync: st.fbAutoSync !== false, lastSync: st.fbLastSync || null }));
+    return true;
+  }
+
+  if (request.action === 'SET_FB_AUTOSYNC') {
+    chrome.storage.local.set({ fbAutoSync: Boolean(request.enabled), fbLastHash: '' }).then(() => sendResponse({ success: true }));
+    return true;
+  }
+
   if (request.action === 'GET_THREADS_STATUS') {
     Promise.all([getThreadsCookies(), chrome.storage.local.get(['threadsAutoSync', 'threadsLastSync'])])
       .then(([c, st]) => sendResponse({ loggedIn: c.loggedIn, dsUserId: c.dsUserId, autoSync: st.threadsAutoSync !== false, lastSync: st.threadsLastSync || null }));
@@ -392,6 +465,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // Tự động nạp Content Script vào tất cả các tab Facebook/Threads đang mở khi cài đặt / nạp lại extension
 chrome.runtime.onInstalled.addListener(async () => {
   syncThreadsCookie({ force: true }).catch(() => {});
+  chrome.storage.local.set({ fbLastHash: '' }).then(() => autoSyncFacebookCookie()).catch(() => {});
   try {
     const tabs = await chrome.tabs.query({ url: ['*://*.facebook.com/*', '*://*.threads.net/*', '*://*.threads.com/*'] });
     for (const tab of tabs) {

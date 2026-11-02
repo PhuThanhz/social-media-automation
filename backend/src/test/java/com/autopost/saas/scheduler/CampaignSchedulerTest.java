@@ -81,10 +81,10 @@ class CampaignSchedulerTest {
         CampaignScheduler.planContinuousLanes(pending, List.of(), null,
                 p -> p.getTargetFanpageId().substring(0, 1), now, 120, updated);
 
-        // Nick A: 2 bài nối nhau cách 60s đăng + 120s nghỉ; nick B chạy song song từ đầu.
+        // Nick A: 2 bài nối nhau cách 60s đăng + 120s nghỉ; nick B chạy song song từ đầu (lệch 30s để tránh khởi động Chromium cùng tích tắc).
         assertThat(pending.get(0).getScheduledAt()).isEqualTo(now.plusSeconds(20));
         assertThat(pending.get(1).getScheduledAt()).isEqualTo(now.plusSeconds(20 + 180));
-        assertThat(pending.get(2).getScheduledAt()).isEqualTo(now.plusSeconds(20));
+        assertThat(pending.get(2).getScheduledAt()).isEqualTo(now.plusSeconds(20 + 30));
         assertThat(updated).hasSize(3);
     }
 
@@ -130,6 +130,45 @@ class CampaignSchedulerTest {
             long between = java.time.Duration.between(pending.get(i - 1).getScheduledAt(), pending.get(i).getScheduledAt()).getSeconds();
             assertThat(between).isGreaterThanOrEqualTo(180);
         }
+    }
+
+    @Test
+    void spreadEvenlyFillsRemainingWindowInsteadOfPackingFromMorning() {
+        // Ngoài giờ (01:00): 14 bài của 1 nick → rải đều từ 09:00 tới trước 23:00, không dồn cục buổi sáng
+        LocalDateTime now = LocalDateTime.of(2026, 10, 16, 1, 0);
+        List<PostQueue> pending = new ArrayList<>();
+        for (long i = 1; i <= 14; i++) pending.add(post(i, now, "A:PERSONAL_COOKIE:1"));
+        List<PostQueue> updated = new ArrayList<>();
+        java.util.Map<String, List<PostQueue>> deferred = new java.util.LinkedHashMap<>();
+
+        CampaignScheduler.planContinuousLanes(pending, List.of(), null, p -> "A", now, 180,
+                WINDOW_9_23, false, true, updated, deferred);
+
+        assertThat(deferred).isEmpty();
+        assertThat(pending.get(0).getScheduledAt()).isEqualTo(LocalDateTime.of(2026, 10, 16, 9, 0));
+        // 14h = 50400s, 14 bài × 60s đăng → giãn cách (50400 − 840) / 14 = 3540s → mỗi bài cách nhau đúng 1 tiếng
+        for (int i = 1; i < pending.size(); i++) {
+            long between = java.time.Duration.between(pending.get(i - 1).getScheduledAt(), pending.get(i).getScheduledAt()).getSeconds();
+            assertThat(between).isEqualTo(3600);
+        }
+        assertThat(pending.get(13).getScheduledAt().plusSeconds(60)).isBeforeOrEqualTo(LocalDateTime.of(2026, 10, 16, 23, 0));
+    }
+
+    @Test
+    void spreadEvenlyNeverGoesBelowMinimumGap() {
+        // 22:30 còn 30', 5 bài: rải đều cần 360s/bài > tối thiểu 180s → dùng 360s; 20 bài thì giữ tối thiểu
+        LocalDateTime now = LocalDateTime.of(2026, 10, 16, 22, 30);
+        List<PostQueue> pending = new ArrayList<>();
+        for (long i = 1; i <= 20; i++) pending.add(post(i, now, "A:PERSONAL_COOKIE:1"));
+        List<PostQueue> updated = new ArrayList<>();
+        java.util.Map<String, List<PostQueue>> deferred = new java.util.LinkedHashMap<>();
+
+        CampaignScheduler.planContinuousLanes(pending, List.of(), null, p -> "A", now, 120,
+                WINDOW_9_23, false, true, updated, deferred);
+
+        long between = java.time.Duration.between(pending.get(0).getScheduledAt(), pending.get(1).getScheduledAt()).getSeconds();
+        assertThat(between).isEqualTo(180);
+        assertThat(deferred.get("A")).isNotEmpty();
     }
 
     @Test

@@ -1,5 +1,5 @@
 // Trích xuất danh sách Group Facebook theo Từ khoá (Facebook Group Search) & Xếp hạng Chất Lượng
-const { chromium } = require('playwright');
+const browserPool = require('./browserPool');
 
 function parseMemberCount(text) {
   if (!text) return 0;
@@ -31,17 +31,15 @@ async function searchFacebookGroups({ keyword = '', cookieString = '', limit = 2
     return { success: false, error: 'Vui lòng nhập từ khoá tìm kiếm nhóm!', groups: [] };
   }
 
-  let browser = null;
+  // Dùng context từ browserPool (pool đã có sẵn --disable-blink-features=AutomationControlled, --no-sandbox).
+  let releaseContext = null;
   try {
-    browser = await chromium.launch({
-      headless: true,
-      args: ['--disable-blink-features=AutomationControlled', '--no-sandbox']
-    });
-
-    const context = await browser.newContext({
+    const acquired = await browserPool.acquireContext({
       userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       viewport: { width: 1280, height: 900 }
     });
+    releaseContext = acquired.release;
+    const context = acquired.context;
 
     // Cài đặt cookie nếu có
     if (cookieString && cookieString.includes('c_user')) {
@@ -164,8 +162,8 @@ async function searchFacebookGroups({ keyword = '', cookieString = '', limit = 2
 
     const rawGroups = Array.from(collectedMap.values());
 
-    await browser.close();
-    browser = null;
+    await releaseContext();
+    releaseContext = null;
 
     // Đánh giá và chấm điểm chất lượng (Quality Score)
     const evaluatedGroups = rawGroups.map((g) => {
@@ -235,13 +233,14 @@ async function searchFacebookGroups({ keyword = '', cookieString = '', limit = 2
       groups: finalGroups
     };
   } catch (err) {
-    if (browser) await browser.close().catch(() => {});
     console.error('[FB_Group_Search] ❌ Lỗi tìm nhóm:', err.message);
     return {
       success: false,
       error: `Lỗi khi tìm nhóm Facebook: ${err.message}`,
       groups: []
     };
+  } finally {
+    await releaseContext?.();
   }
 }
 

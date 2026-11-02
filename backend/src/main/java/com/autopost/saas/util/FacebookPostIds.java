@@ -124,4 +124,20 @@ public final class FacebookPostIds {
         }
         return keys;
     }
+
+    /**
+     * Nhóm được miễn trừ kiểm tra trùng lặp (cho phép đăng lại thoải mái theo yêu cầu):
+     * - Nhóm Đảo (Đảo Mèo 1 - ID 263510030791508 hoặc tên chứa 'đảo' / 'dao')
+     * - Nhóm Tinder Pets (Tinder Pets Việt Nam - ID 1195776878326307 hoặc tên chứa 'tinder pet')
+     */
+    public static boolean isDuplicateExemptGroup(String groupTarget) {
+        if (groupTarget == null || groupTarget.isBlank()) return false;
+        String lower = groupTarget.toLowerCase();
+        return lower.contains("263510030791508")
+                || lower.contains("1195776878326307")
+                || lower.contains("đảo")
+                || lower.contains("dao")
+                || lower.contains("tinder pet")
+                || lower.contains("tinder pets");
+    }
 }

@@ -23,7 +23,8 @@ public class CacheConfig {
         CaffeineCacheManager manager = new CaffeineCacheManager("socialAccountsByUser", "campaignsByUser");
         manager.setCaffeine(Caffeine.newBuilder()
                 .expireAfterWrite(Duration.ofSeconds(30))
-                .maximumSize(500));
+                .maximumSize(500)
+                .recordStats());
         return manager;
     }
 }

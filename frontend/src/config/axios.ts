@@ -1,7 +1,8 @@
 import axios from 'axios';
+import { apiBaseUrl, sessionHeaders } from './runtime';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || `http://${typeof window !== 'undefined' ? window.location.hostname : 'localhost'}:8081/api`,
+  baseURL: apiBaseUrl(),
   headers: {
     'Content-Type': 'application/json',
   },
@@ -10,6 +11,7 @@ const api = axios.create({
 
 // Interceptor request: đính kèm JWT token
 api.interceptors.request.use((config) => {
+  Object.assign(config.headers, sessionHeaders()); // token phiên của bản Desktop
   const token = localStorage.getItem('access_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;

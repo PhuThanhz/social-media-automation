@@ -1,5 +1,6 @@
 package com.autopost.saas.service;
 
+import com.autopost.saas.util.LocalServices;
 import com.autopost.saas.util.PooledRestTemplateFactory;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpEntity;
@@ -30,7 +31,7 @@ public class PlaywrightHealthCheckService {
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<Map<String, String>> request = new HttpEntity<>(Map.of("cookieString", cookieString), headers);
         try {
-            restTemplate.postForEntity("http://localhost:3001/api/get-account-name", request, Map.class);
+            restTemplate.postForEntity(LocalServices.WORKER_BASE + "/api/get-account-name", request, Map.class);
             return "OK";
         } catch (HttpStatusCodeException e) {
             // /api/get-account-name trả HTTP 500 kèm {success:false, error:"..."} khi cookie hỏng (không

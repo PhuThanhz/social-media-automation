@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
         name = "post_queue",
         indexes = {
                 @Index(name = "idx_post_queue_status_scheduled_id", columnList = "status, scheduled_at, id"),
+                @Index(name = "idx_post_queue_status_updated", columnList = "status, updated_at"),
                 @Index(name = "idx_post_queue_published_at", columnList = "published_at"),
                 @Index(name = "idx_post_queue_target_fanpage_id", columnList = "target_fanpage_id"),
                 @Index(name = "idx_post_queue_content_hash", columnList = "content_hash")
@@ -96,6 +97,25 @@ public class PostQueue {
     @Builder.Default
     @Column(name = "retry_count")
     private Integer retryCount = 0; // Số lần đã tự động thử lại khi đăng lỗi (giới hạn MAX_RETRY)
+
+    @Column(name = "locked_by", length = 100)
+    private String lockedBy; // Worker URL hoặc Thread đang chiếm quyền lease (vd: http://localhost:3001)
+
+    @Column(name = "lock_token", length = 64)
+    private String lockToken; // Fencing token ngẫu nhiên chống race condition
+
+    @Column(name = "locked_at")
+    private LocalDateTime lockedAt; // Thời điểm cấp lease
+
+    @Column(name = "lease_expires_at")
+    private LocalDateTime leaseExpiresAt; // Thời điểm hết hạn lease
+
+    @Builder.Default
+    @Column(name = "attempt_count")
+    private Integer attemptCount = 0; // Tổng số lượt thực thi
+
+    @Column(name = "last_attempt_id", length = 64)
+    private String lastAttemptId; // UUID của lượt thực thi gần nhất
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

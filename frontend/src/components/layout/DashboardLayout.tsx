@@ -3,7 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   Layout, Menu, Button, Avatar, Dropdown, Badge, Drawer, Grid, Tooltip,
-  Progress, Popover, Input,
+  Progress, Popover, Input, Flex,
 } from 'antd';
 import {
   MenuFoldOutlined, MenuUnfoldOutlined, DashboardOutlined,
@@ -12,7 +12,8 @@ import {
   TeamOutlined, VideoCameraOutlined, PlayCircleOutlined, PictureOutlined,
   FacebookFilled, QuestionCircleOutlined, CalendarOutlined, BankOutlined,
   CodeOutlined, AimOutlined, LikeOutlined, FireOutlined, SearchOutlined, RadarChartOutlined,
-  RobotOutlined, BgColorsOutlined, CloseOutlined,
+  RobotOutlined, BgColorsOutlined, CloseOutlined, SafetyCertificateOutlined,
+  DownOutlined, RightOutlined, SettingOutlined, RocketOutlined,
 } from '@ant-design/icons';
 import api from '../../config/axios';
 import dayjs from 'dayjs';
@@ -50,16 +51,17 @@ const navigation = [
   {
     type: 'group' as const, label: 'TỔNG QUAN', children: [
       { key: '/dashboard', icon: <DashboardOutlined />, label: 'Bảng điều khiển' },
+      { key: '/dashboard/publishing-control-center', icon: <RocketOutlined className="app-nav-icon-cyan" />, label: 'Publishing Control Center' },
     ]
   },
   {
     type: 'group' as const, label: 'NỘI DUNG', children: [
       { key: '/dashboard/news-studio', icon: <PictureOutlined />, label: 'Studio Ảnh Tin' },
       { key: '/dashboard/video-studio', icon: <VideoCameraOutlined />, label: 'Studio Video Tin' },
-      { key: '/dashboard/viral-hunter', icon: <FireOutlined className="text-amber-400" />, label: 'Săn bài Viral' },
+      { key: '/dashboard/viral-hunter', icon: <FireOutlined className="app-nav-icon-amber" />, label: 'Săn bài Viral' },
       { key: '/dashboard/playwright', icon: <PlayCircleOutlined />, label: 'Đăng tự động' },
       { key: '/dashboard/post-story', icon: <PictureOutlined />, label: 'Đăng story' },
-      { key: '/dashboard/threads', icon: <span className="font-black">@</span>, label: 'Đăng Threads' },
+      { key: '/dashboard/threads', icon: <span className="app-nav-icon-at">@</span>, label: 'Đăng Threads' },
     ]
   },
   {
@@ -72,7 +74,10 @@ const navigation = [
   },
   {
     type: 'group' as const, label: 'HỆ THỐNG', children: [
-      { key: 'ai-settings', icon: <RobotOutlined className="text-cyan-400 font-bold" />, label: 'Cấu hình AI (Gemini)' },
+      { key: 'ai-settings', icon: <RobotOutlined className="app-nav-icon-cyan app-nav-icon-bold" />, label: 'Cấu hình AI (Gemini)' },
+      // Trang quản trị key chỉ dành cho chủ phần mềm, ẩn khỏi bản Desktop giao khách
+      ...(isTauri() ? [{ key: '/dashboard/users', icon: <TeamOutlined />, label: 'Người dùng' }] : []),
+      ...(isTauri() ? [] : [{ key: '/dashboard/license', icon: <SafetyCertificateOutlined className="app-nav-icon-amber app-nav-icon-bold" />, label: 'Quản lý bản quyền' }]),
       { key: '/dashboard/logs', icon: <CodeOutlined />, label: 'Nhật ký hệ thống' },
     ]
   },
@@ -80,6 +85,7 @@ const navigation = [
 
 const pageMeta: Record<string, { title: string; description: string }> = {
   '/dashboard': { title: 'Tổng quan', description: 'Theo dõi hoạt động đăng bài và tình trạng hệ thống' },
+  '/dashboard/publishing-control-center': { title: 'Publishing Control Center', description: 'Trung tâm điều hành xuất bản — Giám sát 3 Worker, kiểm soát hàng đợi 1,000+ bài và giải quyết sự cố' },
   '/dashboard/news-studio': { title: 'Studio Ảnh Tin', description: 'Cào full bài báo, AI viết tiêu đề, ghép ảnh kiểu page tin tức rồi lên lịch đăng' },
   '/dashboard/video-studio': { title: 'Studio Video Tin', description: 'Dán link video, thêm khung tiêu đề + giọng AI đọc vài giây đầu, trộn nhạc nền rồi xuất hoặc lên lịch đăng' },
   '/dashboard/viral-hunter': { title: 'Săn Bài Viral (FB & Threads)', description: 'Cào bài Facebook Group & Threads theo từ khoá, lọc tương tác khủng và tích hợp Gemini AI viết lại' },
@@ -91,9 +97,12 @@ const pageMeta: Record<string, { title: string; description: string }> = {
   '/dashboard/video-library': { title: 'Thư viện video', description: 'Quản lý toàn bộ video đã tải về' },
   '/dashboard/post-story': { title: 'Đăng story', description: 'Tạo và đăng Facebook Story nhanh chóng' },
   '/dashboard/threads': { title: 'Đăng Threads', description: 'Đăng và hẹn giờ bài lên một hoặc nhiều nick Threads' },
+  '/dashboard/license': { title: 'Quản lý bản quyền', description: 'Kiểm soát ai đang dùng phần mềm, tạo key và khóa tức thì từ xa (Kill-Switch)' },
+  '/dashboard/users': { title: 'Người dùng', description: 'Tài khoản đăng nhập trên máy này và giới hạn gói bản quyền' },
   '/dashboard/logs': { title: 'Nhật ký hệ thống', description: 'Theo dõi Worker, Backend và Frontend theo thời gian thực' },
 };
 
+import { isTauri } from '../../services/license.service';
 import QuickUpdateCookieModal from '../modals/QuickUpdateCookieModal';
 import AiSettingsModal from '../modals/AiSettingsModal';
 
@@ -108,6 +117,7 @@ const DashboardLayout = () => {
   const [dismissCookieBanner, setDismissCookieBanner] = useState(() => sessionStorage.getItem('dismiss_cookie_banner') === '1');
   const [kpiPanelOpen, setKpiPanelOpen] = useState(false);
   const [bgPickerOpen, setBgPickerOpen] = useState(false);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const backgroundId = useBackgroundStore((s) => s.backgroundId);
   const customImage = useBackgroundStore((s) => s.customImage);
   const shellStyle = { '--app-bg-image': resolveBackgroundImage(backgroundId, customImage) } as CSSProperties;
@@ -221,20 +231,138 @@ const DashboardLayout = () => {
     navigate(`/dashboard/playwright?${params.toString()}`);
   };
 
-  const userMenuItems = useMemo(() => [
-    { key: 'home', icon: <DashboardOutlined />, label: 'Trang chủ PhuSocial', onClick: () => navigate('/') },
-    { key: 'profile', icon: <UserOutlined />, label: 'Phú Admin', disabled: true },
-    { key: 'background', icon: <BgColorsOutlined />, label: 'Hình nền giao diện', onClick: () => setBgPickerOpen(true) },
-    { type: 'divider' as const },
-    { key: 'logout', icon: <LogoutOutlined />, label: 'Đăng xuất', danger: true, onClick: () => { logout(); navigate('/login'); } },
-  ], [logout, navigate]);
+  // Bản Desktop: hiện người đang đăng nhập (bản web giữ tên quản trị cũ)
+  const { data: desktopMe } = useQuery({
+    queryKey: ['desktopMe'],
+    queryFn: async () => (await api.get<{ displayName: string; login: string }>('/desktop/me')).data,
+    enabled: isTauri(),
+    staleTime: 60_000,
+  });
+  const profileName = isTauri() ? desktopMe?.displayName || desktopMe?.login || '' : 'Phú Admin';
+  const profileInitials = profileName.split(/\s+/).filter(Boolean).slice(-2).map((w) => w[0]).join('').toUpperCase() || 'U';
+
+  const renderUserDropdownCard = () => (
+    <div className="w-[300px] rounded-2xl bg-gradient-to-b from-[#14213d]/98 via-[#0e172a]/98 to-[#090f1d]/98 backdrop-blur-2xl border border-white/12 shadow-2xl shadow-black/70 p-4 text-slate-100 relative overflow-hidden select-none">
+      {/* Ambient background glow accents */}
+      <div className="absolute -top-10 -right-10 w-28 h-28 bg-sky-500/20 rounded-full blur-2xl pointer-events-none" />
+      <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-blue-600/15 rounded-full blur-2xl pointer-events-none" />
+
+      {/* User Header Profile Card */}
+      <div className="relative flex items-center gap-3.5 pb-3.5 border-b border-white/10">
+        <div className="relative shrink-0">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-sky-400 via-blue-500 to-indigo-600 p-[2px] shadow-lg shadow-sky-500/25">
+            <div className="w-full h-full rounded-[14px] bg-[#0b1222] flex items-center justify-center font-black text-white text-base">
+              {profileInitials}
+            </div>
+          </div>
+          <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-[#0b1222]" title="Hệ thống trực tuyến" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <h4 className="font-extrabold text-sm text-white truncate m-0">{profileName}</h4>
+            <span className="inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 text-sky-300 bg-sky-500/15 border border-sky-400/30 rounded-md">
+              ADMIN
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-400 truncate mt-0.5 m-0 font-medium">
+            {isTauri() ? 'Bản quyền Desktop v2.0' : 'Hệ thống Quản trị Tối cao'}
+          </p>
+        </div>
+      </div>
+
+      {/* Action Links */}
+      <div className="py-2 space-y-1">
+        {!isTauri() && (
+          <button
+            type="button"
+            onClick={() => {
+              setProfileDropdownOpen(false);
+              navigate('/');
+            }}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/8 transition-all text-left cursor-pointer group"
+          >
+            <div className="w-7 h-7 rounded-lg bg-sky-500/15 text-sky-400 flex items-center justify-center border border-sky-500/20 group-hover:scale-105 transition-transform shrink-0">
+              <DashboardOutlined />
+            </div>
+            <span className="flex-1">Trang chủ PhuSocial</span>
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={() => {
+            setProfileDropdownOpen(false);
+            setBgPickerOpen(true);
+          }}
+          className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/8 transition-all text-left cursor-pointer group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-7 h-7 rounded-lg bg-purple-500/15 text-purple-400 flex items-center justify-center border border-purple-500/20 group-hover:scale-105 transition-transform shrink-0">
+              <BgColorsOutlined />
+            </div>
+            <span>Hình nền giao diện</span>
+          </div>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-400/30">
+            Tùy biến
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setProfileDropdownOpen(false);
+            setAiModalOpen(true);
+          }}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/8 transition-all text-left cursor-pointer group"
+        >
+          <div className="w-7 h-7 rounded-lg bg-cyan-500/15 text-cyan-400 flex items-center justify-center border border-cyan-500/20 group-hover:scale-105 transition-transform shrink-0">
+            <RobotOutlined />
+          </div>
+          <span className="flex-1">Cấu hình AI (Gemini)</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setProfileDropdownOpen(false);
+            navigate('/dashboard/logs');
+          }}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/8 transition-all text-left cursor-pointer group"
+        >
+          <div className="w-7 h-7 rounded-lg bg-amber-500/15 text-amber-400 flex items-center justify-center border border-amber-500/20 group-hover:scale-105 transition-transform shrink-0">
+            <CodeOutlined />
+          </div>
+          <span className="flex-1">Nhật ký hệ thống</span>
+        </button>
+      </div>
+
+      {/* Subtle Divider */}
+      <div className="border-t border-white/10 my-1" />
+
+      {/* Logout Button */}
+      <button
+        type="button"
+        onClick={() => {
+          setProfileDropdownOpen(false);
+          logout();
+          navigate('/login');
+        }}
+        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-rose-300 hover:text-rose-100 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 hover:border-rose-500/35 transition-all text-left cursor-pointer mt-1"
+      >
+        <div className="w-7 h-7 rounded-lg bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0">
+          <LogoutOutlined />
+        </div>
+        <span>Đăng xuất tài khoản</span>
+      </button>
+    </div>
+  );
 
   const kpiPanelContent = (
     <div style={{ width: 440 }}>
       <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-slate-800/80">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-base shadow-md shadow-blue-600/30">
-            🎯
+          <div className="w-8 h-8 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 text-sm shadow-sm">
+            <AimOutlined />
           </div>
           <div>
             <div className="text-sm font-black text-slate-100 tracking-tight">Mục tiêu KPI & Danh sách Nhóm</div>
@@ -407,8 +535,8 @@ const DashboardLayout = () => {
                         ? '+ Thêm bài'
                         : isFullyScheduled
                           ? '✓ Đã đủ lịch'
-                          : `⚡ Lên ${remainingToSchedule} bài`)
-                      : '⚡ Lên bài'}
+                          : `Lên ${remainingToSchedule} bài`)
+                      : 'Lên bài'}
                   </Button>
                 </div>
               </div>
@@ -420,12 +548,16 @@ const DashboardLayout = () => {
   );
 
   const sidebar = (
-    <div className="app-sidebar-shell h-full flex flex-col min-h-0 overflow-hidden">
-      <div className={`app-sidebar-brand h-20 flex items-center ${collapsed && isDesktop ? 'justify-center' : 'px-6'} shrink-0`}>
+    <Flex vertical className="app-sidebar-shell">
+      <Flex
+        align="center"
+        justify={collapsed && isDesktop ? 'center' : undefined}
+        className={`app-sidebar-brand app-sidebar-brand-box ${collapsed && isDesktop ? '' : 'app-sidebar-brand-pad'}`}
+      >
         <BrandLogo compact={collapsed && isDesktop} light to="/" hideMark />
-      </div>
+      </Flex>
 
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+      <div className="app-sidebar-scroll">
         <Menu
           theme="dark"
           mode="inline"
@@ -441,52 +573,56 @@ const DashboardLayout = () => {
             navigate(key);
             setMobileOpen(false);
           }}
-          className="app-main-menu border-none text-[13px] font-medium"
+          className="app-main-menu app-main-menu-text"
         />
       </div>
-    </div>
+    </Flex>
   );
 
   return (
-    <Layout className="dashboard-shell min-h-screen" style={shellStyle}>
+    <Layout className="dashboard-shell app-shell-min" style={shellStyle}>
       {isDesktop ? (
-        <Sider trigger={null} collapsible collapsed={collapsed} theme="dark" width={252} collapsedWidth={80} className="app-sidebar sticky top-0 h-screen z-20">
+        <Sider trigger={null} collapsible collapsed={collapsed} theme="dark" width={252} collapsedWidth={80} className="app-sidebar app-sidebar-sticky">
           {sidebar}
         </Sider>
       ) : (
         <Drawer open={mobileOpen} onClose={() => setMobileOpen(false)} placement="left" size={256} closable={false}>{sidebar}</Drawer>
       )}
 
-      <Layout className="min-w-0">
-        <Header className="app-topbar px-4 md:px-6 flex items-center justify-between sticky top-0 z-10" style={{ lineHeight: 'normal', height: 72 }}>
-          <div className="flex items-center min-w-0">
+      <Layout className="app-main-column">
+        <Header className="app-topbar app-topbar-bar" style={{ lineHeight: 'normal', height: 72 }}>
+          <Flex align="center" className="app-main-column">
             <Button
               type="text"
               icon={isDesktop ? (collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />) : <MenuUnfoldOutlined />}
               onClick={() => isDesktop ? setCollapsed(!collapsed) : setMobileOpen(true)}
               aria-label="Mở menu"
+              className="!text-slate-300 hover:!text-white hover:!bg-white/10 !mr-2.5 !rounded-xl !w-9 !h-9 !flex !items-center !justify-center !border !border-white/5 transition-all"
             />
-            <div className="ml-2 md:ml-3 min-w-0">
-              <h1 className="text-sm md:text-base font-bold mb-0 truncate">{meta.title}</h1>
-              <p className="hidden md:block text-[11px] mb-0 mt-0.5 truncate">{meta.description}</p>
+            <div className="app-topbar-heading">
+              <h1 className="app-topbar-title !text-base sm:!text-lg !font-black !text-white !tracking-tight !m-0">{meta.title}</h1>
+              <p className="app-topbar-desc !text-xs !text-slate-300 !mt-0.5 !m-0 !font-medium">{meta.description}</p>
             </div>
-          </div>
+          </Flex>
 
-          <div className="flex items-center gap-1.5 md:gap-2">
+          <Flex align="center" gap={10} className="app-topbar-actions">
             <QueueFinishBadge />
             <Button
-              className="hidden sm:inline-flex"
+              className="app-topbar-buff !flex !items-center !gap-1.5 !font-bold !text-xs !rounded-xl !bg-gradient-to-r !from-blue-600 !to-indigo-600 hover:!from-blue-500 hover:!to-indigo-500 !text-white !border-blue-400/40 !shadow-md !shadow-blue-600/25 !h-9 !px-3.5 transition-all"
               icon={<LikeOutlined />}
               onClick={() => navigate('/dashboard/buff')}
             >
               Tăng tương tác
             </Button>
             <Tooltip title={expiredCookieCount > 0 ? `${expiredCookieCount} Fanpage có Cookie hết hạn — Bấm để cập nhật ngay` : 'Không có cảnh báo'}>
-              <Badge count={expiredCookieCount} size="small">
-                <Button
-                  type="text"
-                  shape="circle"
-                  icon={<BellOutlined className={expiredCookieCount > 0 ? 'text-red-500 font-bold' : ''} />}
+              <Badge count={expiredCookieCount} size="small" offset={[-2, 2]}>
+                <button
+                  type="button"
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer border ${
+                    expiredCookieCount > 0
+                      ? 'bg-rose-500/15 text-rose-400 border-rose-500/35 shadow-lg shadow-rose-500/25 animate-pulse'
+                      : 'bg-white/6 text-slate-300 hover:text-white hover:bg-white/10 border-white/10'
+                  }`}
                   onClick={() => {
                     if (expiredCookieCount > 0) {
                       setQuickCookieTargetId(expiredCookieAccounts[0]?.id);
@@ -496,32 +632,56 @@ const DashboardLayout = () => {
                     }
                   }}
                   aria-label="Cảnh báo"
-                />
+                >
+                  <BellOutlined className="text-sm" />
+                </button>
               </Badge>
             </Tooltip>
-            <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" trigger={['click']}>
-              <Button type="text" className="h-10 px-1.5 md:px-2">
-                <Avatar size={32} className="admin-avatar font-bold">PA</Avatar>
-                <span className="hidden md:inline ml-2 text-xs font-semibold">Phú Admin</span>
-              </Button>
+            <Dropdown
+              dropdownRender={renderUserDropdownCard}
+              placement="bottomRight"
+              trigger={['click']}
+              open={profileDropdownOpen}
+              onOpenChange={setProfileDropdownOpen}
+            >
+              <button
+                type="button"
+                className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-white/6 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all cursor-pointer group select-none"
+              >
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-sky-500 to-indigo-600 p-[1.5px] shadow-sm shrink-0">
+                  <div className="w-full h-full rounded-[6.5px] bg-[#0b1222] flex items-center justify-center font-black text-white text-xs">
+                    {profileInitials}
+                  </div>
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="font-bold text-xs text-slate-100 group-hover:text-white leading-tight">
+                    {profileName}
+                  </span>
+                  <span className="text-[10px] text-emerald-400 font-semibold leading-tight flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Online
+                  </span>
+                </div>
+                <DownOutlined className="text-[10px] text-slate-400 group-hover:text-slate-200 transition-transform ml-1" />
+              </button>
             </Dropdown>
-          </div>
+          </Flex>
         </Header>
 
         {/* Global Warning Banner for Expired Cookies (Chỉ cảnh báo Fanpage, không tính Group) */}
         {expiredCookieCount > 0 && !dismissCookieBanner && (
-          <div className="bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 text-white px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 shadow-sm sticky top-16 z-10 border-b border-red-700">
-            <div className="flex items-center gap-2 text-xs md:text-sm font-medium min-w-0">
-              <span className="flex h-2.5 w-2.5 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-yellow-300"></span>
+          <Flex wrap align="center" justify="space-between" gap={8} className="cookie-banner">
+            <Flex align="center" gap={8} className="cookie-banner-text">
+              <span className="cookie-banner-dot">
+                <span className="cookie-banner-dot-ping"></span>
+                <span className="cookie-banner-dot-core"></span>
               </span>
-              <span className="font-bold">⚠️ CẢNH BÁO COOKIE:</span>
-              <span className="truncate">
+              <span className="cookie-banner-title">CẢNH BÁO COOKIE:</span>
+              <span className="cookie-banner-list">
                 Có <b>{expiredCookieCount}</b> Fanpage bị hết hạn Cookie ({expiredCookieAccounts.slice(0, 3).map(a => a.pageName || a.platformAccountId).join(', ')}{expiredCookieCount > 3 ? ` và ${expiredCookieCount - 3} trang khác` : ''})!
               </span>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
+            </Flex>
+            <Flex align="center" gap={8} className="cookie-banner-actions">
               <Button
                 type="primary"
                 size="small"
@@ -530,26 +690,26 @@ const DashboardLayout = () => {
                   setQuickCookieTargetId(expiredCookieAccounts[0]?.id);
                   setQuickCookieModalOpen(true);
                 }}
-                className="bg-yellow-400 hover:bg-yellow-300 text-slate-900 font-extrabold border-none shadow text-xs rounded-lg h-7 px-3 flex items-center"
+                className="cookie-banner-update"
               >
-                ⚡ Cập Nhật Cookie Ngay
+                Cập Nhật Cookie Ngay
               </Button>
               <Button
                 type="text"
                 size="small"
-                icon={<CloseOutlined className="text-white hover:text-yellow-200 text-sm" />}
+                icon={<CloseOutlined className="cookie-banner-close-icon" />}
                 onClick={() => {
                   setDismissCookieBanner(true);
                   sessionStorage.setItem('dismiss_cookie_banner', '1');
                 }}
-                className="hover:!bg-white/20 !text-white flex items-center justify-center h-7 w-7 !p-0 rounded-lg cursor-pointer"
+                className="cookie-banner-close"
                 title="Đóng cảnh báo này"
               />
-            </div>
-          </div>
+            </Flex>
+          </Flex>
         )}
 
-        <Content className="dashboard-content p-3 sm:p-5 md:p-7 xl:p-8 w-full max-w-[1600px] mx-auto pb-24 md:pb-8">
+        <Content className="dashboard-content app-content-box">
           <Outlet />
         </Content>
 
@@ -567,7 +727,7 @@ const DashboardLayout = () => {
       </Layout>
 
       {/* Mobile Bottom Navigation Bar */}
-      <div className="mobile-bottom-nav md:hidden fixed bottom-0 left-0 right-0 z-50 px-1.5 py-1.5 flex items-center justify-around">
+      <Flex align="center" justify="space-around" className="mobile-bottom-nav mobile-bottom-nav-bar">
         {[
           { path: '/dashboard', icon: <DashboardOutlined />, label: 'Tổng quan' },
           { path: '/dashboard/playwright', icon: <PlayCircleOutlined />, label: 'Đăng bài' },
@@ -578,14 +738,13 @@ const DashboardLayout = () => {
           <button
             key={path}
             onClick={() => navigate(path)}
-            className={`flex flex-col items-center justify-center py-1 px-1.5 rounded-xl text-[10px] font-bold transition-all ${location.pathname === path ? 'is-active' : ''
-              }`}
+            className={`mobile-bottom-nav-item ${location.pathname === path ? 'is-active' : ''}`}
           >
-            <span className="text-base mb-0.5">{icon}</span>
+            <span className="mobile-bottom-nav-icon">{icon}</span>
             <span>{label}</span>
           </button>
         ))}
-      </div>
+      </Flex>
     </Layout>
   );
 };

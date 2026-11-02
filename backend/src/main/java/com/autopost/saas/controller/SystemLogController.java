@@ -7,7 +7,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import com.autopost.saas.service.StorageCleanupService;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -34,14 +36,55 @@ public class SystemLogController {
     private static final int DEFAULT_LINES = 500;
     private static final int MAX_LINES = 5_000;
     private final Map<String, LogFile> logFiles;
+    private final StorageCleanupService storageCleanupService;
 
     public SystemLogController() {
+        this(null);
+    }
+
+    public SystemLogController(StorageCleanupService storageCleanupService) {
+        this.storageCleanupService = storageCleanupService;
         Path projectRoot = resolveProjectRoot();
+        Path homeDir = Paths.get(System.getProperty("user.home", ""));
         Map<String, LogFile> sources = new LinkedHashMap<>();
-        sources.put("worker", new LogFile("worker", "Worker", "Playwright & tiến trình đăng bài", projectRoot.resolve("worker/worker.log")));
-        sources.put("backend", new LogFile("backend", "Backend", "Spring Boot API", projectRoot.resolve("backend/backend_stable.log")));
-        sources.put("frontend", new LogFile("frontend", "Frontend", "Vite development server", projectRoot.resolve("frontend/vite.log")));
+        sources.put("worker", new LogFile(
+                "worker",
+                "Worker",
+                "Playwright & tiến trình đăng bài",
+                List.of(
+                        homeDir.resolve("Library/Logs/autopost-worker.log"),
+                        projectRoot.resolve("worker/worker.log"),
+                        projectRoot.resolve("worker/server.log")
+                )
+        ));
+        sources.put("backend", new LogFile(
+                "backend",
+                "Backend",
+                "Spring Boot API",
+                List.of(
+                        homeDir.resolve("Library/Logs/autopost-backend.log"),
+                        projectRoot.resolve("backend/backend_stable.log"),
+                        projectRoot.resolve("backend/backend.log")
+                )
+        ));
+        sources.put("frontend", new LogFile(
+                "frontend",
+                "Frontend",
+                "Vite development server",
+                List.of(
+                        projectRoot.resolve("frontend/vite.log"),
+                        projectRoot.resolve("frontend/frontend.log")
+                )
+        ));
         this.logFiles = Collections.unmodifiableMap(sources);
+    }
+
+    @PostMapping("/clean-storage")
+    public ResponseEntity<Map<String, Object>> cleanStorage(@RequestParam(defaultValue = "false") boolean dryRun) {
+        if (storageCleanupService == null) {
+            return ResponseEntity.ok(Map.of("success", false, "message", "StorageCleanupService chưa khởi tạo"));
+        }
+        return ResponseEntity.ok(storageCleanupService.cleanStorage(dryRun));
     }
 
     @GetMapping("/sources")
@@ -150,7 +193,27 @@ public class SystemLogController {
         return cwd;
     }
 
-    private record LogFile(String id, String name, String description, Path path) {}
+    private record LogFile(String id, String name, String description, List<Path> candidatePaths) {
+        public Path path() {
+            if (candidatePaths == null || candidatePaths.isEmpty()) {
+                return Paths.get(id + ".log");
+            }
+            Path best = candidatePaths.get(0);
+            Instant latestTime = Instant.MIN;
+            for (Path p : candidatePaths) {
+                if (p != null && Files.isRegularFile(p)) {
+                    try {
+                        Instant mod = Files.getLastModifiedTime(p).toInstant();
+                        if (mod.isAfter(latestTime)) {
+                            latestTime = mod;
+                            best = p;
+                        }
+                    } catch (Exception ignored) {}
+                }
+            }
+            return best;
+        }
+    }
     public record LogSourceResponse(String id, String name, String description, boolean exists, long size, Instant lastModified) {}
     public record LogResponse(String source, List<String> lines, int returned, long fileSize, Instant lastModified) {}
 }

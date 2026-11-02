@@ -402,3 +402,29 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.runtime.sendMessage({ action: 'SET_THREADS_AUTOSYNC', enabled: e.target.checked });
   });
 });
+
+// ─── Tab Cookie FB: trạng thái tự đồng bộ ───
+function loadFbAutoSyncStatus() {
+  chrome.runtime.sendMessage({ action: 'GET_FB_AUTOSYNC_STATUS' }, (res) => {
+    const syncEl = document.getElementById('fb-last-sync');
+    if (!res || !syncEl) return;
+    document.getElementById('fb-autosync').checked = res.autoSync;
+    if (res.lastSync) {
+      syncEl.textContent = `${res.lastSync.ok ? 'OK' : 'Lỗi'} · ${formatAgo(res.lastSync.at)}`;
+      syncEl.title = res.lastSync.message || '';
+      syncEl.style.color = res.lastSync.ok ? '#34d399' : '#f59e0b';
+    } else {
+      syncEl.textContent = 'Chưa đồng bộ lần nào';
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadFbAutoSyncStatus();
+  const toggle = document.getElementById('fb-autosync');
+  if (toggle) {
+    toggle.addEventListener('change', (e) => {
+      chrome.runtime.sendMessage({ action: 'SET_FB_AUTOSYNC', enabled: e.target.checked });
+    });
+  }
+});

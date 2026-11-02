@@ -4,7 +4,7 @@ import {
   App, Card, Typography, Select, Button, Input, Radio,
   Form, Divider, Tag, Steps, Result, Checkbox, DatePicker,
   Progress, Space, InputNumber, Table, Popconfirm, Tooltip,
-  Spin, Modal, Row, Col, Badge, Upload, Segmented
+  Spin, Modal, Row, Col, Badge, Upload, Segmented, Flex
 } from 'antd';
 import {
   ThunderboltOutlined,
@@ -15,7 +15,7 @@ import {
   CopyOutlined, ScissorOutlined, VideoCameraOutlined, CheckCircleFilled,
   PlusOutlined, FacebookFilled, GlobalOutlined, CloseCircleFilled,
   AimOutlined, FireOutlined, TrophyOutlined, SettingOutlined, EditOutlined,
-  DownOutlined, UpOutlined, SearchOutlined
+  DownOutlined, UpOutlined, SearchOutlined, BarChartOutlined, ClockCircleOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
@@ -114,10 +114,10 @@ const PostStory = () => {
 
   // 4 Khung Giờ Vàng Chuẩn của Facebook Story
   const goldenHourSlots = [
-    { name: 'Sáng', emoji: '🌅', hour: 8, minute: 0, tagColor: 'orange', desc: '07:30 - 08:30' },
-    { name: 'Trưa', emoji: '🍜', hour: 12, minute: 0, tagColor: 'cyan', desc: '11:45 - 12:45' },
-    { name: 'Tối', emoji: '🌆', hour: 20, minute: 0, tagColor: 'purple', desc: '19:45 - 20:45' },
-    { name: 'Đêm', emoji: '🌙', hour: 22, minute: 30, tagColor: 'indigo', desc: '22:30 - 23:30' },
+    { name: 'Sáng', emoji: '', hour: 8, minute: 0, tagColor: 'orange', desc: '07:30 - 08:30' },
+    { name: 'Trưa', emoji: '', hour: 12, minute: 0, tagColor: 'cyan', desc: '11:45 - 12:45' },
+    { name: 'Tối', emoji: '', hour: 20, minute: 0, tagColor: 'purple', desc: '19:45 - 20:45' },
+    { name: 'Đêm', emoji: '', hour: 22, minute: 30, tagColor: 'indigo', desc: '22:30 - 23:30' },
   ];
 
   // Tính toán trước danh sách mốc Giờ Vàng cho từng Story
@@ -252,7 +252,7 @@ const PostStory = () => {
       await Promise.all(changed.map(([socialAccountId, value]) =>
         setTargetMutation.mutateAsync({ socialAccountId: Number(socialAccountId), targetCount: value })
       ));
-      message.success('🎯 Đã lưu mục tiêu KPI Story hôm nay!');
+      message.success('Đã lưu mục tiêu KPI Story hôm nay!');
       queryClient.invalidateQueries({ queryKey: ['postTargets'] });
       setKpiModalOpen(false);
     } catch {
@@ -552,7 +552,7 @@ const PostStory = () => {
       if (text) {
         setStoryUrlsText(text);
         syncClipsFromText(text, false);
-        message.success('📋 Đã dán link & bắt đầu quét trích xuất clip!');
+        message.success('Đã dán link và bắt đầu quét trích xuất clip!');
       }
     } catch {
       message.info('Vui lòng dán trực tiếp vào khung nhập liệu.');
@@ -667,7 +667,7 @@ const PostStory = () => {
         }
       }
       window.scrollTo({ top: 0, behavior: 'smooth' });
-      message.success('📋 Đã nạp lại link Story & chọn Fanpage sẵn sàng đăng!');
+      message.success('Đã nạp lại link Story và chọn Fanpage sẵn sàng đăng!');
     }
   };
 
@@ -682,7 +682,7 @@ const PostStory = () => {
       return;
     }
 
-    message.loading({ content: `🚀 Đang đăng lại Story lên ${conn.pageName || conn.platformAccountId}...`, key: 'repost', duration: 0 });
+    message.loading({ content: `Đang đăng lại Story lên ${conn.pageName || conn.platformAccountId}...`, key: 'repost', duration: 0 });
     try {
       const res = await api.post('/queue/post-story', {
         connectionId: conn.id,
@@ -690,7 +690,7 @@ const PostStory = () => {
         mediaType: 'video'
       });
       if (res.data?.success) {
-        message.success({ content: `🎉 Đã đăng lại Story thành công lên ${conn.pageName || 'Fanpage'}!`, key: 'repost' });
+        message.success({ content: `Đã đăng lại Story thành công lên ${conn.pageName || 'Fanpage'}!`, key: 'repost' });
         refetchHistory();
         refetchTargets();
       } else {
@@ -792,7 +792,7 @@ const PostStory = () => {
         }
       } else if (scheduleMode === 'LATER') {
         const itemScheduledAt = baseScheduleTime.add(i * batchIntervalMinutes, 'minute');
-        setCurrentProgressText(`🗓️ [${storyIndex}/${total}] Đang lên lịch Story: ${clipTitle.slice(0, 35)} lúc ${itemScheduledAt.format('HH:mm DD/MM')}...`);
+        setCurrentProgressText(`[${storyIndex}/${total}] Đang lên lịch Story: ${clipTitle.slice(0, 35)} lúc ${itemScheduledAt.format('HH:mm DD/MM')}...`);
 
         try {
           const res = await api.post('/queue/schedule-story', {
@@ -829,7 +829,7 @@ const PostStory = () => {
         }
       } else {
         // ĐĂNG NGAY
-        setCurrentProgressText(`🚀 [${storyIndex}/${total}] Đang tải lên Story: ${clipTitle.slice(0, 35)}...`);
+        setCurrentProgressText(`[${storyIndex}/${total}] Đang tải lên Story: ${clipTitle.slice(0, 35)}...`);
 
         const payload: any = {
           mediaUrl: targetMediaUrl,
@@ -885,11 +885,11 @@ const PostStory = () => {
 
     const successCount = results.filter(r => r.success).length;
     if (successCount === total) {
-      message.success(`🎉 Đã xuất bản thành công tất cả ${total} Story!`);
+      message.success(`Đã xuất bản thành công tất cả ${total} Story!`);
     } else if (successCount > 0) {
       message.warning(`Đã hoàn tất ${successCount}/${total} Story.`);
     } else {
-      message.error('❌ Đăng Story thất bại, vui lòng kiểm tra lỗi bên dưới.');
+      message.error('Đăng Story thất bại, vui lòng kiểm tra lỗi bên dưới.');
     }
   };
 
@@ -908,7 +908,7 @@ const PostStory = () => {
     try {
       const res = await api.post(`/queue/${id}/publish-now`);
       if (res.data?.success) {
-        message.success('🚀 Đã đăng Story thành công!');
+        message.success('Đã đăng Story thành công!');
         refetchHistory();
         refetchTargets();
       } else {
@@ -959,7 +959,7 @@ const PostStory = () => {
                 className="text-[11px] text-blue-400 hover:text-blue-300 hover:underline font-mono truncate block max-w-[220px]"
                 title={link}
               >
-                🔗 {link}
+                {link}
               </a>
             )}
           </div>
@@ -976,7 +976,7 @@ const PostStory = () => {
         const pageName = matchedConn?.pageName || `Fanpage (${pageId || 'Mặc định'})`;
         return (
           <div>
-            <span className="font-semibold text-slate-200 text-xs block">🎯 {pageName}</span>
+            <span className="font-semibold text-slate-200 text-xs block">{pageName}</span>
             <Tag color="purple" className="text-[10px] !mt-1 font-bold">
               {matchedConn?.accountType || 'PERSONAL_COOKIE'}
             </Tag>
@@ -991,15 +991,15 @@ const PostStory = () => {
       render: (status: string, record: any) => {
         switch (status) {
           case 'PUBLISHED':
-            return <Tag color="success" className="font-bold text-xs">✅ Đã xuất bản</Tag>;
+            return <Tag color="success" className="font-bold text-xs">Đã xuất bản</Tag>;
           case 'PENDING':
-            return <Tag color="processing" className="font-bold text-xs">🗓️ Chờ đăng</Tag>;
+            return <Tag color="processing" className="font-bold text-xs">Chờ đăng</Tag>;
           case 'PROCESSING':
-            return <Tag color="purple" className="font-bold text-xs animate-pulse">🔄 Đang tải lên...</Tag>;
+            return <Tag color="purple" className="font-bold text-xs animate-pulse">Đang tải lên...</Tag>;
           case 'FAILED':
             return (
               <Tooltip title={record.errorMessage || 'Lỗi không xác định'}>
-                <Tag color="error" className="font-bold text-xs cursor-pointer">❌ Thất bại</Tag>
+                <Tag color="error" className="font-bold text-xs cursor-pointer">Thất bại</Tag>
               </Tooltip>
             );
           default:
@@ -1045,7 +1045,7 @@ const PostStory = () => {
                 onClick={() => handleQuickRepublish(record)}
                 className="text-xs text-amber-300 border-amber-500/40 hover:border-amber-400 bg-amber-950/30 font-semibold rounded-lg"
               >
-                ⚡ Đăng lại ngay
+                Đăng lại ngay
               </Button>
             </Tooltip>
           )}
@@ -1079,42 +1079,40 @@ const PostStory = () => {
   return (
     <div className="app-page max-w-5xl mx-auto space-y-6">
       {/* Header Bar */}
-      <div className="app-surface app-page-header !border-[#202a3a] !bg-[#111722] p-5 rounded-2xl shadow-lg">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-13 h-13 bg-gradient-to-tr from-purple-600 via-indigo-600 to-pink-500 text-white rounded-2xl flex items-center justify-center text-2xl shadow-lg shadow-purple-950/60 shrink-0">
-              🎬
+      <Card variant="borderless">
+        <Flex justify="space-between" align="center" wrap="wrap" gap="middle">
+          <Flex align="center" gap={14}>
+            <div className="w-10 h-10 bg-purple-500/15 border border-purple-500/30 text-purple-300 rounded-xl flex items-center justify-center text-lg shadow-sm shrink-0">
+              <VideoCameraOutlined />
             </div>
             <div>
-              <Title level={4} className="!text-slate-100 !mb-1 flex items-center gap-2">
+              <Title level={4} className="!mb-0.5 flex items-center gap-2">
                 Đăng Story Facebook & Quản Lý KPI Story
               </Title>
-              <Text className="text-slate-400 text-xs font-medium">
+              <Text type="secondary" className="text-xs font-medium">
                 Tự động bóc tách Clip từ Threads, TikTok, Reels và theo dõi tiến độ KPI Story hàng ngày của từng Fanpage
               </Text>
             </div>
-          </div>
+          </Flex>
 
-          <div className="flex gap-2 flex-wrap sm:justify-end items-center">
-            <Button
-              type="primary"
-              icon={<AimOutlined />}
-              onClick={openKpiModal}
-              className="bg-indigo-600 hover:bg-indigo-500 font-bold text-xs rounded-xl h-9 px-4 border-none shadow-md shadow-indigo-950/50"
-            >
-              🎯 Đặt KPI Story Hôm Nay
-            </Button>
-          </div>
-        </div>
-      </div>
+          <Button
+            type="primary"
+            icon={<AimOutlined />}
+            onClick={openKpiModal}
+            className="bg-indigo-600 hover:bg-indigo-500 font-bold text-xs"
+          >
+            Đặt KPI Story Hôm Nay
+          </Button>
+        </Flex>
+      </Card>
 
       {/* ── BẢNG THEO DÕI TIẾN ĐỘ KPI STORY HÔM NAY CHO CÁC FANPAGE ── */}
-      <div className="bg-[#111722] p-4 rounded-2xl border border-[#202a3a] shadow-sm space-y-3">
+      <Card variant="borderless" className="space-y-3">
         {/* Header với bộ lọc và nút thu gọn */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2.5 flex-wrap">
             <div className="flex items-center gap-2">
-              <TrophyOutlined className="text-amber-400 text-base" />
+              <BarChartOutlined className="text-purple-400 text-sm" />
               <span className="font-bold text-slate-100 text-sm">
                 Tiến Độ KPI Story Hôm Nay ({dayjs().format('DD/MM/YYYY')}):
               </span>
@@ -1139,7 +1137,7 @@ const PostStory = () => {
                 {
                   label: (
                     <span className="text-xs px-1">
-                      🎯 Đang theo dõi ({activeKpiPages.length})
+                      Đang theo dõi ({activeKpiPages.length})
                     </span>
                   ),
                   value: 'ACTIVE_ONLY'
@@ -1174,7 +1172,7 @@ const PostStory = () => {
             {/* Thanh tìm kiếm & hướng dẫn nhanh */}
             <div className="flex items-center justify-between gap-3 pt-1 border-t border-[#1c2636]">
               <span className="text-[11px] text-slate-400 hidden sm:inline">
-                💡 Bấm vào thẻ Fanpage để chọn nhanh trang đăng Story
+                Bấm vào thẻ Fanpage bên dưới để chọn nhanh trang đăng Story
               </span>
               {(kpiFilterMode === 'ALL' || fanpageStoryKpiStats.length > 6) && (
                 <div className="w-full sm:w-64">
@@ -1252,7 +1250,7 @@ const PostStory = () => {
                           {stat.hasKpi ? (
                             stat.isAchieved ? (
                               <Tag color="success" className="font-bold text-[10px] !m-0">
-                                🎉 Đạt KPI
+                                Đạt KPI
                               </Tag>
                             ) : (
                               <Tag color="warning" className="font-bold text-[10px] !m-0">
@@ -1322,7 +1320,7 @@ const PostStory = () => {
         ) : (
           <div className="flex items-center justify-between pt-1 border-t border-[#1c2636] text-xs text-slate-400">
             <span>
-              💡 Bảng KPI đang thu gọn ({displayedKpiStats.length} trang).
+              Bảng KPI đang thu gọn ({displayedKpiStats.length} trang).
             </span>
             <Button
               size="small"
@@ -1334,10 +1332,10 @@ const PostStory = () => {
             </Button>
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Progress Steps (Dark Mode) */}
-      <div className="bg-[#111722] p-4 rounded-2xl border border-[#202a3a] shadow-sm">
+      <Card variant="borderless">
         <Steps
           current={step}
           className="dark-steps"
@@ -1355,7 +1353,7 @@ const PostStory = () => {
             }
           ]}
         />
-      </div>
+      </Card>
 
       {/* Nhật ký Worker thời gian thực */}
       <PostStoryLogPanel isProcessing={isProcessing} />
@@ -1364,14 +1362,16 @@ const PostStory = () => {
       {step === 1 && (
         <Card variant="borderless" className="shadow-lg rounded-2xl border border-[#202a3a] !bg-[#111722] p-6 text-center">
           <div className="max-w-md mx-auto space-y-4">
-            <div className="text-4xl animate-bounce">🎬</div>
+            <div className="py-2">
+              <Spin indicator={<LoadingOutlined className="text-3xl text-purple-400" spin />} />
+            </div>
             <Title level={4} className="!text-purple-300 !mb-1">Đang tải Story lên Fanpage Facebook...</Title>
             <Text className="text-slate-400 text-xs block">{currentProgressText}</Text>
             
             {/* Đồng hồ đếm thời gian thực thi thời gian thực */}
             <div className="my-3 inline-flex items-center gap-3 bg-[#0d131d] border border-purple-900/60 px-5 py-2.5 rounded-2xl shadow-lg">
               <div className="w-9 h-9 rounded-xl bg-purple-950/80 border border-purple-800/50 flex items-center justify-center text-purple-300 text-base">
-                ⏱️
+                <ClockCircleOutlined />
               </div>
               <div className="text-left">
                 <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Thời gian đang chạy</div>
@@ -1408,12 +1408,12 @@ const PostStory = () => {
               <div className="space-y-1">
                 <span className="text-slate-100 font-bold text-lg block">
                   {failCount === 0
-                    ? `🎉 Hoàn tất! Đã đăng thành công cả ${successCount} Story lên Fanpage!`
+                    ? `Hoàn tất: Đã đăng thành công cả ${successCount} Story lên Fanpage!`
                     : `Hoàn tất: ${successCount} Story thành công, ${failCount} Story lỗi`}
                 </span>
                 {totalDurationSeconds > 0 && (
                   <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-950/40 border border-emerald-800/40 text-emerald-300 text-xs font-semibold">
-                    ⏱️ Thời gian hoàn tất: <b>{totalDurationSeconds} giây</b> ({Math.floor(totalDurationSeconds / 60).toString().padStart(2, '0')}:{(totalDurationSeconds % 60).toString().padStart(2, '0')})
+                    Thời gian hoàn tất: <b>{totalDurationSeconds} giây</b> ({Math.floor(totalDurationSeconds / 60).toString().padStart(2, '0')}:{(totalDurationSeconds % 60).toString().padStart(2, '0')})
                   </div>
                 )}
               </div>
@@ -1449,14 +1449,14 @@ const PostStory = () => {
                   }`}
                 >
                   <div className="flex items-center gap-2 overflow-hidden">
-                    <span className="font-bold shrink-0">{item.success ? '✅' : '❌'} #{idx + 1}</span>
+                    <span className="font-bold shrink-0">{item.success ? <CheckCircleFilled className="text-emerald-400 mr-1" /> : <CloseCircleFilled className="text-rose-400 mr-1" />} #{idx + 1}</span>
                     <span className="font-semibold text-slate-200 truncate max-w-xs">{item.title || item.url}</span>
                     <span className="font-mono text-slate-400 text-[11px] truncate max-w-xs">({item.url})</span>
                   </div>
                   <div>
                     {item.success ? (
                       <Tag color="success" className="font-semibold">
-                        {item.scheduledAt ? `🗓️ Lịch: ${item.scheduledAt}` : (item.postId ? `Post ID: ${item.postId}` : 'Đã đăng thành công')}
+                        {item.scheduledAt ? `Lịch: ${item.scheduledAt}` : (item.postId ? `Post ID: ${item.postId}` : 'Đã đăng thành công')}
                       </Tag>
                     ) : (
                       <Tag color="error" className="font-semibold">{item.error || 'Lỗi đăng'}</Tag>
@@ -1511,7 +1511,7 @@ const PostStory = () => {
                       onClick={() => setTargetMode('DIRECT')}
                     >
                       <Radio value="DIRECT">
-                        <span className="font-bold text-xs sm:text-sm text-slate-100">🔑 Nhập Page Access Token trực tiếp</span>
+                        <span className="font-bold text-xs sm:text-sm text-slate-100">Nhập Page Access Token trực tiếp</span>
                       </Radio>
                       <div className="text-xs text-slate-400 mt-1 pl-6">
                         Dán trực tiếp Page ID & Token (EAAG...) để đăng ngay
@@ -1525,7 +1525,7 @@ const PostStory = () => {
               {targetMode === 'SELECT' && (
                 <div className="space-y-3 mb-6">
                   <Form.Item
-                    label={<span className="font-bold text-slate-300 text-xs">🎯 Chọn Fanpage đăng Story</span>}
+                    label={<span className="font-bold text-slate-300 text-xs">Chọn Fanpage đăng Story</span>}
                     name="connectionId"
                     rules={[{ required: targetMode === 'SELECT', message: 'Vui lòng chọn Fanpage!' }]}
                     className="!mb-2"
@@ -1538,7 +1538,7 @@ const PostStory = () => {
                         value: c.id,
                         label: (
                           <div className="flex items-center justify-between">
-                            <span className="font-semibold text-slate-100">🎯 {c.pageName || c.platformAccountId}</span>
+                            <span className="font-semibold text-slate-100">{c.pageName || c.platformAccountId}</span>
                             <Tag color={c.accountType === 'PAGE_TOKEN' ? 'purple' : 'blue'} className="text-xs !mr-0 font-bold">
                               {c.accountType || 'PAGE_TOKEN'}
                             </Tag>
@@ -1547,7 +1547,7 @@ const PostStory = () => {
                       }))}
                       notFoundContent={
                         <div className="text-center py-4 text-slate-400 text-xs">
-                          Chưa có kết nối nào. Hãy chuyển sang tab <b>"🔑 Nhập Page Access Token trực tiếp"</b> ở trên!
+                          Chưa có kết nối nào. Hãy chuyển sang tab <b>"Nhập Page Access Token trực tiếp"</b> ở trên!
                         </div>
                       }
                     />
@@ -1564,7 +1564,7 @@ const PostStory = () => {
                             <>
                               Đã xuất bản <b>{currentSelectedPageKpi.publishedToday}/{currentSelectedPageKpi.targetCount} Story</b> hôm nay.
                               {currentSelectedPageKpi.isAchieved ? (
-                                <span className="text-emerald-400 font-bold ml-1.5">🎉 Đã đạt KPI!</span>
+                                <span className="text-emerald-400 font-bold ml-1.5">Đã đạt KPI!</span>
                               ) : (
                                 <span className="text-amber-400 font-medium ml-1.5">Còn thiếu {currentSelectedPageKpi.remaining} Story.</span>
                               )}
@@ -1594,7 +1594,7 @@ const PostStory = () => {
               {targetMode === 'DIRECT' && (
                 <div className="bg-[#0d131d] p-4 rounded-xl border border-purple-900/40 mb-6 space-y-4">
                   <Form.Item
-                    label={<span className="font-bold text-slate-300 text-xs">🆔 Page ID</span>}
+                    label={<span className="font-bold text-slate-300 text-xs">Page ID</span>}
                     name="pageId"
                     rules={[{ required: targetMode === 'DIRECT', message: 'Vui lòng nhập Page ID!' }]}
                     className="!mb-3"
@@ -1607,7 +1607,7 @@ const PostStory = () => {
                   </Form.Item>
 
                   <Form.Item
-                    label={<span className="font-bold text-slate-300 text-xs">🔑 Page Access Token (EAAG...)</span>}
+                    label={<span className="font-bold text-slate-300 text-xs">Page Access Token (EAAG...)</span>}
                     name="accessToken"
                     rules={[{ required: targetMode === 'DIRECT', message: 'Vui lòng nhập Page Access Token!' }]}
                     className="!mb-3"
@@ -1647,11 +1647,11 @@ const PostStory = () => {
               <div className="mb-6 bg-[#0d131d] p-4 rounded-xl border border-[#202a3a]">
                 <div className="flex items-center justify-between gap-2 mb-3">
                   <Text className="font-bold text-slate-200 text-sm flex items-center gap-2">
-                    ⏰ Thời điểm xuất bản Story:
+                    Thời điểm xuất bản Story:
                   </Text>
                   {scheduleMode === 'GOLDEN_HOURS' && (
                     <Tag color="purple" className="font-bold text-[10px] uppercase">
-                      ✨ Tự động tối ưu tương tác
+                      Tự động tối ưu tương tác
                     </Tag>
                   )}
                 </div>
@@ -1669,7 +1669,7 @@ const PostStory = () => {
                       onClick={() => targetMode !== 'DIRECT' && setScheduleMode('GOLDEN_HOURS')}
                     >
                       <Radio value="GOLDEN_HOURS" disabled={targetMode === 'DIRECT'}>
-                        <span className="font-bold text-xs sm:text-sm text-slate-100">🌟 Phân Bổ Giờ Vàng</span>
+                        <span className="font-bold text-xs sm:text-sm text-slate-100">Phân Bổ Giờ Vàng</span>
                       </Radio>
                       <div className="text-[11px] text-purple-300/80 mt-1 pl-6">
                         Tự động rải Story vào 4 mốc vàng: Sáng, Trưa, Tối, Đêm
@@ -1686,7 +1686,7 @@ const PostStory = () => {
                       onClick={() => setScheduleMode('NOW')}
                     >
                       <Radio value="NOW">
-                        <span className="font-bold text-xs sm:text-sm text-slate-100">🚀 Đăng ngay tất cả</span>
+                        <span className="font-bold text-xs sm:text-sm text-slate-100">Đăng ngay tất cả</span>
                       </Radio>
                       <div className="text-[11px] text-slate-400 mt-1 pl-6">
                         Xuất bản tất cả clip Story lên Fanpage ngay lập tức
@@ -1703,7 +1703,7 @@ const PostStory = () => {
                       onClick={() => targetMode !== 'DIRECT' && setScheduleMode('LATER')}
                     >
                       <Radio value="LATER" disabled={targetMode === 'DIRECT'}>
-                        <span className="font-bold text-xs sm:text-sm text-slate-100">🗓️ Tự chọn giờ</span>
+                        <span className="font-bold text-xs sm:text-sm text-slate-100">Tự chọn giờ</span>
                       </Radio>
                       <div className="text-[11px] text-slate-400 mt-1 pl-6">
                         Chọn ngày giờ bắt đầu và khoảng cách tùy chỉnh
@@ -1717,7 +1717,7 @@ const PostStory = () => {
                   <div className="mt-4 pt-4 border-t border-[#202a3a] space-y-3">
                     <div className="flex items-center justify-between text-xs text-slate-300">
                       <span className="font-bold text-purple-300 flex items-center gap-1.5">
-                        🎯 Lộ trình phát hành Giờ Vàng tự động ({goldenTimeline.length} Story):
+                        Lộ trình phát hành Giờ Vàng tự động ({goldenTimeline.length} Story):
                       </span>
                       <span className="text-[11px] text-slate-400">
                         (Mỗi Story giãn cách ngẫu nhiên ±3p để bảo đảm an toàn)
@@ -1736,7 +1736,7 @@ const PostStory = () => {
                             </span>
                             <div className="overflow-hidden">
                               <div className="font-bold text-slate-200 text-xs truncate">
-                                {item.emoji} {item.slotName} ({item.time.format('DD/MM')})
+                                {item.slotName} ({item.time.format('DD/MM')})
                               </div>
                               <div className="text-[10px] text-slate-400">
                                 {item.desc}
@@ -1802,26 +1802,26 @@ const PostStory = () => {
                 >
                   <div className="grid grid-cols-2 gap-3">
                     <div
-                      className={`p-3.5 rounded-xl border cursor-pointer transition-all text-center ${
+                      className={`p-3.5 rounded-xl border cursor-pointer transition-all text-center flex flex-col items-center justify-center ${
                         mediaType === 'video'
                           ? 'border-purple-500 bg-purple-950/40 shadow-sm ring-1 ring-purple-500/40 text-purple-200'
                           : 'border-[#202a3a] bg-[#111722] hover:border-purple-500/40 hover:bg-[#151f2e] text-slate-300'
                       }`}
                       onClick={() => setMediaType('video')}
                     >
-                      <div className="text-2xl mb-1">🎬</div>
+                      <VideoCameraOutlined className="text-xl text-purple-400 mb-1.5" />
                       <div className="font-bold text-slate-100 text-sm">Video Story</div>
                       <div className="text-[11px] text-slate-400 mt-0.5">File .MP4 hoặc link Reels / Threads / TikTok</div>
                     </div>
                     <div
-                      className={`p-3.5 rounded-xl border cursor-pointer transition-all text-center ${
+                      className={`p-3.5 rounded-xl border cursor-pointer transition-all text-center flex flex-col items-center justify-center ${
                         mediaType === 'photo'
                           ? 'border-pink-500 bg-pink-950/40 shadow-sm ring-1 ring-pink-500/40 text-pink-200'
                           : 'border-[#202a3a] bg-[#111722] hover:border-pink-500/40 hover:bg-[#151f2e] text-slate-300'
                       }`}
                       onClick={() => setMediaType('photo')}
                     >
-                      <div className="text-2xl mb-1">🖼️</div>
+                      <PictureOutlined className="text-xl text-pink-400 mb-1.5" />
                       <div className="font-bold text-slate-100 text-sm">Photo Story</div>
                       <div className="text-[11px] text-slate-400 mt-0.5">Ảnh JPG/PNG — tỉ lệ 9:16</div>
                     </div>
@@ -1850,7 +1850,7 @@ const PostStory = () => {
                       onClick={handlePasteFromClipboard}
                       className="text-xs font-semibold rounded-lg bg-[#172230] border-[#2d3b4f] hover:border-purple-400"
                     >
-                      📋 Dán link
+                      Dán link
                     </Button>
                     <Upload
                       customRequest={handleUploadCustomRequest}
@@ -1865,7 +1865,7 @@ const PostStory = () => {
                         loading={isUploadingFiles}
                         className="text-xs font-semibold rounded-lg bg-[#172230] border-[#2d3b4f] hover:border-purple-400 text-purple-300"
                       >
-                        📁 Tải file từ máy
+                        Tải file từ máy
                       </Button>
                     </Upload>
                     <Button
@@ -1876,7 +1876,7 @@ const PostStory = () => {
                       onClick={handleExtractAll}
                       className="bg-purple-600 hover:bg-purple-500 font-bold text-xs rounded-lg"
                     >
-                      🔍 Quét & Trích Xuất Clip
+                      Quét & Trích Xuất Clip
                     </Button>
                   </div>
                 </div>
@@ -1898,7 +1898,7 @@ const PostStory = () => {
 
                 <div className="mt-2.5 flex items-center justify-between flex-wrap gap-2 text-[11px] text-slate-400">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-emerald-400 font-medium">✨ Hỗ trợ link:</span>
+                    <span className="text-emerald-400 font-medium">Hỗ trợ link:</span>
                     <span>Threads</span> • <span>TikTok</span> • <span>Reels / FB</span> • <span>Video MP4 trực tiếp</span>
                   </div>
                   <span className="text-slate-500">Hệ thống sẽ tự động bóc tách video MP4 sắc nét</span>
@@ -2101,7 +2101,7 @@ const PostStory = () => {
                 <div className="flex gap-3">
                   <InfoCircleOutlined className="text-purple-400 mt-0.5 flex-shrink-0 text-base" />
                   <div className="space-y-1.5 text-xs text-slate-300">
-                    <div className="font-semibold text-slate-100 mb-1">📋 Cơ Chế Đăng Story & Hỗ Trợ Link:</div>
+                    <div className="font-semibold text-slate-100 mb-1">Cơ Chế Đăng Story & Hỗ Trợ Link:</div>
                     <div>• Hệ thống <strong>tự động bóc tách video HD</strong> từ link Threads, TikTok, Reels mà không cần tải thủ công về máy.</div>
                     <div>• Tự động đăng tuần tự từng Story lên Fanpage cách nhau hợp lý, tối ưu hiển thị bảng tin 24h.</div>
                     <div>• Bạn có thể xem trước tất cả các clip ở trên trước khi bấm Đăng Ngay hoặc Lên Lịch.</div>
@@ -2123,8 +2123,8 @@ const PostStory = () => {
                   }}
                 >
                   {scheduleMode === 'LATER'
-                    ? `🗓️ Lên Lịch Cho ${clips.length || 1} Story Tự Động`
-                    : `🚀 Đăng Ngay ${clips.length || 1} Story Lên Fanpage Facebook`}
+                    ? `Lên Lịch Cho ${clips.length || 1} Story Tự Động`
+                    : `Đăng Ngay ${clips.length || 1} Story Lên Fanpage Facebook`}
                 </Button>
               </Form.Item>
             </Form>
@@ -2156,7 +2156,7 @@ const PostStory = () => {
 
       {/* Modal Sửa Link Media Trực Tiếp Cho Clip */}
       <Modal
-        title={<span className="text-purple-400 font-bold">🛠️ Sửa Link Media Cho Clip #{editingClip ? editingClip.index + 1 : ''}</span>}
+        title={<span className="text-purple-400 font-bold">Sửa Link Media Cho Clip #{editingClip ? editingClip.index + 1 : ''}</span>}
         open={!!editingClip}
         onCancel={() => setEditingClip(null)}
         onOk={handleSaveEditClip}
@@ -2182,7 +2182,7 @@ const PostStory = () => {
         title={
           <div className="flex items-center gap-2 text-slate-100 pb-2 border-b border-[#202a3a]">
             <AimOutlined className="text-indigo-400 text-lg" />
-            <span className="font-bold text-base">🎯 Thiết Lập Mục Tiêu KPI Story Hôm Nay</span>
+            <span className="font-bold text-base">Thiết Lập Mục Tiêu KPI Story Hôm Nay</span>
           </div>
         }
         open={kpiModalOpen}

@@ -1,14 +1,16 @@
+import { runtime, withSessionToken } from '../config/runtime';
 import { useState, useEffect, useMemo } from 'react';
-import { Button, Card, Table, Typography, Space, Tag, Modal, Form, Input, Select, DatePicker, Checkbox, Tooltip, App, Tabs, Progress, Segmented, Dropdown, Drawer, Descriptions, Empty, Grid, Pagination, Collapse } from 'antd';
+import { Button, Card, Table, Typography, Space, Tag, Modal, Form, Input, Select, DatePicker, Checkbox, Tooltip, App, Tabs, Progress, Segmented, Dropdown, Drawer, Descriptions, Empty, Grid, Pagination, Collapse, Alert, Flex, Statistic, Row, Col } from 'antd';
 import { SyncOutlined, SendOutlined, DeleteOutlined, ClockCircleOutlined, CheckCircleOutlined, CloseCircleOutlined, LinkOutlined, PlusOutlined, LoadingOutlined, ThunderboltOutlined, EditOutlined, ExclamationCircleOutlined, SearchOutlined, MoreOutlined, EyeOutlined, VideoCameraOutlined, PictureOutlined, FileTextOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs, { Dayjs } from 'dayjs';
 import api from '../config/axios';
 import { BatchPostModal } from '../components/BatchPostModal';
+import { POSTING_WINDOW_QUERY_KEY, formatWhen, type WindowPlan } from '../components/common/PostingWindowPanel';
 
 const { Title, Text, Paragraph } = Typography;
 
-const WORKER_BASE_URL = import.meta.env.VITE_WORKER_BASE_URL || 'http://localhost:3001';
+const WORKER_BASE_URL = runtime.workerBase;
 type TimePeriod = 'DAY' | 'WEEK' | 'MONTH' | 'ALL';
 
 interface SocialAccount {
@@ -67,38 +69,56 @@ const PostQueueView = () => {
   const [viewingPost, setViewingPost] = useState<PostQueue | null>(null);
   const [editingContent, setEditingContent] = useState('');
   const [mobilePage, setMobilePage] = useState(1);
+  const [isPackingQueue, setIsPackingQueue] = useState(false);
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
   const screens = Grid.useBreakpoint();
 
-  // Fetch danh sách post queue
+  // Fetch trạng thái khung giờ và dự báo hàng đợi
+  const { data: windowPlan } = useQuery<WindowPlan>({
+    queryKey: POSTING_WINDOW_QUERY_KEY,
+    queryFn: async () => (await api.get('/queue/window-plan')).data,
+    refetchInterval: 20000,
+  });
+
+  const handlePackQueueContinuous = async () => {
+    setIsPackingQueue(true);
+    try {
+      await api.put('/queue/posting-window', {
+        enabled: true,
+        start: '08:00',
+        end: '23:59',
+        minGapSeconds: 180,
+      });
+      const res = await api.post('/queue/pack-continuous', { gapSeconds: 180 });
+      const finish = res.data?.estimatedFinishAt ? dayjs(res.data.estimatedFinishAt).format('HH:mm DD/MM') : '';
+      const deferred = Number(res.data?.deferredCount) || 0;
+      message.success(
+        `⚡ Đã dồn ${res.data?.updated ?? 0} bài đăng liên tục${finish ? `, dự kiến xong lúc ${finish}` : ''}` +
+        (deferred > 0 ? `. ${deferred} bài không kịp trong hôm nay.` : ' · 100% hoàn thành hôm nay!'),
+        6
+      );
+      queryClient.invalidateQueries({ queryKey: ['postQueue'] });
+      queryClient.invalidateQueries({ queryKey: POSTING_WINDOW_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ['postQueuePlaywright'] });
+    } catch (err: any) {
+      message.error(err?.response?.data?.message || 'Không thể dồn hàng đợi');
+    } finally {
+      setIsPackingQueue(false);
+    }
+  };
+
+  // Fetch danh sách post queue (tối ưu: chỉ lấy 2 ngày gần nhất thay vì toàn bộ 7 ngày để giảm 65% tải RAM/mạng)
   const { data: posts, isLoading, refetch } = useQuery({
     queryKey: ['postQueue'],
     queryFn: async () => {
-      const response = await api.get('/campaigns');
-      const campaigns = response.data;
-
-      // Gọi song song thay vì tuần tự — N campaign không còn kéo dài thời gian tải tuyến tính.
-      const results = await Promise.all(
-        campaigns.map(async (campaign: any) => {
-          try {
-            const res = await api.get(`/queue/campaign/${campaign.id}`);
-            return res.data.map((item: any) => ({
-              ...item,
-              campaign: { id: campaign.id, name: campaign.name }
-            }));
-          } catch (e) {
-            console.error(e);
-            return [];
-          }
-        })
-      );
-      const allPosts: PostQueue[] = results.flat();
-      // Sắp xếp bài mới nhất lên vị trí số #1 ở trên đầu bảng
+      // 1 request cho mọi campaign (mỗi item đã kèm `campaign`)
+      const response = await api.get('/queue/recent', { params: { days: 2 } });
+      const allPosts: PostQueue[] = response.data || [];
       return allPosts.sort((a, b) => b.id - a.id);
     },
-    // Tự động làm mới để bài vừa Lưu từ Extension xuất hiện ngay mà không cần bấm nút Làm mới thủ công.
-    refetchInterval: 18000
+    staleTime: 12000,
+    refetchInterval: 25000
   });
 
   const failedPosts = useMemo(() => (posts || []).filter(p => p.status === 'FAILED'), [posts]);
@@ -115,7 +135,7 @@ const PostQueueView = () => {
 
   // Thêm bài từ 1 hoặc nhiều URL (mỗi dòng 1 link)
   const addFromUrlMutation = useMutation({
-    mutationFn: async (values: { urls: string; scheduledAt?: Dayjs; targetFanpageId?: string; publishNow?: boolean; intervalMinutes?: number; affiliateLink?: string; groupNames?: string[] }) => {
+    mutationFn: async (values: { urls: string; scheduledAt?: Dayjs; targetFanpageId?: string; publishNow?: boolean; intervalMinutes?: number; affiliateLink?: string; groupNames?: string[]; fitToday?: boolean }) => {
       setProgressPercent(15);
       setProgressStatusMsg('🔍 Đang kết nối Threads & phân tích đường dẫn...');
 
@@ -134,14 +154,25 @@ const PostQueueView = () => {
           .split('\n')
           .map((u) => u.trim())
           .filter((u) => u.length > 0);
+
+        let calculatedInterval = values.intervalMinutes || 3;
+        if (values.fitToday && urls.length > 0) {
+          const now = dayjs();
+          const endOfDay = now.hour(23).minute(45).second(0);
+          const diffMinutes = Math.max(10, endOfDay.diff(now, 'minute'));
+          calculatedInterval = Math.max(2, Math.min(15, Math.floor(diffMinutes / urls.length)));
+        }
+
         const payload = {
           urls,
           scheduledAt: values.publishNow || !values.scheduledAt ? undefined : values.scheduledAt.format('YYYY-MM-DDTHH:mm:ss'),
           targetFanpageId: values.targetFanpageId,
           publishNow: values.publishNow ? 'true' : 'false',
-          intervalMinutes: values.intervalMinutes,
+          intervalMinutes: calculatedInterval,
           affiliateLink: values.affiliateLink?.trim() || undefined,
           groupNames: values.groupNames && values.groupNames.length > 0 ? values.groupNames : undefined,
+          appendToQueue: values.fitToday || false,
+          gapSeconds: Math.round(calculatedInterval * 60),
         };
         const response = await api.post('/queue/add-from-urls', payload);
         clearTimeout(timer1);
@@ -169,6 +200,7 @@ const PostQueueView = () => {
         setProgressStatusMsg('');
         form.resetFields();
         queryClient.invalidateQueries({ queryKey: ['postQueue'] });
+        queryClient.invalidateQueries({ queryKey: POSTING_WINDOW_QUERY_KEY });
       }, 1000);
     },
     onError: () => {
@@ -357,35 +389,40 @@ const PostQueueView = () => {
     },
   };
 
-  const postsForPeriod = posts?.filter(post => {
-    if (timePeriod === 'ALL') return true;
-    const rawDate = post.publishedAt || post.scheduledAt;
-    if (!rawDate) return false;
-    const date = dayjs(rawDate);
+  const postsForPeriod = useMemo(() => {
+    if (!posts) return [];
+    if (timePeriod === 'ALL') return posts;
     const now = dayjs();
-    if (timePeriod === 'DAY') return date.isSame(now, 'day');
-    if (timePeriod === 'WEEK') {
-      const start = now.startOf('week').add(1, 'day');
-      return !date.isBefore(start) && !date.isAfter(start.add(6, 'day').endOf('day'));
-    }
-    return date.isSame(now, 'month');
-  });
+    const startOfWeek = now.startOf('week').add(1, 'day');
+    const endOfWeek = startOfWeek.add(6, 'day').endOf('day');
 
-  const searchablePosts = postsForPeriod?.filter(post => {
+    return posts.filter(post => {
+      const rawDate = post.publishedAt || post.scheduledAt;
+      if (!rawDate) return false;
+      const date = dayjs(rawDate);
+      if (timePeriod === 'DAY') return date.isSame(now, 'day');
+      if (timePeriod === 'WEEK') {
+        return !date.isBefore(startOfWeek) && !date.isAfter(endOfWeek);
+      }
+      return date.isSame(now, 'month');
+    });
+  }, [posts, timePeriod]);
+
+  const searchablePosts = useMemo(() => {
+    if (!postsForPeriod) return [];
     const keyword = searchText.trim().toLocaleLowerCase('vi');
-    if (!keyword) return true;
-    return [post.title, post.content, post.originalUrl, post.campaign?.name, String(post.id)]
-      .some(value => value?.toLocaleLowerCase('vi').includes(keyword));
-  });
+    if (!keyword) return postsForPeriod;
+    return postsForPeriod.filter(post =>
+      [post.title, post.content, post.originalUrl, post.campaign?.name, String(post.id)]
+        .some(value => value?.toLocaleLowerCase('vi').includes(keyword))
+    );
+  }, [postsForPeriod, searchText]);
 
-  const filteredPosts = searchablePosts?.filter(post => {
-    if (activeTab === 'PENDING') return post.status === 'PENDING';
-    if (activeTab === 'PROCESSING') return post.status === 'PROCESSING';
-    if (activeTab === 'PUBLISHED') return post.status === 'PUBLISHED';
-    if (activeTab === 'FAILED') return post.status === 'FAILED';
-    if (activeTab === 'PENDING_APPROVAL') return post.status === 'PENDING_APPROVAL';
-    return true;
-  });
+  const filteredPosts = useMemo(() => {
+    if (!searchablePosts) return [];
+    if (activeTab === 'ALL') return searchablePosts;
+    return searchablePosts.filter(post => post.status === activeTab);
+  }, [searchablePosts, activeTab]);
 
   const getPostMeta = (record: PostQueue) => {
     const isVideo = !!record.mediaUrls && (record.mediaUrls.includes('.mp4') || record.mediaUrls.includes('video'));
@@ -490,7 +527,7 @@ const PostQueueView = () => {
     return items;
   };
 
-  const columns = [
+  const columns = useMemo(() => [
     {
       title: 'Bài đăng', key: 'post', width: 350,
       render: (_: any, record: PostQueue) => {
@@ -574,7 +611,7 @@ const PostQueueView = () => {
         );
       },
     },
-  ];
+  ], [retryingGroupsId, groupRetryProgress, publishNowMutation.isPending, resetFailedMutation.isPending, retryFailedGroupsMutation]);
 
   return (
     <div className="app-page">
@@ -611,6 +648,15 @@ const PostQueueView = () => {
           )}
           <Button
             type="primary"
+            icon={<ThunderboltOutlined />}
+            loading={isPackingQueue}
+            onClick={handlePackQueueContinuous}
+            className="font-bold text-xs h-10 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:!from-amber-400 hover:!to-orange-500 border-none shadow-md shadow-amber-500/20 text-white flex items-center gap-1.5"
+          >
+            ⚡ Dồn đăng hết hôm nay
+          </Button>
+          <Button
+            type="primary"
             icon={<PlusOutlined />}
             onClick={() => setIsUrlModalVisible(true)}
             className="font-bold text-xs h-10 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 border-none shadow-md shadow-blue-600/20"
@@ -631,12 +677,58 @@ const PostQueueView = () => {
         </Space>
       </div>
 
-      <div className="bg-[#111a28] border border-slate-800/80 rounded-2xl p-4 flex flex-col xl:flex-row xl:items-center justify-between gap-3 shadow-lg">
-        <Segmented<TimePeriod> block={!screens.md} value={timePeriod} onChange={(value) => { setTimePeriod(value); setMobilePage(1); }} options={[{ label: screens.md ? 'Hôm nay' : 'Ngày', value: 'DAY' }, { label: screens.md ? 'Tuần này' : 'Tuần', value: 'WEEK' }, { label: screens.md ? 'Tháng này' : 'Tháng', value: 'MONTH' }, { label: 'Tất cả', value: 'ALL' }]} />
-        <div className="flex flex-col sm:flex-row gap-2 w-full xl:w-auto">
-          <Input allowClear value={searchText} onChange={event => { setSearchText(event.target.value); setMobilePage(1); }} prefix={<SearchOutlined className="text-slate-400" />} placeholder="Tìm bài đăng..." className="w-full sm:w-72 bg-[#0e1622] border-slate-700 text-slate-200 rounded-xl" />
-        </div>
-      </div>
+      {windowPlan?.queue && (windowPlan.queue.laterCount > 0 || (windowPlan.totalDeferred || 0) > 0) && (
+        <Alert
+          type="warning"
+          showIcon
+          className="mb-4"
+          message={
+            <Text strong className="text-amber-300">
+              Đang có {windowPlan.queue.laterCount || windowPlan.totalDeferred} bài bị hoãn sang ngày mai
+            </Text>
+          }
+          description={
+            <Text className="text-slate-400 text-xs">
+              Các bài viết bị xếp lịch sau 23:59. Bấm nút bên cạnh để hệ thống tự động co khoảng cách và đăng xong 100% trong hôm nay.
+            </Text>
+          }
+          action={
+            <Button
+              type="primary"
+              icon={<ThunderboltOutlined />}
+              loading={isPackingQueue}
+              onClick={handlePackQueueContinuous}
+              className="bg-amber-500 hover:!bg-amber-400 text-slate-950 font-extrabold text-xs border-none"
+            >
+              ⚡ Dồn đăng hết hôm nay
+            </Button>
+          }
+        />
+      )}
+
+      <Card variant="borderless" className="mb-4 shadow-lg border border-slate-800/80 bg-[#111a28]">
+        <Flex justify="space-between" align="center" wrap gap="middle">
+          <Segmented<TimePeriod>
+            block={!screens.md}
+            value={timePeriod}
+            onChange={(value) => { setTimePeriod(value); setMobilePage(1); }}
+            options={[
+              { label: screens.md ? 'Hôm nay' : 'Ngày', value: 'DAY' },
+              { label: screens.md ? 'Tuần này' : 'Tuần', value: 'WEEK' },
+              { label: screens.md ? 'Tháng này' : 'Tháng', value: 'MONTH' },
+              { label: 'Tất cả', value: 'ALL' }
+            ]}
+          />
+          <Input
+            allowClear
+            value={searchText}
+            onChange={event => { setSearchText(event.target.value); setMobilePage(1); }}
+            prefix={<SearchOutlined className="text-slate-400" />}
+            placeholder="Tìm bài đăng..."
+            style={{ width: screens.sm ? 280 : '100%' }}
+          />
+        </Flex>
+      </Card>
 
       {/* Main Table Card with Filter Tabs */}
       <Card variant="borderless" className="shadow-2xl rounded-2xl border border-slate-800/80 bg-[#111a28]">
@@ -663,51 +755,59 @@ const PostQueueView = () => {
             ]} /></div>}
         </div>
 
-          {selectedRowKeys.length > 0 && (
-            <div className="flex items-center gap-3 bg-[#15233a] border border-cyan-500/30 px-4 py-2 rounded-xl shrink-0 mb-4">
-              <span className="text-xs font-bold text-slate-200">
-                Đã chọn <span className="text-cyan-400 font-extrabold">{selectedRowKeys.length}</span> bài viết
-              </span>
-              <Button
-                type="primary"
-                size="small"
-                icon={<SyncOutlined />}
-                loading={resetFailedBatchMutation.isPending}
-                className="bg-amber-600 hover:!bg-amber-500 border-none font-bold rounded-lg text-xs"
-                onClick={() => {
-                  Modal.confirm({
-                    title: `Chuyển ${selectedRowKeys.length} bài đã chọn sang Chờ đăng`,
-                    content: `Bạn có chắc muốn đưa ${selectedRowKeys.length} bài viết này về trạng thái Chờ đăng không?`,
-                    okText: 'Chuyển sang Chờ đăng',
-                    cancelText: 'Hủy',
-                    onOk: () => resetFailedBatchMutation.mutate(selectedRowKeys)
-                  });
-                }}
-              >
-                Chuyển Sang Chờ Đăng
-              </Button>
-              <Button
-                type="primary"
-                danger
-                size="small"
-                icon={<DeleteOutlined />}
-                loading={batchDeleteMutation.isPending}
-                className="font-bold rounded-lg text-xs"
-                onClick={() => {
-                  Modal.confirm({
-                    title: `Xóa hàng loạt ${selectedRowKeys.length} bài viết`,
-                    content: `Bạn có chắc chắn muốn xóa ${selectedRowKeys.length} bài viết đã chọn khỏi hàng đợi không?`,
-                    okText: 'Xóa hàng loạt',
-                    okType: 'danger',
-                    cancelText: 'Hủy',
-                    onOk: () => batchDeleteMutation.mutate(selectedRowKeys)
-                  });
-                }}
-              >
-                Xóa Hàng Loạt
-              </Button>
-            </div>
-          )}
+        {selectedRowKeys.length > 0 && (
+          <Alert
+            type="info"
+            className="mb-4"
+            message={
+              <Flex align="center" justify="space-between" wrap gap="small">
+                <Text strong className="text-slate-200 text-xs">
+                  Đã chọn <Text className="text-cyan-400 font-extrabold">{selectedRowKeys.length}</Text> bài viết
+                </Text>
+                <Space>
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<SyncOutlined />}
+                    loading={resetFailedBatchMutation.isPending}
+                    className="bg-amber-600 hover:!bg-amber-500 border-none font-bold rounded-lg text-xs"
+                    onClick={() => {
+                      Modal.confirm({
+                        title: `Chuyển ${selectedRowKeys.length} bài đã chọn sang Chờ đăng`,
+                        content: `Bạn có chắc muốn đưa ${selectedRowKeys.length} bài viết này về trạng thái Chờ đăng không?`,
+                        okText: 'Chuyển sang Chờ đăng',
+                        cancelText: 'Hủy',
+                        onOk: () => resetFailedBatchMutation.mutate(selectedRowKeys)
+                      });
+                    }}
+                  >
+                    Chuyển Sang Chờ Đăng
+                  </Button>
+                  <Button
+                    type="primary"
+                    danger
+                    size="small"
+                    icon={<DeleteOutlined />}
+                    loading={batchDeleteMutation.isPending}
+                    className="font-bold rounded-lg text-xs"
+                    onClick={() => {
+                      Modal.confirm({
+                        title: `Xóa hàng loạt ${selectedRowKeys.length} bài viết`,
+                        content: `Bạn có chắc chắn muốn xóa ${selectedRowKeys.length} bài viết đã chọn khỏi hàng đợi không?`,
+                        okText: 'Xóa hàng loạt',
+                        okType: 'danger',
+                        cancelText: 'Hủy',
+                        onOk: () => batchDeleteMutation.mutate(selectedRowKeys)
+                      });
+                    }}
+                  >
+                    Xóa Hàng Loạt
+                  </Button>
+                </Space>
+              </Flex>
+            }
+          />
+        )}
 
         {screens.md ? (
           <Table
@@ -753,10 +853,10 @@ const PostQueueView = () => {
       {/* Add From Link Modal */}
       <Modal
         title={
-          <div className="flex items-center gap-2 text-slate-800 pb-2 border-b border-slate-100">
-            <LinkOutlined className="text-blue-600 text-xl" />
-            <span className="font-bold text-lg">Tạo bài đăng</span>
-          </div>
+          <Flex align="center" gap={8} className="pb-3 border-b border-slate-800">
+            <LinkOutlined className="text-blue-500 text-lg" />
+            <Text strong className="text-base text-slate-100">Tạo bài đăng từ liên kết</Text>
+          </Flex>
         }
         open={isUrlModalVisible}
         onCancel={() => setIsUrlModalVisible(false)}
@@ -775,8 +875,8 @@ const PostQueueView = () => {
           <Form.Item
             name="urls"
             label={
-              <div className="flex items-center justify-between gap-2 w-full">
-                <span className="font-semibold text-slate-700">1. Dán liên kết bài gốc</span>
+              <Flex align="center" justify="space-between" className="w-full">
+                <Text strong className="text-slate-200">1. Dán liên kết bài gốc</Text>
                 <Button
                   type="primary"
                   size="small"
@@ -794,7 +894,7 @@ const PostQueueView = () => {
                 >
                   📋 Dán link
                 </Button>
-              </div>
+              </Flex>
             }
             extra="Hỗ trợ Threads, Facebook và website. Nếu có nhiều liên kết, nhập mỗi liên kết trên một dòng."
             rules={[{ required: true, message: 'Vui lòng dán ít nhất một liên kết' }]}
@@ -813,7 +913,7 @@ const PostQueueView = () => {
                 .map((u: string) => u.trim())
                 .filter((u: string) => u.length > 0).length;
               return count > 1 ? (
-                <div className="text-xs text-emerald-600 font-semibold -mt-2">
+                <div className="text-xs text-emerald-400 font-semibold -mt-2">
                   Đã nhập {count} link — sẽ tạo {count} bài trong Hàng đợi
                 </div>
               ) : null;
@@ -822,7 +922,7 @@ const PostQueueView = () => {
 
           <Form.Item
             name="targetFanpageId"
-            label={<span className="font-semibold text-slate-700">2. Chọn Fanpage nhận bài</span>}
+            label={<Text strong className="text-slate-200">2. Chọn Fanpage nhận bài</Text>}
             rules={[{ required: true, message: 'Vui lòng chọn Fanpage' }]}
           >
             <Select
@@ -838,14 +938,19 @@ const PostQueueView = () => {
             />
           </Form.Item>
 
-          <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80">
-            <div className="text-xs font-semibold text-slate-700 mb-2">3. Chọn thời điểm đăng</div>
-            <Form.Item name="publishNow" valuePropName="checked" className="mb-0">
-              <Checkbox className="font-semibold text-slate-800">
+          <Card size="small" variant="borderless" className="bg-[#15233a] border border-slate-700/80 mb-4" styles={{ body: { padding: '12px' } }}>
+            <Text strong className="text-xs text-slate-200 mb-2 block">3. Chọn thời điểm đăng</Text>
+            <Form.Item name="publishNow" valuePropName="checked" className="mb-1">
+              <Checkbox className="font-semibold text-slate-200">
                 Đăng ngay, không cần hẹn giờ
               </Checkbox>
             </Form.Item>
-          </div>
+            <Form.Item name="fitToday" valuePropName="checked" className="mb-0" initialValue={true}>
+              <Checkbox className="font-semibold text-amber-400 text-xs">
+                ⚡ Tự động tính khoảng cách để đăng hết trong hôm nay
+              </Checkbox>
+            </Form.Item>
+          </Card>
 
           <Form.Item
             noStyle
@@ -855,7 +960,7 @@ const PostQueueView = () => {
               !getFieldValue('publishNow') && (
                 <Form.Item
                   name="scheduledAt"
-                  label={<span className="font-semibold text-slate-700">Ngày giờ hẹn đăng</span>}
+                  label={<Text strong className="text-slate-200">Ngày giờ hẹn đăng</Text>}
                   rules={[{ required: true, message: 'Chọn ngày giờ muốn đăng bài!' }]}
                 >
                   <DatePicker
@@ -874,10 +979,10 @@ const PostQueueView = () => {
 
           <Collapse
             ghost
-            className="border border-slate-200 rounded-xl bg-slate-50"
+            className="border border-slate-800 rounded-xl bg-[#0e1622]"
             items={[{
               key: 'advanced',
-              label: <span className="text-xs font-semibold text-slate-700">Tùy chọn nâng cao</span>,
+              label: <Text className="text-xs font-semibold text-slate-300">Tùy chọn nâng cao</Text>,
               children: <>
                 <Form.Item noStyle shouldUpdate={(prev, cur) => prev.targetFanpageId !== cur.targetFanpageId}>
                   {({ getFieldValue }) => {
@@ -896,31 +1001,36 @@ const PostQueueView = () => {
           />
 
           {addFromUrlMutation.isPending && (
-            <div className="my-4 p-4 bg-emerald-50/80 rounded-2xl border border-emerald-200 space-y-2">
-              <div className="flex justify-between items-center text-xs font-bold text-emerald-800">
-                <span className="flex items-center gap-1.5">
-                  <LoadingOutlined spin /> {progressStatusMsg}
-                </span>
-                <span className="bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded-full text-[11px] font-extrabold">{progressPercent}%</span>
-              </div>
-              <Progress
-                percent={progressPercent}
-                showInfo={false}
-                strokeColor={{ '0%': '#10b981', '100%': '#059669' }}
-              />
-            </div>
+            <Alert
+              type="info"
+              showIcon
+              className="my-4 rounded-xl"
+              message={
+                <Flex justify="space-between" align="center">
+                  <Text strong className="text-xs text-slate-200">{progressStatusMsg}</Text>
+                  <Tag color="processing">{progressPercent}%</Tag>
+                </Flex>
+              }
+              description={
+                <Progress
+                  percent={progressPercent}
+                  showInfo={false}
+                  strokeColor={{ '0%': '#3b82f6', '100%': '#06b6d4' }}
+                />
+              }
+            />
           )}
 
           <Form.Item noStyle shouldUpdate={(prev, cur) => prev.publishNow !== cur.publishNow}>
             {({ getFieldValue }) => (
-              <div className="pt-4 flex justify-end gap-3 border-t border-slate-100">
+              <Flex justify="flex-end" gap={12} className="pt-4 border-t border-slate-800">
                 <Button onClick={() => setIsUrlModalVisible(false)} size="large" className="rounded-xl" disabled={addFromUrlMutation.isPending}>
                   Hủy
                 </Button>
                 <Button type="primary" htmlType="submit" loading={addFromUrlMutation.isPending} size="large" className="font-bold rounded-xl px-6">
                   {getFieldValue('publishNow') ? 'Đăng ngay' : 'Tạo và lên lịch'}
                 </Button>
-              </div>
+              </Flex>
             )}
           </Form.Item>
         </Form>
@@ -928,10 +1038,10 @@ const PostQueueView = () => {
 
       <Modal
         title={
-          <div className="flex items-center gap-2">
-            <EditOutlined className="text-emerald-600" />
-            <span className="font-bold text-lg">Sửa Caption Bài Viết</span>
-          </div>
+          <Flex align="center" gap={8} className="pb-3 border-b border-slate-800">
+            <EditOutlined className="text-emerald-500 text-lg" />
+            <Text strong className="text-base text-slate-100">Sửa Caption Bài Viết</Text>
+          </Flex>
         }
         open={!!editingPost}
         onCancel={() => setEditingPost(null)}
@@ -948,7 +1058,7 @@ const PostQueueView = () => {
             className="rounded-xl"
             placeholder="Nhập caption bài viết..."
           />
-          <div className="pt-4 flex justify-end gap-3 border-t border-slate-100 mt-4">
+          <Flex justify="flex-end" gap={12} className="pt-4 border-t border-slate-800 mt-4">
             <Button onClick={() => setEditingPost(null)} size="large" className="rounded-xl">
               Hủy
             </Button>
@@ -965,7 +1075,7 @@ const PostQueueView = () => {
             >
               Lưu Caption
             </Button>
-          </div>
+          </Flex>
         </div>
       </Modal>
 
@@ -980,7 +1090,7 @@ const PostQueueView = () => {
           <div className="space-y-5">
             <div>
               <Text className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Tiêu đề</Text>
-              <h3 className="text-base font-bold text-slate-900 mt-1 mb-0">{viewingPost.title || `Bài đăng #${viewingPost.id}`}</h3>
+              <Title level={5} className="!mt-1 !mb-0 !text-slate-100">{viewingPost.title || `Bài đăng #${viewingPost.id}`}</Title>
             </div>
             <Descriptions column={1} size="small" bordered items={[
               { key: 'type', label: 'Loại', children: viewingPost.postType === 'STORY' ? 'Story' : 'Bài viết' },
@@ -990,41 +1100,42 @@ const PostQueueView = () => {
             ]} />
             <div>
               <Text className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Nội dung bài đăng</Text>
-              <Paragraph className="!mt-2 !mb-0 whitespace-pre-line bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm leading-6">{viewingPost.content || 'Chưa có nội dung'}</Paragraph>
+              <Card size="small" variant="borderless" className="!mt-2 !mb-0 whitespace-pre-line bg-[#0e1726] border border-slate-800 text-sm leading-6 text-slate-200">
+                {viewingPost.content || 'Chưa có nội dung'}
+              </Card>
             </div>
-            {viewingPost.errorMessage && <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl p-3"><b>Lý do đăng lỗi:</b> {viewingPost.errorMessage}</div>}
+            {viewingPost.errorMessage && (
+              <Alert type="error" showIcon message={<Text strong className="text-red-300">Lý do đăng lỗi</Text>} description={<Text className="text-xs text-red-400">{viewingPost.errorMessage}</Text>} className="rounded-xl border border-red-500/30" />
+            )}
 
             {viewingPost.status === 'PUBLISHED' && (
               <div>
                 <Text className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Hiệu suất bài đăng</Text>
-                <div className="mt-2 bg-slate-50 border border-slate-200 rounded-xl p-3">
+                <Card size="small" variant="borderless" className="mt-2 bg-[#0e1726] border border-slate-800">
                   {insightsLoading ? (
                     <Text className="text-xs text-slate-500">Đang tải insights...</Text>
                   ) : insightsData?.success ? (
-                    <div className="grid grid-cols-3 gap-3 text-center">
-                      <div>
-                        <div className="text-base font-bold text-slate-800">{insightsData.insights?.post_impressions_unique ?? '—'}</div>
-                        <div className="text-[10px] text-slate-500">Người tiếp cận</div>
-                      </div>
-                      <div>
-                        <div className="text-base font-bold text-slate-800">{insightsData.insights?.likeCount ?? '—'}</div>
-                        <div className="text-[10px] text-slate-500">Lượt thích</div>
-                      </div>
-                      <div>
-                        <div className="text-base font-bold text-slate-800">{insightsData.insights?.commentCount ?? '—'}</div>
-                        <div className="text-[10px] text-slate-500">Bình luận</div>
-                      </div>
-                    </div>
+                    <Row gutter={16} className="text-center">
+                      <Col span={8}>
+                        <Statistic title={<span className="text-[11px] text-slate-400">Người tiếp cận</span>} value={insightsData.insights?.post_impressions_unique ?? 0} />
+                      </Col>
+                      <Col span={8}>
+                        <Statistic title={<span className="text-[11px] text-slate-400">Lượt thích</span>} value={insightsData.insights?.likeCount ?? 0} />
+                      </Col>
+                      <Col span={8}>
+                        <Statistic title={<span className="text-[11px] text-slate-400">Bình luận</span>} value={insightsData.insights?.commentCount ?? 0} />
+                      </Col>
+                    </Row>
                   ) : (
                     <Text className="text-xs text-slate-500">{insightsData?.message || 'Không có insights cho bài này (chỉ hỗ trợ bài đăng qua Graph API/PAGE_TOKEN)'}</Text>
                   )}
-                </div>
+                </Card>
               </div>
             )}
 
             <Space wrap>
               {viewingPost.originalUrl && <Button icon={<LinkOutlined />} href={viewingPost.originalUrl} target="_blank">Mở bài gốc</Button>}
-              {getPostMeta(viewingPost).isVideo && <Button icon={<VideoCameraOutlined />} href={`${WORKER_BASE_URL}/api/download-video?url=${encodeURIComponent(viewingPost.mediaUrls.split(',')[0].trim())}&filename=${encodeURIComponent(viewingPost.title || 'video')}`} target="_blank">Tải video</Button>}
+              {getPostMeta(viewingPost).isVideo && <Button icon={<VideoCameraOutlined />} href={withSessionToken(`${WORKER_BASE_URL}/api/download-video?url=${encodeURIComponent(viewingPost.mediaUrls.split(',')[0].trim())}&filename=${encodeURIComponent(viewingPost.title || 'video')}`)} target="_blank">Tải video</Button>}
             </Space>
             <div className="sticky bottom-0 bg-[#111a28] border-t border-slate-800 pt-4 flex gap-2">
               <Button block icon={<EditOutlined />} onClick={() => { setViewingPost(null); setEditingPost(viewingPost); setEditingContent(viewingPost.content || ''); }}>Sửa nội dung</Button>

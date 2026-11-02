@@ -53,6 +53,14 @@ export const BatchPostModal = ({ open, onClose }: BatchPostModalProps) => {
         throw new Error('Vui lòng chọn Fanpage/Nick đăng bài!');
       }
 
+      let interval = values.intervalMinutes || 15;
+      if (values.fitToday && urlList.length > 0) {
+        const now = dayjs();
+        const endOfDay = now.hour(23).minute(45).second(0);
+        const diffMinutes = Math.max(10, endOfDay.diff(now, 'minute'));
+        interval = Math.max(2, Math.min(15, Math.floor(diffMinutes / urlList.length)));
+      }
+
       const scheduledAtStr = values.scheduledAt
         ? (values.scheduledAt as Dayjs).format('YYYY-MM-DDTHH:mm:ss')
         : dayjs().format('YYYY-MM-DDTHH:mm:ss');
@@ -70,7 +78,7 @@ export const BatchPostModal = ({ open, onClose }: BatchPostModalProps) => {
         for (const groupId of groups) {
           const payload = {
             urls: urlList,
-            intervalMinutes: values.intervalMinutes || 15,
+            intervalMinutes: interval,
             publishNow: values.publishNow || false,
             scheduledAt: scheduledAtStr,
             pageId,
@@ -83,18 +91,25 @@ export const BatchPostModal = ({ open, onClose }: BatchPostModalProps) => {
           totalPosted += response.data?.posted || 0;
           totalRequested += response.data?.total || urlList.length;
         }
+        if (values.fitToday) {
+          try {
+            await api.post('/queue/pack-continuous', { gapSeconds: Math.round(interval * 60) });
+          } catch (ignored) {}
+        }
         return { count: totalPosted, total: totalRequested, mode: 'GROUP' as const };
       }
 
       const payload = {
         urls: urlList,
-        intervalMinutes: values.intervalMinutes || 15,
+        intervalMinutes: interval,
         publishNow: values.publishNow || false,
         scheduledAt: scheduledAtStr,
         targetFanpageId: values.targetFanpageId,
         affiliateLink: values.affiliateLink?.trim() || undefined,
         groupNames: values.groupNames && values.groupNames.length > 0 ? values.groupNames : undefined,
         enableGroupComment: values.affiliateLink?.trim() ? true : undefined,
+        appendToQueue: values.fitToday || false,
+        gapSeconds: Math.round(interval * 60),
       };
 
       const response = await api.post('/queue/add-from-urls', payload);
@@ -105,6 +120,7 @@ export const BatchPostModal = ({ open, onClose }: BatchPostModalProps) => {
       form.resetFields();
       onClose();
       queryClient.invalidateQueries({ queryKey: ['postQueue'] });
+      queryClient.invalidateQueries({ queryKey: ['posting-window'] });
     },
     onError: (err: any) => {
       message.error(err?.response?.data?.message || err?.message || 'Có lỗi xảy ra khi tạo danh sách đăng bài!');
@@ -368,6 +384,16 @@ export const BatchPostModal = ({ open, onClose }: BatchPostModalProps) => {
               <Text className="text-xs text-slate-500 block mt-1">
                 Nếu tắt: bài đầu tiên sẽ bắt đầu vào Ngày & Giờ đã chọn bên dưới.
               </Text>
+
+              <div className="mt-3 pt-3 border-t border-slate-200">
+                <Form.Item name="fitToday" valuePropName="checked" className="!mb-0" initialValue={true}>
+                  <Switch defaultChecked />
+                  <span className="ml-2 font-bold text-amber-600 text-sm">⚡ Tự động tính khoảng cách để đăng hết trong hôm nay</span>
+                </Form.Item>
+                <Text className="text-xs text-slate-500 block mt-1">
+                  Tự động chia đều giờ từ bây giờ tới 23:59, đảm bảo 100% bài không bị tràn sang ngày mai.
+                </Text>
+              </div>
             </div>
 
             <Form.Item name="scheduledAt" label={<span className="font-semibold text-xs text-slate-600">Thời điểm bắt đầu bài 1</span>} className="!mb-0">

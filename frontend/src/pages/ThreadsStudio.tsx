@@ -906,14 +906,25 @@ export default function ThreadsStudio() {
                           ...accounts.filter((a) => a.tokenStatus !== 'EXPIRED').map((a) => ({ value: a.id, label: `Chỉ @${usernameOf(a)}` })),
                         ]}
                       />
-                      <div className="poster-timing-toggle" role="group" aria-label={`Thời gian đăng bài ${index + 1}`}>
-                        <button type="button" onClick={() => updateItem(item.id, { isNow: true })} className={item.isNow ? 'is-active' : ''}>
-                          <ThunderboltOutlined /> Đăng ngay
-                        </button>
-                        <button type="button" onClick={() => updateItem(item.id, { isNow: false, scheduledAt: item.scheduledAt || dayjs().add(intervalMinutes, 'minute').second(0).toISOString() })} className={!item.isNow ? 'is-active' : ''}>
-                          <ClockCircleOutlined /> Hẹn giờ
-                        </button>
-                      </div>
+                      <Segmented
+                        size="small"
+                        value={item.isNow ? 'NOW' : 'SCHEDULE'}
+                        onChange={(val) => {
+                          if (val === 'NOW') {
+                            updateItem(item.id, { isNow: true });
+                          } else {
+                            updateItem(item.id, {
+                              isNow: false,
+                              scheduledAt: item.scheduledAt || dayjs().add(intervalMinutes, 'minute').second(0).toISOString(),
+                            });
+                          }
+                        }}
+                        options={[
+                          { label: 'Đăng ngay', value: 'NOW', icon: <ThunderboltOutlined /> },
+                          { label: 'Hẹn giờ', value: 'SCHEDULE', icon: <ClockCircleOutlined /> },
+                        ]}
+                        className="rounded-lg text-xs shrink-0"
+                      />
                       {!item.isNow && (
                         <DatePicker size="small" showTime={{ format: 'HH:mm' }} format="HH:mm DD/MM" allowClear={false}
                           value={item.scheduledAt ? dayjs(item.scheduledAt) : null}
@@ -1011,10 +1022,10 @@ export default function ThreadsStudio() {
                               accept="image/jpeg,image/png,image/webp,image/avif,video/mp4,video/quicktime,video/webm"
                               beforeUpload={(file) => { uploadFile(item.id, file as File); return false; }}
                             >
-                              <button type="button" className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-slate-300 text-[11px] text-slate-500 hover:border-blue-400 hover:text-blue-500">
+                              <div className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-slate-700 bg-slate-900/40 text-[11px] text-slate-400 hover:border-blue-500 hover:text-blue-400 transition-colors cursor-pointer">
                                 {uploading > 0 ? <LoadingOutlined /> : <InboxOutlined className="text-lg" />}
                                 {uploading > 0 ? 'Đang tải…' : 'Ảnh/video'}
-                              </button>
+                              </div>
                             </Upload>
                           )}
                         </div>

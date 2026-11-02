@@ -1,7 +1,9 @@
-import { Button, Popover, Table } from 'antd';
-import { FieldTimeOutlined } from '@ant-design/icons';
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { Button, Popover, Table, App } from 'antd';
+import { FieldTimeOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import dayjs from 'dayjs';
 import api from '../../config/axios';
 import { POSTING_WINDOW_QUERY_KEY, formatWhen, type QueueLane, type WindowPlan } from '../common/PostingWindowPanel';
 
@@ -11,11 +13,37 @@ import { POSTING_WINDOW_QUERY_KEY, formatWhen, type QueueLane, type WindowPlan }
  */
 export default function QueueFinishBadge() {
   const navigate = useNavigate();
+  const { message } = App.useApp();
+  const queryClient = useQueryClient();
+  const [isPacking, setIsPacking] = useState(false);
+
   const { data: plan } = useQuery<WindowPlan>({
     queryKey: POSTING_WINDOW_QUERY_KEY,
     queryFn: async () => (await api.get('/queue/window-plan')).data,
-    refetchInterval: 30000,
+    refetchInterval: 20000,
   });
+
+  const handlePackContinuous = async () => {
+    setIsPacking(true);
+    try {
+      const currentGap = plan?.minGapSeconds || 120;
+      const res = await api.post('/queue/pack-continuous', { gapSeconds: currentGap });
+      const finish = res.data?.estimatedFinishAt ? dayjs(res.data.estimatedFinishAt).format('HH:mm DD/MM') : '';
+      const deferred = Number(res.data?.deferredCount) || 0;
+      message.success(
+        `⚡ Đã dồn ${res.data?.updated ?? 0} bài đăng liên tục (nghỉ ${currentGap}s)${finish ? `, dự kiến xong lúc ${finish}` : ''}` +
+        (deferred > 0 ? `. ${deferred} bài không kịp trong hôm nay.` : ' · 100% hoàn thành hôm nay!'),
+        6
+      );
+      queryClient.invalidateQueries({ queryKey: POSTING_WINDOW_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ['postQueue'] });
+      queryClient.invalidateQueries({ queryKey: ['postQueuePlaywright'] });
+    } catch (err: any) {
+      message.error(err?.response?.data?.message || 'Không thể dồn hàng đợi');
+    } finally {
+      setIsPacking(false);
+    }
+  };
   const queue = plan?.queue;
   if (!queue) return null;
 
@@ -65,6 +93,17 @@ export default function QueueFinishBadge() {
           ]}
         />
       )}
+      {queue.totalPending > 0 && (
+        <Button
+          type="primary"
+          icon={<ThunderboltOutlined />}
+          loading={isPacking}
+          onClick={handlePackContinuous}
+          className="qfb-pack-btn"
+        >
+          ⚡ Dồn đăng hết hôm nay {late ? `(Cứu ${queue.laterCount} bài sang mai)` : ''}
+        </Button>
+      )}
       <Button
         type="link"
         size="small"
@@ -86,8 +125,8 @@ export default function QueueFinishBadge() {
         className={`queue-finish-badge${late || deferred > 0 ? ' is-late' : ''}`}
         icon={<FieldTimeOutlined />}
       >
-        <span className="hidden sm:inline">{label}</span>
-        <span className="sm:hidden">{queue.totalPending}</span>
+        <span className="qfb-label-full">{label}</span>
+        <span className="qfb-label-short">{queue.totalPending}</span>
       </Button>
     </Popover>
   );

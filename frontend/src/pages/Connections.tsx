@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import {
   Button,
+  Dropdown,
   Card,
   Table,
   Typography,
@@ -22,6 +23,8 @@ import {
   Badge,
   Segmented,
   Divider,
+  Alert,
+  Flex,
 } from 'antd';
 import {
   PlusOutlined,
@@ -118,9 +121,9 @@ const isPersonalCookieType = (accountType?: string) =>
   !accountType || accountType === 'PERSONAL_COOKIE' || accountType === 'PERSONAL_PROFILE_COOKIE';
 
 // Tự động trích xuất c_user & xs từ mọi định dạng (Full Cookie chuỗi dài, JSON mảng, chuỗi gộp)
-export const smartExtractCookie = (rawInput?: string) => {
-  if (!rawInput) return { cUser: '', xs: '', isValid: false, normalized: '' };
-  const text = rawInput.trim();
+export const smartExtractCookie = (rawInput?: string, defaultCUser: string = '') => {
+  if (!rawInput && !defaultCUser) return { cUser: '', xs: '', sb: '', datr: '', isValid: false, normalized: '', fullCookie: '', hasDatrOrSb: false };
+  const text = (rawInput || '').trim();
 
   // 1. JSON format từ tiện ích J2Team / Cookie-Editor
   if (text.startsWith('[') && text.endsWith(']')) {
@@ -128,21 +131,32 @@ export const smartExtractCookie = (rawInput?: string) => {
       const arr = JSON.parse(text);
       let cUser = '';
       let xs = '';
+      let sb = '';
+      let datr = '';
+      const pairs: string[] = [];
       if (Array.isArray(arr)) {
         for (const item of arr) {
-          if (item?.name === 'c_user') cUser = String(item.value || '').trim();
-          if (item?.name === 'xs') xs = String(item.value || '').trim();
+          const name = String(item?.name || '').trim();
+          const val = String(item?.value || '').trim();
+          if (!name || !val) continue;
+          if (name === 'c_user') cUser = val;
+          if (name === 'xs') xs = val;
+          if (name === 'sb') sb = val;
+          if (name === 'datr') datr = val;
+          pairs.push(`${name}=${val}`);
         }
       }
       if (cUser && xs) {
-        return { cUser, xs, isValid: true, normalized: `c_user=${cUser}; xs=${xs}` };
+        const full = pairs.join('; ');
+        const hasDatrOrSb = Boolean(sb || datr);
+        return { cUser, xs, sb, datr, isValid: true, normalized: full, fullCookie: full, hasDatrOrSb };
       }
     } catch {}
   }
 
   // 2. Regex trích xuất c_user
   const cUserMatch = text.match(/(?:c_user=|^c_user:\s*|["']?c_user["']?\s*[:=]\s*["']?)([\d]+)/i);
-  const cUser = cUserMatch ? cUserMatch[1].trim() : '';
+  const cUser = (cUserMatch ? cUserMatch[1].trim() : defaultCUser) || '';
 
   // 3. Regex trích xuất xs
   const xsMatch = text.match(/(?:xs=|^xs:\s*|["']?xs["']?\s*[:=]\s*["']?)([^;'"\s\n\r]+)/i);
@@ -152,12 +166,34 @@ export const smartExtractCookie = (rawInput?: string) => {
     xs = text;
   }
 
+  // 4. Trích xuất sb & datr (kháng checkpoint)
+  const sbMatch = text.match(/(?:sb=|^sb:\s*|["']?sb["']?\s*[:=]\s*["']?)([^;'"\s\n\r]+)/i);
+  const datrMatch = text.match(/(?:datr=|^datr:\s*|["']?datr["']?\s*[:=]\s*["']?)([^;'"\s\n\r]+)/i);
+  const sb = sbMatch ? sbMatch[1].trim() : '';
+  const datr = datrMatch ? datrMatch[1].trim() : '';
+  const hasDatrOrSb = Boolean(sb || datr);
+
   const isValid = Boolean(cUser && xs);
+  if (!isValid) {
+    return { cUser, xs, sb, datr, isValid: false, normalized: '', fullCookie: '', hasDatrOrSb };
+  }
+
+  let fullCookie = text;
+  if (!text.includes('c_user=') && cUser) {
+    fullCookie = `c_user=${cUser}; ${text}`;
+  }
+  const minimal = `c_user=${cUser}; xs=${xs}`;
+  const normalized = fullCookie.includes(';') ? fullCookie : minimal;
+
   return {
     cUser,
     xs,
-    isValid,
-    normalized: isValid ? `c_user=${cUser}; xs=${xs}` : '',
+    sb,
+    datr,
+    isValid: true,
+    normalized,
+    fullCookie,
+    hasDatrOrSb,
   };
 };
 
@@ -320,11 +356,26 @@ const Connections = () => {
   const [latestPageScan, setLatestPageScan] = useState<FacebookPageScanResult | null>(null);
   const [manualPageName, setManualPageName] = useState('');
   const [manualPageId, setManualPageId] = useState('');
+  const [checkingHealthId, setCheckingHealthId] = useState<number | null>(null);
 
   // Forms
   const [form] = Form.useForm();
   const [configForm] = Form.useForm();
   const [personalViaForm] = Form.useForm();
+
+  // State & Watchers cho Modal Thêm Via phân tầng
+  const [viaInputMode, setViaInputMode] = useState<'structured' | 'quick'>('structured');
+  const watchedViaCUser = Form.useWatch('cUser', personalViaForm) || '';
+  const watchedViaXs = Form.useWatch('xs', personalViaForm) || '';
+  const watchedViaSecurity = Form.useWatch('securityCookies', personalViaForm) || '';
+
+  const hasViaCUser = Boolean(watchedViaCUser && watchedViaCUser.trim().length >= 5);
+  const hasViaXs = Boolean(watchedViaXs && watchedViaXs.trim().length >= 8);
+  const hasViaSecurity = Boolean(
+    (watchedViaSecurity && (watchedViaSecurity.includes('sb=') || watchedViaSecurity.includes('datr='))) ||
+    (rawCookieVia && (rawCookieVia.includes('sb=') || rawCookieVia.includes('datr=')))
+  );
+  const viaCompletenessScore = (hasViaCUser ? 1 : 0) + (hasViaXs ? 1 : 0) + (hasViaSecurity ? 1 : 0);
 
   const activeTab = searchParams.get('tab') === 'groups' ? 'groups' : 'accounts';
 
@@ -337,62 +388,23 @@ const Connections = () => {
     },
   });
 
-  // Page cookie chạy bằng phiên của Via quản trị (postingIdentityAccountId). Khi cookie riêng của Page
-  // có c_user không phải nick cá nhân nào (VD: bị ghi thành chính ID Page) thì bản sao đó đã hỏng —
-  // Page đi theo Via: nhóm dưới Via và lấy trạng thái của Via (backend tự đồng bộ cookie Via xuống).
-  const followedViaById = useMemo(() => {
-    const list = accounts || [];
-    const isProfile = (a: SocialAccount) => a.platform === 'FACEBOOK_PROFILE' || a.accountType === 'PERSONAL_PROFILE_COOKIE';
-    const byId = new Map(list.map((a) => [a.id, a]));
-    const profileCUsers = new Set(list.filter(isProfile).map((a) => parseCookieString(a.accessToken).cUser).filter(Boolean));
-    const map = new Map<number, SocialAccount>();
-    for (const acc of list) {
-      if (acc.accountType !== 'PERSONAL_COOKIE' || isProfile(acc) || acc.platform === 'FACEBOOK_GROUP' || !acc.postingIdentityAccountId) continue;
-      const via = byId.get(acc.postingIdentityAccountId);
-      if (!via || !isProfile(via) || !parseCookieString(via.accessToken).cUser) continue;
-      const ownCUser = parseCookieString(acc.accessToken).cUser;
-      if (!ownCUser || !profileCUsers.has(ownCUser)) map.set(acc.id, via);
-    }
-    return map;
-  }, [accounts]);
-
-  // c_user của Via mà kết nối này thực sự đi theo
-  const viaCUserOf = useCallback(
-    (acc: SocialAccount) => parseCookieString((followedViaById.get(acc.id) ?? acc).accessToken).cUser,
-    [followedViaById]
-  );
-
-  // Trạng thái hiển thị: Page đi theo Via thì sống/chết theo Via
-  const withEffectiveStatus = useCallback(
-    (acc: SocialAccount): SocialAccount => {
-      const via = followedViaById.get(acc.id);
-      return via ? { ...acc, tokenStatus: via.tokenStatus } : acc;
-    },
-    [followedViaById]
-  );
-
-  // Tách danh sách Vias duy nhất theo c_user
+  // 2. Danh sách Nick Via cá nhân (Chỉ lọc tài khoản profile thật, loại bỏ Fanpage và Group)
   const personalVias = useMemo(() => {
     const uniqueVias = new Map<string, SocialAccount>();
+    const isProfile = (a: SocialAccount) => a.platform === 'FACEBOOK_PROFILE' || a.accountType === 'PERSONAL_PROFILE_COOKIE';
     for (const account of accounts || []) {
-      if (!isPersonalCookieType(account.accountType) || account.platform === 'FACEBOOK_GROUP') continue;
-      if (followedViaById.has(account.id)) continue;
+      if (!isProfile(account) || account.platform === 'FACEBOOK_GROUP') continue;
       const { cUser } = parseCookieString(account.accessToken);
-      if (!cUser) continue;
-      const existing = uniqueVias.get(cUser);
-      const accountIsProfile = account.platform === 'FACEBOOK_PROFILE' || account.accountType === 'PERSONAL_PROFILE_COOKIE';
-      const existingIsProfile = existing?.platform === 'FACEBOOK_PROFILE' || existing?.accountType === 'PERSONAL_PROFILE_COOKIE';
-      const shouldReplace =
-        !existing ||
-        (accountIsProfile && !existingIsProfile) ||
-        (accountIsProfile === existingIsProfile && existing.tokenStatus !== 'OK' && account.tokenStatus === 'OK') ||
-        (accountIsProfile === existingIsProfile && existing.tokenStatus === account.tokenStatus && account.id > existing.id);
+      const uid = cUser || (account.platformAccountId?.match(/^\d+$/) ? account.platformAccountId : '');
+      if (!uid) continue;
+      const existing = uniqueVias.get(uid);
+      const shouldReplace = !existing || (existing.tokenStatus !== 'OK' && account.tokenStatus === 'OK') || (account.id > existing.id);
       if (shouldReplace) {
-        uniqueVias.set(cUser, account);
+        uniqueVias.set(uid, account);
       }
     }
     return Array.from(uniqueVias.entries()).map(([cUser, account]) => ({ cUser, account }));
-  }, [accounts, followedViaById]);
+  }, [accounts]);
 
   // Lookup map theo c_user để lấy tên hiển thị của via (O(1))
   const viaNameMap = useMemo(() => {
@@ -403,6 +415,62 @@ const Connections = () => {
     });
     return map;
   }, [personalVias]);
+
+  // 3. Map chính xác từng Fanpage/kết nối con với Nick Via quản trị mẹ (ưu tiên postingIdentityAccountId tường minh)
+  const followedViaById = useMemo(() => {
+    const list = accounts || [];
+    const isProfile = (a: SocialAccount) => a.platform === 'FACEBOOK_PROFILE' || a.accountType === 'PERSONAL_PROFILE_COOKIE';
+    const byId = new Map(list.map((a) => [a.id, a]));
+    const viaByCUser = new Map<string, SocialAccount>();
+    personalVias.forEach(({ cUser, account }) => viaByCUser.set(cUser, account));
+
+    const map = new Map<number, SocialAccount>();
+    for (const acc of list) {
+      if (isProfile(acc) || acc.platform === 'FACEBOOK_GROUP') continue;
+      // Ưu tiên 1: postingIdentityAccountId tường minh
+      if (acc.postingIdentityAccountId && byId.has(acc.postingIdentityAccountId)) {
+        const parent = byId.get(acc.postingIdentityAccountId);
+        if (parent && isProfile(parent)) {
+          map.set(acc.id, parent);
+          continue;
+        }
+      }
+      // Ưu tiên 2: Khớp theo c_user của Via
+      const ownCUser = parseCookieString(acc.accessToken).cUser;
+      if (ownCUser && viaByCUser.has(ownCUser)) {
+        map.set(acc.id, viaByCUser.get(ownCUser)!);
+      }
+    }
+    return map;
+  }, [accounts, personalVias]);
+
+  // c_user của Via mà kết nối này thực sự đi theo
+  const viaCUserOf = useCallback(
+    (acc: SocialAccount) => {
+      const via = followedViaById.get(acc.id);
+      if (via) {
+        const viaCUser = parseCookieString(via.accessToken).cUser || via.platformAccountId;
+        if (viaCUser) return viaCUser;
+      }
+      return parseCookieString(acc.accessToken).cUser;
+    },
+    [followedViaById]
+  );
+
+  // Trạng thái hiển thị: Page đi theo Via thì sống/chết đồng bộ theo Via
+  const withEffectiveStatus = useCallback(
+    (acc: SocialAccount): SocialAccount => {
+      const via = followedViaById.get(acc.id);
+      if (via && (via.tokenStatus === 'EXPIRED' || acc.tokenStatus === 'EXPIRED')) {
+        return { ...acc, tokenStatus: 'EXPIRED' };
+      }
+      if (via && via.tokenStatus === 'OK') {
+        return { ...acc, tokenStatus: 'OK' };
+      }
+      return acc;
+    },
+    [followedViaById]
+  );
 
   // Danh sách Fanpage / Trang (loại bỏ Profile cá nhân và Group)
   const publishableAccounts = useMemo(
@@ -421,7 +489,7 @@ const Connections = () => {
     [accounts, withEffectiveStatus]
   );
 
-  // GOM NHÓM: Phân chia chính xác Fanpage nào thuộc Via nào (O(N) siêu nhanh)
+  // GOM NHÓM: Phân chia chính xác Fanpage nào thuộc Via nào
   const viaGroupedData = useMemo(() => {
     const map = new Map<string, SocialAccount[]>();
     const independent: SocialAccount[] = [];
@@ -549,14 +617,18 @@ const Connections = () => {
   });
 
   const addPersonalViaMutation = useMutation({
-    mutationFn: async (values: { profileLabel?: string; cUser: string; xs: string }) => {
+    mutationFn: async (values: { profileLabel?: string; cUser: string; xs: string; fullCookie?: string; proxyUrl?: string }) => {
       const cUser = values.cUser.trim();
+      const accessToken = (values.fullCookie && values.fullCookie.includes(';'))
+        ? values.fullCookie.trim()
+        : `c_user=${cUser}; xs=${values.xs.trim()}`;
       const response = await api.post('/connections', {
         platform: 'FACEBOOK_PROFILE',
         platformAccountId: cUser,
         pageName: values.profileLabel?.trim() || `Via Facebook #${cUser}`,
         accountType: 'PERSONAL_PROFILE_COOKIE',
-        accessToken: `c_user=${cUser}; xs=${values.xs.trim()}`,
+        accessToken,
+        proxyUrl: values.proxyUrl?.trim() || undefined,
         tokenStatus: 'OK',
         tokenCheckedAt: new Date().toISOString(),
       });
@@ -598,8 +670,11 @@ const Connections = () => {
       await api.delete(`/connections/${id}`);
     },
     onSuccess: () => {
-      message.success('Đã xóa kết nối!');
+      message.success('Đã xóa kết nối thành công!');
       queryClient.invalidateQueries({ queryKey: ['socialAccounts'] });
+    },
+    onError: (err: any) => {
+      message.error(err?.response?.data?.message || 'Không thể xóa kết nối này! Vui lòng thử lại.');
     },
   });
 
@@ -620,6 +695,44 @@ const Connections = () => {
     },
   });
 
+  // Mutation kiểm tra trạng thái Cookie trực tiếp (Live Health Check)
+  const checkHealthMutation = useMutation({
+    mutationFn: async (accountId: number) => {
+      setCheckingHealthId(accountId);
+      const res = await api.post(`/connections/${accountId}/check-cookie-health`);
+      return res.data;
+    },
+    onSuccess: (data) => {
+      setCheckingHealthId(null);
+      queryClient.invalidateQueries({ queryKey: ['socialAccounts'] });
+      if (data?.status === 'OK') {
+        message.success(data?.message || 'Cookie đang hoạt động rất tốt!');
+      } else {
+        message.warning(data?.message || 'Cookie hết hạn hoặc không hợp lệ!');
+      }
+    },
+    onError: (err: any) => {
+      setCheckingHealthId(null);
+      message.error(err?.response?.data?.message || 'Không thể kiểm tra cookie lúc này.');
+    },
+  });
+
+  // Mutation đồng bộ nhanh các Page từ danh sách kiểm kê vào kết nối xuất bản
+  const importPagesMutation = useMutation({
+    mutationFn: async ({ accountId, pageIds }: { accountId: number; pageIds?: string[] }) => {
+      const res = await api.post(`/connections/${accountId}/import-managed-pages`, pageIds ? { pageIds } : {});
+      return res.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['socialAccounts'] });
+      queryClient.invalidateQueries({ queryKey: ['managedFacebookPages'] });
+      message.success(data?.message || 'Đã đồng bộ Fanpage vào hệ thống thành công!');
+    },
+    onError: (err: any) => {
+      message.error(err?.response?.data?.message || 'Không thể đồng bộ Fanpage.');
+    },
+  });
+
   const openConfigDrawer = (record: SocialAccount) => {
     setConfigDrawerAccount(record);
     const { cUser, xs } = parseCookieString(record.accessToken);
@@ -631,6 +744,7 @@ const Connections = () => {
       accessToken: record.accessToken || '',
       maxPostsPerDay: record.maxPostsPerDay ?? null,
       backupAccountId: record.backupAccountId || undefined,
+      postingIdentityAccountId: record.postingIdentityAccountId || undefined,
       proxyUrl: record.proxyUrl || '',
     });
   };
@@ -788,9 +902,20 @@ const Connections = () => {
     {
       title: 'Thao tác',
       key: 'action',
-      width: 110,
+      width: 140,
       render: (_: any, record: SocialAccount) => (
         <Space size="small">
+          {isPersonalCookieType(record.accountType) && (
+            <Tooltip title="Kiểm tra Cookie ngay qua Playwright">
+              <Button
+                type="text"
+                icon={<SafetyCertificateOutlined spin={checkingHealthId === record.id} />}
+                loading={checkingHealthId === record.id}
+                onClick={() => checkHealthMutation.mutate(record.id)}
+                className="text-slate-400 hover:text-emerald-400 hover:bg-slate-800 rounded-lg transition-colors"
+              />
+            </Tooltip>
+          )}
           <Tooltip title="Cấu hình tài khoản">
             <Button
               type="text"
@@ -831,7 +956,7 @@ const Connections = () => {
   ];
 
   const tabsBar = (
-    <div className="flex items-center justify-between pb-1 border-b border-slate-800/80 mb-4">
+    <div className="bg-slate-900/80 border border-slate-800/80 rounded-2xl px-5 py-1.5 mb-4 backdrop-blur-md shadow-sm">
       <Tabs
         activeKey={activeTab}
         onChange={(key) => setSearchParams(key === 'groups' ? { tab: 'groups' } : {})}
@@ -854,27 +979,21 @@ const Connections = () => {
   }
 
   return (
-    <div className="app-page space-y-6">
+    <div className="app-page space-y-4">
       {tabsBar}
 
       {/* Emergency Cookie Banner if any account expired */}
       {expiredAccounts.length > 0 && (
-        <div className="rounded-2xl border border-red-500/30 bg-gradient-to-r from-red-950/30 via-slate-900/60 to-red-950/20 p-4 shadow-[0_4px_20px_rgba(239,68,68,0.12)] backdrop-blur-md">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 flex items-center justify-center shrink-0 mt-0.5">
-                <CloseCircleOutlined className="text-base" />
-              </div>
-              <div>
-                <div className="font-semibold text-sm text-red-200 flex items-center gap-2">
-                  <span>Có {expiredAccounts.length} kết nối Facebook Cookie đã hết hạn</span>
-                  <span className="w-2 h-2 rounded-full bg-red-400 animate-ping" />
-                </div>
-                <div className="text-xs text-red-400/80 mt-0.5 leading-relaxed">
-                  Các Fanpage: <b>{expiredAccounts.map((a) => a.pageName || a.platformAccountId).join(', ')}</b> có thể bị tạm dừng xuất bản. Hãy cập nhật cookie mới cho Via sở hữu để đồng bộ toàn bộ.
-                </div>
-              </div>
+        <Alert
+          type="error"
+          showIcon
+          message={<span className="font-semibold text-rose-200">Có {expiredAccounts.length} kết nối Facebook Cookie đã hết hạn</span>}
+          description={
+            <div className="text-xs text-slate-300 mt-0.5 leading-relaxed">
+              Các Fanpage: <b className="text-white">{expiredAccounts.map((a) => a.pageName || a.platformAccountId).join(', ')}</b> có thể bị tạm dừng xuất bản. Hãy cập nhật cookie mới cho Via sở hữu.
             </div>
+          }
+          action={
             <Button
               type="primary"
               danger
@@ -883,28 +1002,30 @@ const Connections = () => {
                 setQuickCookieTargetId(expiredAccounts[0]?.id);
                 setQuickCookieModalOpen(true);
               }}
-              className="font-bold text-xs h-9 px-4 rounded-xl shrink-0 shadow-md hover:scale-[1.02] active:scale-[0.98] transition-transform"
+              className="font-semibold text-xs rounded-xl"
             >
               Cập nhật Cookie (1-Chạm Đồng Bộ)
             </Button>
-          </div>
-        </div>
+          }
+          className="rounded-xl border border-rose-500/30"
+        />
       )}
 
       {/* Header Bar & Quick Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <Title level={4} className="!mb-0.5 !text-slate-100 flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400">
-              <ApiOutlined />
-            </div>
-            <span>Quản lý kết nối Via & Fanpage</span>
-          </Title>
-          <Text className="text-xs text-slate-400">
-            Xem rõ cấu trúc phân cấp: Via cá nhân nào đang nắm giữ những Fanpage nào, đồng bộ Cookie tức thì khi hết hạn
-          </Text>
-        </div>
-        <div className="flex items-center gap-2.5">
+      <Card variant="borderless" styles={{ body: { padding: '16px 20px' } }}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <Title level={4} className="!mb-0.5 !text-slate-100 flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400">
+                <ApiOutlined />
+              </div>
+              <span>Quản lý kết nối Via & Fanpage</span>
+            </Title>
+            <Text className="text-xs text-slate-300">
+              Xem rõ cấu trúc phân cấp: Via cá nhân nào đang nắm giữ những Fanpage nào, đồng bộ Cookie tức thì khi hết hạn
+            </Text>
+          </div>
+          <div className="flex items-center gap-2.5">
           {expiredAccounts.length > 0 && (
             <Button
               type="primary"
@@ -919,83 +1040,99 @@ const Connections = () => {
               Đổi {expiredAccounts.length} Cookie
             </Button>
           )}
-          <Button
-            icon={<ThunderboltOutlined className="text-amber-400" />}
-            onClick={() => setExtensionModalOpen(true)}
-            className="font-semibold h-10 px-4 rounded-xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20 hover:border-amber-400/50 transition-all shadow-sm"
+
+          <Dropdown
+            menu={{
+              items: [
+                {
+                  key: 'sync_all',
+                  icon: <ThunderboltOutlined className="text-amber-400" />,
+                  label: 'Đồng bộ 1-Chạm (Mọi Profile)',
+                  onClick: () => setExtensionModalOpen(true),
+                },
+                {
+                  key: 'login_fb',
+                  icon: <LoginOutlined className="text-blue-400" />,
+                  label: 'Đăng nhập Facebook (Trình duyệt)',
+                  onClick: () => setFbLoginModal({}),
+                },
+              ],
+            }}
+            placement="bottomRight"
           >
-            Đồng bộ 1-Chạm (Mọi Profile)
-          </Button>
-          <Button
-            icon={<LoginOutlined />}
-            onClick={() => setFbLoginModal({})}
-            className="font-medium h-10 px-4 rounded-xl bg-slate-800/80 border-slate-700 text-slate-200 hover:bg-slate-700/80 hover:border-slate-600 transition-all"
-          >
-            Đăng nhập Facebook
-          </Button>
+            <Button
+              icon={<ThunderboltOutlined className="text-amber-400" />}
+              className="font-medium h-10 px-4 rounded-xl bg-slate-800/80 border-slate-700/80 text-slate-200 hover:bg-slate-700 transition-all"
+            >
+              Tiện ích đồng bộ
+            </Button>
+          </Dropdown>
+
           <Button
             icon={<UserOutlined />}
             onClick={() => setPersonalViaModalOpen(true)}
-            className="font-medium h-10 px-4 rounded-xl bg-slate-800/80 border-slate-700 text-slate-200 hover:bg-slate-700/80 hover:border-slate-600 transition-all"
+            className="font-medium h-10 px-4 rounded-xl bg-slate-800/80 border-slate-700/80 text-slate-200 hover:bg-slate-700 transition-all"
           >
             Thêm Via cá nhân
           </Button>
+
           <Button
             type="primary"
             icon={<PlusOutlined />}
             onClick={() => setIsModalVisible(true)}
-            className="font-semibold h-10 px-5 rounded-xl bg-blue-600 hover:bg-blue-500 shadow-[0_4px_16px_rgba(37,99,235,0.25)] hover:scale-[1.02] active:scale-[0.98] transition-all"
+            className="font-semibold h-10 px-5 rounded-xl bg-blue-600 hover:bg-blue-500 shadow-[0_4px_16px_rgba(37,99,235,0.25)] transition-all"
           >
-            Thêm Fanpage mới
+            Thêm Fanpage
           </Button>
         </div>
       </div>
+      </Card>
 
       {/* Control Bar: Search, Filters, View Modes */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-900/40 p-2.5 rounded-2xl border border-slate-800/80 backdrop-blur-md">
-        <div className="flex flex-wrap items-center gap-2.5 flex-1">
-          <Input
-            prefix={<SearchOutlined className="text-slate-500" />}
-            placeholder="Tìm theo tên Page, ID hoặc UID..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            className="max-w-[260px] rounded-xl bg-slate-800/60 border-slate-700/80 text-xs hover:border-slate-600 focus:border-blue-500"
-            allowClear
-          />
+      <Card variant="borderless" styles={{ body: { padding: '12px 16px' } }}>
+        <Flex justify="space-between" align="center" wrap="wrap" gap="middle">
+          <Flex wrap="wrap" align="center" gap="small" className="flex-1">
+            <Input
+              prefix={<SearchOutlined className="text-slate-500" />}
+              placeholder="Tìm theo tên Page, ID hoặc UID..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="max-w-[260px] rounded-xl text-xs"
+              allowClear
+            />
 
-          <Select
-            value={statusFilter}
-            onChange={setStatusFilter}
-            className="w-36 text-xs"
-            options={[
-              { value: 'ALL', label: 'Tất cả trạng thái' },
-              { value: 'OK', label: 'Đang hoạt động' },
-              { value: 'EXPIRED', label: 'Cookie hết hạn' },
-            ]}
-          />
-
-          {personalVias.length > 0 && (
             <Select
-              value={viaFilter}
-              onChange={setViaFilter}
-              className="w-44 text-xs"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              className="w-36 text-xs"
               options={[
-                { value: 'ALL', label: 'Tất cả Via sở hữu' },
-                ...personalVias.map(({ cUser }) => ({
-                  value: cUser,
-                  label: viaNameMap.get(cUser) || `Via #${cUser}`,
-                })),
+                { value: 'ALL', label: 'Tất cả trạng thái' },
+                { value: 'OK', label: 'Đang hoạt động' },
+                { value: 'EXPIRED', label: 'Cookie hết hạn' },
               ]}
             />
-          )}
 
-          <div className="hidden lg:flex items-center gap-1.5 text-xs text-slate-500 ml-auto pr-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-            <span>Tổng cộng: <b className="text-slate-300 font-semibold">{personalVias.length} Via</b> · <b className="text-slate-300 font-semibold">{publishableAccounts.length} Fanpage</b></span>
-          </div>
-        </div>
+            {personalVias.length > 0 && (
+              <Select
+                value={viaFilter}
+                onChange={setViaFilter}
+                className="w-44 text-xs"
+                options={[
+                  { value: 'ALL', label: 'Tất cả Via sở hữu' },
+                  ...personalVias.map(({ cUser }) => ({
+                    value: cUser,
+                    label: viaNameMap.get(cUser) || `Via #${cUser}`,
+                  })),
+                ]}
+              />
+            )}
 
-        <div className="flex items-center gap-2">
+            <div className="hidden lg:flex items-center gap-1.5 text-xs text-slate-400 ml-auto pr-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+              <span>Tổng cộng: <b className="text-slate-200 font-semibold">{personalVias.length} Via</b> · <b className="text-slate-200 font-semibold">{publishableAccounts.length} Fanpage</b></span>
+            </div>
+          </Flex>
+
           <Segmented
             value={viewMode}
             onChange={(val) => setViewMode(val as 'grouped' | 'table' | 'cards')}
@@ -1004,10 +1141,10 @@ const Connections = () => {
               { value: 'table', icon: <BarsOutlined />, label: 'Bảng phẳng' },
               { value: 'cards', icon: <AppstoreOutlined />, label: 'Lưới thẻ' },
             ]}
-            className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-0.5 text-xs"
+            className="rounded-xl p-0.5 text-xs"
           />
-        </div>
-      </div>
+        </Flex>
+      </Card>
 
       {/* ========================================================================= */}
       {/* CHẾ ĐỘ 1: THEO TỪNG VIA (KHUYÊN DÙNG — PHÂN CẤP RÕ RÀNG VIA NÀO CÓ PAGE NÀO) */}
@@ -1062,12 +1199,12 @@ const Connections = () => {
                     key={cUser}
                     className={`rounded-2xl border transition-all duration-300 ${
                       isViaExpired
-                        ? 'border-red-500/30 bg-gradient-to-b from-red-950/20 via-slate-900/80 to-slate-900/90 shadow-[0_4px_24px_rgba(239,68,68,0.08)]'
-                        : 'border-slate-800/80 bg-slate-900/60 shadow-[inset_0_1px_1px_rgba(255,255,255,0.03)] hover:border-slate-700/80'
+                        ? 'border-rose-500/30 bg-[#120d18] shadow-[0_4px_24px_rgba(244,63,94,0.08)]'
+                        : 'border-white/[0.08] bg-[#0c1220] shadow-[0_4px_20px_rgba(0,0,0,0.3)] hover:border-white/[0.14]'
                     } overflow-hidden`}
                   >
                     {/* VIA HEADER PANEL */}
-                    <div className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800/80 bg-slate-900/80 backdrop-blur-sm">
+                    <div className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-white/[0.06] bg-white/[0.015]">
                       <div className="flex items-center gap-3.5">
                         <Avatar
                           icon={<FacebookOutlined />}
@@ -1148,6 +1285,17 @@ const Connections = () => {
                         </Button>
 
                         <Button
+                          icon={<SafetyCertificateOutlined spin={checkingHealthId === viaAccount.id} />}
+                          size="small"
+                          loading={checkingHealthId === viaAccount.id}
+                          onClick={() => checkHealthMutation.mutate(viaAccount.id)}
+                          className="text-xs text-emerald-400 bg-emerald-950/20 border-emerald-900/60 hover:bg-emerald-950/40 rounded-lg transition-all"
+                          title="Kiểm tra Cookie sống/chết tức thì qua Playwright"
+                        >
+                          Kiểm tra Cookie
+                        </Button>
+
+                        <Button
                           type="default"
                           size="small"
                           icon={<SyncOutlined />}
@@ -1169,6 +1317,7 @@ const Connections = () => {
                               platform: 'FACEBOOK_PAGE',
                               accountType: 'PERSONAL_COOKIE',
                               accessToken: viaAccount.accessToken,
+                              postingIdentityAccountId: viaAccount.id,
                             });
                             setIsModalVisible(true);
                           }}
@@ -1208,7 +1357,7 @@ const Connections = () => {
                     </div>
 
                     {/* CHILD PAGES TABLE */}
-                    <div className="p-0 bg-slate-950/30">
+                    <div className="p-0 bg-[#090e18]">
                       {pages.length === 0 ? (
                         <div className="py-7 px-4 text-center text-xs text-slate-500">
                           Chưa có Fanpage nào được liên kết với Via này. Hãy bấm{' '}
@@ -1265,7 +1414,7 @@ const Connections = () => {
       {/* CHẾ ĐỘ 2: BẢNG PHẲNG TRUYỀN THỐNG (TABLE VIEW) */}
       {/* ========================================================================= */}
       {viewMode === 'table' && (
-        <Card variant="borderless" className="app-surface shadow-sm rounded-2xl border border-slate-800/80 overflow-hidden p-0">
+        <Card variant="borderless" className="shadow-sm overflow-hidden p-0">
           <Table
             columns={makePageColumns(true)}
             dataSource={filteredAccounts}
@@ -1284,7 +1433,7 @@ const Connections = () => {
       {viewMode === 'cards' && (
         <div>
           {filteredAccounts.length === 0 ? (
-            <Card variant="borderless" className="app-surface rounded-2xl border border-slate-800 text-center py-8">
+            <Card variant="borderless" className="text-center py-8">
               <Empty description={<span className="text-slate-400 text-xs">Không tìm thấy Fanpage nào</span>} />
             </Card>
           ) : (
@@ -1448,6 +1597,7 @@ const Connections = () => {
                       accessToken,
                       maxPostsPerDay: values.maxPostsPerDay ?? null,
                       backupAccountId: values.backupAccountId ?? 0,
+                      postingIdentityAccountId: values.postingIdentityAccountId !== undefined ? values.postingIdentityAccountId : 0,
                       proxyUrl: values.proxyUrl ? values.proxyUrl.trim() : null,
                     },
                   });
@@ -1546,6 +1696,27 @@ const Connections = () => {
             />
           </Form.Item>
 
+          {configDrawerAccount?.platform !== 'FACEBOOK_PROFILE' && (
+            <Form.Item
+              name="postingIdentityAccountId"
+              label={<span className="font-medium text-slate-300">Nick Via quản trị (Sở hữu)</span>}
+              extra={<span className="text-xs text-slate-500">Gán Page vào Via để tự động đồng bộ Cookie tức thì khi Via đổi cookie hoặc hết hạn.</span>}
+            >
+              <Select
+                allowClear
+                placeholder="Chọn Nick Via sở hữu..."
+                options={[
+                  { value: 0, label: '— Không gắn Via nào (Kênh độc lập) —' },
+                  ...personalVias.map(({ cUser, account }) => ({
+                    value: account.id,
+                    label: `${viaNameMap.get(cUser) || `Via #${cUser}`} (UID: ${cUser})`,
+                  })),
+                ]}
+                className="rounded-xl"
+              />
+            </Form.Item>
+          )}
+
           <Form.Item
             name="proxyUrl"
             label={<span className="font-medium text-slate-300">Proxy riêng (IPv4)</span>}
@@ -1617,7 +1788,7 @@ const Connections = () => {
                     label={<span className="font-medium text-slate-300">{pageNameLabel}</span>}
                     rules={[{ required: true, message: `Vui lòng nhập ${pageNameLabel}!` }]}
                   >
-                    <Input placeholder={isThreads ? 'Ví dụ: Làm Sen Threads' : 'Ví dụ: Tin Tức Công Nghệ 24/7'} className="rounded-xl" />
+                    <Input placeholder={isThreads ? 'Ví dụ: Tin Tức Threads' : 'Ví dụ: Tin Tức Công Nghệ 24/7'} className="rounded-xl" />
                   </Form.Item>
 
                   <Form.Item
@@ -1667,6 +1838,7 @@ const Connections = () => {
                         if (getFV3('accountType') !== 'PERSONAL_COOKIE') return null;
                         return (
                           <Form.Item
+                            name="postingIdentityAccountId"
                             label={<span className="font-medium text-slate-300">Gắn vào Via cá nhân sở hữu</span>}
                             extra={<span className="text-xs text-slate-400">💡 Chọn Via có sẵn để tự động kế thừa Cookie, khi Via đổi cookie thì Page này cũng tự cập nhật.</span>}
                           >
@@ -1674,16 +1846,16 @@ const Connections = () => {
                               placeholder="Chọn Via sở hữu..."
                               allowClear
                               className="rounded-xl"
-                              onChange={(viaCUser) => {
-                                const targetVia = personalVias.find((v) => v.cUser === viaCUser);
+                              onChange={(viaAccountId) => {
+                                const targetVia = personalVias.find((v) => v.account.id === viaAccountId);
                                 if (targetVia) {
                                   form.setFieldValue('accessToken', targetVia.account.accessToken);
-                                  message.success(`Đã tự động lấy Cookie của Via ${viaNameMap.get(viaCUser) || viaCUser}`);
+                                  message.success(`Đã tự động lấy Cookie của Via ${viaNameMap.get(targetVia.cUser) || targetVia.cUser}`);
                                 }
                               }}
                             >
-                              {personalVias.map(({ cUser }) => (
-                                <Option key={cUser} value={cUser}>
+                              {personalVias.map(({ cUser, account }) => (
+                                <Option key={account.id} value={account.id}>
                                   {viaNameMap.get(cUser) || `Via #${cUser}`} (UID: {cUser})
                                 </Option>
                               ))}
@@ -1783,11 +1955,11 @@ const Connections = () => {
             setPersonalViaModalOpen(false);
             personalViaForm.resetFields();
             setRawCookieVia('');
-            setIsManualViaMode(false);
+            setViaInputMode('structured');
           }
         }}
         footer={null}
-        width={520}
+        width={580}
         centered
         className="dark-modal"
       >
@@ -1795,22 +1967,44 @@ const Connections = () => {
           form={personalViaForm}
           layout="vertical"
           onFinish={(values) => {
-            // Tự động kiểm tra nếu có rawCookieVia mà form chưa set kịp
-            if ((!values.cUser || !values.xs) && rawCookieVia) {
-              const parsed = smartExtractCookie(rawCookieVia);
-              if (parsed.isValid) {
-                values.cUser = parsed.cUser;
-                values.xs = parsed.xs;
+            let cUser = values.cUser?.trim() || '';
+            let xs = values.xs?.trim() || '';
+            let fullCookie = values.securityCookies?.trim() || rawCookieVia?.trim() || '';
+
+            if (!cUser || !xs) {
+              if (fullCookie) {
+                const parsed = smartExtractCookie(fullCookie);
+                if (parsed.isValid) {
+                  cUser = parsed.cUser;
+                  xs = parsed.xs;
+                  fullCookie = parsed.fullCookie || parsed.normalized;
+                }
               }
             }
-            if (!values.cUser || !values.xs) {
-              message.error('Vui lòng cung cấp Cookie có chứa c_user và mã phiên xs hợp lệ!');
+
+            if (!cUser || !xs) {
+              message.error('Vui lòng cung cấp ít nhất UID Facebook (c_user) và Mã phiên (xs) hợp lệ!');
               return;
             }
-            addPersonalViaMutation.mutate(values);
+
+            if (fullCookie) {
+              if (!fullCookie.includes('c_user=')) fullCookie = `c_user=${cUser}; ${fullCookie}`;
+              if (!fullCookie.includes('xs=')) fullCookie = `${fullCookie}; xs=${xs}`;
+            } else {
+              fullCookie = `c_user=${cUser}; xs=${xs}`;
+            }
+
+            addPersonalViaMutation.mutate({
+              profileLabel: values.profileLabel?.trim(),
+              cUser,
+              xs,
+              fullCookie,
+              proxyUrl: values.proxyUrl?.trim(),
+            });
           }}
-          className="mt-4 space-y-3"
+          className="mt-3 space-y-3.5"
         >
+          {/* Thanh đăng nhập tự động Chrome */}
           <div className="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-700/80 bg-slate-900/60">
             <span className="text-xs text-slate-400">Không muốn copy cookie? Tự đăng nhập trong cửa sổ Chrome, hệ thống tự lấy cookie.</span>
             <Button
@@ -1829,164 +2023,331 @@ const Connections = () => {
             </Button>
           </div>
 
-          {/* Ô DÁN COOKIE NHANH - 1 Ô DUY NHẤT */}
-          <div className="p-3.5 rounded-2xl border border-blue-500/30 bg-blue-950/20 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-blue-300 flex items-center gap-1.5">
-                <ThunderboltOutlined className="text-amber-400" />
-                Dán Cookie Facebook (1 Ô Duy Nhất — Tự Bóc Tách)
-              </span>
-              <Button
-                size="small"
-                icon={<CopyOutlined />}
-                onClick={async () => {
-                  try {
-                    const text = await navigator.clipboard.readText();
-                    if (text) {
-                      const trimmed = text.trim();
-                      setRawCookieVia(trimmed);
-                      const parsed = smartExtractCookie(trimmed);
-                      if (parsed.isValid) {
-                        personalViaForm.setFieldsValue({
-                          cUser: parsed.cUser,
-                          xs: parsed.xs,
-                        });
-                        if (!personalViaForm.getFieldValue('profileLabel')) {
-                          personalViaForm.setFieldValue('profileLabel', `Via Facebook #${parsed.cUser}`);
-                        }
-                        message.success(`Đã tự động nhận diện UID: ${parsed.cUser}`);
-                      } else {
-                        message.warning('Đã dán nhưng chưa tìm thấy c_user hoặc xs. Hãy kiểm tra lại chuỗi cookie.');
-                      }
-                    }
-                  } catch {
-                    message.info('Vui lòng dán trực tiếp (Ctrl+V) vào ô bên dưới');
-                  }
-                }}
-                className="text-[11px] h-6 px-2.5 rounded-lg bg-blue-600/30 border-blue-500/40 text-blue-200 hover:bg-blue-600 hover:text-white"
-              >
-                Dán từ Clipboard
-              </Button>
-            </div>
-
-            <Input.TextArea
-              rows={3}
-              value={rawCookieVia}
-              placeholder="Dán toàn bộ chuỗi Cookie vào đây (ví dụ: sb=...; c_user=1000...; xs=... hoặc định dạng JSON từ J2Team / Cookie-Editor)..."
-              className="rounded-xl font-mono text-xs bg-slate-900/90 border-slate-700/80"
-              onChange={(e) => {
-                const text = e.target.value;
-                setRawCookieVia(text);
-                const parsed = smartExtractCookie(text);
-                if (parsed.isValid) {
-                  personalViaForm.setFieldsValue({
-                    cUser: parsed.cUser,
-                    xs: parsed.xs,
-                  });
-                  if (!personalViaForm.getFieldValue('profileLabel')) {
-                    personalViaForm.setFieldValue('profileLabel', `Via Facebook #${parsed.cUser}`);
-                  }
-                }
-              }}
+          {/* Segmented Switcher */}
+          <div className="flex justify-center">
+            <Segmented
+              value={viaInputMode}
+              onChange={(val) => setViaInputMode(val as 'structured' | 'quick')}
+              options={[
+                {
+                  value: 'structured',
+                  label: (
+                    <Flex align="center" gap={6} className="px-2 py-1">
+                      <SafetyCertificateOutlined className="text-blue-400" />
+                      <span className="font-semibold text-xs">📋 Nhập Từng Ô Phân Tầng (Khuyên dùng)</span>
+                    </Flex>
+                  ),
+                },
+                {
+                  value: 'quick',
+                  label: (
+                    <Flex align="center" gap={6} className="px-2 py-1">
+                      <ThunderboltOutlined className="text-amber-400" />
+                      <span className="font-semibold text-xs">⚡ Dán Nhanh Cookie (Tự Bóc Tách)</span>
+                    </Flex>
+                  ),
+                },
+              ]}
+              className="bg-slate-900 border border-slate-800 p-1 rounded-xl"
             />
+          </div>
 
-            {(() => {
-              const parsed = smartExtractCookie(rawCookieVia);
-              if (parsed.isValid) {
-                return (
-                  <div className="flex items-center justify-between p-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs">
-                    <span className="flex items-center gap-1.5 font-semibold">
-                      <CheckCircleOutlined className="text-emerald-400" />
-                      Nhận diện thành công UID: <span className="font-mono text-white underline">{parsed.cUser}</span>
-                    </span>
-                    <Tag color="success" className="mr-0 font-mono">Đã lấy c_user + xs</Tag>
-                  </div>
-                );
-              }
-              if (rawCookieVia.trim()) {
-                return (
-                  <div className="p-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-1.5">
-                    <WarningOutlined className="text-amber-400" />
-                    Chưa tìm thấy cặp <code className="bg-amber-950/40 px-1 rounded font-mono">c_user</code> và <code className="bg-amber-950/40 px-1 rounded font-mono">xs</code> hợp lệ. Hãy kiểm tra lại chuỗi copy.
-                  </div>
-                );
-              }
-              return (
-                <div className="text-[11px] text-slate-400 flex items-center gap-1">
-                  <span>💡 Hỗ trợ: Chuỗi Cookie thô, định dạng JSON J2Team, hoặc chuỗi có chứa c_user & xs.</span>
+          {/* CHẾ ĐỘ 1: NHẬP TỪNG Ô PHÂN TẦNG */}
+          {viaInputMode === 'structured' && (
+            <div className="space-y-3">
+              {/* TẦNG 1: ĐỊNH DANH VIA */}
+              <div className="p-3.5 rounded-2xl border border-blue-500/30 bg-blue-950/20 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-blue-300 flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-blue-500/30 text-blue-300 flex items-center justify-center text-[11px] font-bold">1</span>
+                    TẦNG 1: ĐỊNH DANH NICK / VIA
+                  </span>
+                  <Tag color="blue" className="text-[10px] m-0 font-semibold">Bắt buộc</Tag>
                 </div>
-              );
-            })()}
-          </div>
 
-          <Form.Item
-            name="profileLabel"
-            label={<span className="font-medium text-slate-300">Tên gợi nhớ</span>}
-            extra={<span className="text-xs text-slate-500">Ví dụ: Huỳnh Thạnh Phú, Nick Chính, Nick Phụ 1...</span>}
-          >
-            <Input placeholder="Huỳnh Thạnh Phú" className="rounded-xl" />
-          </Form.Item>
+                <Form.Item
+                  name="profileLabel"
+                  label={<span className="text-xs font-semibold text-slate-300">Tên gợi nhớ của Nick</span>}
+                  rules={[{ required: true, message: 'Vui lòng nhập Tên gợi nhớ!' }]}
+                  className="!mb-2"
+                >
+                  <Input
+                    placeholder="Ví dụ: Nick Chính 01, Nick Nuôi, Nick Đăng Phim..."
+                    className="rounded-xl bg-slate-900/90 border-slate-700/80"
+                  />
+                </Form.Item>
 
-          {/* TOGGLE MỞ FORM NHẬP THỦ CÔNG */}
-          <div className="flex items-center justify-between pt-1">
-            <Button
-              type="link"
-              size="small"
-              onClick={() => setIsManualViaMode(!isManualViaMode)}
-              className="text-xs text-slate-400 hover:text-slate-200 px-0 flex items-center gap-1"
-            >
-              <span>{isManualViaMode ? '▲ Thu gọn chi tiết c_user & xs' : '▼ Tùy chỉnh nâng cao (Nhập tay c_user & xs)'}</span>
-            </Button>
-          </div>
+                <Form.Item
+                  name="cUser"
+                  label={<span className="text-xs font-semibold text-slate-300">UID Facebook cá nhân (c_user)</span>}
+                  rules={[
+                    { required: true, message: 'Vui lòng nhập UID Facebook (c_user)!' },
+                    { pattern: /^\d{5,}$/, message: 'c_user phải là dãy số ID Facebook.' },
+                  ]}
+                  className="!mb-0"
+                >
+                  <Input
+                    placeholder="Ví dụ: 100023403136194 (dãy số c_user trong cookie hoặc ID trang cá nhân)"
+                    className="rounded-xl font-mono text-xs bg-slate-900/90 border-slate-700/80"
+                  />
+                </Form.Item>
+              </div>
 
-          {isManualViaMode && (
-            <div className="space-y-3 p-3 rounded-xl bg-slate-900/60 border border-slate-800">
-              <Form.Item
-                name="cUser"
-                label={<span className="font-medium text-slate-300 text-xs">c_user (Facebook UID)</span>}
-                rules={[
-                  { required: true, message: 'Vui lòng nhập c_user!' },
-                  { pattern: /^\d{5,}$/, message: 'c_user phải là chuỗi số Facebook ID.' },
-                ]}
-              >
-                <Input placeholder="100023403136194" className="rounded-xl font-mono text-xs" />
-              </Form.Item>
+              {/* TẦNG 2: PHIÊN ĐĂNG NHẬP PLAYWRIGHT */}
+              <div className="p-3.5 rounded-2xl border border-indigo-500/30 bg-indigo-950/20 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-indigo-500/30 text-indigo-300 flex items-center justify-center text-[11px] font-bold">2</span>
+                    TẦNG 2: KHÓA PHIÊN ĐĂNG NHẬP (xs)
+                  </span>
+                  <Tag color="blue" className="text-[10px] m-0 font-semibold">Bắt buộc</Tag>
+                </div>
 
-              <Form.Item
-                name="xs"
-                label={<span className="font-medium text-slate-300 text-xs">xs (Session token)</span>}
-                rules={[{ required: true, message: 'Vui lòng nhập xs!' }]}
-              >
-                <div className="flex gap-2">
-                  <Input.Password placeholder="Chuỗi xs..." className="rounded-xl font-mono text-xs flex-1" />
+                <Form.Item
+                  name="xs"
+                  rules={[{ required: true, message: 'Vui lòng nhập mã phiên xs!' }]}
+                  className="!mb-0"
+                >
+                  <div className="flex gap-2">
+                    <Input.Password
+                      placeholder="Dán chuỗi xs... (Ví dụ: 2%3Aabc123...)"
+                      className="rounded-xl font-mono text-xs bg-slate-900/90 border-slate-700/80 flex-1"
+                    />
+                    <Button
+                      icon={<CopyOutlined />}
+                      onClick={async () => {
+                        try {
+                          const text = await navigator.clipboard.readText();
+                          if (text) {
+                            const trimmed = text.trim();
+                            const parsed = smartExtractCookie(trimmed);
+                            if (parsed.isValid) {
+                              personalViaForm.setFieldsValue({
+                                cUser: parsed.cUser,
+                                xs: parsed.xs,
+                                securityCookies: parsed.fullCookie || trimmed,
+                              });
+                              message.success(`Đã tự động trích xuất xs & c_user: ${parsed.cUser}`);
+                            } else {
+                              personalViaForm.setFieldValue('xs', trimmed);
+                              message.success('Đã dán mã phiên xs');
+                            }
+                          }
+                        } catch {}
+                      }}
+                      className="shrink-0 rounded-xl"
+                    >
+                      Dán
+                    </Button>
+                  </div>
+                </Form.Item>
+                <div className="text-[11px] text-slate-400">
+                  🔑 Session token bí mật giúp bot Playwright tự động tương tác Facebook không cần nhập mật khẩu.
+                </div>
+              </div>
+
+              {/* TẦNG 3: KHÁNG CHECKPOINT & CHỐNG VĂNG NICK */}
+              <div className="p-3.5 rounded-2xl border border-emerald-500/30 bg-emerald-950/20 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-emerald-500/30 text-emerald-300 flex items-center justify-center text-[11px] font-bold">3</span>
+                    TẦNG 3: COOKIE BẢO MẬT KHÁNG CHECKPOINT (sb, datr, fr)
+                  </span>
+                  <Tag color="green" className="text-[10px] m-0 font-semibold">Khuyên dùng (Để đạt 100% ĐỦ)</Tag>
+                </div>
+
+                <Form.Item name="securityCookies" className="!mb-0">
+                  <Input.TextArea
+                    rows={2}
+                    placeholder="Ví dụ: sb=...; datr=...; fr=... (hoặc dán toàn bộ chuỗi cookie dài vào đây)"
+                    className="rounded-xl font-mono text-xs bg-slate-900/90 border-slate-700/80"
+                  />
+                </Form.Item>
+                <div className="text-[11px] text-slate-400">
+                  🛡️ Facebook dùng datr và sb để nhận diện thiết bị quen thuộc. Có 2 mã này bot Playwright sẽ không bị Facebook nghi ngờ checkpoint.
+                </div>
+              </div>
+
+              {/* TẦNG 4: PROXY RIÊNG CHO NICK */}
+              <div className="p-3.5 rounded-2xl border border-slate-700/80 bg-slate-900/60 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-slate-700 text-slate-300 flex items-center justify-center text-[11px] font-bold">4</span>
+                    TẦNG 4: PROXY RIÊNG CHO NICK (HTTP/SOCKS5)
+                  </span>
+                  <Tag className="text-[10px] m-0">Tùy chọn</Tag>
+                </div>
+
+                <Form.Item name="proxyUrl" className="!mb-0">
+                  <Input
+                    placeholder="Ví dụ: http://user:pass@103.152.xxx.xxx:8080 (hoặc bỏ trống nếu dùng IP máy)"
+                    className="rounded-xl font-mono text-xs bg-slate-900/90 border-slate-700/80"
+                  />
+                </Form.Item>
+                <div className="text-[11px] text-slate-400">
+                  🌐 Dành cho bạn nuôi nhiều nick cần gán IP riêng cố định để chống checkpoint chùm.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* CHẾ ĐỘ 2: DÁN NHANH COOKIE */}
+          {viaInputMode === 'quick' && (
+            <div className="space-y-3">
+              <div className="p-3.5 rounded-2xl border border-blue-500/30 bg-blue-950/20 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-blue-300 flex items-center gap-1.5">
+                    <ThunderboltOutlined className="text-amber-400" />
+                    Dán Chuỗi Cookie Hoặc JSON J2Team (Tự Động Bóc Tách)
+                  </span>
                   <Button
+                    size="small"
                     icon={<CopyOutlined />}
                     onClick={async () => {
                       try {
                         const text = await navigator.clipboard.readText();
-                        if (text) personalViaForm.setFieldValue('xs', text.trim());
-                      } catch {}
+                        if (text) {
+                          const trimmed = text.trim();
+                          setRawCookieVia(trimmed);
+                          const parsed = smartExtractCookie(trimmed);
+                          if (parsed.isValid) {
+                            personalViaForm.setFieldsValue({
+                              cUser: parsed.cUser,
+                              xs: parsed.xs,
+                              securityCookies: parsed.fullCookie || trimmed,
+                            });
+                            if (!personalViaForm.getFieldValue('profileLabel')) {
+                              personalViaForm.setFieldValue('profileLabel', `Via Facebook #${parsed.cUser}`);
+                            }
+                            message.success(`Đã tự động nhận diện và phân tầng cho UID: ${parsed.cUser}`);
+                          } else {
+                            message.warning('Đã dán nhưng chưa tìm thấy c_user hoặc xs. Hãy kiểm tra lại chuỗi cookie.');
+                          }
+                        }
+                      } catch {
+                        message.info('Vui lòng dán trực tiếp (Ctrl+V) vào ô bên dưới');
+                      }
                     }}
-                    className="shrink-0 rounded-xl"
+                    className="text-[11px] h-6 px-2.5 rounded-lg bg-blue-600/30 border-blue-500/40 text-blue-200 hover:bg-blue-600 hover:text-white"
                   >
-                    Dán
+                    Dán từ Clipboard
                   </Button>
                 </div>
+
+                <Input.TextArea
+                  rows={4}
+                  value={rawCookieVia}
+                  placeholder="Dán toàn bộ chuỗi Cookie vào đây (ví dụ: sb=...; c_user=1000...; xs=... hoặc định dạng JSON từ J2Team / Cookie-Editor)..."
+                  className="rounded-xl font-mono text-xs bg-slate-900/90 border-slate-700/80"
+                  onChange={(e) => {
+                    const text = e.target.value;
+                    setRawCookieVia(text);
+                    const parsed = smartExtractCookie(text);
+                    if (parsed.isValid) {
+                      personalViaForm.setFieldsValue({
+                        cUser: parsed.cUser,
+                        xs: parsed.xs,
+                        securityCookies: parsed.fullCookie || text,
+                      });
+                      if (!personalViaForm.getFieldValue('profileLabel')) {
+                        personalViaForm.setFieldValue('profileLabel', `Via Facebook #${parsed.cUser}`);
+                      }
+                    }
+                  }}
+                />
+
+                {/* Kết quả bóc tách nhanh */}
+                {(() => {
+                  const parsed = smartExtractCookie(rawCookieVia);
+                  if (parsed.isValid) {
+                    return (
+                      <div className="space-y-1.5 p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="flex items-center gap-1.5 font-semibold">
+                            <CheckCircleOutlined className="text-emerald-400" />
+                            Đã bóc tách thành công UID: <span className="font-mono text-white underline">{parsed.cUser}</span>
+                          </span>
+                          <Tag color="success" className="mr-0 font-mono">Đã lấy c_user + xs</Tag>
+                        </div>
+                        <div className="text-[11px] text-emerald-200/80 flex items-center justify-between pt-1 border-t border-emerald-500/20">
+                          <span>{parsed.hasDatrOrSb ? '🛡️ Đã có mã kháng checkpoint (sb/datr)!' : '⚠️ Chưa thấy sb/datr (Vẫn đăng được nhưng nên copy full cookie)'}</span>
+                          <Button
+                            type="link"
+                            size="small"
+                            onClick={() => setViaInputMode('structured')}
+                            className="text-xs text-emerald-300 hover:text-white p-0 h-auto"
+                          >
+                            Xem chi tiết các ô phân tầng →
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  }
+                  if (rawCookieVia.trim()) {
+                    return (
+                      <div className="p-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-1.5">
+                        <WarningOutlined className="text-amber-400" />
+                        Chưa tìm thấy cặp <code className="bg-amber-950/40 px-1 rounded font-mono">c_user</code> và <code className="bg-amber-950/40 px-1 rounded font-mono">xs</code> hợp lệ. Hãy kiểm tra lại chuỗi copy.
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                      <span>💡 Hỗ trợ: Chuỗi Cookie thô, định dạng JSON J2Team, hoặc chuỗi có chứa c_user & xs.</span>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <Form.Item
+                name="profileLabel"
+                label={<span className="font-medium text-slate-300 text-xs">Tên gợi nhớ Nick / Via</span>}
+                extra={<span className="text-[11px] text-slate-500">Ví dụ: Nick Chính 01, Nick Nuôi, Nick Phụ 1...</span>}
+              >
+                <Input placeholder="Ví dụ: Nick Chính 01" className="rounded-xl" />
               </Form.Item>
             </div>
           )}
 
-          {/* Ẩn input cUser & xs khi không ở manual mode để form vẫn giữ giá trị */}
-          {!isManualViaMode && (
-            <>
-              <Form.Item name="cUser" hidden>
-                <Input />
-              </Form.Item>
-              <Form.Item name="xs" hidden>
-                <Input />
-              </Form.Item>
-            </>
-          )}
+          {/* THƯỚC ĐO ĐỘ ĐẦY ĐỦ THÔNG SỐ CỦA VIA (LUÔN HIỂN THỊ) */}
+          <div className={`p-3 rounded-xl border transition-all ${
+            viaCompletenessScore === 3
+              ? 'border-emerald-500/40 bg-emerald-950/30'
+              : viaCompletenessScore === 2
+              ? 'border-amber-500/40 bg-amber-950/30'
+              : 'border-slate-800 bg-slate-900/50'
+          }`}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-slate-300">KIỂM TRA ĐỘ ĐẦY ĐỦ THÔNG SỐ CỦA VIA:</span>
+              {viaCompletenessScore === 3 ? (
+                <Tag color="success" className="font-semibold m-0">🟢 100% HOÀN HẢO (ĐÃ ĐỦ)</Tag>
+              ) : viaCompletenessScore === 2 ? (
+                <Tag color="warning" className="font-semibold m-0">🟡 ĐỦ CƠ BẢN (70%)</Tag>
+              ) : (
+                <Tag color="error" className="font-semibold m-0">❌ CHƯA ĐỦ THÔNG SỐ</Tag>
+              )}
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 text-xs mb-1.5">
+              <div className={`p-1.5 rounded-lg border text-center ${hasViaCUser ? 'border-emerald-500/30 bg-emerald-950/40 text-emerald-300' : 'border-slate-800 bg-slate-900/60 text-slate-500'}`}>
+                👤 UID: {hasViaCUser ? '✅ Đã có' : '❌ Chưa có'}
+              </div>
+              <div className={`p-1.5 rounded-lg border text-center ${hasViaXs ? 'border-emerald-500/30 bg-emerald-950/40 text-emerald-300' : 'border-slate-800 bg-slate-900/60 text-slate-500'}`}>
+                🔑 Phiên xs: {hasViaXs ? '✅ Đã có' : '❌ Chưa có'}
+              </div>
+              <div className={`p-1.5 rounded-lg border text-center ${hasViaSecurity ? 'border-emerald-500/30 bg-emerald-950/40 text-emerald-300' : 'border-amber-500/30 bg-amber-950/40 text-amber-400'}`}>
+                🛡️ Kháng Checkpoint: {hasViaSecurity ? '✅ Đầy đủ' : '⚠️ Nên thêm'}
+              </div>
+            </div>
+
+            <div className="text-[11px] text-slate-300 leading-relaxed">
+              {viaCompletenessScore === 3
+                ? '🎉 Tuyệt vời! Nick đã có đủ toàn bộ thông số định danh, phiên làm việc và mã bảo mật (sb/datr) kháng checkpoint tối đa.'
+                : viaCompletenessScore === 2
+                ? '💡 Đã đủ điều kiện cơ bản để Playwright chạy đăng bài. Bạn nên bổ sung Cookie bảo mật ở Tầng 3 để nick không bị Facebook nghi ngờ checkpoint.'
+                : '⚠️ Bắt buộc phải có Tên gợi nhớ, UID (c_user) và Mã phiên (xs) thì hệ thống mới có thể tương tác tự động được.'}
+            </div>
+          </div>
 
           <div className="pt-3 flex justify-end gap-2.5 border-t border-slate-800">
             <Button
@@ -2191,6 +2552,33 @@ const Connections = () => {
             </div>
           </div>
 
+          {/* Quick sync all verified pages action bar */}
+          <div className="flex items-center justify-between p-3 rounded-2xl bg-gradient-to-r from-blue-950/40 via-indigo-950/30 to-purple-950/40 border border-blue-500/30">
+            <div>
+              <div className="font-semibold text-xs text-blue-200 flex items-center gap-1.5">
+                <ThunderboltOutlined className="text-amber-400" />
+                Đồng bộ vào danh sách kênh xuất bản
+              </div>
+              <div className="text-[11px] text-slate-400 mt-0.5">
+                Thêm ngay toàn bộ Fanpage đã kiểm kê vào hệ thống để bắt đầu lên lịch và đăng bài.
+              </div>
+            </div>
+            <Button
+              type="primary"
+              icon={<ThunderboltOutlined className="text-amber-300" />}
+              loading={importPagesMutation.isPending}
+              disabled={auditedPages.length === 0}
+              onClick={() => {
+                if (pageAuditSource) {
+                  importPagesMutation.mutate({ accountId: pageAuditSource.id });
+                }
+              }}
+              className="bg-emerald-600 hover:bg-emerald-500 font-semibold text-xs rounded-xl shadow-md shrink-0"
+            >
+              Đồng bộ tất cả vào Tool
+            </Button>
+          </div>
+
           {/* Bảng danh sách Pages đã quét */}
           <Table<FacebookPageAccess>
             rowKey={(r) => r.id || r.pageId}
@@ -2220,36 +2608,61 @@ const Connections = () => {
                 render: (st: FacebookPageAccess['verificationStatus']) => <PageAccessStatusTag status={st} />,
               },
               {
-                title: '',
+                title: 'Hành động',
                 key: 'action',
-                width: 70,
-                render: (_, r) => (
-                  <div className="flex items-center justify-end gap-1">
-                    {r.pageUrl && (
+                width: 140,
+                render: (_, r) => {
+                  const isConnected = publishableAccounts.some((a) => String(a.platformAccountId) === String(r.pageId));
+                  return (
+                    <div className="flex items-center justify-end gap-1.5">
+                      {isConnected ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                          Đã kết nối
+                        </span>
+                      ) : (
+                        <Button
+                          type="primary"
+                          size="small"
+                          icon={<PlusOutlined />}
+                          loading={importPagesMutation.isPending}
+                          onClick={() => {
+                            if (pageAuditSource) {
+                              importPagesMutation.mutate({ accountId: pageAuditSource.id, pageIds: [r.pageId] });
+                            }
+                          }}
+                          className="text-[11px] h-6 px-2.5 bg-blue-600 rounded-md font-medium"
+                        >
+                          Thêm
+                        </Button>
+                      )}
+                      {r.pageUrl && (
+                        <Button
+                          type="link"
+                          href={r.pageUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          icon={<LinkOutlined />}
+                          className="text-blue-400 p-0 text-xs"
+                          title="Xem trên Facebook"
+                        />
+                      )}
                       <Button
-                        type="link"
-                        href={r.pageUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        icon={<LinkOutlined />}
-                        className="text-blue-400 p-0 text-xs"
+                        type="text"
+                        danger
+                        size="small"
+                        icon={<DeleteOutlined />}
+                        loading={deleteManualPageMutation.isPending}
+                        onClick={() => {
+                          if (pageAuditSource) {
+                            deleteManualPageMutation.mutate({ accountId: pageAuditSource.id, pageId: r.pageId });
+                          }
+                        }}
+                        className="text-slate-500 hover:text-red-400 p-0 h-6 w-6"
+                        title="Xóa khỏi kiểm kê"
                       />
-                    )}
-                    <Button
-                      type="text"
-                      danger
-                      size="small"
-                      icon={<DeleteOutlined />}
-                      loading={deleteManualPageMutation.isPending}
-                      onClick={() => {
-                        if (pageAuditSource) {
-                          deleteManualPageMutation.mutate({ accountId: pageAuditSource.id, pageId: r.pageId });
-                        }
-                      }}
-                      className="text-slate-500 hover:text-red-400 p-0 h-6 w-6"
-                    />
-                  </div>
-                ),
+                    </div>
+                  );
+                },
               },
             ]}
           />
@@ -2320,21 +2733,21 @@ const Connections = () => {
               <li>Mở tab mới trên Chrome: <code className="bg-slate-800 px-1.5 py-0.5 rounded text-sky-400 font-mono">chrome://extensions/</code></li>
               <li>Bật công tắc <b>"Chế độ dành cho nhà phát triển" (Developer mode)</b> ở góc trên cùng bên phải.</li>
               <li>Bấm nút <b>"Tải tiện ích đã giải nén" (Load unpacked)</b> ở góc trên cùng bên trái.</li>
-              <li>Chọn thư mục extension trên máy tính:
+              <li>Chọn thư mục extension trên máy tính (nằm trong thư mục mã nguồn dự án):
                 <div className="mt-1.5 flex items-center gap-2 bg-slate-900 p-2 rounded-lg border border-slate-700/80">
                   <span className="text-[11px] font-mono text-emerald-400 truncate flex-1">
-                    /Users/huynhthanhphu/Documents/TOOLZUTTER/auto-post-saas/extension
+                    auto-post-saas/extension
                   </span>
                   <Button
                     size="small"
                     icon={<CopyOutlined />}
                     onClick={() => {
-                      navigator.clipboard.writeText('/Users/huynhthanhphu/Documents/TOOLZUTTER/auto-post-saas/extension');
-                      message.success('Đã sao chép đường dẫn thư mục!');
+                      navigator.clipboard.writeText('auto-post-saas/extension');
+                      message.success('Đã sao chép tên thư mục extension!');
                     }}
                     className="shrink-0 text-xs"
                   >
-                    Sao chép đường dẫn
+                    Sao chép tên thư mục
                   </Button>
                 </div>
               </li>

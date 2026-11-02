@@ -1,5 +1,6 @@
 package com.autopost.saas.scheduler;
 
+import com.autopost.saas.util.LocalServices;
 import com.autopost.saas.entity.Campaign;
 import com.autopost.saas.entity.PostQueue;
 import com.autopost.saas.entity.SocialAccount;
@@ -49,11 +50,11 @@ public class CampaignScheduler {
 
     private static final int MAX_RETRY = 3;
     private static final int TOKEN_EXPIRING_SOON_DAYS = 3;
-    // Mỗi nick (c_user) đăng TUẦN TỰ; các nick KHÁC nhau được đăng song song, tối đa 4 nick cùng lúc
-    // được chia đều qua 2 Playwright Worker (Port 3001 và Port 3002).
-    private static final int MAX_PARALLEL_ACCOUNTS = 4;
+    // Mỗi nick (c_user) đăng TUẦN TỰ; các nick KHÁC nhau được đăng song song, tối đa 6 nick cùng lúc
+    // được chia đều qua các Playwright Worker (Port 3001, 3002 và 3003).
+    private static final int MAX_PARALLEL_ACCOUNTS = 6;
     // Giãn cách tối thiểu giữa 2 lần đăng liên tiếp trên CÙNG 1 account (nghỉ nhẹ giải phóng Chromium)
-    private static final long MIN_MS_BETWEEN_POSTS_SAME_ACCOUNT = 15_000;
+    private static final long MIN_MS_BETWEEN_POSTS_SAME_ACCOUNT = 8_000;
     // Bài cùng nick bị hẹn trùng giờ: dời từng bài ra sau đúng chừng này phút (giữ sát lịch gốc thay vì đẩy xa).
     private static final int STAGGER_GAP_MINUTES = 3;
     // Quá 3 phút không có heartbeat mới xem là tiến trình đã chết/mất phản hồi thật sự.
@@ -76,6 +77,8 @@ public class CampaignScheduler {
     private final PlaywrightHealthCheckService playwrightHealthCheckService;
     private final com.autopost.saas.service.ViaCookieFollowService viaCookieFollowService;
     private final com.autopost.saas.service.PostingWindowService postingWindowService;
+    private final com.autopost.saas.service.NickThrottleService nickThrottleService;
+    private final com.autopost.saas.service.WorkerRouterService workerRouterService;
 
     // 1. TẮT HOÀN TOÀN CÀO TỰ ĐỘNG CHẠY NGẦM: Chỉ cào bài khi người dùng trực tiếp yêu cầu hoặc dán link
     // @Scheduled(fixedRate = 300000)
@@ -165,10 +168,9 @@ public class CampaignScheduler {
 
         String platformId = parts[0].trim();
         String accountType = parts.length >= 2 ? parts[1].trim() : "";
-        return socialAccountRepository.findAll().stream()
-                .filter(account -> platformId.equals(account.getPlatformAccountId()))
-                .filter(account -> accountType.isBlank() || accountType.equalsIgnoreCase(account.getAccountType()))
-                .findFirst();
+        return accountType.isBlank()
+                ? socialAccountRepository.findFirstByPlatformAccountIdOrderByIdAsc(platformId)
+                : socialAccountRepository.findFirstByPlatformAccountIdAndAccountTypeIgnoreCaseOrderByIdAsc(platformId, accountType);
     }
 
     private static String extractCookieValue(String cookieString, String cookieName) {
@@ -237,8 +239,8 @@ public class CampaignScheduler {
     // Thời điểm mỗi target (Fanpage/Group) đăng xong bài gần nhất
     private final Map<String, Long> lastPublishFinishedAtByTarget = new ConcurrentHashMap<>();
 
-    // 2. Tiến trình tự động đăng bài theo lịch đặt trước mỗi 10 giây (siêu nhạy, đúng giờ là chạy ngay).
-    @Scheduled(fixedRate = 10000)
+    // 2. Tiến trình tự động đăng bài theo lịch đặt trước mỗi 5 giây (siêu nhạy, đúng giờ là chạy ngay).
+    @Scheduled(fixedRate = 5000)
     @Transactional(readOnly = true)
     public void executePublishing() {
         LocalDateTime now = LocalDateTime.now();
@@ -299,22 +301,30 @@ public class CampaignScheduler {
                     : (firstPost.getTargetFanpageId() != null ? firstPost.getTargetFanpageId() : "__no_target__");
 
             // Giãn cách an toàn:
-            // 1. Nếu là CÙNG 1 Target (Fanpage/Group) thì giãn cách 20 giây để trang nghỉ nhẹ.
-            // 2. Nếu là Target KHÁC NHAU (Group khác / Page khác) của cùng via: chỉ cần 5 giây sau khi bài trước đóng trình duyệt.
+            // 1. Nếu là CÙNG 1 Target (Fanpage/Group) thì giãn cách 10 giây để trang nghỉ nhẹ.
+            // 2. Nếu là Target KHÁC NHAU (Group khác / Page khác) của cùng via: chỉ cần 3 giây sau khi bài trước đóng trình duyệt.
             // 3. Nếu bài đã trễ hạn quá 1 phút: ưu tiên đăng bù ngay lập tức, không chờ giãn cách.
             boolean isOverdue = firstPost.getScheduledAt() != null && firstPost.getScheduledAt().isBefore(now.minusMinutes(1));
             Long lastTargetFinished = lastPublishFinishedAtByTarget.get(targetId);
             Long lastAccountFinished = lastPublishFinishedAt.get(accountKey);
 
             if (!isOverdue) {
-                if (lastTargetFinished != null && (nowMs - lastTargetFinished < 20_000)) {
-                    // Cùng Group/Fanpage vừa đăng xong — nghỉ nhẹ 20s
+                if (lastTargetFinished != null && (nowMs - lastTargetFinished < 10_000)) {
+                    // Cùng Group/Fanpage vừa đăng xong — nghỉ nhẹ 10s
                     continue;
                 }
-                if (lastAccountFinished != null && (nowMs - lastAccountFinished < 5_000)) {
-                    // Trình duyệt vừa đóng — nghỉ 5s để giải phóng tài nguyên
+                if (lastAccountFinished != null && (nowMs - lastAccountFinished < 3_000)) {
+                    // Trình duyệt vừa đóng — nghỉ 3s để giải phóng tài nguyên
                     continue;
                 }
+            }
+
+            // Nick đang bị Facebook giới hạn tần suất hoặc đã chạm trần bài/giờ → để bài chờ tick sau (không đổi lịch).
+            SocialAccount laneAccount = firstPost.getTargetFanpageId() != null
+                    ? resolveTargetAccount(firstPost.getTargetFanpageId()).orElse(null) : null;
+            String nickKey = laneAccount != null ? com.autopost.saas.service.NickThrottleService.nickKey(laneAccount) : accountKey;
+            if (nickThrottleService.blockReason(nickKey, laneAccount != null ? laneAccount.getPageName() : accountKey, now, nowMs) != null) {
+                continue;
             }
 
             if (targetsCurrentlyPublishing.putIfAbsent(targetId, nowMs) != null) {
@@ -327,9 +337,11 @@ public class CampaignScheduler {
                 targetsCurrentlyPublishing.remove(targetId);
                 continue;
             }
+            nickThrottleService.recordStart(nickKey, nowMs);
 
-            log.info("🚀 [Scheduler] Đang tự động xử lý Post ID {} (Tên: '{}') cho account '{}' vào target '{}'...",
-                    firstPost.getId(), firstPost.getTitle(), accountKey, targetId);
+            log.info("🚀 [Scheduler] Đang tự động xử lý Post ID {} (Tên: '{}') cho account '{}' vào target '{}' (nick đã đăng {}/{} bài trong 60 phút)...",
+                    firstPost.getId(), firstPost.getTitle(), accountKey, targetId,
+                    nickThrottleService.startsInLastHour(nickKey, nowMs), com.autopost.saas.service.NickThrottleService.MAX_POSTS_PER_HOUR_PER_NICK);
 
             try {
                 publishExecutor.submit(() -> {
@@ -366,6 +378,8 @@ public class CampaignScheduler {
         if (pendingPosts.isEmpty()) return;
 
         Set<String> assignedKeysInThisTick = new HashSet<>();
+        // Nhiều bài cùng Page trong 1 tick → chỉ tra DB 1 lần cho mỗi (user, page, connection).
+        Map<String, List<SocialAccount>> candidatesCache = new java.util.HashMap<>();
 
         for (PostQueue post : pendingPosts) {
             String target = post.getTargetFanpageId();
@@ -384,7 +398,11 @@ public class CampaignScheduler {
             Long userId = post.getCampaign() != null && post.getCampaign().getUser() != null
                     ? post.getCampaign().getUser().getId() : null;
 
-            List<SocialAccount> candidates = postQueueService.findCandidatePostingAccountsForPage(userId, pagePlatformId, connId);
+            final Long candUserId = userId;
+            final Long candConnId = connId;
+            List<SocialAccount> candidates = candidatesCache.computeIfAbsent(
+                    userId + "|" + pagePlatformId + "|" + connId,
+                    k -> postQueueService.findCandidatePostingAccountsForPage(candUserId, pagePlatformId, candConnId));
             if (candidates.size() <= 1) {
                 // Chỉ có 1 Via quản trị -> giữ nguyên và ghi nhận key
                 if (!candidates.isEmpty()) {
@@ -406,8 +424,11 @@ public class CampaignScheduler {
                 Long lastFinished = lastPublishFinishedAt.get(key);
                 boolean inCooldown = (lastFinished != null && (System.currentTimeMillis() - lastFinished < MIN_MS_BETWEEN_POSTS_SAME_ACCOUNT));
                 boolean alreadyAssigned = assignedKeysInThisTick.contains(key);
+                String candidateNick = com.autopost.saas.service.NickThrottleService.nickKey(candidate);
+                boolean throttled = nickThrottleService.rateLimitedUntil(candidateNick, now) != null
+                        || nickThrottleService.isOverHourlyCap(candidateNick, System.currentTimeMillis());
 
-                if (!isPublishing && !inCooldown && !alreadyAssigned) {
+                if (!isPublishing && !inCooldown && !alreadyAssigned && !throttled) {
                     bestVia = candidate;
                     break;
                 }
@@ -423,7 +444,8 @@ public class CampaignScheduler {
                             post.getId(), post.getTitle(), bestVia.getPageName(), bestVia.getPlatformAccountId());
                     post.setTargetFanpageId(newTarget);
                     try {
-                        postQueueRepository.save(post);
+                        // UPDATE riêng (REQUIRES_NEW): save() trong transaction readOnly sẽ không được flush.
+                        postQueueRepository.reassignPendingTarget(post.getId(), newTarget);
                     } catch (Exception e) {
                         log.warn("Không thể lưu điều phối Post ID {}: {}", post.getId(), e.getMessage());
                     }
@@ -443,44 +465,33 @@ public class CampaignScheduler {
             return;
         }
         // Allowlist hẹp: lỗi CHẮC CHẮN xảy ra trước khi Playwright kịp mở trình duyệt/bấm Đăng, nên
-        // auto-retry luôn an toàn (không rủi ro đăng trùng) — retry các lỗi này BẤT KỂ cờ
-        // autoRetryFailedPosts, vì cờ đó chỉ nhằm chặn retry cho lỗi mơ hồ (có thể đã bấm Đăng rồi
-        // mất phản hồi), không áp dụng cho 2 lỗi dưới đây.
-        List<PostQueue> safeToRetryPosts = postQueueRepository.findByStatusAndUpdatedAtBefore("FAILED", LocalDateTime.now().minusMinutes(10))
-                .stream()
-                .filter(p -> isSafePreSubmitFailure(p.getErrorMessage()))
-                .toList();
-        for (PostQueue post : safeToRetryPosts) {
-            try {
-                if (postQueueRepository.markRetryIfEligible(post.getId(), MAX_RETRY) == 1) {
-                    log.info("🔁 Tự động thử lại Post ID: {} (lỗi trước-khi-bấm-Đăng, an toàn để retry)", post.getId());
-                    postQueueService.publishPostNow(post.getId());
-                }
-            } catch (Exception e) {
-                log.error("Lỗi khi tự động thử lại Post ID {}: {}", post.getId(), e.getMessage());
-            }
-        }
-
-        if (!autoRetryFailedPosts) {
-            return;
-        }
+        // auto-retry luôn an toàn (không rủi ro đăng trùng).
         List<PostQueue> failedPosts = postQueueRepository.findByStatusAndUpdatedAtBefore("FAILED", LocalDateTime.now().minusMinutes(10));
         if (failedPosts.isEmpty()) {
             return;
         }
         log.info("🔁 [Scheduler] Phát hiện {} bài lỗi, kiểm tra để tự động thử lại (tối đa {} lần)...", failedPosts.size(), MAX_RETRY);
         for (PostQueue post : failedPosts) {
+            boolean safePreSubmit = isSafePreSubmitFailure(post.getErrorMessage());
             // Lỗi vĩnh viễn (token/cookie hết hạn, thiếu quyền...) sẽ không tự khỏi chỉ vì đợi 10 phút
             // rồi thử lại — retry chỉ tổ tốn thêm 1 lượt (giới hạn MAX_RETRY) và có nguy cơ đăng trùng
             // nếu lần trước Playwright đã bấm Đăng nhưng mất phản hồi. Chỉ retry lỗi có tính tạm thời.
-            if (isPermanentFailure(post.getErrorMessage())) {
+            if (!safePreSubmit && isPermanentFailure(post.getErrorMessage())) {
                 log.info("⏭️ Post ID {} lỗi vĩnh viễn ({}), bỏ qua auto-retry — cần người dùng xử lý thủ công.", post.getId(), post.getErrorMessage());
                 continue;
             }
             try {
                 if (postQueueRepository.markRetryIfEligible(post.getId(), MAX_RETRY) == 1) {
-                    log.info("🔁 Tự động thử lại Post ID: {} (lần thử tiếp theo)", post.getId());
-                    postQueueService.publishPostNow(post.getId());
+                    log.info("🔁 Tự động thử lại Post ID: {}{}", post.getId(),
+                            safePreSubmit ? " (lỗi trước-khi-bấm-Đăng, an toàn để retry)" : " (lần thử tiếp theo)");
+                    // Đăng trên publishExecutor để không chiếm thread @Scheduled (pool nhỏ) suốt thời gian worker xử lý.
+                    publishExecutor.submit(() -> {
+                        try {
+                            postQueueService.publishPostNow(post.getId());
+                        } catch (Exception e) {
+                            log.error("Lỗi khi tự động thử lại Post ID {}: {}", post.getId(), e.getMessage());
+                        }
+                    });
                 }
             } catch (Exception e) {
                 log.error("Lỗi khi tự động thử lại Post ID {}: {}", post.getId(), e.getMessage());
@@ -494,6 +505,44 @@ public class CampaignScheduler {
      * chuyển FAILED để dừng spinner nhưng KHÔNG tự retry — người dùng phải kiểm tra Facebook trước,
      * tránh trường hợp worker đã bấm Đăng xong rồi mất phản hồi dẫn đến đăng trùng.
      */
+    private boolean isNickResting(PostQueue post) {
+        if (post.getTargetFanpageId() == null) return false;
+        SocialAccount account = resolveTargetAccount(post.getTargetFanpageId()).orElse(null);
+        return account != null && nickThrottleService.rateLimitedUntil(
+                com.autopost.saas.service.NickThrottleService.nickKey(account), LocalDateTime.now()) != null;
+    }
+
+    /**
+     * NickThrottleService chỉ giữ trong RAM — sau restart nạp lại số bài đã đăng trong 60 phút qua theo nick
+     * (để trần bài/giờ không bị reset) và mốc nghỉ của các nick đang bị Facebook giới hạn tần suất.
+     */
+    @org.springframework.context.event.EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
+    @Transactional(readOnly = true)
+    public void restoreNickThrottleState() {
+        LocalDateTime now = LocalDateTime.now();
+        int restored = 0;
+        for (PostQueue post : postQueueRepository.findByPublishedAtAfter(now.minusHours(1))) {
+            if (post.getTargetFanpageId() == null || post.getPublishedAt() == null) continue;
+            SocialAccount account = resolveTargetAccount(post.getTargetFanpageId()).orElse(null);
+            if (account == null) continue;
+            long startedMs = post.getPublishedAt().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+            nickThrottleService.recordStart(com.autopost.saas.service.NickThrottleService.nickKey(account), startedMs);
+            restored++;
+        }
+        // Bài bị dời do cooldown giữ đúng giờ hết nghỉ; lấy mốc SỚM NHẤT của mỗi nick (các bài khác bị đẩy xa hơn).
+        Map<String, LocalDateTime> resumeByNick = new java.util.HashMap<>();
+        for (PostQueue post : postQueueRepository.findByStatusAndErrorMessageStartingWithAndScheduledAtAfter(
+                "PENDING", PostQueueService.RATE_LIMIT_MESSAGE_PREFIX, now)) {
+            SocialAccount account = post.getTargetFanpageId() != null ? resolveTargetAccount(post.getTargetFanpageId()).orElse(null) : null;
+            if (account == null) continue;
+            resumeByNick.merge(com.autopost.saas.service.NickThrottleService.nickKey(account), post.getScheduledAt(),
+                    (a, b) -> a.isBefore(b) ? a : b);
+        }
+        resumeByNick.forEach(nickThrottleService::markRateLimited);
+        log.info("🔁 [NickThrottle] Đã nạp lại {} bài đăng trong 60 phút qua và {} nick đang nghỉ do Facebook giới hạn tần suất.",
+                restored, resumeByNick.size());
+    }
+
     @Scheduled(fixedRate = 30000, initialDelay = 5000)
     @org.springframework.context.event.EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
     public void recoverStaleProcessingPosts() {
@@ -539,11 +588,11 @@ public class CampaignScheduler {
                 postQueueRepository.save(post);
                 log.warn("✅ [Recovery] Post ID {} bị kẹt PROCESSING nhưng có bằng chứng đã đăng — đã chốt PUBLISHED.", post.getId());
             } else {
-                post.setStatus("FAILED");
+                post.setStatus("NEEDS_REVIEW");
                 post.setErrorMessage(appendRecoveryWarning(post.getErrorMessage(),
-                        "Tiến trình đăng mất phản hồi quá " + PROCESSING_STALE_AFTER_MINUTES + " phút và chưa tìm thấy ID/link xác nhận. Hãy kiểm tra Facebook trước khi bấm Đăng lại để tránh đăng trùng. [NO_AUTO_RETRY]"));
+                        "Tiến trình đăng mất phản hồi quá " + PROCESSING_STALE_AFTER_MINUTES + " phút và chưa tìm thấy ID/link xác nhận. Đã chuyển sang trạng thái CẦN XÁC MINH (NEEDS_REVIEW) để tránh đăng trùng."));
                 postQueueRepository.save(post);
-                log.warn("⚠️ [Recovery] Post ID {} bị kẹt PROCESSING và chưa có bằng chứng — chuyển FAILED, không tự retry.", post.getId());
+                log.warn("⚠️ [Recovery] Post ID {} bị kẹt PROCESSING và chưa có bằng chứng — chuyển NEEDS_REVIEW để đối soát an toàn.", post.getId());
             }
         }
     }
@@ -553,25 +602,37 @@ public class CampaignScheduler {
      * Trả về IN_PROGRESS (worker còn đang đăng/xếp hàng), SUCCESS (mọi lượt đã xong và có lượt thành công, không lượt
      * nào lỗi), hoặc null (không biết — giữ cách xử lý cũ). Lấy link bài nếu worker có.
      */
-    private String askWorkerPostResult(PostQueue post) {
-        try {
-            Map<?, ?> resp = workerStatusClient.getForObject("http://localhost:3001/api/post-results/" + post.getId(), Map.class);
-            if (resp == null || !(resp.get("legs") instanceof List<?> legs) || legs.isEmpty()) return null;
-            boolean anySuccess = false;
-            for (Object o : legs) {
-                if (!(o instanceof Map<?, ?> leg)) continue;
-                String status = String.valueOf(leg.get("status"));
-                if ("IN_PROGRESS".equals(status)) return "IN_PROGRESS";
-                if (!"SUCCESS".equals(status)) return null;
-                anySuccess = true;
-                if (leg.get("postUrl") instanceof String url && !url.isBlank() && (post.getPublishedPostUrl() == null || post.getPublishedPostUrl().isBlank())) {
-                    post.setPublishedPostUrl(url);
+    /**
+     * Hỏi toàn bộ cụm worker (3001, 3002, 3003) kết quả các lượt đăng của bài (worker ghi theo header X-Post-Queue-Id).
+     * Trả về IN_PROGRESS (có worker đang xử lý), SUCCESS (có worker báo đã đăng thành công), hoặc null.
+     */
+    public String askWorkerPostResult(PostQueue post) {
+        if (post == null || post.getId() == null) return null;
+        List<String> workerUrls = workerRouterService != null ? workerRouterService.getAllWorkerUrls() : List.of(LocalServices.WORKER_BASE);
+        boolean anySuccess = false;
+
+        for (String baseUrl : workerUrls) {
+            try {
+                Map<?, ?> resp = workerStatusClient.getForObject(baseUrl + "/api/post-results/" + post.getId(), Map.class);
+                if (resp == null || !(resp.get("legs") instanceof List<?> legs) || legs.isEmpty()) continue;
+                for (Object o : legs) {
+                    if (!(o instanceof Map<?, ?> leg)) continue;
+                    String status = String.valueOf(leg.get("status"));
+                    if ("IN_PROGRESS".equals(status)) {
+                        return "IN_PROGRESS"; // Có worker đang xử lý, tuyệt đối không can thiệp!
+                    }
+                    if ("SUCCESS".equals(status)) {
+                        anySuccess = true;
+                        if (leg.get("postUrl") instanceof String url && !url.isBlank() && (post.getPublishedPostUrl() == null || post.getPublishedPostUrl().isBlank())) {
+                            post.setPublishedPostUrl(url);
+                        }
+                    }
                 }
+            } catch (Exception ignored) {
+                // Tiếp tục hỏi worker khác trong cụm
             }
-            return anySuccess ? "SUCCESS" : null;
-        } catch (Exception e) {
-            return null;
         }
+        return anySuccess ? "SUCCESS" : null;
     }
 
     static boolean hasDirectPublishedEvidence(PostQueue post) {
@@ -760,9 +821,39 @@ public class CampaignScheduler {
         return result;
     }
 
-    // Mỗi 5 phút: bài bị hẹn/sửa giờ ra ngoài khung giờ đăng (VD sửa tay giờ, dữ liệu cũ) được đưa lại vào
-    // trong khung — tránh dồn cục cả loạt bài trễ hạn đăng liền một lúc khi khung giờ vừa mở.
-    @Scheduled(fixedRate = 300000, initialDelay = 60000)
+    /**
+     * Rải đều TOÀN BỘ bài PENDING của từng nick trong phần còn lại của khung giờ hôm nay (hoặc khung kế tiếp
+     * nếu đang ngoài giờ): giãn cách = (thời gian khung còn lại − thời gian đăng) / số bài, không dưới minGapSeconds.
+     * Không kịp hết trong ngày thì giãn cách rút về mức tối thiểu và phần dư dời sang hôm sau như packContinuous.
+     */
+    @Transactional
+    public Map<String, Object> spreadEvenly(int minGapSeconds) {
+        PostingWindow window = postingWindowService.get();
+        if (!window.enabled()) {
+            return packContinuous(null, minGapSeconds);
+        }
+        List<PostQueue> pending = postQueueRepository.findByStatusOrderByIdAsc("PENDING");
+        List<PostQueue> processing = postQueueRepository.findByStatusOrderByIdAsc("PROCESSING");
+        List<PostQueue> updated = new ArrayList<>();
+        Map<String, List<PostQueue>> deferred = new LinkedHashMap<>();
+        long gap = Math.max(Math.max(0, minGapSeconds), window.minGapSeconds());
+        LocalDateTime lastFinish = planContinuousLanes(pending, processing, null, this::accountGroupKey,
+                LocalDateTime.now(), gap, window, false, true, updated, deferred);
+        postQueueRepository.saveAll(updated);
+        int deferredCount = deferred.values().stream().mapToInt(List::size).sum();
+        log.info("📅 [Rải đều] Đã xếp lại {} bài trong khung {}–{} (tối thiểu {}s/bài), dự kiến xong lúc {}{}",
+                updated.size(), window.start(), window.end(), gap, lastFinish,
+                deferredCount > 0 ? " — " + deferredCount + " bài không kịp, dời sang hôm sau" : "");
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("updated", updated.size());
+        result.put("estimatedFinishAt", lastFinish.toString());
+        result.put("deferredCount", deferredCount);
+        return result;
+    }
+
+    // ĐÃ TẮT TỰ ĐỘNG CHẠY NGẦM MỖI 5 PHÚT: Tránh việc tự ý ghi đè/xáo trộn giờ đăng của người dùng sau lưng.
+    // Việc chặn đăng ngoài khung giờ đã được đảm bảo an toàn tại thời điểm publish (executePublishing kiểm tra postingWindow).
+    // @Scheduled(fixedRate = 300000, initialDelay = 60000)
     public void keepPendingInsidePostingWindow() {
         if (!postingWindowService.get().enabled()) return;
         try {
@@ -792,20 +883,18 @@ public class CampaignScheduler {
 
         long gapSeconds = window.minGapSeconds() > 0 ? window.minGapSeconds() : 120;
 
-        if (scope == null) {
-            // Khi cấu hình lại khung giờ hoặc gọi quét tổng: đưa toàn bộ bài PENDING vào để xếp lại chuẩn theo khung giờ & giãn cách
-            for (PostQueue p : pending) {
-                movingIds.add(p.getId());
-            }
-        } else {
-            for (PostQueue p : pending) {
-                if (!scope.contains(p.getId())) continue;
-                LocalDateTime at = p.getScheduledAt();
-                boolean outside = at == null || !window.contains(at)
-                        || at.plusSeconds(estimatePublishSeconds(p)).isAfter(window.closeOf(at))
-                        || Boolean.TRUE.equals(p.getWindowDeferred());
-                if (outside) movingIds.add(p.getId());
-            }
+        // Chỉ dời bài đang nằm NGOÀI khung giờ (hoặc bị đánh dấu dư). Trước đây scope == null xếp lại TOÀN BỘ
+        // hàng chờ — job 5 phút gọi vậy nên giờ hẹn của mọi bài bị đổi liên tục. Muốn xếp lại cả ngày: spreadEvenly().
+        for (PostQueue p : pending) {
+            if (scope != null && !scope.contains(p.getId())) continue;
+            LocalDateTime at = p.getScheduledAt();
+            boolean outside = at == null || !window.contains(at)
+                    || at.plusSeconds(estimatePublishSeconds(p)).isAfter(window.closeOf(at))
+                    || Boolean.TRUE.equals(p.getWindowDeferred());
+            // Nick đang nghỉ do Facebook giới hạn tần suất: giờ hết nghỉ có thể rơi ngoài khung (VD 23:00) — không được
+            // kéo bài về "ngay bây giờ" (2026-10-27 đã kéo 32 bài Thành An về lại tối nay theo cách này).
+            if (outside && isNickResting(p)) continue;
+            if (outside) movingIds.add(p.getId());
         }
         if (movingIds.isEmpty()) return result;
 
@@ -974,6 +1063,7 @@ public class CampaignScheduler {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("moved", moved.size());
         if (!moved.isEmpty()) {
+            // Chỉ xếp lại đúng các bài vừa chuyển nick vào làn mới, không xáo trộn toàn bộ hàng đợi
             Map<String, Object> packed = packContinuous(moved.stream().map(PostQueue::getId).toList(),
                     (int) Math.max(postingWindowService.get().minGapSeconds(), 120));
             result.putAll(packed);
@@ -1104,6 +1194,19 @@ public class CampaignScheduler {
                                              Set<Long> movingIds, Function<PostQueue, String> laneKey,
                                              LocalDateTime now, long gap, PostingWindow window, boolean keepOriginalTime,
                                              List<PostQueue> updatedOut, Map<String, List<PostQueue>> deferredOut) {
+        return planContinuousLanes(pending, processing, movingIds, laneKey, now, gap, window, keepOriginalTime,
+                false, updatedOut, deferredOut);
+    }
+
+    /**
+     * @param spreadEvenly true = giãn cách mỗi làn được nới ra để các bài trải đều tới giờ đóng khung của
+     *                     ngày đầu tiên (chỉ áp dụng cho làn không có bài cố định), thay vì nối đuôi sát nhau.
+     */
+    static LocalDateTime planContinuousLanes(List<PostQueue> pending, List<PostQueue> processing,
+                                             Set<Long> movingIds, Function<PostQueue, String> laneKey,
+                                             LocalDateTime now, long gap, PostingWindow window, boolean keepOriginalTime,
+                                             boolean spreadEvenly,
+                                             List<PostQueue> updatedOut, Map<String, List<PostQueue>> deferredOut) {
         Map<String, List<PostQueue>> movingByLane = new LinkedHashMap<>();
         Map<String, List<PostQueue>> fixedByLane = new LinkedHashMap<>();
         for (PostQueue post : pending) {
@@ -1119,6 +1222,7 @@ public class CampaignScheduler {
         }
 
         LocalDateTime lastFinish = now;
+        int laneIndex = 0;
         for (Map.Entry<String, List<PostQueue>> entry : movingByLane.entrySet()) {
             List<PostQueue> moving = entry.getValue();
             moving.sort(Comparator.comparing((PostQueue p) -> p.getScheduledAt() != null ? p.getScheduledAt() : now)
@@ -1132,9 +1236,18 @@ public class CampaignScheduler {
                 busy.add(new LocalDateTime[]{start, start.plusSeconds(estimatePublishSeconds(fixed) + gap)});
             }
 
-            LocalDateTime laneStart = window.openAtOrAfter(laneBusyUntil.getOrDefault(entry.getKey(), now.plusSeconds(20)));
+            // Lệch nhẹ 30 giây giữa các làn/nick để các trình duyệt Chromium không khởi động cùng tích tắc
+            long laneStaggerSeconds = (laneIndex++) * 30L;
+            LocalDateTime defaultLaneStart = now.plusSeconds(20 + laneStaggerSeconds);
+            LocalDateTime laneStart = window.openAtOrAfter(laneBusyUntil.getOrDefault(entry.getKey(), defaultLaneStart));
 
             long chosenGap = gap;
+            if (spreadEvenly && window.enabled() && busy.isEmpty() && !moving.isEmpty()) {
+                long available = java.time.Duration.between(laneStart, window.closeOf(laneStart)).getSeconds();
+                long work = moving.stream().mapToLong(CampaignScheduler::estimatePublishSeconds).sum();
+                long evenGap = (available - work) / moving.size();
+                if (evenGap > chosenGap) chosenGap = evenGap;
+            }
             List<LocalDateTime> slots = simulateLane(moving, busy, laneStart, chosenGap, window, keepOriginalTime);
             int spill = countSpilled(moving, slots, laneStart, keepOriginalTime, window);
             long minGap = Math.min(gap, window.minGapSeconds());

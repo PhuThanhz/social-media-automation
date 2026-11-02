@@ -39,6 +39,24 @@ public class GeminiService {
     private final RestTemplate generateRestTemplate = PooledRestTemplateFactory.create(10000, 45000);
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    // Cache kết quả AI (TTL 30 phút, tối đa 500 mục) để tiết kiệm token và quota Gemini khi người dùng re-generate cùng nội dung
+    private final com.github.benmanes.caffeine.cache.Cache<String, String> aiResponseCache =
+            com.github.benmanes.caffeine.cache.Caffeine.newBuilder()
+                    .expireAfterWrite(java.time.Duration.ofMinutes(30))
+                    .maximumSize(500)
+                    .recordStats()
+                    .build();
+
+    private String getCacheKey(String prefix, String input) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest((prefix + ":" + (input != null ? input.trim() : "")).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(hash);
+        } catch (Exception e) {
+            return prefix + ":" + (input != null ? input.hashCode() : 0);
+        }
+    }
+
     // Theo dõi số lượt gọi API của từng key trong ngày (tự reset vào ngày mới)
     private final java.util.Map<String, java.util.concurrent.atomic.AtomicInteger> dailyUsage = new java.util.concurrent.ConcurrentHashMap<>();
     private volatile String currentTrackingDate = java.time.LocalDate.now().toString();
@@ -120,7 +138,6 @@ public class GeminiService {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
 
         List<String> modelsToTry = new java.util.ArrayList<>();
         if (model != null && !model.isBlank()) {
@@ -142,6 +159,11 @@ public class GeminiService {
             String currentKey = keyPool.get(i);
             String masked = maskKey(currentKey);
             log.info("[Gemini] Sử dụng API Key #{}/{} ({})", i + 1, keyPool.size(), masked);
+
+            HttpHeaders keyHeaders = new HttpHeaders();
+            keyHeaders.setContentType(MediaType.APPLICATION_JSON);
+            keyHeaders.set("x-goog-api-key", currentKey);
+            HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, keyHeaders);
 
             boolean keyExhausted = false;
             // Model đang tạm nghỉ vẫn được thử, nhưng sau cùng (phòng khi mọi model khác cũng lỗi)
@@ -175,25 +197,29 @@ public class GeminiService {
                         modelCooldownUntil.put(cooldownKey(currentKey, targetModel),
                                 System.currentTimeMillis() + (status == 404 ? MODEL_GONE_COOLDOWN_MS : MODEL_COOLDOWN_MS));
                     }
-                    if (status == 403) {
-                        // Key không hợp lệ hoặc bị khoá -> nhảy sang key tiếp theo
+                    if (status == 401 || status == 403) {
+                        // Key không hợp lệ hoặc bị khoá hoặc sai project -> nhảy sang key tiếp theo ngay lập tức
                         keyExhausted = true;
                         break;
                     }
                     // Nếu gặp 429 (hết quota model này), 404 (model không tồn tại) hoặc 400 -> tiếp tục thử model tiếp theo trong danh sách fallback
                 } catch (Exception e) {
                     lastException = e;
-                    if (e instanceof org.springframework.web.client.ResourceAccessException) {
-                        // Hết thời gian chờ / mất kết nối: model đang treo → tạm bỏ qua như lỗi quá tải
+                    if (e instanceof org.springframework.web.client.ResourceAccessException
+                            || e instanceof java.io.UncheckedIOException) {
+                        // Hết thời gian chờ / mất kết nối: model đang treo hoặc rớt mạng → tạm bỏ qua như lỗi quá tải
                         modelCooldownUntil.put(cooldownKey(currentKey, targetModel), System.currentTimeMillis() + MODEL_COOLDOWN_MS);
                     }
-                    failures.add("Key #" + (i + 1) + " [" + masked + "] (" + targetModel + ": " + e.getClass().getSimpleName() + ")");
-                    log.warn("⚠️ [Gemini] Key #{} ({}) model {} gặp lỗi: {}", i + 1, masked, targetModel, e.getMessage());
+                    String causeMsg = e.getCause() != null && e.getCause().getMessage() != null
+                            ? e.getCause().getMessage()
+                            : (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+                    failures.add("Key #" + (i + 1) + " [" + masked + "] (" + targetModel + ": " + causeMsg + ")");
+                    log.warn("⚠️ [Gemini] Key #{} ({}) model {} gặp lỗi {}: {}", i + 1, masked, targetModel, e.getClass().getSimpleName(), causeMsg);
                 }
             }
 
             if (keyExhausted && i < keyPool.size() - 1) {
-                log.warn("🔄 [Gemini] Key #{} ({}) không hợp lệ (HTTP 403) -> Chuyển sang Key tiếp theo #{}/{}", i + 1, masked, i + 2, keyPool.size());
+                log.warn("🔄 [Gemini] Key #{} ({}) không hợp lệ (HTTP 401/403) -> Chuyển sang Key tiếp theo #{}/{}", i + 1, masked, i + 2, keyPool.size());
             }
         }
 
@@ -319,6 +345,14 @@ public class GeminiService {
         String source = "Tiêu đề: " + (title == null ? "" : title)
                 + "\nTóm tắt: " + (sapo == null ? "" : sapo)
                 + "\nNội dung: " + (content == null ? "" : content.length() > 3000 ? content.substring(0, 3000) : content);
+
+        String cacheKey = getCacheKey("newscard_headline", source);
+        String cached = aiResponseCache.getIfPresent(cacheKey);
+        if (cached != null) {
+            log.info("[Gemini] ⚡ Trả về tiêu đề NewsCard từ Cache: {}", cached);
+            return cached;
+        }
+
         String prompt = "Bạn là biên tập viên của một Fanpage tin tức giật tít triệu follow tại Việt Nam. "
                 + "Viết 1 TIÊU ĐỀ để in lên ảnh bài đăng, dựa trên bài báo dưới đây.\n"
                 + "Yêu cầu:\n"
@@ -337,6 +371,7 @@ public class GeminiService {
         result = result.replaceAll("^[\"“”']+|[\"“”']+$", "").replaceAll("\\s*\\n+\\s*", " ").trim();
         result = result.replaceAll("([^\\s(\\[{])(\\[\\[)", "$1 $2")
                        .replaceAll("(\\]\\])([^\\s)\\]}.,;:!?])", "$1 $2");
+        aiResponseCache.put(cacheKey, result);
         return result;
     }
 
@@ -366,6 +401,14 @@ public class GeminiService {
         String body = "Tiêu đề: " + (title == null ? "" : title)
                 + "\nTóm tắt: " + (sapo == null ? "" : sapo)
                 + "\nNội dung: " + (content == null ? "" : content.length() > 6000 ? content.substring(0, 6000) : content);
+
+        String cacheKey = getCacheKey("news_pkg", cleanSource + ":" + body);
+        String cached = aiResponseCache.getIfPresent(cacheKey);
+        if (cached != null) {
+            log.info("[Gemini] ⚡ Trả về NewsPostPackage từ Cache.");
+            return cached;
+        }
+
         String prompt = "Bạn là chuyên gia sáng tạo nội dung khoa học, đời sống, lịch sử và tri thức mạng xã hội hàng đầu tại Việt Nam, bậc thầy nghệ thuật Storytelling triệu view. "
                 + "Dựa trên bài viết/tiêu đề dưới đây (thường từ Reddit, mạng xã hội hoặc báo chí quốc tế), hãy biên tập lại thành nội dung CỰC KỲ CUỐN HÚT, GIÀU KIẾN THỨC, HỌC HỎI ĐƯỢC NHIỀU THÔNG TIN MỚI MẺ và trả về JSON với đúng 4 trường:\n"
                 + "1. \"headline\": Tiêu đề in lên ảnh (15-35 từ), một câu kể liền mạch gây tò mò cực mạnh (nhân vật/sự kiện + phát hiện/kết quả bất ngờ nhất). "
@@ -398,7 +441,9 @@ public class GeminiService {
             hl = hl.replaceAll("([^\\s(\\[{])(\\[\\[)", "$1 $2")
                    .replaceAll("(\\]\\])([^\\s)\\]}.,;:!?])", "$1 $2");
             ((com.fasterxml.jackson.databind.node.ObjectNode) node).put("headline", hl);
-            return objectMapper.writeValueAsString(node);
+            String formatted = objectMapper.writeValueAsString(node);
+            aiResponseCache.put(cacheKey, formatted);
+            return formatted;
         } catch (Exception e) {
             throw new IllegalStateException("AI trả về sai định dạng, thử lại: " + e.getMessage());
         }
@@ -408,6 +453,12 @@ public class GeminiService {
     public String rewriteCaption(String originalCaption) {
         if (!isConfigured()) {
             throw new IllegalStateException("Chưa cấu hình GEMINI_API_KEY — không thể xào lại caption bằng AI.");
+        }
+
+        String cacheKey = getCacheKey("rewrite_caption", originalCaption);
+        String cached = aiResponseCache.getIfPresent(cacheKey);
+        if (cached != null) {
+            return cached;
         }
 
         String prompt = "Bạn là chuyên gia sáng tạo nội dung mạng xã hội triệu follow. Hãy viết lại đoạn caption tiếng Việt dưới đây thành một bản MỚI TOANH CỰC KỲ CUỐN HÚT, RÕ Ý & CHẠM CẢM XÚC: "
@@ -420,7 +471,9 @@ public class GeminiService {
                 "contents", List.of(Map.of("parts", List.of(Map.of("text", prompt))))
         );
 
-        return stripMarkdownAsterisks(postWithModelFallback(body));
+        String result = stripMarkdownAsterisks(postWithModelFallback(body));
+        aiResponseCache.put(cacheKey, result);
+        return result;
     }
 
     /**
@@ -456,6 +509,13 @@ public class GeminiService {
             throw new IllegalStateException("Chưa cấu hình GEMINI_API_KEY — vui lòng nhập key tại Cài đặt AI.");
         }
 
+        String cacheKey = getCacheKey("viral_rewrite", platform + ":" + mode + ":" + content);
+        String cached = aiResponseCache.getIfPresent(cacheKey);
+        if (cached != null) {
+            log.info("[Gemini] ⚡ Trả về bài Viral rewrite từ Cache.");
+            return cached;
+        }
+
         String platformInstruction = "FACEBOOK".equalsIgnoreCase(platform)
                 ? "Nội dung này dùng để đăng lên Facebook Group hoặc Fanpage: tạo cảm giác gần gũi, khơi gợi bình luận, dùng 2-4 emoji tự nhiên, ngắt dòng dễ đọc."
                 : "Nội dung này dùng để đăng lên mạng xã hội Threads: giọng điệu tự sự, súc tích, ngắt đoạn ngắn thoáng mắt, có chiều sâu, giữ dưới 500 ký tự.";
@@ -485,7 +545,9 @@ public class GeminiService {
 
         String result = postWithModelFallback(body, apiKeyOverride).trim();
         result = result.replaceAll("^[\"“”']+|[\"“”']+$", "").trim();
-        return stripMarkdownAsterisks(result);
+        String cleaned = stripMarkdownAsterisks(result);
+        aiResponseCache.put(cacheKey, cleaned);
+        return cleaned;
     }
 
     /** Dịch caption tiếng Trung (từ Douyin) sang tiếng Việt tự nhiên, dí dỏm, phong cách mạng xã hội Việt Nam. */
@@ -648,32 +710,59 @@ public class GeminiService {
             return result;
         }
 
+        if (!cleanKey.startsWith("AIza") && !cleanKey.startsWith("AQ.")) {
+            result.put("status", "INVALID");
+            result.put("message", "Sai định dạng: Google Gemini API Key chuẩn từ Google AI Studio phải bắt đầu bằng 'AIza...' hoặc 'AQ....'");
+            return result;
+        }
+
         try {
-            // Ping Google Generative Language API
+            // Dùng java.net.http.HttpClient (hỗ trợ HTTP/2 chuẩn, không bị EOFException khi Google trả 401)
+            java.net.http.HttpClient client = java.net.http.HttpClient.newBuilder()
+                    .connectTimeout(java.time.Duration.ofSeconds(10))
+                    .followRedirects(java.net.http.HttpClient.Redirect.NORMAL)
+                    .build();
+
             String url = "https://generativelanguage.googleapis.com/v1beta/models?key=" + cleanKey;
-            ResponseEntity<String> resp = restTemplate.getForEntity(url, String.class);
-            if (resp.getStatusCode().is2xxSuccessful()) {
+            java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder(java.net.URI.create(url))
+                    .header("x-goog-api-key", cleanKey)
+                    .timeout(java.time.Duration.ofSeconds(15))
+                    .GET()
+                    .build();
+
+            java.net.http.HttpResponse<String> resp = client.send(req, java.net.http.HttpResponse.BodyHandlers.ofString());
+            int code = resp.statusCode();
+            String responseBody = resp.body() != null ? resp.body() : "";
+
+            if (code >= 200 && code < 300) {
                 result.put("status", "HEALTHY");
                 result.put("message", "Hoạt động tốt (200 OK)");
-            } else {
-                result.put("status", "WARN");
-                result.put("message", "Mã phản hồi: " + resp.getStatusCode());
-            }
-        } catch (org.springframework.web.client.HttpStatusCodeException e) {
-            int code = e.getStatusCode().value();
-            if (code == 429) {
+            } else if (code == 429) {
                 result.put("status", "RATE_LIMITED");
                 result.put("message", "Đã hết hạn ngạch hôm nay (429 Quota Exceeded) - Chờ reset lúc 07:00 sáng mai");
-            } else if (code == 400 || code == 403) {
+            } else if (code == 400 || code == 401 || code == 403) {
                 result.put("status", "INVALID");
-                result.put("message", "API Key không hợp lệ hoặc không có quyền (HTTP " + code + ")");
+                if (responseBody.contains("ACCESS_TOKEN_TYPE_UNSUPPORTED")) {
+                    result.put("message", "Google từ chối key (401 ACCESS_TOKEN_TYPE_UNSUPPORTED). Dự án GCP của key này chưa được bật 'Generative Language API'. Vui lòng bấm 'Create API key in new project' trên Google AI Studio.");
+                } else if (responseBody.contains("API_KEY_INVALID") || responseBody.contains("not valid")) {
+                    result.put("message", "API Key không hợp lệ (Google báo sai key hoặc key đã bị xoá)");
+                } else {
+                    result.put("message", "API Key không có quyền truy cập (HTTP " + code + ")");
+                }
             } else {
                 result.put("status", "ERROR");
-                result.put("message", "Lỗi HTTP " + code);
+                result.put("message", "Mã phản hồi HTTP " + code);
             }
         } catch (Exception e) {
             result.put("status", "ERROR");
-            result.put("message", "Lỗi kết nối: " + e.getMessage());
+            String msg = e.getCause() != null && e.getCause().getMessage() != null
+                    ? e.getCause().getMessage()
+                    : (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+            if (msg.contains("EOFException") || msg.contains("Connection reset")) {
+                result.put("message", "Google đóng kết nối. Dự án của key này chưa kích hoạt Generative Language API. Vui lòng tạo key mới tại Google AI Studio bằng cách chọn 'Create in new project'.");
+            } else {
+                result.put("message", "Lỗi kết nối: " + msg);
+            }
         }
         return result;
     }

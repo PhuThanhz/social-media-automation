@@ -22,8 +22,17 @@ public interface PostQueueRepository extends JpaRepository<PostQueue, Long> {
     /** Bản phân trang của findByCampaignId, dùng cho các endpoint/lời gọi mới cần giới hạn kích thước lịch sử trả về. */
     Page<PostQueue> findByCampaignId(Long campaignId, Pageable pageable);
     @Query("SELECT p FROM PostQueue p LEFT JOIN FETCH p.campaign c LEFT JOIN FETCH c.user u WHERE p.status = :status AND p.scheduledAt < :time ORDER BY p.scheduledAt ASC, p.id ASC")
-    List<PostQueue> findByStatusAndScheduledAtBeforeOrderByScheduledAtAscIdAsc(@org.springframework.data.repository.query.Param("status") String status, @org.springframework.data.repository.query.Param("time") LocalDateTime time);
+    List<PostQueue> findByStatusAndScheduledAtBeforeOrderByScheduledAtAscIdAsc(@org.springframework.data.repository.query.Param("status") String status, @org.springframework.data.repository.query.Param("time") LocalDateTime time, Pageable pageable);
+
+    /**
+     * Giới hạn an toàn mặc định 100 bài mỗi nhịp tick scheduler (5 giây) để bảo vệ JVM Heap & MySQL I/O.
+     */
+    default List<PostQueue> findByStatusAndScheduledAtBeforeOrderByScheduledAtAscIdAsc(String status, LocalDateTime time) {
+        return findByStatusAndScheduledAtBeforeOrderByScheduledAtAscIdAsc(status, time, org.springframework.data.domain.PageRequest.of(0, 100));
+    }
     boolean existsByOriginalUrlAndCampaignId(String originalUrl, Long campaignId);
+    @Query("SELECT p.mediaUrls FROM PostQueue p WHERE (p.status IN ('PENDING', 'PROCESSING') OR p.scheduledAt >= :since OR p.publishedAt >= :since) AND p.mediaUrls IS NOT NULL")
+    List<String> findReferencedMediaUrls(@org.springframework.data.repository.query.Param("since") LocalDateTime since);
 
     /** Dedup xuyên suốt mọi campaign của 1 user — tránh đăng trùng khi cùng 1 bài được cào lại từ nguồn khác. */
     boolean existsByOriginalUrlAndCampaign_User_Id(String originalUrl, Long userId);
@@ -69,16 +78,45 @@ public interface PostQueueRepository extends JpaRepository<PostQueue, Long> {
     @Query("UPDATE PostQueue p SET p.status = 'PROCESSING' WHERE p.id = :id AND (p.status = 'PENDING' OR p.status = 'FAILED' OR p.status = 'CANCELLED')")
     int markProcessingIfPending(Long id);
 
+    /**
+     * Cơ chế chiếm quyền Lease có Fencing Token và thời gian hết hạn (TOOLZUTTER 3.3).
+     * Đảm bảo tính nguyên tử tuyệt đối, ngăn chặn 2 Worker hoặc 2 luồng cùng nhận 1 job.
+     */
+    @Modifying
+    @Transactional
+    @Query("UPDATE PostQueue p SET p.status = 'PROCESSING', p.lockedBy = :lockedBy, p.lockToken = :lockToken, " +
+            "p.lockedAt = :now, p.leaseExpiresAt = :leaseExpiresAt, " +
+            "p.attemptCount = COALESCE(p.attemptCount, 0) + 1, p.lastAttemptId = :lockToken " +
+            "WHERE p.id = :id AND (p.status = 'PENDING' OR p.status = 'FAILED' OR (p.status = 'PROCESSING' AND p.leaseExpiresAt < :now))")
+    int acquireLease(Long id, String lockedBy, String lockToken, LocalDateTime now, LocalDateTime leaseExpiresAt);
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE PostQueue p SET p.lockedBy = null, p.leaseExpiresAt = null WHERE p.id = :id AND p.lockToken = :lockToken")
+    int releaseLease(Long id, String lockToken);
+
     List<PostQueue> findByStatusAndUpdatedAtBefore(String status, LocalDateTime time);
 
     List<PostQueue> findByStatusAndTargetFanpageIdEndingWith(String status, String suffix);
+
+    // Khôi phục bộ đếm trần bài/giờ và mốc nghỉ theo nick sau khi restart (NickThrottleService chỉ giữ trong RAM).
+    List<PostQueue> findByPublishedAtAfter(LocalDateTime since);
+
+    List<PostQueue> findByStatusAndErrorMessageStartingWithAndScheduledAtAfter(String status, String errorPrefix, LocalDateTime time);
 
     List<PostQueue> findTop50ByStatusOrderByIdDesc(String status);
 
     List<PostQueue> findByStatusOrderByIdAsc(String status);
 
-    @Query("SELECT p FROM PostQueue p LEFT JOIN FETCH p.campaign c LEFT JOIN FETCH c.user u WHERE p.status = 'PUBLISHED' ORDER BY p.id DESC")
-    List<PostQueue> findTop50PublishedWithCampaignAndUser();
+    /** Bài PUBLISHED mới nhất của 1 user (kèm bài đăng nhanh không gán campaign), giới hạn bằng Pageable. */
+    @Query("SELECT p FROM PostQueue p LEFT JOIN FETCH p.campaign c LEFT JOIN FETCH c.user u WHERE p.status = 'PUBLISHED' AND (c IS NULL OR u IS NULL OR u.id = :userId) ORDER BY p.id DESC")
+    List<PostQueue> findRecentPublishedForUser(Long userId, Pageable pageable);
+
+    /** Đổi Via đăng cho bài còn PENDING — transaction riêng để chạy được từ scheduler đang ở transaction readOnly. */
+    @Modifying
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    @Query("UPDATE PostQueue p SET p.targetFanpageId = :target WHERE p.id = :id AND p.status = 'PENDING'")
+    int reassignPendingTarget(Long id, String target);
 
     /** Cập nhật nhịp sống khi một bài PROCESSING đang lần lượt đăng qua nhiều Group. */
     @Modifying
@@ -137,6 +175,24 @@ public interface PostQueueRepository extends JpaRepository<PostQueue, Long> {
     List<Object[]> countByStatusForUser(@org.springframework.data.repository.query.Param("userId") Long userId);
 
     /** Lấy hàng đợi active (PENDING, PROCESSING, FAILED) + các bài PUBLISHED từ thời điểm 'since' trở lại đây của 1 campaign */
-    @Query("SELECT p FROM PostQueue p WHERE p.campaign.id = :campaignId AND (p.status != 'PUBLISHED' OR p.publishedAt >= :since) ORDER BY p.id DESC")
+    @Query("SELECT p FROM PostQueue p LEFT JOIN FETCH p.campaign c WHERE c.id = :campaignId AND (p.status != 'PUBLISHED' OR p.publishedAt >= :since) ORDER BY p.id DESC")
     List<PostQueue> findActiveAndRecentByCampaignId(@org.springframework.data.repository.query.Param("campaignId") Long campaignId, @org.springframework.data.repository.query.Param("since") LocalDateTime since);
+
+    /** Như findActiveAndRecentByCampaignId nhưng gộp mọi campaign của 1 user trong 1 query (bỏ qua 1 postType nếu có). */
+    @Query("SELECT p FROM PostQueue p LEFT JOIN FETCH p.campaign c WHERE c.user.id = :userId AND (p.status != 'PUBLISHED' OR p.publishedAt >= :since) AND (:excludeType IS NULL OR p.postType IS NULL OR p.postType <> :excludeType) ORDER BY p.id DESC")
+    List<PostQueue> findActiveAndRecentByUserId(@org.springframework.data.repository.query.Param("userId") Long userId, @org.springframework.data.repository.query.Param("since") LocalDateTime since, @org.springframework.data.repository.query.Param("excludeType") String excludeType);
+
+    /** Phân trang hàng đợi cho Publishing Control Center — hỗ trợ hàng ngàn bài không bị nghẽn bộ nhớ. */
+    @Query(value = "SELECT p FROM PostQueue p LEFT JOIN FETCH p.campaign c WHERE c.user.id = :userId " +
+            "AND (:status IS NULL OR p.status = :status) " +
+            "AND (:search IS NULL OR LOWER(p.title) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(p.content) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(p.targetFanpageId) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+            "ORDER BY p.id DESC",
+            countQuery = "SELECT COUNT(p) FROM PostQueue p WHERE p.campaign.user.id = :userId " +
+            "AND (:status IS NULL OR p.status = :status) " +
+            "AND (:search IS NULL OR LOWER(p.title) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(p.content) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(p.targetFanpageId) LIKE LOWER(CONCAT('%', :search, '%')))")
+    Page<PostQueue> findQueuePaginatedForUser(
+            @org.springframework.data.repository.query.Param("userId") Long userId,
+            @org.springframework.data.repository.query.Param("status") String status,
+            @org.springframework.data.repository.query.Param("search") String search,
+            Pageable pageable);
 }

@@ -397,19 +397,9 @@ const EconomyJob: React.FC = () => {
   const { data: allPosts = [], isLoading: isLoadingPosts, refetch: refetchPosts } = useQuery({
     queryKey: ['postQueueEconomyJob'],
     queryFn: async () => {
-      const response = await api.get('/campaigns');
-      const campaigns = response.data || [];
-      let posts: PostQueue[] = [];
-      for (const campaign of campaigns) {
-        try {
-          const res = await api.get(`/queue/campaign/${campaign.id}`);
-          if (Array.isArray(res.data)) {
-            posts = [...posts, ...res.data];
-          }
-        } catch (e) {
-          console.error(e);
-        }
-      }
+      // 1 request cho mọi campaign
+      const response = await api.get('/queue/recent', { params: { days: 3 } });
+      const posts: PostQueue[] = Array.isArray(response.data) ? response.data : [];
 
       // Lọc các bài đăng có liên quan tới 3 Group Kinh Tế
       const targetIds = ECONOMY_GROUPS.map((g) => g.id);
@@ -418,7 +408,8 @@ const EconomyJob: React.FC = () => {
         return targetIds.some((id) => p.targetGroupNames!.includes(id));
       });
     },
-    refetchInterval: 8000,
+    staleTime: 30000,
+    refetchInterval: 60000,
   });
 
   // ── DỮ LIỆU BÁO CÁO THEO NGÀY ĐƯỢC CHỌN ──

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, App, Button, Checkbox, Empty, Modal, Spin, Tag } from 'antd';
+import { Alert, App, Button, Card, Checkbox, Empty, Modal, Spin, Tag, Flex } from 'antd';
 import { LinkOutlined, LoadingOutlined, LoginOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '../../config/axios';
@@ -132,6 +132,7 @@ const FacebookBrowserLoginModal = ({ open, onClose, reloginAccount, accounts }: 
           pageName: page?.pageName,
           accountType: 'PERSONAL_COOKIE',
           accessToken: via.accessToken,
+          postingIdentityAccountId: via.id,
           tokenStatus: 'OK',
           tokenCheckedAt: new Date().toISOString(),
         });
@@ -156,10 +157,10 @@ const FacebookBrowserLoginModal = ({ open, onClose, reloginAccount, accounts }: 
 
   return (
     <Modal open={open} onCancel={close} footer={null} width={600} title={title} destroyOnHidden>
-      <div className="space-y-3 pt-1">
+      <div className="fbl-body">
         {!via && (
           <>
-            <ol className="m-0 pl-5 text-[13px] leading-relaxed text-slate-400 space-y-1">
+            <ol className="fbl-steps">
               <li>Bấm nút bên dưới — một cửa sổ Chrome sẽ mở trên máy tính đang chạy hệ thống.</li>
               <li>Tự đăng nhập Facebook trong cửa sổ đó (gõ tài khoản, mật khẩu, mã 2FA nếu có).</li>
               <li>Đăng nhập xong, hệ thống tự lấy cookie và lưu nick — không cần copy gì cả.</li>
@@ -179,7 +180,7 @@ const FacebookBrowserLoginModal = ({ open, onClose, reloginAccount, accounts }: 
                 Mở cửa sổ đăng nhập Facebook
               </Button>
             )}
-            <div className="text-[11px] text-slate-500">
+            <div className="fbl-note">
               Mỗi nick có hồ sơ trình duyệt riêng trên máy, nên lần đăng nhập lại sau thường nhanh hơn. Hệ thống không lưu mật khẩu.
             </div>
           </>
@@ -196,37 +197,37 @@ const FacebookBrowserLoginModal = ({ open, onClose, reloginAccount, accounts }: 
                 : `Đã cập nhật cookie mới cho ${login?.updatedCount || 0} kết nối cùng UID ${via.platformAccountId}.`}
             />
 
-            <div className="app-surface rounded-lg p-3">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[13px] font-semibold text-slate-200">Chọn Page để tạo kết nối</span>
+            <Card variant="borderless" className="fbl-pages">
+              <Flex align="center" justify="space-between" className="fbl-pages-head">
+                <span className="fbl-pages-title">Chọn Page để tạo kết nối</span>
                 <Button size="small" icon={<ReloadOutlined />} disabled={scanning} onClick={() => scanPages(via)}>
                   Quét lại
                 </Button>
-              </div>
+              </Flex>
               {scanning ? (
-                <div className="flex items-center gap-2 py-6 justify-center text-[13px] text-slate-400">
+                <Flex align="center" gap={8} justify="center" className="fbl-loading">
                   <Spin size="small" /> Đang quét các Page mà nick này quản trị…
-                </div>
+                </Flex>
               ) : scanError ? (
                 <Alert type="warning" showIcon message={scanError} />
               ) : pages && pages.length === 0 ? (
                 <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Không tìm thấy Page nào nick này quản trị" />
               ) : (
-                <div className="max-h-72 overflow-y-auto divide-y divide-slate-800">
+                <div className="fbl-page-list">
                   {(pages || []).map((p) => {
                     const connected = connectedPageIds.has(p.pageId);
                     return (
-                      <label key={p.pageId} className="flex items-center gap-3 py-2 cursor-pointer">
+                      <label key={p.pageId} className="fbl-page-row">
                         <Checkbox
                           disabled={connected}
                           checked={connected || selected.includes(p.pageId)}
                           onChange={(e) => setSelected((cur) => e.target.checked ? [...cur, p.pageId] : cur.filter((x) => x !== p.pageId))}
                         />
-                        <div className="min-w-0 flex-1">
-                          <div className="text-[13px] text-slate-200 truncate">{p.pageName || p.pageId}</div>
-                          <div className="text-[11px] text-slate-500 font-mono">{p.pageId}</div>
+                        <div className="fbl-page-main">
+                          <div className="fbl-page-name">{p.pageName || p.pageId}</div>
+                          <div className="fbl-page-id">{p.pageId}</div>
                         </div>
-                        {connected && <Tag className="mr-0">Đã có kết nối</Tag>}
+                        {connected && <Tag className="fbl-mr0">Đã có kết nối</Tag>}
                         {p.pageUrl && (
                           <Button type="link" size="small" href={p.pageUrl} target="_blank" rel="noreferrer" icon={<LinkOutlined />} />
                         )}
@@ -235,14 +236,14 @@ const FacebookBrowserLoginModal = ({ open, onClose, reloginAccount, accounts }: 
                   })}
                 </div>
               )}
-            </div>
+            </Card>
 
-            <div className="flex justify-end gap-2">
+            <Flex justify="flex-end" gap={8} className="fbl-actions">
               <Button onClick={close}>Xong</Button>
               <Button type="primary" disabled={selected.length === 0 || scanning} loading={creating} onClick={createConnections}>
                 Tạo kết nối cho {selected.length} Page
               </Button>
-            </div>
+            </Flex>
           </>
         )}
       </div>

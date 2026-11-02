@@ -1,5 +1,6 @@
 package com.autopost.saas.controller;
 
+import com.autopost.saas.util.LocalServices;
 import com.autopost.saas.service.GeminiService;
 import com.autopost.saas.service.RedditService;
 import com.autopost.saas.util.PooledRestTemplateFactory;
@@ -80,7 +81,7 @@ public class NewsRadarController {
             HttpEntity<Map<String, String>> request = new HttpEntity<>(body, headers);
             @SuppressWarnings("unchecked")
             Map<String, Object> response = restTemplate.postForObject(
-                    "http://localhost:3001/api/scrape-article", request, Map.class);
+                    LocalServices.WORKER_BASE + "/api/scrape-article", request, Map.class);
             return ResponseEntity.ok(response != null ? response : Map.of("success", false, "error", "Worker không phản hồi"));
         } catch (HttpStatusCodeException e) {
             log.warn("[NewsRadar] Worker trả lỗi khi cào bài báo: {}", e.getResponseBodyAsString());

@@ -1,5 +1,6 @@
 package com.autopost.saas.service;
 
+import com.autopost.saas.util.LocalServices;
 import com.autopost.saas.entity.SocialAccount;
 import com.autopost.saas.repository.SocialAccountRepository;
 import com.autopost.saas.util.PooledRestTemplateFactory;
@@ -26,6 +27,9 @@ public class SocialAccountService {
     private final SocialAccountRepository repository;
     private final FacebookGraphApiService facebookGraphApiService;
     private final com.autopost.saas.repository.FacebookPageAccessRepository facebookPageAccessRepository;
+    private final com.autopost.saas.repository.PostTargetRepository postTargetRepository;
+    private final com.autopost.saas.repository.PostQueueGroupResultRepository postQueueGroupResultRepository;
+    private final com.autopost.saas.repository.GroupFlopConfigRepository groupFlopConfigRepository;
     private final RestTemplate restTemplate = PooledRestTemplateFactory.create(10000, 60000);
 
     @Cacheable(value = "socialAccountsByUser", key = "#userId")
@@ -54,6 +58,12 @@ public class SocialAccountService {
                 if (account.getAccountType() != null) {
                     existingProfile.setAccountType(account.getAccountType());
                 }
+                if (account.getPostingIdentityAccountId() != null) {
+                    existingProfile.setPostingIdentityAccountId(account.getPostingIdentityAccountId());
+                }
+                if (account.getBackupAccountId() != null) {
+                    existingProfile.setBackupAccountId(account.getBackupAccountId());
+                }
                 existingProfile.setTokenStatus(account.getTokenStatus() != null ? account.getTokenStatus() : "OK");
                 existingProfile.setTokenCheckedAt(java.time.LocalDateTime.now());
                 account = existingProfile;
@@ -80,7 +90,7 @@ public class SocialAccountService {
                 }
             } else {
                 try {
-                    String workerUrl = "http://localhost:3001/api/get-account-name";
+                    String workerUrl = LocalServices.WORKER_BASE + "/api/get-account-name";
                     HttpHeaders headers = new HttpHeaders();
                     headers.setContentType(MediaType.APPLICATION_JSON);
 
@@ -151,15 +161,47 @@ public class SocialAccountService {
         }
     }
 
-    private String extractCUser(String cookieStr) {
+    public static String extractCUser(String cookieStr) {
         if (cookieStr == null || cookieStr.isBlank()) return null;
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(?:^|;\\s*)c_user=([^;]+)", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(cookieStr);
-        return m.find() ? m.group(1).trim() : null;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(?:^|;\\s*)c_user=([^;\\s]+)", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(cookieStr);
+        if (!m.find()) return null;
+        String val = m.group(1).trim();
+        if (val.startsWith("\"") && val.endsWith("\"") && val.length() > 1) {
+            val = val.substring(1, val.length() - 1);
+        }
+        return val;
+    }
+
+    /**
+     * Ghi cookie mới cho MỌI kết nối của user có cùng c_user (Via + các Page/Group dùng cookie của Via đó).
+     * Đọc thẳng repository (không qua cache) và tự evict cache vì gọi saveAccount nội bộ không đi qua proxy.
+     */
+    @CacheEvict(value = "socialAccountsByUser", allEntries = true)
+    public List<String> applyCookieToSameCUser(Long userId, String cUser, String cookie) {
+        List<String> updatedNames = new java.util.ArrayList<>();
+        if (userId == null || cUser == null || cUser.isBlank() || cookie == null || cookie.isBlank()) return updatedNames;
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        for (SocialAccount acc : repository.findByUserId(userId)) {
+            String accCUser = extractCUser(acc.getAccessToken());
+            boolean matchCUser = accCUser != null && accCUser.equalsIgnoreCase(cUser);
+            boolean matchPlatform = cUser.equalsIgnoreCase(acc.getPlatformAccountId());
+            if (matchCUser || matchPlatform) {
+                acc.setAccessToken(cookie);
+                acc.setTokenStatus("OK");
+                acc.setTokenCheckedAt(now);
+                saveAccount(acc);
+                updatedNames.add(acc.getPageName() != null ? acc.getPageName() : acc.getPlatformAccountId());
+            }
+        }
+        return updatedNames;
     }
 
     @CacheEvict(value = "socialAccountsByUser", allEntries = true)
     @org.springframework.transaction.annotation.Transactional
     public void deleteAccount(Long id) {
+        if (id == null) return;
+
+        // 1. Gỡ tham chiếu tự trỏ (Self-reference) ở các SocialAccount khác
         repository.findAll().forEach(acc -> {
             boolean changed = false;
             if (id.equals(acc.getPostingIdentityAccountId())) {
@@ -170,9 +212,46 @@ public class SocialAccountService {
                 acc.setBackupAccountId(null);
                 changed = true;
             }
+            if (id.equals(acc.getFallbackGroupId())) {
+                acc.setFallbackGroupId(null);
+                changed = true;
+            }
             if (changed) repository.save(acc);
         });
-        facebookPageAccessRepository.deleteBySourceAccountId(id);
+
+        // 2. Gỡ liên kết cấu hình chống Flop
+        try {
+            groupFlopConfigRepository.findAll().stream()
+                    .filter(c -> id.equals(c.getSocialAccountId()))
+                    .forEach(c -> {
+                        c.setSocialAccountId(null);
+                        groupFlopConfigRepository.save(c);
+                    });
+        } catch (Exception e) {
+            log.warn("Không thể gỡ tham chiếu GroupFlopConfig cho account {}: {}", id, e.getMessage());
+        }
+
+        // 3. Xóa các dữ liệu có ràng buộc khóa ngoại (Foreign Key) trỏ tới social_accounts
+        try {
+            facebookPageAccessRepository.deleteBySourceAccountId(id);
+        } catch (Exception e) {
+            log.warn("Lỗi khi xóa facebookPageAccesses cho account {}: {}", id, e.getMessage());
+        }
+
+        try {
+            postTargetRepository.deleteBySocialAccount_Id(id);
+        } catch (Exception e) {
+            log.warn("Lỗi khi xóa postTarget cho account {}: {}", id, e.getMessage());
+        }
+
+        try {
+            postQueueGroupResultRepository.deleteBySocialAccount_Id(id);
+        } catch (Exception e) {
+            log.warn("Lỗi khi xóa postQueueGroupResult cho account {}: {}", id, e.getMessage());
+        }
+
+        // 4. Xóa bản ghi trong social_accounts
         repository.deleteById(id);
+        log.info("🗑️ Đã xóa thành công SocialAccount ID: {}", id);
     }
 }

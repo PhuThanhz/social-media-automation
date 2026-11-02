@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import {
   Alert, Badge, Button, Dropdown, Empty, Input, Segmented, Select, Space, Spin, Switch, Tooltip, message,
+  Card, Flex, Typography, Statistic, Tabs,
 } from 'antd';
 import {
   ArrowsAltOutlined, ClearOutlined, CloudDownloadOutlined, CopyOutlined, DownOutlined,
@@ -153,28 +154,60 @@ const SystemLogs = () => {
 
   return (
     <div className="logs-page app-page" ref={panelRef}>
-      <section className="logs-heading">
-        <div>
-          <div className="logs-eyebrow"><span className="logs-live-dot" /> LIVE SYSTEM CONSOLE</div>
-          <h2>Nhật ký hệ thống</h2>
-          <p>Theo dõi tiến trình đăng bài và chẩn đoán lỗi ngay trên trang tổng quan.</p>
-        </div>
-        <div className="logs-status-row">
-          <div className="logs-status-card"><span>Trạng thái</span><b><Badge status={paused ? 'warning' : 'processing'} /> {paused ? 'Đã tạm dừng' : 'Đang theo dõi'}</b></div>
-          <div className="logs-status-card"><span>Dung lượng</span><b>{formatBytes(data?.fileSize || activeSource?.size)}</b></div>
-          <div className="logs-status-card"><span>Cập nhật</span><b>{dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString('vi-VN') : '—'}</b></div>
-        </div>
-      </section>
+      <Card variant="borderless" className="!mb-4">
+        <Flex justify="space-between" align="center" wrap="wrap" gap="middle">
+          <div>
+            <div className="logs-eyebrow mb-1"><span className="logs-live-dot" /> LIVE SYSTEM CONSOLE</div>
+            <Typography.Title level={4} className="!mb-1 !text-slate-100">Nhật ký hệ thống</Typography.Title>
+            <Typography.Text className="text-xs text-slate-400">Theo dõi tiến trình đăng bài và chẩn đoán lỗi ngay trên trang tổng quan.</Typography.Text>
+          </div>
+          <Flex wrap="wrap" gap="middle" align="center">
+            <Card variant="borderless" size="small" styles={{ body: { padding: '8px 16px' } }}>
+              <Statistic
+                title={<span className="text-[11px] text-slate-400">Trạng thái</span>}
+                valueRender={() => (
+                  <span className="text-xs font-semibold text-slate-200 flex items-center gap-1.5 mt-0.5">
+                    <Badge status={paused ? 'warning' : 'processing'} />
+                    {paused ? 'Đã tạm dừng' : 'Đang theo dõi'}
+                  </span>
+                )}
+              />
+            </Card>
+            <Card variant="borderless" size="small" styles={{ body: { padding: '8px 16px' } }}>
+              <Statistic
+                title={<span className="text-[11px] text-slate-400">Dung lượng</span>}
+                value={formatBytes(data?.fileSize || activeSource?.size)}
+                valueStyle={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9' }}
+              />
+            </Card>
+            <Card variant="borderless" size="small" styles={{ body: { padding: '8px 16px' } }}>
+              <Statistic
+                title={<span className="text-[11px] text-slate-400">Cập nhật</span>}
+                value={dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString('vi-VN') : '—'}
+                valueStyle={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9' }}
+              />
+            </Card>
+          </Flex>
+        </Flex>
+      </Card>
 
-      <section className="logs-source-tabs" aria-label="Nguồn log">
-        {sources.map((item) => (
-          <button key={item.id} disabled={!item.exists} className={source === item.id ? 'is-active' : ''} onClick={() => { setSource(item.id); setClearedAt(null); }}>
-            <span className="logs-source-icon">{item.name.slice(0, 1)}</span>
-            <span><b>{item.name}</b><small>{item.description}</small></span>
-            <Badge status={item.exists ? (source === item.id ? 'processing' : 'success') : 'default'} />
-          </button>
-        ))}
-      </section>
+      <Card variant="borderless" className="!mb-4" styles={{ body: { padding: '6px 16px 2px 16px' } }}>
+        <Tabs
+          activeKey={source}
+          onChange={(key) => { setSource(key); setClearedAt(null); }}
+          items={sources.map((item) => ({
+            key: item.id,
+            disabled: !item.exists,
+            label: (
+              <span className="flex items-center gap-2 py-0.5">
+                <span className="font-semibold text-xs">{item.name}</span>
+                <span className="text-[11px] text-slate-400 hidden sm:inline">({item.description})</span>
+                <Badge status={item.exists ? (source === item.id ? 'processing' : 'success') : 'default'} />
+              </span>
+            ),
+          }))}
+        />
+      </Card>
 
       <section className="logs-console-card">
         <div className="logs-toolbar">

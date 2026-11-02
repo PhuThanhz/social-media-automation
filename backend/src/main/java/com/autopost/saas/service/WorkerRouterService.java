@@ -1,5 +1,6 @@
 package com.autopost.saas.service;
 
+import com.autopost.saas.util.LocalServices;
 import com.autopost.saas.util.PooledRestTemplateFactory;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -37,17 +38,28 @@ public class WorkerRouterService {
                     .forEach(urls::add);
         }
         if (urls.isEmpty()) {
-            urls.add(defaultBaseUrl != null && !defaultBaseUrl.isBlank() ? defaultBaseUrl.trim() : "http://localhost:3001");
+            urls.add(defaultBaseUrl != null && !defaultBaseUrl.isBlank() ? defaultBaseUrl.trim() : LocalServices.WORKER_BASE);
         }
         this.workerUrls = List.copyOf(urls);
         log.info("🚀 [WorkerRouterService] Đã kích hoạt hệ thống Đa Worker với {} tiến trình: {}", workerUrls.size(), workerUrls);
     }
 
     /**
-     * Dành cho ĐĂNG BÀI: Luân phiên (Round-Robin) giữa các Worker để đăng song song nhiều tài khoản.
+     * Dành cho ĐĂNG BÀI: Luân phiên (Round-Robin) giữa các Worker nếu không truyền accountKey.
      */
     public String getPostingWorkerUrl(String apiPath) {
-        String base = getNextPostingWorkerUrl();
+        return getPostingWorkerUrl(apiPath, null);
+    }
+
+    /**
+     * Dành cho ĐĂNG BÀI THEO ACCOUNT (Account Affinity):
+     * - Mỗi VIA/Account được gán ưu tiên cho 1 Worker cố định để lưu giữ trọn vẹn browser profile,
+     *   session cookie và fingerprint trong thư mục browser_profiles của worker đó.
+     * - Giúp các VIA khác nhau tự động chạy trên các Worker khác nhau (song song hoàn toàn).
+     * - Nếu worker ưu tiên không phản hồi -> tự động fallback sang worker khác còn sống.
+     */
+    public String getPostingWorkerUrl(String apiPath, String accountKey) {
+        String base = getOptimalPostingWorkerUrl(accountKey);
         return buildFullUrl(base, apiPath);
     }
 
@@ -78,13 +90,27 @@ public class WorkerRouterService {
         return workerUrls;
     }
 
+    private final Map<String, Long> workerHealthCache = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<String, Boolean> workerHealthStatus = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final long HEALTH_CACHE_TTL_MS = 5000;
+
     public boolean isWorkerAlive(String baseUrl) {
+        long now = System.currentTimeMillis();
+        Long cachedTime = workerHealthCache.get(baseUrl);
+        Boolean cachedStatus = workerHealthStatus.get(baseUrl);
+        if (cachedTime != null && cachedStatus != null && (now - cachedTime < HEALTH_CACHE_TTL_MS)) {
+            return cachedStatus;
+        }
+        boolean alive = false;
         try {
             Map<?, ?> resp = healthCheckClient.getForObject(buildFullUrl(baseUrl, "/api/health"), Map.class);
-            return resp != null && "ok".equals(resp.get("status"));
-        } catch (Exception e) {
-            return false;
+            alive = (resp != null && "ok".equals(resp.get("status")));
+        } catch (Exception ignored) {
+            alive = false;
         }
+        workerHealthCache.put(baseUrl, now);
+        workerHealthStatus.put(baseUrl, alive);
+        return alive;
     }
 
     public boolean isAnyWorkerAlive() {
@@ -92,6 +118,24 @@ public class WorkerRouterService {
             if (isWorkerAlive(url)) return true;
         }
         return false;
+    }
+
+    private String getOptimalPostingWorkerUrl(String accountKey) {
+        if (workerUrls.isEmpty()) return LocalServices.WORKER_BASE;
+        if (workerUrls.size() == 1) return workerUrls.get(0);
+
+        if (accountKey != null && !accountKey.isBlank()) {
+            int total = workerUrls.size();
+            int preferredIdx = Math.abs(accountKey.hashCode()) % total;
+            String preferredCandidate = workerUrls.get(preferredIdx);
+            if (isWorkerAlive(preferredCandidate)) {
+                return preferredCandidate;
+            }
+            log.warn("⚠️ Worker ưu tiên ({}) cho account '{}' không phản hồi, tự động chuyển worker dự phòng.",
+                    preferredCandidate, accountKey);
+        }
+
+        return getNextPostingWorkerUrl();
     }
 
     private String getNextPostingWorkerUrl() {

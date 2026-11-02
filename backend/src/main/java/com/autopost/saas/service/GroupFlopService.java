@@ -176,7 +176,7 @@ public class GroupFlopService {
             }
 
             // Tìm các bài mới nhất trong PostQueue đã đăng ở Group này
-            List<PostQueue> publishedPosts = postQueueRepository.findTop50PublishedWithCampaignAndUser().stream()
+            List<PostQueue> publishedPosts = postQueueRepository.findRecentPublishedForUser(userId, org.springframework.data.domain.PageRequest.of(0, 300)).stream()
                     .filter(p -> {
                         try {
                             if (p.getCampaign() != null && p.getCampaign().getUser() != null) {

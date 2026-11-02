@@ -1,6 +1,8 @@
 package com.autopost.saas.config;
 
+import com.autopost.saas.security.DesktopSessionTokenFilter;
 import com.autopost.saas.security.JwtAuthenticationFilter;
+import com.autopost.saas.util.LocalServices;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -42,6 +44,9 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        if (LocalServices.SESSION_TOKEN != null) {
+            return desktopFilterChain(http);
+        }
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
@@ -60,6 +65,34 @@ public class SecurityConfig {
 
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
+        return http.build();
+    }
+
+    /**
+     * Bản Desktop: mọi API cần token phiên (filter) + đăng nhập người dùng trong app.
+     * Ngoại lệ: đăng nhập/thiết lập lần đầu, file tĩnh, health, và request của worker.
+     * Không cho tự đăng ký: người dùng do chủ tạo trong giới hạn gói.
+     */
+    private SecurityFilterChain desktopFilterChain(HttpSecurity http) throws Exception {
+        http
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .csrf(AbstractHttpConfigurer::disable)
+                .authorizeHttpRequests(a -> a
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers("/api/auth/register").denyAll()
+                        .requestMatchers("/api/auth/login", "/api/desktop/setup-status", "/api/desktop/setup",
+                                "/actuator/health", "/uploads/**", "/error").permitAll()
+                        .requestMatchers(req -> Boolean.TRUE.equals(req.getAttribute(DesktopSessionTokenFilter.WORKER_ATTR))).permitAll()
+                        .anyRequest().authenticated())
+                .exceptionHandling(e -> e.authenticationEntryPoint((req, res, ex) -> {
+                    res.setStatus(401);
+                    res.setContentType("application/json;charset=UTF-8");
+                    res.getWriter().write("{\"error\":\"LOGIN_REQUIRED\",\"message\":\"Vui lòng đăng nhập\"}");
+                }))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .addFilterBefore(new DesktopSessionTokenFilter(LocalServices.SESSION_TOKEN, LocalServices.WORKER_TOKEN),
+                        UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 

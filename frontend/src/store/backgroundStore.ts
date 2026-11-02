@@ -21,11 +21,9 @@ export const BACKGROUNDS: BackgroundPreset[] = [
 
 export const CUSTOM_BACKGROUND_ID = 'custom';
 
-// Gradient biển sâu dùng cho "Mặc định" (không cần file ảnh).
+// Sleek obsidian dark gradient for pro dashboard
 const DEFAULT_BACKGROUND =
-  'radial-gradient(ellipse at 20% 0%, rgba(56, 132, 255, .45), transparent 55%), ' +
-  'radial-gradient(ellipse at 85% 90%, rgba(20, 184, 210, .32), transparent 50%), ' +
-  'linear-gradient(160deg, #0b2a55 0%, #0a1f3f 45%, #06132a 100%)';
+  'radial-gradient(circle at 50% 0%, rgba(30, 58, 110, 0.25) 0%, transparent 60%), linear-gradient(180deg, #07090e 0%, #0a0e17 100%)';
 
 interface BackgroundState {
   backgroundId: string;
@@ -37,7 +35,7 @@ interface BackgroundState {
 export const useBackgroundStore = create<BackgroundState>()(
   persist(
     (set) => ({
-      backgroundId: 'ocean',
+      backgroundId: 'mountain',
       customImage: null,
       setBackground: (backgroundId) => set({ backgroundId }),
       setCustomImage: (customImage) => set({ customImage, backgroundId: CUSTOM_BACKGROUND_ID }),

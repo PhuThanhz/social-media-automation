@@ -1,6 +1,11 @@
+import { runtime } from '../config/runtime';
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import {
   Card,
+  Alert,
+  Empty,
+  Flex,
+  Space,
   Input,
   Button,
   Select,
@@ -57,9 +62,7 @@ import PasteLinkInput from '../components/common/PasteLinkInput';
 
 import PostHunterTab from '../components/buff/PostHunterTab';
 
-const WORKER_BASE_URL =
-  import.meta.env.VITE_WORKER_BASE_URL ||
-  `http://${typeof window !== 'undefined' ? window.location.hostname : 'localhost'}:3001`;
+const WORKER_BASE_URL = runtime.workerBase;
 
 interface FanpageItem {
   id: string;
@@ -451,6 +454,41 @@ function saveStoredPagesForVia(viaKey: string, pages: FanpageItem[]) {
   }
 }
 
+// Giữ nguyên reference nếu dữ liệu poll không đổi để tránh re-render thừa
+function keepIfSame<T>(prev: T, next: T): T {
+  return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+}
+
+// Gọi fn ngay khi mount/đổi `enabled`; chỉ lặp mỗi `ms` khi enabled và cửa sổ đang hiển thị
+function useVisiblePolling(fn: () => void, ms: number, enabled: boolean) {
+  useEffect(() => {
+    fn();
+    if (!enabled) return;
+    let id: ReturnType<typeof setInterval> | undefined;
+    const start = () => {
+      if (id === undefined) id = setInterval(fn, ms);
+    };
+    const stop = () => {
+      if (id !== undefined) clearInterval(id);
+      id = undefined;
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fn();
+        start();
+      } else {
+        stop();
+      }
+    };
+    if (document.visibilityState === 'visible') start();
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      stop();
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [fn, ms, enabled]);
+}
+
 export default function BuffEngagement() {
   const [searchParams] = useSearchParams();
   const { message, modal } = App.useApp();
@@ -518,6 +556,8 @@ export default function BuffEngagement() {
     ].join('\n')
   );
 
+  const [activeTabKey, setActiveTabKey] = useState<string>('buff-like');
+
   // Auto-Buff Queue State (Hunter-Ready & Background Pipeline)
   const [queueItems, setQueueItems] = useState<any[]>([]);
   const [queueUrlInput, setQueueUrlInput] = useState<string>('');
@@ -530,16 +570,13 @@ export default function BuffEngagement() {
     try {
       const res = await axios.get(`${WORKER_BASE_URL}/api/buff-queue/list`);
       if (res.data?.success) {
-        setQueueItems(res.data.queue || []);
+        setQueueItems((prev) => keepIfSame(prev, res.data.queue || []));
       }
     } catch {}
   }, []);
 
-  useEffect(() => {
-    fetchBuffQueue();
-    const interval = setInterval(fetchBuffQueue, 10000);
-    return () => clearInterval(interval);
-  }, [fetchBuffQueue]);
+  // Hàng đợi chỉ hiển thị ở tab Hàng đợi và Post Hunter
+  useVisiblePolling(fetchBuffQueue, 10000, activeTabKey === 'buff-queue' || activeTabKey === 'post-hunter');
 
   const handleAddQueueTask = async () => {
     if (!queueUrlInput.trim()) {
@@ -648,16 +685,12 @@ export default function BuffEngagement() {
     try {
       const res = await axios.get(`${WORKER_BASE_URL}/api/buff-monitors`);
       if (res.data?.success) {
-        setMonitors(res.data.monitors || []);
+        setMonitors((prev) => keepIfSame(prev, res.data.monitors || []));
       }
     } catch {}
   }, []);
 
-  useEffect(() => {
-    fetchBuffMonitors();
-    const interval = setInterval(fetchBuffMonitors, 15000);
-    return () => clearInterval(interval);
-  }, [fetchBuffMonitors]);
+  useVisiblePolling(fetchBuffMonitors, 15000, activeTabKey === 'post-hunter');
 
   // Via Health & Enterprise BM Overview State
   const [checkingViaHealth, setCheckingViaHealth] = useState<boolean>(false);
@@ -683,12 +716,12 @@ export default function BuffEngagement() {
     try {
       const res = await axios.get(`${WORKER_BASE_URL}/api/buff-vias/overview`);
       if (res.data?.success) {
-        setBmOverview({
+        setBmOverview((prev: any) => keepIfSame(prev, {
           ...(res.data.bmHealth || {}),
           antiOverlap: res.data.antiOverlap || { totalTrackedPosts: 0, totalProtectedInteractions: 0 },
           system: res.data.system || { isEmergencyStopped: false, telegramConfigured: false },
           stats: res.data.stats || {},
-        });
+        }));
       }
     } catch {}
   }, []);
@@ -703,11 +736,10 @@ export default function BuffEngagement() {
   }, []);
 
   useEffect(() => {
-    fetchBmOverview();
     fetchSettings();
-    const interval = setInterval(fetchBmOverview, 15000);
-    return () => clearInterval(interval);
-  }, [fetchBmOverview, fetchSettings]);
+  }, [fetchSettings]);
+  // Overview hiển thị ở header chung của mọi tab nên chỉ dừng khi cửa sổ bị ẩn
+  useVisiblePolling(fetchBmOverview, 15000, true);
 
   const handleSaveSettings = async () => {
     setSavingSettings(true);
@@ -998,7 +1030,6 @@ export default function BuffEngagement() {
   }, [engagementMode]);
 
   // History & Anti-Duplicate States
-  const [activeTabKey, setActiveTabKey] = useState<string>('buff-like');
   const [buffLogs, setBuffLogs] = useState<BuffLogEntry[]>(() => loadBuffLogs());
   useEffect(() => {
     saveBuffLogs(buffLogs);
@@ -2036,83 +2067,83 @@ export default function BuffEngagement() {
   return (
     <div className="space-y-5 max-w-[1440px] mx-auto px-2 sm:px-4 md:px-6 pb-28 md:pb-12">
       {/* THANH TRẠNG THÁI DÀN VIA */}
-      <div className="app-surface p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="font-semibold text-slate-100 text-sm sm:text-base">Dàn Via & Fanpage</div>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400 mt-1.5">
-            <span className="inline-flex items-center gap-1.5">
-              <UserOutlined />
-              Via:
-              <span className="font-semibold text-emerald-400">{bmOverview?.liveVias ?? fbAccounts.length} hoạt động</span>
-              {bmOverview?.deadVias > 0 && (
-                <span className="font-semibold text-rose-400">· {bmOverview.deadVias} lỗi</span>
-              )}
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <ThunderboltFilled />
-              Fanpage: <strong className="text-slate-200 font-semibold">{scannedPages.length}</strong>
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <CheckCircleOutlined />
-              Đã chống trùng: <strong className="text-slate-200 font-semibold">{bmOverview?.antiOverlap?.totalProtectedInteractions || 0}</strong>
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <BellOutlined />
-              Telegram:
-              <span className={bmOverview?.system?.telegramConfigured ? 'text-emerald-400 font-semibold' : 'text-slate-500'}>
-                {bmOverview?.system?.telegramConfigured ? 'Đã kết nối' : 'Chưa cấu hình'}
+      <Card variant="borderless">
+        <Flex justify="space-between" align="center" wrap="wrap" gap="middle">
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold text-slate-100 text-sm sm:text-base">Dàn Via & Fanpage</div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400 mt-1.5">
+              <span className="inline-flex items-center gap-1.5">
+                <UserOutlined />
+                Via:
+                <span className="font-semibold text-emerald-400">{bmOverview?.liveVias ?? fbAccounts.length} hoạt động</span>
+                {bmOverview?.deadVias > 0 && (
+                  <span className="font-semibold text-rose-400">· {bmOverview.deadVias} lỗi</span>
+                )}
               </span>
-            </span>
+              <span className="inline-flex items-center gap-1.5">
+                <ThunderboltFilled />
+                Fanpage: <strong className="text-slate-200 font-semibold">{scannedPages.length}</strong>
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <CheckCircleOutlined />
+                Đã chống trùng: <strong className="text-slate-200 font-semibold">{bmOverview?.antiOverlap?.totalProtectedInteractions || 0}</strong>
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <BellOutlined />
+                Telegram:
+                <span className={bmOverview?.system?.telegramConfigured ? 'text-emerald-400 font-semibold' : 'text-slate-500'}>
+                  {bmOverview?.system?.telegramConfigured ? 'Đã kết nối' : 'Chưa cấu hình'}
+                </span>
+              </span>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2 shrink-0 flex-wrap">
-          <Button
-            icon={<SettingOutlined />}
-            onClick={() => {
-              fetchSettings();
-              setIsSettingsModalOpen(true);
-            }}
-          >
-            Cài đặt
-          </Button>
-          <Button icon={<SafetyCertificateOutlined />} loading={checkingViaHealth} onClick={handleRunViaHealthCheck}>
-            Kiểm tra Via
-          </Button>
-          {bmOverview?.system?.isEmergencyStopped ? (
-            <Button type="primary" icon={<PlayCircleOutlined />} onClick={handleResumeSystem}>
-              Khôi phục hoạt động
+          <Flex align="center" gap={8} wrap="wrap" className="shrink-0">
+            <Button
+              icon={<SettingOutlined />}
+              onClick={() => {
+                fetchSettings();
+                setIsSettingsModalOpen(true);
+              }}
+            >
+              Cài đặt
             </Button>
-          ) : (
-            <Button danger icon={<StopOutlined />} onClick={handleEmergencyStop}>
-              Dừng khẩn cấp
+            <Button icon={<SafetyCertificateOutlined />} loading={checkingViaHealth} onClick={handleRunViaHealthCheck}>
+              Kiểm tra Via
             </Button>
-          )}
-        </div>
-      </div>
+            {bmOverview?.system?.isEmergencyStopped ? (
+              <Button type="primary" icon={<PlayCircleOutlined />} onClick={handleResumeSystem}>
+                Khôi phục hoạt động
+              </Button>
+            ) : (
+              <Button danger icon={<StopOutlined />} onClick={handleEmergencyStop}>
+                Dừng khẩn cấp
+              </Button>
+            )}
+          </Flex>
+        </Flex>
+      </Card>
 
       {/* BANNER CẢNH BÁO NẾU HỆ THỐNG ĐANG DỪNG KHẨN CẤP */}
       {bmOverview?.system?.isEmergencyStopped && (
-        <div className="p-3.5 rounded-xl bg-rose-950/40 border border-rose-800/60 text-rose-200 flex items-center justify-between text-xs gap-3 shadow-lg">
-          <div className="flex items-center gap-2.5">
-            <StopOutlined className="text-rose-400 text-base shrink-0" />
-            <div>
-              <strong className="text-rose-200 text-xs font-semibold uppercase tracking-wider">Hệ thống đang dừng khẩn cấp (Emergency Stop)</strong>
-              <div className="text-rose-300/80 text-[11px] mt-0.5">
-                Toàn bộ hàng đợi tự động và tác vụ Playwright đang tạm dừng an toàn ({bmOverview?.system?.emergencyReason || 'Bởi Quản trị viên'}).
-              </div>
-            </div>
-          </div>
-          <Button
-            size="small"
-            type="primary"
-            icon={<PlayCircleOutlined />}
-            onClick={handleResumeSystem}
-            className="bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold shrink-0 rounded-lg"
-          >
-            Khôi phục ngay
-          </Button>
-        </div>
+        <Alert
+          type="error"
+          showIcon
+          icon={<StopOutlined />}
+          message="Hệ thống đang dừng khẩn cấp (Emergency Stop)"
+          description={`Toàn bộ hàng đợi tự động và tác vụ Playwright đang tạm dừng an toàn (${bmOverview?.system?.emergencyReason || 'Bởi Quản trị viên'}).`}
+          action={
+            <Button
+              size="small"
+              type="primary"
+              icon={<PlayCircleOutlined />}
+              onClick={handleResumeSystem}
+              className="bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold"
+            >
+              Khôi phục ngay
+            </Button>
+          }
+        />
       )}
 
       <Tabs
@@ -2126,7 +2157,7 @@ export default function BuffEngagement() {
             children: (
               <div className="space-y-5">
                 {/* TOP HERO COMMAND BAR: DÁN LINK & QUICK PRESETS */}
-                <div className="app-surface p-5 space-y-4">
+                <Card variant="borderless" className="space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
                     <div className="flex items-center gap-3">
                       <div>
@@ -2231,37 +2262,37 @@ export default function BuffEngagement() {
                     <span className="text-xs font-bold text-slate-400 flex items-center gap-1.5">
                       Cấu hình nhanh:
                     </span>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <button
-                        type="button"
+                    <Space wrap>
+                      <Button
+                        size="small"
                         onClick={handleQuickPresetLike24}
-                        className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-medium transition-colors cursor-pointer"
+                        className="text-xs"
                       >
                         Like bằng tất cả Page ({scannedPages.length})
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button
+                        size="small"
                         onClick={handleQuickPresetAiSeeding}
-                        className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-medium transition-colors cursor-pointer"
+                        className="text-xs"
                       >
                         Like + bình luận AI
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button
+                        size="small"
                         onClick={handleQuickPresetVias}
-                        className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-medium transition-colors cursor-pointer"
+                        className="text-xs"
                       >
                         Dùng nick cá nhân ({fbAccounts.length})
-                      </button>
-                    </div>
+                      </Button>
+                    </Space>
                   </div>
-                </div>
+                </Card>
 
                 {/* MAIN 2-COLUMN BENTO GRID */}
                 <Row gutter={[20, 20]}>
                   {/* CỘT TRÁI (45%): FLEET MANAGER - DÀN TÀI KHOẢN & FANPAGE */}
                   <Col xs={24} lg={11}>
-                    <div className="app-surface p-5 space-y-4">
+                    <Card variant="borderless" className="space-y-4">
                       {/* Card Header */}
                       <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-800/80">
                         <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-100">
@@ -2574,14 +2605,14 @@ export default function BuffEngagement() {
                           </button>
                         </div>
                       )}
-                    </div>
+                    </Card>
                   </Col>
 
                   {/* CỘT PHẢI (55%): CONTROL DECK & LIVE MONITOR TERMINAL */}
                   <Col xs={24} lg={13}>
                     <div className="space-y-4">
                       {/* HERO ACTION CARD - LUÔN Ở ĐỈNH TẦM MẮT */}
-                      <div className="app-surface p-5 space-y-3.5">
+                      <Card variant="borderless" className="space-y-3.5">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
                           <div className="flex items-center gap-2">
                             <span className="text-slate-300">
@@ -2666,15 +2697,14 @@ export default function BuffEngagement() {
                             )}
                           </div>
                         )}
-                      </div>
+                      </Card>
 
                       {/* BẢNG CẤU HÌNH TINH CHỈNH TƯƠNG TÁC */}
-                      <div className="p-4 sm:p-5 app-surface space-y-4">
+                      <Card variant="borderless" className="space-y-4">
                         <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
                           <span className="text-xs sm:text-sm font-bold text-slate-100 flex items-center gap-2">
                             <SettingOutlined className="text-blue-400" /> Cài đặt tương tác
                           </span>
-                          
                         </div>
 
                         {/* 1. Hình thức tương tác: Combo / Like / Comment */}
@@ -2682,41 +2712,17 @@ export default function BuffEngagement() {
                           <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                             Hình thức tương tác:
                           </label>
-                          <div className="grid grid-cols-3 gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setEngagementMode('LIKE_ONLY')}
-                              className={`p-2.5 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
-                                engagementMode === 'LIKE_ONLY'
-                                  ? 'border-blue-500 bg-blue-600/30 text-white font-bold'
-                                  : 'border-slate-800 bg-slate-950/40 text-slate-400 hover:text-slate-200 hover:border-slate-700'
-                              }`}
-                            >
-                              <span className="text-xs font-bold">Chỉ like</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setEngagementMode('LIKE_AND_COMMENT')}
-                              className={`p-2.5 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
-                                engagementMode === 'LIKE_AND_COMMENT'
-                                  ? 'border-blue-500 bg-blue-600/30 text-white font-bold'
-                                  : 'border-slate-800 bg-slate-950/40 text-slate-400 hover:text-slate-200 hover:border-slate-700'
-                              }`}
-                            >
-                              <span className="text-xs font-bold">Like + bình luận</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setEngagementMode('COMMENT_ONLY')}
-                              className={`p-2.5 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
-                                engagementMode === 'COMMENT_ONLY'
-                                  ? 'border-blue-500 bg-blue-600/30 text-white font-bold'
-                                  : 'border-slate-800 bg-slate-950/40 text-slate-400 hover:text-slate-200 hover:border-slate-700'
-                              }`}
-                            >
-                              <span className="text-xs font-bold">Chỉ bình luận</span>
-                            </button>
-                          </div>
+                          <Segmented
+                            block
+                            size="middle"
+                            value={engagementMode}
+                            onChange={(val) => setEngagementMode(val as any)}
+                            options={[
+                              { label: 'Chỉ like', value: 'LIKE_ONLY' },
+                              { label: 'Like + bình luận', value: 'LIKE_AND_COMMENT' },
+                              { label: 'Chỉ bình luận', value: 'COMMENT_ONLY' },
+                            ]}
+                          />
                         </div>
 
                         {/* 2. Reaction Picker (Floating Dock Style) */}
@@ -2896,10 +2902,10 @@ export default function BuffEngagement() {
                             />
                           </div>
                         )}
-                      </div>
+                      </Card>
 
                       {/* LIVE MONITOR TERMINAL / GIÁM SÁT TIẾN TRÌNH TRỰC TIẾP */}
-                      <div className="p-4 sm:p-5 app-surface space-y-3.5">
+                      <Card variant="borderless" className="space-y-3.5">
                         <div className="flex items-center justify-between pb-2.5 border-b border-slate-800/80">
                           <span className="text-xs sm:text-sm font-bold text-slate-100 flex items-center gap-2">
                             <RobotOutlined className="text-blue-400" /> Tiến trình
@@ -3130,7 +3136,7 @@ export default function BuffEngagement() {
                             </div>
                           </div>
                         )}
-                      </div>
+                      </Card>
                     </div>
                   </Col>
                 </Row>
@@ -3144,12 +3150,12 @@ export default function BuffEngagement() {
               <Row gutter={[20, 20]}>
                 <Col xs={24} lg={12}>
                   <Card
+                    variant="borderless"
                     title={
                       <div className="flex items-center gap-2 text-sm font-bold text-slate-100">
                         <EyeOutlined className="text-emerald-400" /> Cấu hình tăng view
                       </div>
                     }
-                    className="app-surface"
                   >
                     <div className="space-y-4">
                       <div>
@@ -3250,7 +3256,8 @@ export default function BuffEngagement() {
                         )}
                       </div>
                     }
-                    className="app-surface h-full"
+                    variant="borderless"
+                    className="h-full"
                   >
                     {viewProgress.status === 'IDLE' ? (
                       <div className="text-center py-20 text-slate-400">
@@ -3330,46 +3337,47 @@ export default function BuffEngagement() {
             children: (
               <div className="space-y-4">
                 {/* Auto Hunter Pipeline Banner */}
-                <div className="app-surface p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <ThunderboltOutlined className="text-amber-400 text-base" />
-                      <span className="font-bold text-slate-100 text-sm">
-                        Hàng đợi tự động
-                      </span>
+                <Card variant="borderless">
+                  <Flex justify="space-between" align="center" wrap="wrap" gap="middle">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <ThunderboltOutlined className="text-amber-400 text-base" />
+                        <span className="font-bold text-slate-100 text-sm">
+                          Hàng đợi tự động
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1 max-w-2xl">
+                        Cơ chế hàng đợi an toàn: Các bài viết phát hiện từ module quét hoặc thêm thủ công sẽ được xếp lịch chạy ngầm tuần tự (FIFO) với độ trễ tự nhiên, chống checkpoint và chia tải đều cho dàn Via.
+                      </p>
                     </div>
-                    <p className="text-xs text-slate-400 mt-1 max-w-2xl">
-                      Cơ chế hàng đợi an toàn: Các bài viết phát hiện từ module quét hoặc thêm thủ công sẽ được xếp lịch chạy ngầm tuần tự (FIFO) với độ trễ tự nhiên, chống checkpoint và chia tải đều cho dàn Via.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="small"
-                      icon={<ReloadOutlined />}
-                      onClick={() => fetchBuffQueue()}
-                      className="bg-slate-900 border-slate-700 text-slate-200"
-                    >
-                      Làm mới
-                    </Button>
-                    <Button
-                      size="small"
-                      danger
-                      onClick={handleClearCompletedQueue}
-                      className="text-xs"
-                    >
-                      Dọn dẹp bài đã xong
-                    </Button>
-                  </div>
-                </div>
+                    <Flex align="center" gap={8}>
+                      <Button
+                        size="small"
+                        icon={<ReloadOutlined />}
+                        onClick={() => fetchBuffQueue()}
+                      >
+                        Làm mới
+                      </Button>
+                      <Button
+                        size="small"
+                        danger
+                        onClick={handleClearCompletedQueue}
+                        className="text-xs"
+                      >
+                        Dọn dẹp bài đã xong
+                      </Button>
+                    </Flex>
+                  </Flex>
+                </Card>
 
                 {/* Form nạp bài vào hàng đợi */}
                 <Card
+                  variant="borderless"
                   title={
                     <div className="flex items-center gap-2 text-sm font-bold text-slate-100">
                       <PlusOutlined className="text-blue-400" /> Nạp bài viết vào hàng đợi ngầm
                     </div>
                   }
-                  className="app-surface"
                 >
                   <Row gutter={[16, 16]}>
                     <Col xs={24} md={12}>
@@ -3444,6 +3452,7 @@ export default function BuffEngagement() {
 
                 {/* Danh sách Task trong hàng đợi */}
                 <Card
+                  variant="borderless"
                   title={
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-bold text-slate-100">
@@ -3454,7 +3463,6 @@ export default function BuffEngagement() {
                       </span>
                     </div>
                   }
-                  className="app-surface"
                 >
                   {queueItems.length === 0 ? (
                     <div className="py-12 text-center text-slate-400 text-xs">
@@ -3569,39 +3577,39 @@ export default function BuffEngagement() {
                 {/* Metric Summary Cards */}
                 <Row gutter={[12, 12]}>
                   <Col xs={12} sm={6}>
-                    <div className="p-3.5 app-surface text-center">
+                    <Card variant="borderless" styles={{ body: { padding: '14px', textAlign: 'center' } }}>
                       <div className="text-[11px] font-bold text-slate-400 uppercase">Tổng lượt chạy</div>
                       <div className="text-2xl font-semibold text-slate-100 mt-1">{buffLogs.length}</div>
-                    </div>
+                    </Card>
                   </Col>
                   <Col xs={12} sm={6}>
-                    <div className="p-3.5 rounded-xl bg-emerald-950/30 border border-emerald-500/30 text-center">
+                    <Card variant="borderless" styles={{ body: { padding: '14px', textAlign: 'center' } }}>
                       <div className="text-[11px] font-bold text-emerald-400 uppercase">Like thành công</div>
-                      <div className="text-2xl font-semibold text-emerald-300 mt-1">
+                      <div className="text-2xl font-semibold text-emerald-400 mt-1">
                         {buffLogs.reduce((acc, l) => acc + (l.successCount || 0), 0)}
                       </div>
-                    </div>
+                    </Card>
                   </Col>
                   <Col xs={12} sm={6}>
-                    <div className="p-3.5 rounded-xl bg-blue-950/30 border border-blue-500/30 text-center">
+                    <Card variant="borderless" styles={{ body: { padding: '14px', textAlign: 'center' } }}>
                       <div className="text-[11px] font-bold text-blue-400 uppercase">Đã like trước đó</div>
-                      <div className="text-2xl font-semibold text-blue-300 mt-1">
+                      <div className="text-2xl font-semibold text-blue-400 mt-1">
                         {buffLogs.reduce((acc, l) => acc + (l.alreadyLikedCount || 0), 0)}
                       </div>
-                    </div>
+                    </Card>
                   </Col>
                   <Col xs={12} sm={6}>
-                    <div className="p-3.5 rounded-xl bg-rose-950/30 border border-rose-500/30 text-center">
+                    <Card variant="borderless" styles={{ body: { padding: '14px', textAlign: 'center' } }}>
                       <div className="text-[11px] font-bold text-rose-400 uppercase">Lỗi / Thất Bại</div>
-                      <div className="text-2xl font-semibold text-rose-300 mt-1">
+                      <div className="text-2xl font-semibold text-rose-400 mt-1">
                         {buffLogs.reduce((acc, l) => acc + (l.failedCount || 0), 0)}
                       </div>
-                    </div>
+                    </Card>
                   </Col>
                 </Row>
 
                 {/* Filter and Actions Bar */}
-                <Card className="app-surface p-0">
+                <Card variant="borderless" styles={{ body: { padding: 0 } }}>
                   <div className="flex flex-wrap items-center justify-between gap-3 p-3">
                     <div className="flex items-center gap-2 flex-1 min-w-[240px]">
                       <Input
@@ -3656,12 +3664,17 @@ export default function BuffEngagement() {
 
                 {/* List / Table of Logs */}
                 {buffLogs.length === 0 ? (
-                  <Card className="app-surface text-center py-16">
-                    <div className="text-5xl mb-3"></div>
-                    <div className="text-base font-bold text-slate-200">Chưa có lịch sử buff tương tác nào</div>
-                    <div className="text-xs text-slate-400 max-w-md mx-auto mt-2 leading-relaxed">
-                      Mỗi khi bạn thực hiện buff like/cảm xúc (đơn lẻ hoặc hàng loạt), hệ thống sẽ tự động ghi nhớ link bài viết, danh sách Page đã like và thời gian tại đây để bạn kiểm tra và tránh like trùng!
-                    </div>
+                  <Card variant="borderless" className="text-center py-16">
+                    <Empty
+                      description={
+                        <div>
+                          <div className="text-base font-bold text-slate-200">Chưa có lịch sử buff tương tác nào</div>
+                          <div className="text-xs text-slate-400 max-w-md mx-auto mt-2 leading-relaxed">
+                            Mỗi khi bạn thực hiện buff like/cảm xúc (đơn lẻ hoặc hàng loạt), hệ thống sẽ tự động ghi nhớ link bài viết, danh sách Page đã like và thời gian tại đây để bạn kiểm tra và tránh like trùng!
+                          </div>
+                        </div>
+                      }
+                    />
                   </Card>
                 ) : (
                   <div className="space-y-3">
@@ -3687,9 +3700,11 @@ export default function BuffEngagement() {
                         });
 
                         return (
-                          <div
+                          <Card
                             key={log.id}
-                            className="p-4 app-surface hover:border-slate-600 transition-all space-y-3"
+                            size="small"
+                            variant="borderless"
+                            className="space-y-3"
                           >
                             {/* Top row of card */}
                             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -3796,7 +3811,7 @@ export default function BuffEngagement() {
                                 ))}
                               </div>
                             </div>
-                          </div>
+                          </Card>
                         );
                       })}
                   </div>
@@ -4096,7 +4111,7 @@ export default function BuffEngagement() {
                   rows={4}
                   value={bulkPagesText}
                   onChange={(e) => setBulkPagesText(e.target.value)}
-                  placeholder={`61589245661782 | Làm Phước Hai\n467447130112806 | Làm Gì Mà Gấp\n61568697241127 | Đại Sảnh Pickleball\n61584834510803 | Làm Sen\n61594279329518 | Nexa 24h\n100091144747972 | Phú Order Hàng Nhật\n61551923480422 | Đại Sảnh Liên Minh Huyền Thoại`}
+                  placeholder={`61589245661782 | Fanpage Tin Tức 24h\n467447130112806 | Fanpage Giải Trí\n61568697241127 | Cộng Đồng Thể Thao`}
                   className="font-mono text-xs rounded-xl bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-500"
                 />
                 <div className="flex items-center justify-between text-[11px] text-slate-400">
@@ -4128,7 +4143,7 @@ export default function BuffEngagement() {
                   <Col span={10}>
                     <label className="block text-slate-400 mb-1">Tên Fanpage (Tùy chọn):</label>
                     <Input
-                      placeholder="VD: Làm Sen"
+                      placeholder="VD: Fanpage Tin Tức"
                       value={newPageName}
                       onChange={(e) => setNewPageName(e.target.value)}
                       className="rounded-xl text-xs bg-slate-900 border-slate-800 text-slate-100"

@@ -404,6 +404,9 @@ public class RedditService {
     }
 
     public static String ffmpegPath() {
+        // Bản Desktop truyền đường dẫn ffmpeg đi kèm app
+        String fromEnv = System.getenv("FFMPEG_PATH");
+        if (fromEnv != null && new java.io.File(fromEnv).canExecute()) return fromEnv;
         for (String c : List.of("/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg", "/usr/bin/ffmpeg")) {
             if (new java.io.File(c).canExecute()) return c;
         }

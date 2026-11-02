@@ -29,6 +29,13 @@ public class User {
     @Column(nullable = false)
     private String password;
 
+    /** Bản Desktop: OWNER (người tạo đầu tiên, quản lý người dùng) hoặc MEMBER; null = MEMBER */
+    @Column(length = 20)
+    private String role;
+
+    /** Bản Desktop: tài khoản bị chủ khóa thì không đăng nhập được */
+    private Boolean disabled;
+
     @Column(name = "daily_post_target")
     private Integer dailyPostTarget; // Mục tiêu số bài cần đăng trong 1 ngày (KPI) — null = chưa đặt mục tiêu
 

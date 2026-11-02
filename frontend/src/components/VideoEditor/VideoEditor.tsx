@@ -3,8 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Button, Modal, Popover, Progress, Tooltip, message } from 'antd';
-import { CaretRightOutlined, PauseOutlined, StepBackwardOutlined, UndoOutlined, RedoOutlined, DownloadOutlined, SendOutlined, ScissorOutlined, DeleteOutlined, ReloadOutlined, CloseOutlined, QuestionCircleOutlined } from '@ant-design/icons';
-import { AudioLines, Blend, Captions, Film, ImagePlus, LayoutTemplate, ScanLine, Sparkles, Type } from 'lucide-react';
+import {
+  CaretRightOutlined, PauseOutlined, StepBackwardOutlined, UndoOutlined, RedoOutlined,
+  DownloadOutlined, SendOutlined, ScissorOutlined, DeleteOutlined, ReloadOutlined,
+  CloseOutlined, QuestionCircleOutlined, ThunderboltOutlined, AppstoreOutlined,
+  SwapOutlined, FontSizeOutlined, CommentOutlined, SoundOutlined, PictureOutlined,
+  VideoCameraOutlined, BorderOutlined,
+} from '@ant-design/icons';
 import api from '../../config/axios';
 import { buildCaptions, DEFAULT_CAPTION_STYLE, newId, timelineDuration, useEditor, usePlayerClock, voiceEnd, voiceIn } from './store';
 import type { Anim, OverlayLayer, Project, VoiceClip } from './store';
@@ -86,14 +91,14 @@ function createProject(src: EditorSource, d: EditorDefaults, hasBrand: boolean):
 }
 
 const LEFT_TABS: Array<{ value: LeftTab; label: string; icon: ReactNode }> = [
-  { value: 'ai', label: 'AI', icon: <Sparkles size={18} /> },
-  { value: 'frame', label: 'Khung', icon: <LayoutTemplate size={18} /> },
-  { value: 'transition', label: 'Chuyển cảnh', icon: <Blend size={18} /> },
-  { value: 'text', label: 'Chữ', icon: <Type size={18} /> },
-  { value: 'captions', label: 'Phụ đề', icon: <Captions size={18} /> },
-  { value: 'audio', label: 'Âm thanh', icon: <AudioLines size={18} /> },
-  { value: 'image', label: 'Ảnh', icon: <ImagePlus size={18} /> },
-  { value: 'video', label: 'Video', icon: <Film size={18} /> },
+  { value: 'ai', label: 'AI', icon: <ThunderboltOutlined className="text-base" /> },
+  { value: 'frame', label: 'Khung', icon: <AppstoreOutlined className="text-base" /> },
+  { value: 'transition', label: 'Chuyển cảnh', icon: <SwapOutlined className="text-base" /> },
+  { value: 'text', label: 'Chữ', icon: <FontSizeOutlined className="text-base" /> },
+  { value: 'captions', label: 'Phụ đề', icon: <CommentOutlined className="text-base" /> },
+  { value: 'audio', label: 'Âm thanh', icon: <SoundOutlined className="text-base" /> },
+  { value: 'image', label: 'Ảnh', icon: <PictureOutlined className="text-base" /> },
+  { value: 'video', label: 'Video', icon: <VideoCameraOutlined className="text-base" /> },
 ];
 
 const SHORTCUTS = [['Space', 'Phát / dừng'], ['← →', '1 khung hình'], ['Shift + ← →', '1 giây'], ['S', 'Tách tại đầu phát'], ['Delete', 'Xoá'], ['⌘/Ctrl + Z', 'Hoàn tác'], ['⌘/Ctrl + Shift + Z', 'Làm lại'], ['⌘/Ctrl + D', 'Nhân bản'], ['Ctrl + cuộn', 'Phóng timeline']];
@@ -484,7 +489,7 @@ export default function VideoEditor(props: Props) {
             </div>
             <div className="flex-1" />
             <Tooltip title="Hiện vùng bị giao diện TikTok/Reels che">
-              <Button size="small" type={safeZone ? 'primary' : 'text'} ghost={safeZone} icon={<ScanLine size={14} />} onClick={() => setSafeZone((x) => !x)} />
+              <Button size="small" type={safeZone ? 'primary' : 'text'} ghost={safeZone} icon={<BorderOutlined className="text-sm" />} onClick={() => setSafeZone((x) => !x)} />
             </Tooltip>
             <Popover placement="bottomRight" title="Phím tắt" content={
               <div className="space-y-1 text-[12px] min-w-[220px]">{SHORTCUTS.map(([k, d]) => <div key={k} className="flex justify-between gap-4"><span className="font-mono">{k}</span><span className="text-slate-400">{d}</span></div>)}</div>

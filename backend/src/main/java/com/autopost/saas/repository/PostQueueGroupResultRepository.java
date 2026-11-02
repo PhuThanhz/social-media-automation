@@ -24,4 +24,6 @@ public interface PostQueueGroupResultRepository extends JpaRepository<PostQueueG
     List<PostQueueGroupResult> findByPostQueue_IdOrderByAttemptedAtDesc(Long postQueueId);
 
     void deleteByPostQueue_Id(Long postQueueId);
+
+    void deleteBySocialAccount_Id(Long socialAccountId);
 }

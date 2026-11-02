@@ -14,7 +14,7 @@ import {
   Select,
   Table,
   Segmented,
-  Tooltip,
+  Tooltip, Flex,
 } from 'antd';
 import {
   PlusOutlined,
@@ -30,6 +30,11 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   ClockCircleOutlined,
+  CopyOutlined,
+  ThunderboltOutlined,
+  SafetyCertificateOutlined,
+  WarningOutlined,
+  InfoCircleOutlined,
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../config/axios';
@@ -50,39 +55,39 @@ interface SocialAccount {
 const GroupHealthBadge = ({ status }: { status?: string }) => {
   if (status === 'JOINED') {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-950/40 text-emerald-400 border border-emerald-800/40">
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+      <span className="grp-health-ok">
+        <span className="grp-health-dot-ok" />
         Đã gia nhập
       </span>
     );
   }
   if (status === 'PENDING_APPROVAL') {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-950/40 text-amber-400 border border-amber-800/40">
-        <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+      <span className="grp-health-warn">
+        <span className="grp-health-dot-warn" />
         Chờ duyệt
       </span>
     );
   }
   if (status === 'KICKED_OR_NOT_JOINED') {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-950/40 text-red-400 border border-red-800/40">
-        <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+      <span className="grp-health-bad">
+        <span className="grp-health-dot-bad" />
         Bị Kick / Chưa vào
       </span>
     );
   }
   if (status === 'PRIVATE_NO_ACCESS') {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-rose-950/40 text-rose-400 border border-rose-800/40">
-        <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+      <span className="grp-health-lock">
+        <span className="grp-health-dot-lock" />
         Riêng tư / Khóa
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800/60 text-slate-400 border border-slate-700/50">
-      <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+    <span className="grp-health-none">
+      <span className="grp-health-dot-none" />
       Chưa scan
     </span>
   );
@@ -96,8 +101,10 @@ const getGroupUrl = (platformAccountId?: string) => {
 };
 
 const Groups = () => {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const [isBulkModalVisible, setIsBulkModalVisible] = useState(false);
+  const [groupAddMode, setGroupAddMode] = useState<'structured' | 'bulk'>('structured');
+  const [bulkInputText, setBulkInputText] = useState('');
   const [editingGroup, setEditingGroup] = useState<SocialAccount | null>(null);
   const [scanningGroupId, setScanningGroupId] = useState<number | null>(null);
   const [isScanningAll, setIsScanningAll] = useState(false);
@@ -106,8 +113,59 @@ const Groups = () => {
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
 
   const [bulkForm] = Form.useForm();
+  const [structuredForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const queryClient = useQueryClient();
+
+  const structuredPageName = Form.useWatch('pageName', structuredForm) || '';
+  const structuredPlatformAccountId = Form.useWatch('platformAccountId', structuredForm) || '';
+
+  // Parser hỗ trợ bóc tách từng dòng Group
+  const parseGroupLine = (line: string) => {
+    const trimmed = line.trim();
+    if (!trimmed) return null;
+    let pageName = trimmed;
+    let platformAccountId: string | undefined = undefined;
+
+    if (trimmed.includes('|') || trimmed.includes(' - ') || trimmed.includes('\t')) {
+      const parts = trimmed.split(/[|\t]| - /).map((s) => s.trim()).filter(Boolean);
+      if (parts.length >= 2) {
+        pageName = parts[0];
+        const second = parts[1];
+        const urlM = second.match(/facebook\.com\/groups\/([a-zA-Z0-9._-]+)/i);
+        platformAccountId = urlM ? urlM[1] : second.replace(/[^0-9]/g, '');
+      }
+    } else {
+      const urlMatch = trimmed.match(/facebook\.com\/groups\/([a-zA-Z0-9._-]+)/i);
+      if (urlMatch) {
+        platformAccountId = urlMatch[1];
+        pageName = `Nhóm ${platformAccountId}`;
+      } else if (/^\d{6,30}$/.test(trimmed)) {
+        platformAccountId = trimmed;
+        pageName = `Nhóm ${trimmed}`;
+      }
+    }
+
+    const isFull = Boolean(pageName && platformAccountId && !pageName.startsWith('Nhóm '));
+    const hasIdOnly = Boolean(platformAccountId && pageName.startsWith('Nhóm '));
+    const hasNameOnly = Boolean(!platformAccountId && pageName);
+
+    return {
+      pageName,
+      platformAccountId,
+      isFull,
+      hasIdOnly,
+      hasNameOnly,
+    };
+  };
+
+  const parsedBulkList = useMemo(() => {
+    if (!bulkInputText.trim()) return [];
+    return bulkInputText
+      .split('\n')
+      .map(parseGroupLine)
+      .filter((item): item is NonNullable<typeof item> => Boolean(item));
+  }, [bulkInputText]);
 
   // Fetch danh sách kết nối, lọc Group Facebook
   const { data: accounts, isLoading } = useQuery({
@@ -196,23 +254,33 @@ const Groups = () => {
     },
   });
 
-  // Khai báo hàng loạt
-  const bulkAddMutation = useMutation({
-    mutationFn: async (names: string[]) => {
+  // Khai báo Group (hỗ trợ cả từng group phân tầng và danh sách hàng loạt)
+  const addGroupsMutation = useMutation({
+    mutationFn: async (items: Array<{ pageName: string; platformAccountId?: string; fallbackGroupId?: number }>) => {
+      const payloadList = items.filter((it) => it.pageName && it.pageName.trim().length > 0);
       const results = await Promise.allSettled(
-        names.map((name) => api.post('/connections', { platform: 'FACEBOOK_GROUP', pageName: name }))
+        payloadList.map((payload) =>
+          api.post('/connections', {
+            platform: 'FACEBOOK_GROUP',
+            pageName: payload.pageName.trim(),
+            platformAccountId: payload.platformAccountId?.trim() || undefined,
+            fallbackGroupId: payload.fallbackGroupId || undefined,
+          })
+        )
       );
       const failed = results.filter((r) => r.status === 'rejected').length;
-      return { total: names.length, failed };
+      return { total: payloadList.length, failed };
     },
     onSuccess: ({ total, failed }) => {
       if (failed > 0) {
-        message.warning(`Đã khai báo ${total - failed}/${total} group. ${failed} group lỗi.`);
+        message.warning(`Đã thêm ${total - failed}/${total} group. ${failed} group lỗi.`);
       } else {
-        message.success(`Đã khai báo thành công ${total} group!`);
+        message.success(`Đã thêm thành công ${total} group!`);
       }
       setIsBulkModalVisible(false);
       bulkForm.resetFields();
+      structuredForm.resetFields();
+      setBulkInputText('');
       queryClient.invalidateQueries({ queryKey: ['socialAccounts'] });
     },
     onError: () => {
@@ -242,8 +310,11 @@ const Groups = () => {
       await api.delete(`/connections/${id}`);
     },
     onSuccess: () => {
-      message.success('Đã xóa Group!');
+      message.success('Đã xóa Group thành công!');
       queryClient.invalidateQueries({ queryKey: ['socialAccounts'] });
+    },
+    onError: (err: any) => {
+      message.error(err?.response?.data?.message || 'Không thể xóa Group này! Vui lòng thử lại.');
     },
   });
 
@@ -259,24 +330,24 @@ const Groups = () => {
       render: (_: any, record: SocialAccount) => {
         const url = getGroupUrl(record.platformAccountId);
         return (
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-600/20 text-blue-400 flex items-center justify-center shrink-0">
+          <Flex align="center" gap={10}>
+            <div className="grp-avatar">
               <TeamOutlined />
             </div>
-            <div className="min-w-0 max-w-[280px]">
-              <div className="font-semibold text-slate-100 text-sm truncate flex items-center gap-1.5">
+            <div className="grp-name-cell">
+              <div className="grp-name">
                 <span>{record.pageName || 'Chưa đặt tên'}</span>
                 {url && (
-                  <a href={url} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-blue-400 text-xs">
+                  <a href={url} target="_blank" rel="noreferrer" className="grp-open-link">
                     <ExportOutlined />
                   </a>
                 )}
               </div>
-              <div className="text-[11px] font-mono text-slate-400">
+              <div className="grp-id">
                 {record.platformAccountId ? `ID: ${record.platformAccountId}` : 'Chưa có ID'}
               </div>
             </div>
-          </div>
+          </Flex>
         );
       },
     },
@@ -298,7 +369,7 @@ const Groups = () => {
           value={record.fallbackGroupId || undefined}
           onChange={(val) => updateFallbackGroupMutation.mutate({ id: record.id, fallbackGroupId: val ?? null })}
           options={groupOptions.filter((o) => o.value !== record.id)}
-          className="w-full text-xs"
+          className="grp-target-select"
         />
       ),
     },
@@ -313,7 +384,7 @@ const Groups = () => {
             type="link"
             loading={scanningGroupId === record.id}
             onClick={() => scanHealthMutation.mutate(record.id)}
-            className="text-xs text-blue-400 hover:text-blue-300 p-0 font-medium"
+            className="grp-link-btn"
           >
             Quét sức khỏe
           </Button>
@@ -322,24 +393,25 @@ const Groups = () => {
             size="small"
             icon={<EditOutlined />}
             onClick={() => openEditModal(record)}
-            className="text-slate-400 hover:text-purple-400 hover:bg-slate-800 rounded-md"
+            className="grp-edit-btn"
           />
           <Button
             type="text"
             danger
             size="small"
             icon={<DeleteOutlined />}
+            loading={deleteMutation.isPending && deleteMutation.variables === record.id}
             onClick={() => {
-              Modal.confirm({
+              modal.confirm({
                 title: 'Xóa Group',
-                content: `Bạn có chắc muốn xóa "${record.pageName}"?`,
+                content: `Bạn có chắc muốn xóa "${record.pageName || record.platformAccountId}"?`,
                 okText: 'Xóa',
                 okType: 'danger',
                 cancelText: 'Hủy',
                 onOk: () => deleteMutation.mutate(record.id),
               });
             }}
-            className="text-slate-500 hover:text-red-400 hover:bg-red-950/40 rounded-md"
+            className="grp-delete-btn"
           />
         </Space>
       ),
@@ -347,53 +419,56 @@ const Groups = () => {
   ];
 
   return (
-    <div className="space-y-4">
+    <div className="grp-page">
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <Title level={4} className="!mb-0.5 !text-slate-100 flex items-center gap-2">
-            <TeamOutlined className="text-blue-500" /> Quản lý nhóm Facebook
-          </Title>
-          <Text className="text-xs text-slate-400">
-            Lưu danh sách Group dùng để chia sẻ bài viết tự động & kiểm tra tình trạng truy cập
-          </Text>
+      <Card variant="borderless" styles={{ body: { padding: '16px 20px' } }}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <Title level={4} className="!mb-1 !text-slate-100 flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
+                <TeamOutlined />
+              </div>
+              <span>Quản lý nhóm Facebook</span>
+            </Title>
+            <Text className="text-xs text-slate-300">
+              Lưu danh sách Group dùng để chia sẻ bài viết tự động & kiểm tra tình trạng truy cập
+            </Text>
+          </div>
+          <Flex align="center" gap={10}>
+            <Button
+              icon={<SyncOutlined spin={isScanningAll} />}
+              loading={isScanningAll}
+              onClick={() => scanAllHealthMutation.mutate()}
+            >
+              Quét sức khỏe tất cả Group
+            </Button>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => setIsBulkModalVisible(true)}
+            >
+              Thêm nhóm
+            </Button>
+          </Flex>
         </div>
-        <div className="flex items-center gap-2.5">
-          <Button
-            icon={<SyncOutlined spin={isScanningAll} />}
-            loading={isScanningAll}
-            onClick={() => scanAllHealthMutation.mutate()}
-            className="font-medium h-10 px-4 rounded-lg bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700"
-          >
-            Quét sức khỏe tất cả Group
-          </Button>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => setIsBulkModalVisible(true)}
-            className="font-semibold h-10 px-5 rounded-lg bg-blue-600 hover:bg-blue-500"
-          >
-            Thêm nhóm
-          </Button>
-        </div>
-      </div>
+      </Card>
 
       {/* Toolbar: Search, Filters & View Toggle */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-800/80">
-        <div className="flex flex-wrap items-center gap-2.5 flex-1">
+      <div className="grp-toolbar">
+        <Flex wrap align="center" gap={10} className="grp-toolbar-filters">
           <Input
-            prefix={<SearchOutlined className="text-slate-500" />}
+            prefix={<SearchOutlined className="grp-search-ic" />}
             placeholder="Tìm theo tên Group hoặc ID..."
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            className="max-w-[260px] rounded-lg bg-slate-800/80 border-slate-700 text-xs"
+            className="grp-search"
             allowClear
           />
 
           <Select
             value={statusFilter}
             onChange={setStatusFilter}
-            className="w-40 text-xs"
+            className="grp-filter-select"
             options={[
               { value: 'ALL', label: 'Tất cả trạng thái' },
               { value: 'JOINED', label: 'Đã gia nhập' },
@@ -403,12 +478,12 @@ const Groups = () => {
             ]}
           />
 
-          <span className="text-xs text-slate-500 font-medium ml-1">
+          <span className="grp-count">
             Hiển thị {filteredGroups.length}/{groups.length} nhóm
           </span>
-        </div>
+        </Flex>
 
-        <div className="flex items-center gap-2">
+        <Flex align="center" gap={8}>
           <Segmented
             value={viewMode}
             onChange={(val) => setViewMode(val as 'table' | 'cards')}
@@ -416,14 +491,14 @@ const Groups = () => {
               { value: 'table', icon: <BarsOutlined />, label: 'Bảng' },
               { value: 'cards', icon: <AppstoreOutlined />, label: 'Lưới thẻ' },
             ]}
-            className="bg-slate-800 border border-slate-700 text-xs"
+            className="grp-view-toggle"
           />
-        </div>
+        </Flex>
       </div>
 
       {/* Content View */}
       {viewMode === 'table' ? (
-        <Card variant="borderless" className="app-surface shadow-sm rounded-xl border border-slate-800/80 overflow-hidden p-0">
+        <Card variant="borderless" className="grp-table-wrap">
           <Table
             columns={columns}
             dataSource={filteredGroups}
@@ -437,8 +512,8 @@ const Groups = () => {
       ) : (
         <div>
           {filteredGroups.length === 0 ? (
-            <Card variant="borderless" className="app-surface rounded-xl border border-slate-800 text-center py-8">
-              <span className="text-slate-400 text-xs">Chưa có Group nào được khai báo</span>
+            <Card variant="borderless" className="grp-empty">
+              <span className="grp-empty-text">Chưa có Group nào được khai báo</span>
             </Card>
           ) : (
             <Row gutter={[14, 14]}>
@@ -446,37 +521,37 @@ const Groups = () => {
                 const url = getGroupUrl(g.platformAccountId);
                 return (
                   <Col xs={24} sm={12} lg={8} key={g.id}>
-                    <div className="rounded-xl border border-slate-800/90 bg-slate-900/60 p-4 transition-all hover:border-slate-700 flex flex-col justify-between h-full">
+                    <div className="grp-card">
                       <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="w-8 h-8 rounded-lg bg-blue-600/20 text-blue-400 flex items-center justify-center font-bold">
+                        <Flex align="center" justify="space-between" className="grp-card-head">
+                          <div className="grp-card-avatar">
                             <TeamOutlined />
                           </div>
                           <GroupHealthBadge status={g.groupHealthStatus} />
-                        </div>
+                        </Flex>
 
-                        <div className="font-semibold text-slate-100 text-sm truncate mb-0.5">
+                        <div className="grp-card-name">
                           {url ? (
-                            <a href={url} target="_blank" rel="noreferrer" className="text-slate-100 hover:text-blue-400 inline-flex items-center gap-1">
-                              <span className="truncate">{g.pageName || 'Chưa đặt tên'}</span>
-                              <ExportOutlined className="text-xs text-slate-500" />
+                            <a href={url} target="_blank" rel="noreferrer" className="grp-card-link">
+                              <span className="grp-truncate">{g.pageName || 'Chưa đặt tên'}</span>
+                              <ExportOutlined className="grp-card-link-ic" />
                             </a>
                           ) : (
                             <span>{g.pageName || 'Chưa đặt tên'}</span>
                           )}
                         </div>
 
-                        <div className="text-xs text-slate-500 font-mono mb-3">
+                        <div className="grp-card-id">
                           {g.platformAccountId ? `ID: ${g.platformAccountId}` : 'Chưa có ID'}
                         </div>
 
-                        <div className="mb-3 bg-slate-800/40 p-2.5 rounded-lg border border-slate-800">
-                          <span className="text-[11px] text-slate-400 block mb-1">Group dự phòng:</span>
+                        <div className="grp-card-target">
+                          <span className="grp-card-target-label">Group dự phòng:</span>
                           <Select
                             size="small"
                             allowClear
                             placeholder="Chọn group dự phòng..."
-                            className="w-full text-xs"
+                            className="grp-target-select"
                             value={g.fallbackGroupId || undefined}
                             onChange={(val) => updateFallbackGroupMutation.mutate({ id: g.id, fallbackGroupId: val ?? null })}
                             options={groupOptions.filter((o) => o.value !== g.id)}
@@ -484,13 +559,13 @@ const Groups = () => {
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between pt-2.5 border-t border-slate-800/80">
+                      <Flex align="center" justify="space-between" className="grp-card-foot">
                         <Button
                           type="link"
                           size="small"
                           loading={scanningGroupId === g.id}
                           onClick={() => scanHealthMutation.mutate(g.id)}
-                          className="text-xs text-blue-400 hover:text-blue-300 p-0 font-medium"
+                          className="grp-link-btn"
                         >
                           Quét sức khỏe
                         </Button>
@@ -501,27 +576,28 @@ const Groups = () => {
                             size="small"
                             icon={<EditOutlined />}
                             onClick={() => openEditModal(g)}
-                            className="text-slate-400 hover:text-purple-400 hover:bg-slate-800 rounded-md"
+                            className="grp-edit-btn"
                           />
                           <Button
                             type="text"
                             danger
                             size="small"
                             icon={<DeleteOutlined />}
+                            loading={deleteMutation.isPending && deleteMutation.variables === g.id}
                             onClick={() => {
-                              Modal.confirm({
+                              modal.confirm({
                                 title: 'Xóa Group',
-                                content: `Bạn có chắc muốn xóa "${g.pageName}"?`,
+                                content: `Bạn có chắc muốn xóa "${g.pageName || g.platformAccountId}"?`,
                                 okText: 'Xóa',
                                 okType: 'danger',
                                 cancelText: 'Hủy',
                                 onOk: () => deleteMutation.mutate(g.id),
                               });
                             }}
-                            className="text-slate-500 hover:text-red-400 hover:bg-red-950/40 rounded-md"
+                            className="grp-delete-btn"
                           />
                         </Space>
-                      </div>
+                      </Flex>
                     </div>
                   </Col>
                 );
@@ -531,90 +607,293 @@ const Groups = () => {
         </div>
       )}
 
-      {/* Bulk Add Modal */}
+      {/* Thêm / Khai Báo Group Modal */}
       <Modal
         title={
-          <div className="flex items-center gap-2 text-slate-100 pb-2 border-b border-slate-800">
-            <TeamOutlined className="text-blue-500 text-lg" />
-            <span className="font-semibold text-base">Khai Báo Nhiều Group Cùng Lúc</span>
-          </div>
+          <Flex align="center" gap={8} className="grp-modal-title">
+            <TeamOutlined className="grp-modal-title-ic" />
+            <span className="grp-modal-title-text">Thêm & Khai Báo Group Facebook</span>
+          </Flex>
         }
         open={isBulkModalVisible}
-        onCancel={() => setIsBulkModalVisible(false)}
+        onCancel={() => {
+          setIsBulkModalVisible(false);
+          structuredForm.resetFields();
+          setBulkInputText('');
+        }}
         footer={null}
-        width={520}
+        width={620}
         centered
         className="dark-modal"
       >
-        <Form
-          form={bulkForm}
-          layout="vertical"
-          onFinish={(values) => {
-            const names = (values.groupNames as string)
-              .split('\n')
-              .map((n) => n.trim())
-              .filter((n) => n.length > 0);
-            if (names.length === 0) {
-              message.error('Vui lòng nhập ít nhất 1 tên Group!');
-              return;
-            }
-            bulkAddMutation.mutate(names);
-          }}
-          className="mt-4"
-        >
-          <Form.Item
-            name="groupNames"
-            label={
-              <div className="flex items-center justify-between gap-2 w-full">
-                <span className="font-medium text-slate-300">Danh sách tên Group (mỗi dòng 1 group)</span>
-                <Button
-                  size="small"
-                  onClick={async () => {
-                    try {
-                      const text = await navigator.clipboard.readText();
-                      if (text) bulkForm.setFieldValue('groupNames', text);
-                    } catch {
-                      // ignore
-                    }
-                  }}
-                  className="text-xs"
-                >
-                  Dán
-                </Button>
-              </div>
-            }
-            rules={[{ required: true, message: 'Nhập ít nhất 1 tên Group!' }]}
-            extra={
-              <span className="text-xs text-slate-500">
-                Mỗi tên phải khớp với tên group trên Facebook để hệ thống dò tìm khi chia sẻ bài.
-              </span>
-            }
-          >
-            <TextArea
-              rows={8}
-              placeholder={'Sài Gòn Ơi Ăn Gì\nKiến Thức Kỳ Quái Đã Được Tiếp Thu\nĐảo Mèo 1\n...'}
-              className="rounded-lg font-mono text-xs"
+        <div className="space-y-4 pt-1">
+          {/* Segmented Switcher */}
+          <div className="flex justify-center">
+            <Segmented
+              value={groupAddMode}
+              onChange={(val) => setGroupAddMode(val as 'structured' | 'bulk')}
+              options={[
+                {
+                  value: 'structured',
+                  label: (
+                    <Flex align="center" gap={6} className="px-2 py-1">
+                      <SafetyCertificateOutlined className="text-blue-400" />
+                      <span className="font-semibold text-xs">📋 Nhập Từng Ô Phân Tầng (Khuyên dùng)</span>
+                    </Flex>
+                  ),
+                },
+                {
+                  value: 'bulk',
+                  label: (
+                    <Flex align="center" gap={6} className="px-2 py-1">
+                      <ThunderboltOutlined className="text-amber-400" />
+                      <span className="font-semibold text-xs">⚡ Dán Nhanh Hàng Loạt (Từ Excel)</span>
+                    </Flex>
+                  ),
+                },
+              ]}
+              className="bg-slate-900 border border-slate-800 p-1 rounded-xl"
             />
-          </Form.Item>
-
-          <div className="pt-3 flex justify-end gap-2.5 border-t border-slate-800">
-            <Button onClick={() => setIsBulkModalVisible(false)} className="rounded-lg">
-              Hủy
-            </Button>
-            <Button type="primary" htmlType="submit" loading={bulkAddMutation.isPending} className="bg-blue-600 font-semibold rounded-lg">
-              Khai báo
-            </Button>
           </div>
-        </Form>
+
+          {/* CHẾ ĐỘ 1: NHẬP TỪNG Ô PHÂN TẦNG */}
+          {groupAddMode === 'structured' && (
+            <Form
+              form={structuredForm}
+              layout="vertical"
+              onFinish={(values) => {
+                let platformAccountId = values.platformAccountId?.trim() || undefined;
+                if (platformAccountId) {
+                  const urlM = platformAccountId.match(/facebook\.com\/groups\/([a-zA-Z0-9._-]+)/i);
+                  if (urlM) platformAccountId = urlM[1];
+                }
+                addGroupsMutation.mutate([
+                  {
+                    pageName: values.pageName.trim(),
+                    platformAccountId,
+                    fallbackGroupId: values.fallbackGroupId || undefined,
+                  },
+                ]);
+              }}
+              className="space-y-3.5"
+            >
+              {/* Tầng 1: Tên hiển thị */}
+              <div className="p-3.5 rounded-2xl border border-blue-500/30 bg-blue-950/20 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-blue-300 flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-blue-500/30 text-blue-300 flex items-center justify-center text-[11px] font-bold">1</span>
+                    Tên Group Facebook
+                  </span>
+                  <Tag color="blue" className="text-[10px] m-0 font-semibold">Bắt buộc</Tag>
+                </div>
+                <Form.Item
+                  name="pageName"
+                  rules={[{ required: true, message: 'Vui lòng nhập Tên Group!' }]}
+                  className="!mb-0"
+                >
+                  <Input
+                    placeholder="Ví dụ: Đảo Mèo 1, Sài Gòn Ơi Ăn Gì, Hội Nghiện Phim..."
+                    className="rounded-xl bg-slate-900/90 border-slate-700/80"
+                  />
+                </Form.Item>
+                <div className="text-[11px] text-slate-400">
+                  💡 Tên hiển thị để bạn dễ dàng nhận biết khi chọn nơi đăng bài và xem báo cáo.
+                </div>
+              </div>
+
+              {/* Tầng 2: Link hoặc ID Group */}
+              <div className="p-3.5 rounded-2xl border border-emerald-500/30 bg-emerald-950/20 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-emerald-500/30 text-emerald-300 flex items-center justify-center text-[11px] font-bold">2</span>
+                    Đường Link hoặc ID số của Group
+                  </span>
+                  <Tag color="green" className="text-[10px] m-0 font-semibold">Khuyên dùng (Để đạt 100% ĐỦ)</Tag>
+                </div>
+                <Form.Item name="platformAccountId" className="!mb-0">
+                  <Input
+                    placeholder="Ví dụ: https://www.facebook.com/groups/263510030791508 hoặc 263510030791508"
+                    className="rounded-xl font-mono text-xs bg-slate-900/90 border-slate-700/80"
+                  />
+                </Form.Item>
+                <div className="text-[11px] text-slate-400">
+                  🎯 Giúp bot Playwright điều hướng trực tiếp vào đúng nhóm 100%, không bị nhầm lẫn giữa các nhóm trùng tên.
+                </div>
+              </div>
+
+              {/* Tầng 3: Nhóm dự phòng */}
+              <div className="p-3.5 rounded-2xl border border-slate-700/80 bg-slate-900/60 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-slate-700 text-slate-300 flex items-center justify-center text-[11px] font-bold">3</span>
+                    Nhóm Facebook dự phòng (Fallback)
+                  </span>
+                  <Tag className="text-[10px] m-0">Tùy chọn</Tag>
+                </div>
+                <Form.Item name="fallbackGroupId" className="!mb-0">
+                  <Select
+                    placeholder="Chọn nhóm dự phòng (nếu nhóm chính bị lỗi/kick)..."
+                    options={groupOptions}
+                    allowClear
+                    className="w-full rounded-xl"
+                  />
+                </Form.Item>
+                <div className="text-[11px] text-slate-400">
+                  🛡️ Khi đăng bài vào nhóm này mà bị kiểm duyệt hoặc bị kick, hệ thống sẽ tự động đổi bài sang nhóm dự phòng này.
+                </div>
+              </div>
+
+              {/* Thước đo ĐỘ ĐẦY ĐỦ CỦA THÔNG TIN */}
+              <div className={`p-3 rounded-xl border transition-all ${
+                structuredPageName.trim() && structuredPlatformAccountId.trim()
+                  ? 'border-emerald-500/40 bg-emerald-950/30'
+                  : structuredPageName.trim()
+                  ? 'border-amber-500/40 bg-amber-950/30'
+                  : 'border-slate-800 bg-slate-900/40'
+              }`}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-bold text-slate-300">KIỂM TRA ĐỘ ĐẦY ĐỦ THÔNG SỐ:</span>
+                  {structuredPageName.trim() && structuredPlatformAccountId.trim() ? (
+                    <Tag color="success" className="font-semibold m-0">🟢 100% HOÀN HẢO (ĐÃ ĐỦ)</Tag>
+                  ) : structuredPageName.trim() ? (
+                    <Tag color="warning" className="font-semibold m-0">🟡 ĐỦ CƠ BẢN (NÊN THÊM LINK/ID)</Tag>
+                  ) : (
+                    <Tag color="default" className="m-0">⚪ CHƯA NHẬP THÔNG TIN</Tag>
+                  )}
+                </div>
+                <div className="text-[11px] text-slate-300 leading-relaxed">
+                  {structuredPageName.trim() && structuredPlatformAccountId.trim()
+                    ? '🎉 Tuyệt vời! Bạn đã điền đủ cả Tên hiển thị và Link/ID nhóm. Bot Playwright sẽ vào thẳng nhóm chính xác 100%.'
+                    : structuredPageName.trim()
+                    ? '💡 Đã có tên nhóm để lên bài. Khuyên bạn nên dán thêm Link hoặc ID nhóm ở ô số 2 để bot vào chuẩn tuyệt đối.'
+                    : '👉 Vui lòng nhập Tên Group ở ô số 1 để bắt đầu khai báo.'}
+                </div>
+              </div>
+
+              <Flex justify="flex-end" gap={10} className="pt-3 border-t border-slate-800">
+                <Button onClick={() => setIsBulkModalVisible(false)} className="rounded-xl">
+                  Hủy
+                </Button>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={addGroupsMutation.isPending}
+                  className="bg-blue-600 font-semibold rounded-xl"
+                >
+                  Lưu Group
+                </Button>
+              </Flex>
+            </Form>
+          )}
+
+          {/* CHẾ ĐỘ 2: DÁN NHANH HÀNG LOẠT */}
+          {groupAddMode === 'bulk' && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-400">
+                  Mỗi dòng 1 group. Hỗ trợ dạng: <b className="text-slate-200">Tên | Link hoặc ID</b>
+                </span>
+                <Space size="small">
+                  <Button
+                    size="small"
+                    onClick={() => {
+                      const sample = `Cinema Sài Gòn | https://www.facebook.com/groups/247792223017151\nKiến Thức Kỳ Quái Đã Được Tiếp Thu | 352102219461769\nhttps://www.facebook.com/groups/964362037266166\nĐảo Mèo 1`;
+                      setBulkInputText(sample);
+                    }}
+                    className="text-[11px] h-6 px-2 text-slate-400"
+                  >
+                    Mẫu
+                  </Button>
+                  <Button
+                    size="small"
+                    icon={<CopyOutlined />}
+                    onClick={async () => {
+                      try {
+                        const text = await navigator.clipboard.readText();
+                        if (text) setBulkInputText(text);
+                      } catch {}
+                    }}
+                    className="text-[11px] h-6 px-2 text-blue-300 bg-blue-600/20 border-blue-500/40"
+                  >
+                    Dán từ Clipboard
+                  </Button>
+                </Space>
+              </div>
+
+              <Input.TextArea
+                rows={6}
+                value={bulkInputText}
+                onChange={(e) => setBulkInputText(e.target.value)}
+                placeholder={`Cinema Sài Gòn | https://www.facebook.com/groups/247792223017151\nKiến Thức Kỳ Quái | 352102219461769\nhttps://www.facebook.com/groups/964362037266166\nĐảo Mèo 1`}
+                className="rounded-xl font-mono text-xs bg-slate-900/90 border-slate-700/80"
+              />
+
+              {/* Realtime Bảng Preview Bóc Tách */}
+              {parsedBulkList.length > 0 && (
+                <div className="rounded-xl border border-slate-700/80 bg-slate-900/80 overflow-hidden">
+                  <div className="px-3 py-2 bg-slate-800/60 border-b border-slate-700/80 flex items-center justify-between text-xs">
+                    <span className="font-semibold text-slate-200">
+                      👀 Xem trước kết quả bóc tách ({parsedBulkList.length} nhóm):
+                    </span>
+                    <Tag color="cyan" className="m-0 text-[10px]">Tự động phân tầng</Tag>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto p-2 space-y-1.5">
+                    {parsedBulkList.map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-slate-950/60 border border-slate-800 text-xs">
+                        <div className="flex-1 min-w-0 pr-2">
+                          <div className="font-medium text-slate-200 truncate">{item.pageName}</div>
+                          <div className="text-[11px] font-mono text-slate-400 truncate">
+                            {item.platformAccountId ? `ID/Link: ${item.platformAccountId}` : 'Chưa có ID (chỉ tìm theo tên)'}
+                          </div>
+                        </div>
+                        <div>
+                          {item.isFull ? (
+                            <Tag color="success" className="m-0 text-[10px]">✅ Đủ Tên & ID</Tag>
+                          ) : item.hasIdOnly ? (
+                            <Tag color="processing" className="m-0 text-[10px]">⚠️ Đã có Link/ID</Tag>
+                          ) : (
+                            <Tag color="warning" className="m-0 text-[10px]">⚠️ Chỉ có tên</Tag>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <Flex justify="flex-end" gap={10} className="pt-3 border-t border-slate-800">
+                <Button onClick={() => setIsBulkModalVisible(false)} className="rounded-xl">
+                  Hủy
+                </Button>
+                <Button
+                  type="primary"
+                  disabled={parsedBulkList.length === 0}
+                  loading={addGroupsMutation.isPending}
+                  onClick={() => {
+                    addGroupsMutation.mutate(
+                      parsedBulkList.map((p) => ({
+                        pageName: p.pageName,
+                        platformAccountId: p.platformAccountId,
+                      }))
+                    );
+                  }}
+                  className="bg-blue-600 font-semibold rounded-xl"
+                >
+                  Khai báo {parsedBulkList.length > 0 ? `(${parsedBulkList.length} Group)` : ''}
+                </Button>
+              </Flex>
+            </div>
+          )}
+        </div>
       </Modal>
 
       {/* Edit Modal */}
       <Modal
         title={
-          <div className="flex items-center gap-2 text-slate-100 pb-2 border-b border-slate-800">
-            <EditOutlined className="text-blue-500 text-lg" />
-            <span className="font-semibold text-base">Sửa Group — {editingGroup?.pageName}</span>
-          </div>
+          <Flex align="center" gap={8} className="grp-modal-title">
+            <EditOutlined className="grp-modal-title-ic" />
+            <span className="grp-modal-title-text">Sửa Group — {editingGroup?.pageName}</span>
+          </Flex>
         }
         open={!!editingGroup}
         onCancel={() => {
@@ -637,35 +916,35 @@ const Groups = () => {
               platformAccountId: values.platformAccountId?.trim(),
             });
           }}
-          className="mt-4 space-y-3"
+          className="grp-edit-form"
         >
           <Form.Item
             name="pageName"
-            label={<span className="font-medium text-slate-300">Tên Group Facebook</span>}
+            label={<span className="grp-option-name">Tên Group Facebook</span>}
             rules={[{ required: true, message: 'Vui lòng nhập tên Group!' }]}
-            extra={<span className="text-xs text-slate-500">Khớp với tên thật của Group trên Facebook.</span>}
+            extra={<span className="grp-hint">Khớp với tên thật của Group trên Facebook.</span>}
           >
-            <Input placeholder="Ví dụ: Đảo Mèo 1" className="rounded-lg" autoFocus />
+            <Input placeholder="Ví dụ: Đảo Mèo 1" className="grp-rounded" autoFocus />
           </Form.Item>
 
-          <Form.Item name="platformAccountId" label={<span className="font-medium text-slate-300">ID Group Facebook (Tùy chọn)</span>}>
-            <Input placeholder="Ví dụ: 100092837461928" className="rounded-lg font-mono" />
+          <Form.Item name="platformAccountId" label={<span className="grp-option-name">ID Group Facebook (Tùy chọn)</span>}>
+            <Input placeholder="Ví dụ: 100092837461928" className="grp-mono-input-plain" />
           </Form.Item>
 
-          <div className="pt-3 flex justify-end gap-2.5 border-t border-slate-800">
+          <Flex justify="flex-end" gap={10} className="grp-form-actions">
             <Button
               onClick={() => {
                 setEditingGroup(null);
                 editForm.resetFields();
               }}
-              className="rounded-lg"
+              className="grp-rounded"
             >
               Hủy
             </Button>
-            <Button type="primary" htmlType="submit" loading={updateGroupMutation.isPending} className="bg-blue-600 font-semibold rounded-lg">
+            <Button type="primary" htmlType="submit" loading={updateGroupMutation.isPending} className="grp-save-btn">
               Cập nhật
             </Button>
-          </div>
+          </Flex>
         </Form>
       </Modal>
     </div>

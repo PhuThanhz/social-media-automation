@@ -1,0 +1,39 @@
+# Bản Desktop (Tauri): app tự khởi động backend với profile này, DB H2 nằm trong thư mục dữ liệu của app
+server:
+  address: 127.0.0.1
+  port: ${PORT:47081}
+
+spring:
+  datasource:
+    url: jdbc:h2:file:${APP_DATA_DIR}/db/toolzutter;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;NON_KEYWORDS=VALUE,KEY,USER,YEAR,MONTH,DAY,HOUR,MINUTE,SECOND
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+  flyway:
+    enabled: false
+  h2:
+    console:
+      enabled: false
+
+worker:
+  base-url: ${WORKER_BASE_URL}
+  urls: ${WORKER_BASE_URL}
+
+desktop:
+  mode: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+logging:
+  level:
+    root: INFO
+    com.autopost.saas: INFO

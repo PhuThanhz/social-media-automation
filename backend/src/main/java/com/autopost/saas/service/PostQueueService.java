@@ -11,8 +11,8 @@ import com.autopost.saas.entity.FacebookPageAccess;
 import com.autopost.saas.repository.FacebookPageAccessRepository;
 import com.autopost.saas.util.PooledRestTemplateFactory;
 import com.autopost.saas.util.WorkerRetryHelper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -30,7 +30,6 @@ import java.util.regex.Pattern;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class PostQueueService {
 
@@ -47,6 +46,67 @@ public class PostQueueService {
     private final FacebookPageAccessRepository facebookPageAccessRepository;
     private final WorkerRouterService workerRouterService;
     private final ViaCookieFollowService viaCookieFollowService;
+    private final NickThrottleService nickThrottleService;
+    private final SocialAccountService socialAccountService;
+    private final com.autopost.saas.repository.PostExecutionAttemptRepository postExecutionAttemptRepository;
+    private final com.autopost.saas.publishing.service.PublishingPreflightService publishingPreflightService;
+
+    @Autowired
+    public PostQueueService(
+            PostQueueRepository postQueueRepository,
+            SocialAccountRepository socialAccountRepository,
+            PostQueueGroupResultRepository postQueueGroupResultRepository,
+            FacebookGraphApiService facebookGraphApiService,
+            GeminiService geminiService,
+            FacebookPageAccessRepository facebookPageAccessRepository,
+            WorkerRouterService workerRouterService,
+            ViaCookieFollowService viaCookieFollowService,
+            NickThrottleService nickThrottleService,
+            SocialAccountService socialAccountService,
+            com.autopost.saas.repository.PostExecutionAttemptRepository postExecutionAttemptRepository,
+            com.autopost.saas.publishing.service.PublishingPreflightService publishingPreflightService
+    ) {
+        this.postQueueRepository = postQueueRepository;
+        this.socialAccountRepository = socialAccountRepository;
+        this.postQueueGroupResultRepository = postQueueGroupResultRepository;
+        this.facebookGraphApiService = facebookGraphApiService;
+        this.geminiService = geminiService;
+        this.facebookPageAccessRepository = facebookPageAccessRepository;
+        this.workerRouterService = workerRouterService;
+        this.viaCookieFollowService = viaCookieFollowService;
+        this.nickThrottleService = nickThrottleService;
+        this.socialAccountService = socialAccountService;
+        this.postExecutionAttemptRepository = postExecutionAttemptRepository;
+        this.publishingPreflightService = publishingPreflightService;
+    }
+
+    public PostQueueService(
+            PostQueueRepository postQueueRepository,
+            SocialAccountRepository socialAccountRepository,
+            PostQueueGroupResultRepository postQueueGroupResultRepository,
+            FacebookGraphApiService facebookGraphApiService,
+            GeminiService geminiService,
+            FacebookPageAccessRepository facebookPageAccessRepository,
+            WorkerRouterService workerRouterService,
+            ViaCookieFollowService viaCookieFollowService,
+            NickThrottleService nickThrottleService,
+            SocialAccountService socialAccountService
+    ) {
+        this(
+                postQueueRepository,
+                socialAccountRepository,
+                postQueueGroupResultRepository,
+                facebookGraphApiService,
+                geminiService,
+                facebookPageAccessRepository,
+                workerRouterService,
+                viaCookieFollowService,
+                nickThrottleService,
+                socialAccountService,
+                null,
+                null
+        );
+    }
     // 10s connect, 600s (10 phút) read — đăng bài thật qua Playwright (mở Modal tối đa 4 lần thử x tới
     // 45s/lần, rồi chờ xác nhận đã xuất bản tới 2 phút, có bài còn tự động comment link sau đó tới 2
     // phút nữa) cộng dồn dễ vượt quá các mốc ngắn hơn, gây lỗi "Read timed out" dù worker vẫn đang xử
@@ -59,8 +119,10 @@ public class PostQueueService {
     private final Map<Long, Integer> inFlightPosts = new ConcurrentHashMap<>();
     // Mã bài của luồng hiện tại — gắn vào header X-Post-Queue-Id khi gọi worker để worker ghi kết quả theo bài.
     private static final ThreadLocal<Long> CURRENT_POST_ID = new ThreadLocal<>();
-    // Số giờ cho nick nghỉ khi Facebook báo "Rate limit exceeded".
-    private static final int RATE_LIMIT_COOLDOWN_HOURS = 3;
+    // Số giờ cho CẢ nick (mọi kết nối cùng c_user) nghỉ khi Facebook báo "Rate limit exceeded"/"giới hạn tần suất".
+    static final int RATE_LIMIT_COOLDOWN_HOURS = 6;
+    // Đầu thông báo lỗi của bài bị dời do cooldown — CampaignScheduler dùng để khôi phục mốc nghỉ sau khi restart.
+    public static final String RATE_LIMIT_MESSAGE_PREFIX = "Facebook đang giới hạn tốc độ nick";
     private final Set<Long> retryingFailedGroupPosts = ConcurrentHashMap.newKeySet();
     private final Map<Long, GroupRetryProgress> groupRetryProgress = new ConcurrentHashMap<>();
 
@@ -89,6 +151,12 @@ public class PostQueueService {
     public List<PostQueue> getRecentQueueByCampaign(Long campaignId, int days) {
         LocalDateTime since = LocalDateTime.now().minusDays(days).toLocalDate().atStartOfDay();
         return postQueueRepository.findActiveAndRecentByCampaignId(campaignId, since);
+    }
+
+    public List<PostQueue> getRecentQueueForUser(Long userId, int days, String excludeType) {
+        LocalDateTime since = LocalDateTime.now().minusDays(days).toLocalDate().atStartOfDay();
+        String type = (excludeType == null || excludeType.isBlank()) ? null : excludeType.trim();
+        return postQueueRepository.findActiveAndRecentByUserId(userId, since, type);
     }
 
     public Map<String, Object> getQueueCountsForUser(Long userId) {
@@ -184,53 +252,97 @@ public class PostQueueService {
     static boolean isRateLimited(String message) {
         if (message == null) return false;
         String m = message.toLowerCase();
+        // Không bắt chữ "spam" chung chung: nội dung bài/tên nhóm có chữ "spam" sẽ khớp nhầm.
         return m.contains("fb_rate_limited") || m.contains("1675004")
                 || m.contains("fb_spam_block") || m.contains("giới hạn tần suất")
-                || m.contains("để bảo vệ cộng đồng") || m.contains("spam");
+                || m.contains("để bảo vệ cộng đồng") || m.contains("we limit how often");
     }
 
     /**
      * Facebook đang giới hạn tốc độ nick này: đăng tiếp chỉ đốt hết từng bài (và kéo dài thời gian bị giới hạn).
-     * Đưa bài hiện tại về PENDING sau {@link #RATE_LIMIT_COOLDOWN_HOURS} giờ và dời luôn các bài PENDING khác của
-     * cùng nick rơi vào khoảng nghỉ đó (giữ nguyên khoảng cách giữa các bài).
+     * Giới hạn áp cho cả NICK (c_user), nên cho mọi kết nối dùng chung cookie nghỉ {@link #RATE_LIMIT_COOLDOWN_HOURS}
+     * giờ: đưa bài hiện tại về PENDING lúc hết nghỉ, dời các bài PENDING của các kết nối đó rơi vào khoảng nghỉ
+     * (giữ nguyên khoảng cách giữa các bài), và báo NickThrottleService để scheduler không giao bài mới cho nick.
      */
-    private void applyRateLimitCooldown(SocialAccount account, PostQueue post) {
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime resumeAt = now.plusHours(RATE_LIMIT_COOLDOWN_HOURS);
-        String suffix = ":" + account.getId();
-        int moved = 0;
-        for (PostQueue other : postQueueRepository.findByStatusAndTargetFanpageIdEndingWith("PENDING", suffix)) {
-            if (other.getScheduledAt() == null || other.getScheduledAt().isBefore(resumeAt)) {
-                LocalDateTime base = other.getScheduledAt() == null || other.getScheduledAt().isBefore(now) ? now : other.getScheduledAt();
-                other.setScheduledAt(base.plusHours(RATE_LIMIT_COOLDOWN_HOURS));
-                postQueueRepository.save(other);
-                moved++;
-            }
-        }
+    void applyRateLimitCooldown(SocialAccount account, PostQueue post) {
+        LocalDateTime resumeAt = LocalDateTime.now().plusHours(RATE_LIMIT_COOLDOWN_HOURS);
+        int connections = cooldownWholeNick(account, post.getId(), resumeAt);
         post.setStatus("PENDING");
         post.setScheduledAt(resumeAt);
-        post.setErrorMessage("Facebook đang giới hạn tốc độ nick \"" + account.getPageName() + "\" (Rate limit exceeded) — hệ thống tự cho nick nghỉ "
-                + RATE_LIMIT_COOLDOWN_HOURS + " giờ, bài sẽ tự đăng lại lúc " + resumeAt.toLocalTime().withSecond(0).withNano(0) + ".");
+        post.setErrorMessage(RATE_LIMIT_MESSAGE_PREFIX + " \"" + account.getPageName() + "\" (giới hạn tần suất/Rate limit) — hệ thống tự cho cả nick ("
+                + connections + " kết nối) nghỉ " + RATE_LIMIT_COOLDOWN_HOURS + " giờ, bài sẽ tự đăng lại lúc "
+                + resumeAt.toLocalTime().withSecond(0).withNano(0) + ".");
         postQueueRepository.save(post);
-        log.warn("🚦 Nick {} (ID {}) bị Facebook rate limit — dời Post ID {} và {} bài khác thêm {} giờ.",
-                account.getPageName(), account.getId(), post.getId(), moved, RATE_LIMIT_COOLDOWN_HOURS);
+    }
+
+    /** Dời bài PENDING (trừ excludePostId) của mọi kết nối cùng nick ra sau resumeAt và chặn scheduler giao bài tới mốc đó. Trả về số kết nối. */
+    int cooldownWholeNick(SocialAccount account, Long excludePostId, LocalDateTime resumeAt) {
+        LocalDateTime now = LocalDateTime.now();
+        List<SocialAccount> sameNick = findConnectionsOfSameNick(account);
+        int moved = 0;
+        for (SocialAccount connection : sameNick) {
+            for (PostQueue other : postQueueRepository.findByStatusAndTargetFanpageIdEndingWith("PENDING", ":" + connection.getId())) {
+                if (Objects.equals(other.getId(), excludePostId)) continue;
+                if (other.getScheduledAt() == null || other.getScheduledAt().isBefore(resumeAt)) {
+                    LocalDateTime base = other.getScheduledAt() == null || other.getScheduledAt().isBefore(now) ? now : other.getScheduledAt();
+                    other.setScheduledAt(base.plusHours(RATE_LIMIT_COOLDOWN_HOURS));
+                    postQueueRepository.save(other);
+                    moved++;
+                }
+            }
+        }
+        nickThrottleService.markRateLimited(NickThrottleService.nickKey(account), resumeAt);
+        log.warn("🚦 Nick của {} (ID {}) bị Facebook giới hạn tần suất — cho {} kết nối cùng nick nghỉ tới {}, dời thêm {} bài PENDING.",
+                account.getPageName(), account.getId(), sameNick.size(), resumeAt.withNano(0), moved);
+        return sameNick.size();
+    }
+
+    /** Mọi kết nối dùng cùng c_user với account (gồm chính nó); cookie không có c_user thì chỉ có chính nó. */
+    List<SocialAccount> findConnectionsOfSameNick(SocialAccount account) {
+        String cUser = NickThrottleService.extractCUser(account);
+        if (cUser == null) return List.of(account);
+        List<SocialAccount> result = new ArrayList<>(socialAccountRepository.findAll().stream()
+                .filter(a -> cUser.equals(NickThrottleService.extractCUser(a)))
+                .toList());
+        if (result.stream().noneMatch(a -> Objects.equals(a.getId(), account.getId()))) {
+            result.add(account);
+        }
+        return result;
     }
 
     private boolean doPublishPostNow(Long postId) {
-        // Chiếm quyền xử lý bài này 1 cách nguyên tử (PENDING -> PROCESSING) trước khi làm bất cứ việc gì
-        // chậm (gọi Graph API + chờ xác nhận mã hóa video có thể mất 30-60s+). Nếu không "chiếm" được
-        // (trả về 0), nghĩa là 1 tiến trình khác (VD: CampaignScheduler chạy song song mỗi 10s) đã hoặc
-        // đang đăng bài này rồi -> bỏ qua ngay để tránh đăng trùng lặp thật lên Fanpage.
-        if (postQueueRepository.markProcessingIfPending(postId) == 0) {
-            log.info("⏭️ Post ID {} đã/đang được xử lý bởi tiến trình khác, bỏ qua để tránh đăng trùng.", postId);
+        String lockToken = UUID.randomUUID().toString();
+        String lockedBy = "worker-thread-" + Thread.currentThread().getId();
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime leaseExpiresAt = now.plusMinutes(5);
+
+        // Chiếm quyền xử lý bài này 1 cách nguyên tử có Fencing Token và Lease Expiration (TOOLZUTTER 3.3).
+        // Nếu không chiếm được (trả về 0) nghĩa là 1 worker/luồng khác đã chiếm lease còn hạn -> bỏ qua ngay.
+        if (postQueueRepository.acquireLease(postId, lockedBy, lockToken, now, leaseExpiresAt) == 0) {
+            log.info("⏭️ Post ID {} đã/đang được xử lý hoặc có lease hợp lệ bởi tiến trình khác, bỏ qua để tránh đăng trùng.", postId);
             return false;
         }
 
+        com.autopost.saas.entity.PostExecutionAttempt executionAttempt = com.autopost.saas.entity.PostExecutionAttempt.builder()
+                .postQueueId(postId)
+                .attemptToken(lockToken)
+                .workerInstance(lockedBy)
+                .startedAt(now)
+                .status("STARTED")
+                .build();
+        if (postExecutionAttemptRepository != null) {
+            try { postExecutionAttemptRepository.save(executionAttempt); } catch (Exception ignored) {}
+        }
+
         PostQueue post = postQueueRepository.findByIdWithCampaignAndUser(postId).orElse(null);
-        if (post == null) return false;
+        if (post == null) {
+            postQueueRepository.releaseLease(postId, lockToken);
+            return false;
+        }
 
         if (post.getOriginalUrl() != null && !post.getOriginalUrl().isBlank()
-                && post.getTargetGroupNames() != null && !post.getTargetGroupNames().isBlank()) {
+                && post.getTargetGroupNames() != null && !post.getTargetGroupNames().isBlank()
+                && !com.autopost.saas.util.FacebookPostIds.isDuplicateExemptGroup(post.getTargetGroupNames())) {
             if (postQueueRepository.existsActiveOrPublishedDuplicate(post.getOriginalUrl(), post.getTargetGroupNames(), postId)) {
                 log.warn("⚠️ Post ID {} có original_url '{}' đã hoặc đang được đăng lên nhóm '{}'. Tự động huỷ bài trùng lặp!",
                         postId, post.getOriginalUrl(), post.getTargetGroupNames());
@@ -306,9 +418,9 @@ public class PostQueueService {
             }
 
             // Các nhánh dưới đây chỉ chạy khi post KHÔNG có connectionId tường minh (parts[2]) hoặc
-            // connectionId đó không tồn tại trong hệ thống. Tuyệt đối không tự ý nhảy sang via cá nhân khác
-            // khi người dùng đã chọn đích danh một connectionId.
-            if (account == null && requestedConnectionId == null) {
+            // connectionId đó không tồn tại trong hệ thống (đối với Fanpage). Tuyệt đối không tự ý nhảy
+            // sang via cá nhân khác khi người dùng đã chọn đích danh một connectionId cá nhân.
+            if (account == null && (requestedConnectionId == null || (!realPlatformId.startsWith("PERSONAL_") && !"PERSONAL_PROFILE".equalsIgnoreCase(realPlatformId)))) {
                 if (realPlatformId.startsWith("PERSONAL_") || "PERSONAL_PROFILE".equalsIgnoreCase(realPlatformId)) {
                     List<SocialAccount> personalMatches = accounts.stream()
                             .filter(a -> "PERSONAL_PROFILE_COOKIE".equalsIgnoreCase(a.getAccountType())
@@ -336,8 +448,19 @@ public class PostQueueService {
                         account = matchingAccounts.get(0);
                     } else if (personalCookieMatches.size() == 1) {
                         account = personalCookieMatches.get(0);
+                    } else if (!personalCookieMatches.isEmpty()) {
+                        account = personalCookieMatches.get(0);
+                    } else if (!matchingAccounts.isEmpty()) {
+                        account = matchingAccounts.get(0);
                     } else {
                         account = null;
+                    }
+
+                    if (account != null && requestedConnectionId != null) {
+                        log.info("🔄 [Self-Healing] ConnectionId '{}' cũ không còn, tự động chuyển Post ID {} sang kết nối hợp lệ '{}' (ID {}) của Fanpage '{}'",
+                                requestedConnectionId, postId, account.getPageName(), account.getId(), realPlatformId);
+                        targetId = account.getPlatformAccountId() + ":" + account.getAccountType() + ":" + account.getId();
+                        post.setTargetFanpageId(targetId);
                     }
                 }
             }
@@ -462,7 +585,29 @@ public class PostQueueService {
             post.setStatus("FAILED");
             post.setErrorMessage("Bài viết không có nội dung lẫn ảnh/video — không có gì để đăng.");
             postQueueRepository.save(post);
+            postQueueRepository.releaseLease(postId, lockToken);
             return false;
+        }
+
+        // Kiểm tra Preflight Validation trước khi gửi sang Worker
+        if (publishingPreflightService != null && account != null) {
+            com.autopost.saas.publishing.model.PreflightResult preflight = publishingPreflightService.validatePost(account, post);
+            if (!preflight.isValid()) {
+                String errorMsg = "Preflight chặn xuất bản: " + String.join(" | ", preflight.getErrors());
+                log.warn("🛑 [Preflight] Post ID {} không qua được thẩm định: {}", postId, errorMsg);
+                post.setStatus("FAILED");
+                post.setErrorMessage(errorMsg);
+                postQueueRepository.save(post);
+                postQueueRepository.releaseLease(postId, lockToken);
+                if (postExecutionAttemptRepository != null) {
+                    executionAttempt.setStatus("FAILED");
+                    executionAttempt.setErrorCode("PREFLIGHT_BLOCKED");
+                    executionAttempt.setErrorMessage(errorMsg);
+                    executionAttempt.setFinishedAt(LocalDateTime.now());
+                    try { postExecutionAttemptRepository.save(executionAttempt); } catch (Exception ignored) {}
+                }
+                return false;
+            }
         }
 
         // Thử đăng tối đa 5 lần: nếu gặp cookie/token hết hạn, tự động đánh dấu EXPIRED
@@ -520,6 +665,13 @@ public class PostQueueService {
                 }
                 post.setErrorMessage(publishWarning);
                 postQueueRepository.save(post);
+                postQueueRepository.releaseLease(postId, lockToken);
+                if (postExecutionAttemptRepository != null) {
+                    executionAttempt.setStatus("SUCCESS");
+                    executionAttempt.setProofUrl(post.getPublishedPostUrl());
+                    executionAttempt.setFinishedAt(LocalDateTime.now());
+                    try { postExecutionAttemptRepository.save(executionAttempt); } catch (Exception ignored) {}
+                }
                 return true;
             } catch (GraphApiException e) {
                 log.error("❌ Lỗi Graph API khi đăng bài Post ID {}: [{}] {}", postId, e.getCode(), e.getMessage());
@@ -591,6 +743,12 @@ public class PostQueueService {
                 // mới chốt PUBLISHED hoặc FAILED, thay vì đoán ngay tại đây.
                 if (isAmbiguousWorkerTimeout(e)) {
                     log.warn("⏳ Post ID {} hết thời gian chờ phản hồi Worker (không rõ đã đăng thành công hay chưa) — giữ nguyên PROCESSING, chờ xác minh tự động sau 5 phút.", postId);
+                    if (postExecutionAttemptRepository != null) {
+                        executionAttempt.setStatus("TIMEOUT");
+                        executionAttempt.setErrorMessage("Ambiguous worker read timeout: " + e.getMessage());
+                        executionAttempt.setFinishedAt(LocalDateTime.now());
+                        try { postExecutionAttemptRepository.save(executionAttempt); } catch (Exception ignored) {}
+                    }
                     return false;
                 }
                 // Nếu gặp lỗi tạm thời từ Playwright Worker (DOM timeout, nuốt click, gián đoạn mạng ngầm),
@@ -604,11 +762,20 @@ public class PostQueueService {
                 PostQueue latestCheck = postQueueRepository.findById(postId).orElse(post);
                 if ("PUBLISHED".equalsIgnoreCase(latestCheck.getStatus())) {
                     log.info("✅ Post ID {} đã ở trạng thái PUBLISHED, không ghi đè FAILED.", postId);
+                    postQueueRepository.releaseLease(postId, lockToken);
                     return true;
                 }
                 post.setStatus("FAILED");
                 post.setErrorMessage(formatFriendlyErrorMessage(e.getMessage()));
                 postQueueRepository.save(post);
+                postQueueRepository.releaseLease(postId, lockToken);
+                if (postExecutionAttemptRepository != null) {
+                    executionAttempt.setStatus("FAILED");
+                    executionAttempt.setErrorCode(e.getClass().getSimpleName());
+                    executionAttempt.setErrorMessage(e.getMessage());
+                    executionAttempt.setFinishedAt(LocalDateTime.now());
+                    try { postExecutionAttemptRepository.save(executionAttempt); } catch (Exception ignored) {}
+                }
                 return false;
             }
         }
@@ -908,9 +1075,11 @@ public class PostQueueService {
         return candidates;
     }
 
+    private static final Pattern C_USER_PATTERN = Pattern.compile("(?:^|;\\s*)c_user=([^;\\s]+)");
+
     public static String extractCUserFromAccount(SocialAccount acc) {
         if (acc == null || acc.getAccessToken() == null) return null;
-        Matcher m = Pattern.compile("(?:^|;\\s*)c_user=([^;\\s]+)").matcher(acc.getAccessToken());
+        Matcher m = C_USER_PATTERN.matcher(acc.getAccessToken());
         return m.find() ? m.group(1).trim() : null;
     }
 
@@ -1162,7 +1331,7 @@ public class PostQueueService {
                                         String originalUrl, String affiliateLink, String postType, String targetFanpageId) {
         String finalFanpageId = (targetFanpageId != null && !targetFanpageId.isBlank()) ? targetFanpageId : account.getPlatformAccountId();
         log.info("🎭 [PLAYWRIGHT ENGINE] Đang gửi yêu cầu đăng bài tự động qua Playwright Worker cho Fanpage ID {}...", finalFanpageId);
-        String playwrightUrl = workerRouterService.getPostingWorkerUrl("/api/post-facebook");
+        String playwrightUrl = workerRouterService.getPostingWorkerUrl("/api/post-facebook", account != null ? String.valueOf(account.getId()) : null);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
@@ -1207,6 +1376,7 @@ public class PostQueueService {
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(requestBody, headers);
         try {
             Map<?, ?> resp = postToWorkerWithConnectionRetry(playwrightUrl, request);
+            saveRefreshedFacebookCookie(account.getAccessToken(), resp, account);
             if (resp != null && resp.get("warning") != null) {
                 return resp.get("warning").toString();
             }
@@ -1216,9 +1386,39 @@ public class PostQueueService {
         return null;
     }
 
+    /**
+     * Facebook xoay vòng cookie (xs, fr...) theo phiên — worker trả cookie mới nhất sau khi đăng thành công.
+     * Lưu lại cho mọi kết nối cùng c_user để nick đăng đều đặn tự gia hạn cookie. Lỗi ở đây không ảnh hưởng bài đã đăng.
+     */
+    void saveRefreshedFacebookCookie(String sentCookie, Map<?, ?> resp, SocialAccount... inMemoryAccounts) {
+        try {
+            if (resp == null || !(resp.get("cookieString") instanceof String fresh) || fresh.isBlank()) return;
+            if (fresh.equals(sentCookie) || !fresh.contains("xs=")) return;
+            String cUser = SocialAccountService.extractCUser(fresh);
+            if (cUser == null || !cUser.equals(SocialAccountService.extractCUser(sentCookie))) return;
+            Long userId = Arrays.stream(inMemoryAccounts)
+                    .filter(a -> a != null && a.getUser() != null)
+                    .map(a -> a.getUser().getId())
+                    .findFirst().orElse(null);
+            if (userId == null) return;
+            List<String> updated = socialAccountService.applyCookieToSameCUser(userId, cUser, fresh);
+            // Đồng bộ cả object đang dùng trong luồng đăng — tránh lần save sau (cooldown, EXPIRED...) ghi đè lại cookie cũ.
+            for (SocialAccount a : inMemoryAccounts) {
+                if (a != null && cUser.equals(SocialAccountService.extractCUser(a.getAccessToken()))) {
+                    a.setAccessToken(fresh);
+                    a.setTokenStatus("OK");
+                    a.setTokenCheckedAt(LocalDateTime.now());
+                }
+            }
+            log.info("🍪 Đã gia hạn cookie Facebook c_user={} sau khi đăng — cập nhật {} kết nối: {}", cUser, updated.size(), updated);
+        } catch (Exception e) {
+            log.warn("⚠️ Không lưu được cookie Facebook mới sau khi đăng (bài vẫn thành công): {}", e.getMessage());
+        }
+    }
+
     private String publishTikTokPost(SocialAccount account, PostQueue post, String content, List<String> mediaUrls) {
         log.info("🎵 [TIKTOK ENGINE] Đang gửi yêu cầu đăng bài TikTok qua Playwright Worker cho Account ID {}...", account.getId());
-        String playwrightUrl = workerRouterService.getPostingWorkerUrl("/api/post-tiktok");
+        String playwrightUrl = workerRouterService.getPostingWorkerUrl("/api/post-tiktok", account != null ? String.valueOf(account.getId()) : null);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
@@ -1253,7 +1453,7 @@ public class PostQueueService {
 
     private String publishThreadsPost(SocialAccount account, PostQueue post, String content, List<String> mediaUrls) {
         log.info("🧵 [THREADS ENGINE] Đang gửi yêu cầu đăng bài Threads qua Playwright Worker cho Account ID {}...", account.getId());
-        String playwrightUrl = workerRouterService.getPostingWorkerUrl("/api/post-threads");
+        String playwrightUrl = workerRouterService.getPostingWorkerUrl("/api/post-threads", account != null ? String.valueOf(account.getId()) : null);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
@@ -1378,7 +1578,7 @@ public class PostQueueService {
      * Playwright/cookie với publishViaPlaywrightWorker, chỉ khác endpoint worker được gọi.
      */
     private void publishReelWithGroupsViaWorker(SocialAccount account, PostQueue post, String content, String videoUrl) {
-        String playwrightUrl = workerRouterService.getPostingWorkerUrl("/api/post-facebook-reel-groups");
+        String playwrightUrl = workerRouterService.getPostingWorkerUrl("/api/post-facebook-reel-groups", account != null ? String.valueOf(account.getId()) : null);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
@@ -1510,6 +1710,13 @@ public class PostQueueService {
                 failures.add((activeTargetGroup.getPageName() != null ? activeTargetGroup.getPageName() : "Group")
                         + " (" + activeTargetGroup.getPlatformAccountId() + "): " + groupError.getMessage());
                 saveGroupResult(post, activeTargetGroup, "FAILED", null, groupError.getMessage());
+                // Page đã lên rồi nên KHÔNG ném lỗi ra ngoài (bài sẽ bị đưa về PENDING và đăng trùng lên Page) —
+                // chỉ cho cả nick nghỉ và dừng các Group còn lại, vì đăng tiếp chỉ kéo dài thời gian bị chặn.
+                if (isRateLimited(groupError.getMessage())) {
+                    cooldownWholeNick(pageAccount, post.getId(), LocalDateTime.now().plusHours(RATE_LIMIT_COOLDOWN_HOURS));
+                    failures.add("Dừng các Group còn lại: Facebook đang giới hạn tần suất nick này");
+                    break;
+                }
             }
         }
 
@@ -1651,7 +1858,7 @@ public class PostQueueService {
 
     private GroupPublishResult sendToFacebookGroupWorker(SocialAccount account, String content, List<String> mediaUrls,
                                             String originalUrl, String targetGroupId, String affiliateLink, boolean isAnonymous, PostQueue post) {
-        String playwrightUrl = workerRouterService.getPostingWorkerUrl("/api/post-facebook-group");
+        String playwrightUrl = workerRouterService.getPostingWorkerUrl("/api/post-facebook-group", account != null ? String.valueOf(account.getId()) : null);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
@@ -1754,6 +1961,7 @@ public class PostQueueService {
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(requestBody, headers);
         try {
             Map<?, ?> resp = postToWorkerWithConnectionRetry(playwrightUrl, request);
+            saveRefreshedFacebookCookie(cookieString, resp, effectiveAccount, account);
             String warning = resp != null && resp.get("warning") != null ? resp.get("warning").toString() : null;
             String postUrl = resp != null && resp.get("groupPostUrl") != null ? resp.get("groupPostUrl").toString() : null;
             return new GroupPublishResult(warning, postUrl);
@@ -1857,7 +2065,7 @@ public class PostQueueService {
     }
 
     public void publishStoryViaWorker(SocialAccount account, String mediaUrl, String originalUrl, String affiliateLink) {
-        String playwrightUrl = workerRouterService.getPostingWorkerUrl("/api/post-story");
+        String playwrightUrl = workerRouterService.getPostingWorkerUrl("/api/post-story", account != null ? String.valueOf(account.getId()) : null);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 

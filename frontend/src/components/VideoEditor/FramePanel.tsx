@@ -3,8 +3,7 @@
 import { useRef } from 'react';
 import type { ReactNode } from 'react';
 import { Button, Collapse, Input, Segmented, Select, Slider, Switch, Tooltip, Upload, message } from 'antd';
-import { SaveOutlined, LoadingOutlined, PlusOutlined } from '@ant-design/icons';
-import { AlignCenter, AlignLeft, Eraser, Highlighter, Info, Sparkles, WandSparkles } from 'lucide-react';
+import { SaveOutlined, LoadingOutlined, PlusOutlined, AlignCenterOutlined, AlignLeftOutlined, ClearOutlined, HighlightOutlined, InfoCircleOutlined, RobotOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import type { BandPosition, FrameLayout, VideoFrameStyle, VideoRatio } from '../../utils/videoFrameTemplate';
 import { CARD_PRESETS, GLASS_PRESETS, isGlassBg } from '../../utils/videoFrameTemplate';
 import { COLOR_PRESETS } from '../../utils/newsCardTemplate';
@@ -102,17 +101,17 @@ export default function FramePanel({ ctl }: { ctl: FrameCtl }) {
         <Label extra={
           <span className="flex items-center gap-2">
             <Tooltip title="In hoa"><Segmented size="small" value={f.uppercase ? 'AA' : 'Aa'} onChange={(v) => ctl.setFrame({ uppercase: v === 'AA' })} options={['Aa', 'AA']} /></Tooltip>
-            <Tooltip title='Bôi đen chữ rồi bấm "Tô màu". Cụm được tô sẽ hiện trong [[ ]] ở ô nhập.'><Info size={13} className="text-slate-500 cursor-help" /></Tooltip>
+            <Tooltip title='Bôi đen chữ rồi bấm "Tô màu". Cụm được tô sẽ hiện trong [[ ]] ở ô nhập.'><InfoCircleOutlined className="text-slate-500 cursor-help text-xs" /></Tooltip>
           </span>
         }>Chữ trên khung</Label>
         <Input.TextArea ref={taRef as never} value={ctl.headline} onChange={(e) => ctl.setHeadline(e.target.value)} autoSize={{ minRows: 2, maxRows: 5 }} className="!text-[13px]" />
         <div className="flex items-center gap-1 mt-1.5">
           <Tooltip title="Bôi đen chữ trong ô rồi bấm để tô màu (bấm lại để bỏ)">
-            <Button size="small" className="!px-2" icon={<Highlighter size={13} />} onMouseDown={(e) => e.preventDefault()} onClick={toggleHighlight}>Tô màu</Button>
+            <Button size="small" className="!px-2" icon={<HighlightOutlined />} onMouseDown={(e) => e.preventDefault()} onClick={toggleHighlight}>Tô màu</Button>
           </Tooltip>
-          {hasHl && <Tooltip title="Bỏ tô màu tất cả"><Button size="small" type="text" icon={<Eraser size={13} />} onClick={() => ctl.setHeadline(ctl.headline.replace(/\[\[|\]\]/g, ''))} /></Tooltip>}
-          <Tooltip title="AI tự chọn cụm đắt giá để tô"><Button size="small" type="text" className="!text-violet-300 !px-1.5" icon={ctl.highlightBusy ? <LoadingOutlined /> : <WandSparkles size={13} />} onClick={ctl.aiHighlight}>AI tô</Button></Tooltip>
-          <Tooltip title="AI viết lại tiêu đề"><Button size="small" type="text" className="!text-violet-300 !px-1.5" icon={ctl.aiBusy ? <LoadingOutlined /> : <Sparkles size={13} />} onClick={ctl.aiWrite}>AI viết</Button></Tooltip>
+          {hasHl && <Tooltip title="Bỏ tô màu tất cả"><Button size="small" type="text" icon={<ClearOutlined />} onClick={() => ctl.setHeadline(ctl.headline.replace(/\[\[|\]\]/g, ''))} /></Tooltip>}
+          <Tooltip title="AI tự chọn cụm đắt giá để tô"><Button size="small" type="text" className="!text-violet-300 !px-1.5" icon={ctl.highlightBusy ? <LoadingOutlined /> : <ThunderboltOutlined />} onClick={ctl.aiHighlight}>AI tô</Button></Tooltip>
+          <Tooltip title="AI viết lại tiêu đề"><Button size="small" type="text" className="!text-violet-300 !px-1.5" icon={ctl.aiBusy ? <LoadingOutlined /> : <RobotOutlined />} onClick={ctl.aiWrite}>AI viết</Button></Tooltip>
         </div>
         {hasHl && <div className="mt-2"><HighlightPreview text={ctl.headline} accent={ctl.isNews ? '#e3151a' : f.accent} upper={f.uppercase} /></div>}
       </section>
@@ -160,7 +159,7 @@ export default function FramePanel({ ctl }: { ctl: FrameCtl }) {
               </div>
               {f.layout === 'card' && (
                 <Segmented size="small" value={f.cardAlign} onChange={(v) => ctl.setFrame({ cardAlign: v as 'center' | 'left' })}
-                  options={[{ value: 'center', icon: <AlignCenter size={13} className="mt-1" /> }, { value: 'left', icon: <AlignLeft size={13} className="mt-1" /> }]} />
+                  options={[{ value: 'center', icon: <AlignCenterOutlined /> }, { value: 'left', icon: <AlignLeftOutlined /> }]} />
               )}
             </section>
           )}
@@ -193,7 +192,7 @@ export default function FramePanel({ ctl }: { ctl: FrameCtl }) {
                 <>
                   <div className="grid grid-cols-2 gap-2">
                     <div><Label>Nhãn</Label><Input size="small" value={f.badgeText} onChange={(e) => ctl.setFrame({ badgeText: e.target.value })} placeholder="VD: TIN NÓNG" /></div>
-                    <div><Label>Tên page</Label><Input size="small" value={f.pageName} onChange={(e) => ctl.setFrame({ pageName: e.target.value })} placeholder="VD: Làm Sen" /></div>
+                    <div><Label>Tên page</Label><Input size="small" value={f.pageName} onChange={(e) => ctl.setFrame({ pageName: e.target.value })} placeholder="VD: Tin Tức 24h" /></div>
                   </div>
                   {f.layout === 'card' && (
                     <div className="grid grid-cols-2 gap-3">

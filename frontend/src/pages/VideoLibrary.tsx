@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { App, Card, Typography, Select, Button, Table, Space, Tag, Tooltip, Modal, Checkbox } from 'antd';
+import { App, Card, Typography, Select, Button, Table, Space, Tag, Tooltip, Modal, Checkbox, Alert, Flex } from 'antd';
 import {
   VideoCameraOutlined, CopyOutlined, ThunderboltOutlined,
   ReloadOutlined, ShareAltOutlined, InfoCircleOutlined
@@ -165,28 +165,35 @@ const VideoLibrary = () => {
   const otherConnections = connections.filter(c => c.platformAccountId !== selectedPageId);
 
   return (
-    <div className="app-page">
+    <div className="app-page space-y-4">
       {/* Header */}
-      <div className="app-surface app-page-header flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <Title level={4} className="!mb-1 text-slate-800 flex items-center gap-2">
-            <VideoCameraOutlined className="text-blue-600" /> Thư viện video
-          </Title>
-          <Text className="text-xs text-slate-500 font-medium">
-            Xem, quản lý và đăng chéo video sang các Fanpage khác
-          </Text>
-        </div>
-        <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 px-4 py-2 rounded-xl">
-          <InfoCircleOutlined className="text-blue-600" />
-          <Text className="text-xs text-blue-700 font-semibold">Chỉ hoạt động với Fanpage dùng PAGE_TOKEN (Graph API)</Text>
-        </div>
-      </div>
+      <Card variant="borderless">
+        <Flex justify="space-between" align="center" wrap="wrap" gap="middle">
+          <Flex align="center" gap="middle">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400 text-lg">
+              <VideoCameraOutlined />
+            </div>
+            <div>
+              <Title level={4} className="!mb-0.5 !text-slate-100">Thư viện video</Title>
+              <Text className="text-xs text-slate-400 font-medium">
+                Xem, quản lý và đăng chéo video sang các Fanpage khác
+              </Text>
+            </div>
+          </Flex>
+          <Alert
+            type="info"
+            showIcon
+            message="Chỉ hoạt động với Fanpage dùng PAGE_TOKEN (Graph API)"
+            className="rounded-xl border border-blue-500/30 text-xs"
+          />
+        </Flex>
+      </Card>
 
       {/* Filter Fanpage */}
-      <Card variant="borderless" className="shadow-sm rounded-2xl border border-slate-200/80 bg-white">
+      <Card variant="borderless">
         <div className="flex flex-col md:flex-row md:items-center gap-4">
           <div className="flex-1">
-            <Text className="font-bold text-slate-700 block mb-2">🎯 Chọn Fanpage để xem Video:</Text>
+            <Text className="font-semibold text-slate-300 block mb-2 text-xs">🎯 Chọn Fanpage để xem Video:</Text>
             <Select
               size="large"
               style={{ width: '100%' }}
@@ -210,7 +217,7 @@ const VideoLibrary = () => {
             size="large"
             disabled={!selectedPageId}
             onClick={() => refetchVideos()}
-            className="rounded-xl font-semibold h-11"
+            className="rounded-xl font-semibold h-10 mt-auto"
           >
             Làm mới
           </Button>
@@ -218,8 +225,8 @@ const VideoLibrary = () => {
 
         {!selectedPageId && (
           <div className="mt-6 text-center py-12 text-slate-400">
-            <VideoCameraOutlined style={{ fontSize: 48 }} className="mb-4 opacity-30" />
-            <div className="font-semibold text-base">Chọn Fanpage ở trên để xem danh sách video đã đăng</div>
+            <VideoCameraOutlined style={{ fontSize: 48 }} className="mb-4 opacity-30 text-blue-400" />
+            <div className="font-semibold text-sm text-slate-300">Chọn Fanpage ở trên để xem danh sách video đã đăng</div>
           </div>
         )}
 

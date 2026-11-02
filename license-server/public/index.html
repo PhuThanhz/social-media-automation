@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ToolZutter — Quản Lý Bản Quyền</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Đăng nhập -->
+    <div id="login-modal" class="modal-overlay">
+      <div class="modal glass-card">
+        <div class="modal-header">
+          <div class="logo-badge">ZUTTER GUARD</div>
+          <h2>Đăng Nhập Quản Trị</h2>
+          <p class="subtitle">Đăng nhập bằng tài khoản admin được cấp</p>
+        </div>
+        <form id="login-form">
+          <div id="login-account-fields">
+            <div class="form-group">
+              <label>Tên đăng nhập</label>
+              <input type="text" id="login-username" autocomplete="username">
+            </div>
+            <div class="form-group">
+              <label>Mật khẩu</label>
+              <input type="password" id="login-password" autocomplete="current-password">
+            </div>
+          </div>
+          <div id="login-secret-fields" class="hidden">
+            <div class="form-group">
+              <label>Admin Secret (quyền Chủ)</label>
+              <input type="password" id="login-secret" autocomplete="off">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Đăng Nhập</button>
+          <button type="button" id="login-toggle-mode" class="link-btn">Đăng nhập bằng Admin Secret</button>
+        </form>
+      </div>
+    </div>
+
+    <div id="dashboard" class="dashboard-layout hidden">
+      <header class="topbar glass-card">
+        <div class="brand">
+          <span class="brand-icon">⚡</span>
+          <div>
+            <div class="brand-title">ToolZutter License Guard</div>
+            <div class="brand-tagline">Bản quyền · Khách hàng · Khóa từ xa</div>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <span id="current-admin" class="current-admin"></span>
+          <button id="btn-refresh" class="btn btn-secondary">Làm mới</button>
+          <button id="btn-open-create" class="btn btn-primary" data-min-role="STAFF">+ Tạo Key Mới</button>
+          <button id="btn-logout" class="btn btn-outline">Đăng Xuất</button>
+        </div>
+      </header>
+
+      <section class="stats-grid">
+        <div class="stat-card glass-card">
+          <div class="stat-content"><div class="stat-label">Tổng Số Key</div><div id="stat-total" class="stat-value">0</div></div>
+        </div>
+        <div class="stat-card glass-card stat-success">
+          <div class="stat-content"><div class="stat-label">Đang Hoạt Động</div><div id="stat-active" class="stat-value">0</div></div>
+        </div>
+        <div class="stat-card glass-card stat-info">
+          <div class="stat-content"><div class="stat-label">Khách Online (5 phút)</div><div id="stat-online" class="stat-value">0</div></div>
+        </div>
+        <div class="stat-card glass-card stat-warning">
+          <div class="stat-content"><div class="stat-label">Sắp Hết Hạn (7 ngày)</div><div id="stat-expiring" class="stat-value">0</div></div>
+        </div>
+        <div class="stat-card glass-card stat-danger">
+          <div class="stat-content"><div class="stat-label">Đang Bị Khóa</div><div id="stat-locked" class="stat-value">0</div></div>
+        </div>
+      </section>
+
+      <nav class="main-tabs">
+        <button class="main-tab active" data-tab="licenses">Key bản quyền</button>
+        <button class="main-tab" data-tab="customers">Khách hàng</button>
+        <button class="main-tab" data-tab="admins" data-min-role="OWNER">Tài khoản admin</button>
+        <button class="main-tab" data-tab="logs">Nhật ký</button>
+      </nav>
+
+      <!-- Tab: Key -->
+      <main id="tab-licenses" class="main-card glass-card tab-panel">
+        <div class="table-header-bar">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="license-search" placeholder="Tìm theo key, khách hàng, SĐT, HWID, IP...">
+          </div>
+          <div class="filter-tabs" id="license-filters">
+            <button class="filter-btn active" data-filter="ALL">Tất cả</button>
+            <button class="filter-btn" data-filter="ACTIVE">Hoạt động</button>
+            <button class="filter-btn" data-filter="ONLINE">Đang online</button>
+            <button class="filter-btn" data-filter="EXPIRING">Sắp hết hạn</button>
+            <button class="filter-btn" data-filter="LOCKED">Bị khóa / Hết hạn</button>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="licenses-table">
+            <thead>
+              <tr>
+                <th>Mã Key</th>
+                <th>Khách Hàng</th>
+                <th>Máy</th>
+                <th>Gói</th>
+                <th>Trạng Thái</th>
+                <th>Hạn Sử Dụng</th>
+                <th>Hoạt Động Gần Nhất</th>
+                <th style="text-align: right;">Thao Tác</th>
+              </tr>
+            </thead>
+            <tbody id="licenses-tbody"><tr><td colspan="8" class="loading-state">Đang tải...</td></tr></tbody>
+          </table>
+        </div>
+      </main>
+
+      <!-- Tab: Khách hàng -->
+      <main id="tab-customers" class="main-card glass-card tab-panel hidden">
+        <div class="table-header-bar">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="customer-search" placeholder="Tìm theo tên, SĐT, Zalo, email...">
+          </div>
+          <button id="btn-add-customer" class="btn btn-primary" data-min-role="STAFF">+ Thêm Khách</button>
+        </div>
+        <div class="table-responsive">
+          <table class="licenses-table">
+            <thead>
+              <tr>
+                <th>Khách Hàng</th>
+                <th>Liên Hệ</th>
+                <th>Key</th>
+                <th>Hạn Gần Nhất</th>
+                <th>Online Lần Cuối</th>
+                <th>Đã Thanh Toán</th>
+                <th style="text-align: right;">Thao Tác</th>
+              </tr>
+            </thead>
+            <tbody id="customers-tbody"></tbody>
+          </table>
+        </div>
+      </main>
+
+      <!-- Tab: Admin -->
+      <main id="tab-admins" class="main-card glass-card tab-panel hidden">
+        <div class="table-header-bar">
+          <div class="subtitle">Chủ: toàn quyền · Nhân viên: tạo / gia hạn / khóa key, quản lý khách · Chỉ xem: không sửa được gì</div>
+          <button id="btn-add-admin" class="btn btn-primary">+ Thêm Tài Khoản</button>
+        </div>
+        <div class="table-responsive">
+          <table class="licenses-table">
+            <thead>
+              <tr>
+                <th>Tên Đăng Nhập</th>
+                <th>Tên Hiển Thị</th>
+                <th>Quyền</th>
+                <th>Trạng Thái</th>
+                <th>Đăng Nhập Lần Cuối</th>
+                <th style="text-align: right;">Thao Tác</th>
+              </tr>
+            </thead>
+            <tbody id="admins-tbody"></tbody>
+          </table>
+        </div>
+      </main>
+
+      <!-- Tab: Nhật ký -->
+      <section id="tab-logs" class="logs-card glass-card tab-panel hidden">
+        <div class="section-header">
+          <h3>Nhật Ký Hoạt Động</h3>
+          <span class="badge badge-subtle">200 dòng gần nhất</span>
+        </div>
+        <div class="logs-container" id="logs-container"></div>
+      </section>
+    </div>
+
+    <!-- Hộp thoại dùng chung (nội dung do admin.js dựng) -->
+    <div id="dialog" class="modal-overlay hidden">
+      <div class="modal glass-card" id="dialog-box">
+        <div class="modal-header">
+          <h2 id="dialog-title"></h2>
+          <p class="subtitle" id="dialog-subtitle"></p>
+        </div>
+        <form id="dialog-form">
+          <div id="dialog-body"></div>
+          <div class="modal-actions" id="dialog-actions">
+            <button type="button" class="btn btn-outline" data-dialog-close>Hủy</button>
+            <button type="submit" class="btn btn-primary" id="dialog-submit">Lưu</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+  </div>
+
+  <script src="admin.js"></script>
+</body>
+</html>

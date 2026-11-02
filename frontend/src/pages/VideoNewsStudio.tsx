@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Dropdown, Input, Modal, Segmented, Select, Slider, Switch, Tag, Tooltip, Upload, message } from 'antd';
-import { DownloadOutlined, PlayCircleOutlined, SendOutlined, SoundOutlined, ThunderboltOutlined, UploadOutlined, DeleteOutlined, PlusOutlined, MoreOutlined, SaveOutlined, HighlightOutlined, PauseOutlined, CaretRightOutlined } from '@ant-design/icons';
+import { DownloadOutlined, PlayCircleOutlined, SendOutlined, SoundOutlined, ThunderboltOutlined, UploadOutlined, DeleteOutlined, PlusOutlined, MoreOutlined, SaveOutlined, HighlightOutlined, PauseOutlined, CaretRightOutlined, VideoCameraOutlined } from '@ant-design/icons';
 import api from '../config/axios';
 import { getStoredGeminiKeys } from '../components/modals/AiSettingsModal';
 import { COLOR_PRESETS, DEFAULT_CARD_STYLE, buildNewsCardHtml, cardHeight } from '../utils/newsCardTemplate';
@@ -519,6 +519,32 @@ export default function VideoNewsStudio() {
     return res.data.url as string;
   };
 
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+
+  const handleFileDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFile(false);
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      if (!file.type.startsWith('video/')) {
+        message.warning('Vui lòng thả file video (định dạng .mp4, .mov, .webm)!');
+        return;
+      }
+      setResolving(true);
+      message.loading({ content: 'Đang tải file video lên...', key: 'drop_video' });
+      try {
+        const url = await uploadFile(file);
+        await resolveUrl(url);
+        message.success({ content: 'Đã tải và nhận diện video thành công!', key: 'drop_video' });
+      } catch (err: any) {
+        message.error({ content: 'Tải video thất bại: ' + (err?.message || err), key: 'drop_video' });
+        setResolving(false);
+      }
+    }
+  };
+
   const writePanelText = async (cap: string, src: string, videoUrl?: string) => {
     const fallback = () => {
       const plain = plainCaption(cap);
@@ -924,7 +950,7 @@ export default function VideoNewsStudio() {
               ) : isNews ? null : (
                 <div>
                   <div className={label}>Tên page trên bảng</div>
-                  <Input size="small" value={frame.pageName} onChange={(e) => setFrame({ pageName: e.target.value })} placeholder="VD: Làm Sen" />
+                  <Input size="small" value={frame.pageName} onChange={(e) => setFrame({ pageName: e.target.value })} placeholder="VD: Tin Tức 24h" />
                 </div>
               )}
             </div>
@@ -1105,9 +1131,13 @@ export default function VideoNewsStudio() {
 
   return (
     <>
-    <div className="grid grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)_360px] gap-4 items-start">
+    <div className="grid grid-cols-1 lg:grid-cols-[290px_minmax(0,1fr)_340px] xl:grid-cols-[300px_minmax(0,1fr)_360px] gap-4 items-start">
       {/* ── TRÁI: nguồn video ── */}
-      <div className="app-surface p-3 space-y-3">
+      <div
+        className="app-surface p-3 space-y-3"
+        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+        onDrop={handleFileDrop}
+      >
         <div className="flex items-center justify-between">
           <span className={sectionTitle}>Video nguồn</span>
           {(source || link.trim()) && (
@@ -1196,11 +1226,21 @@ export default function VideoNewsStudio() {
           <div className="flex items-center gap-2 text-[11px] text-slate-400">
             {rawView ? 'Clip gốc — nhập tiêu đề (hoặc AI viết) để thêm khung' : alwaysOn ? 'Khung hiện suốt video' : `Khung hiện ${effectiveIntro}s đầu`}
             <Button size="small" icon={<PlayCircleOutlined />} disabled={!source} loading={voiceBusy} onClick={playPreview}>Xem từ đầu</Button>
-            {source && (
-              <Button size="small" type="primary" onClick={() => setEditorOpen(true)}>
-                Mở Video Editor
-              </Button>
-            )}
+            <Button
+              size="small"
+              type="primary"
+              className="!bg-gradient-to-r !from-sky-500 !to-blue-600 font-semibold"
+              icon={<VideoCameraOutlined />}
+              onClick={() => {
+                if (source) {
+                  setEditorOpen(true);
+                } else {
+                  message.info('💡 Vui lòng dán link video hoặc bấm icon tải lên để lấy video trước khi mở Video Editor nhé!');
+                }
+              }}
+            >
+              Mở Video Editor
+            </Button>
           </div>
         </div>
         {source && (
@@ -1292,11 +1332,21 @@ export default function VideoNewsStudio() {
             onMouseDown={handleMouseDown}
             onMouseUp={handleMouseUp}
             onWheel={handleWheel}
-            className={`relative overflow-hidden bg-black rounded shadow-2xl select-none ${source ? 'cursor-ns-resize' : ''}`}
+            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingFile(true); }}
+            onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingFile(false); }}
+            onDrop={handleFileDrop}
+            className={`relative overflow-hidden bg-black rounded shadow-2xl select-none transition-all ${source ? 'cursor-ns-resize' : ''} ${isDraggingFile ? 'ring-2 ring-sky-400 ring-offset-2 ring-offset-slate-900' : ''}`}
             style={rawView && source
               ? { width: source.width / source.height < 0.8 ? 'min(100%, 320px)' : 'min(100%, 460px)', aspectRatio: `${source.width} / ${source.height}`, maxHeight: 'min(48vh, 480px)' }
               : { height: !isNews && frame.ratio === '9:16' ? 'min(60vh, 600px)' : 'min(48vh, 460px)', aspectRatio: `${FW} / ${H}`, maxWidth: '100%' }}
           >
+            {isDraggingFile && (
+              <div className="absolute inset-0 z-50 bg-blue-950/80 backdrop-blur-sm border-2 border-dashed border-sky-400 flex flex-col items-center justify-center text-sky-200 pointer-events-none rounded transition-all">
+                <UploadOutlined className="text-4xl mb-2 animate-bounce text-sky-300" />
+                <span className="font-bold text-sm text-white">Thả file video vào đây để bắt đầu ngay!</span>
+                <span className="text-[11px] text-sky-300/80 mt-1">Hỗ trợ MP4, MOV, WebM</span>
+              </div>
+            )}
             {source ? (
               <>
                 <div className="absolute top-2 left-2 z-10 bg-black/60 backdrop-blur text-[10px] text-slate-300 px-2 py-0.5 rounded pointer-events-none opacity-80 flex items-center gap-1">
@@ -1413,7 +1463,13 @@ export default function VideoNewsStudio() {
                 </div>
               </>
             ) : (
-              <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-xs px-6 text-center">Dán link hoặc upload video ở cột trái</div>
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 text-xs px-6 text-center space-y-2 pointer-events-none select-none">
+                <div className="w-12 h-12 rounded-full bg-slate-800/90 border border-slate-700/80 flex items-center justify-center text-slate-300 mb-1 shadow-lg">
+                  <UploadOutlined className="text-xl text-sky-400" />
+                </div>
+                <div className="font-semibold text-slate-200 text-sm">Kéo & thả file video vào đây</div>
+                <div className="text-[11px] text-slate-500 max-w-[260px]">hoặc dán link TikTok, Douyin, Facebook ở cột bên trái</div>
+              </div>
             )}
             <iframe
               title="frame"
@@ -1464,12 +1520,24 @@ export default function VideoNewsStudio() {
         <audio ref={voiceRef} hidden />
         {music && <audio ref={musicRef} src={music.url} loop hidden />}
 
-        {source && (
-          <div className="flex items-center justify-between gap-2 rounded border border-slate-700/70 bg-slate-900/60 px-3 py-2 text-[11px] text-slate-400">
-            <span>Lồng tiếng, phụ đề, chữ, nhạc nền, cắt clip và timeline kéo thả nằm trong Video Editor.</span>
-            <Button size="small" type="primary" onClick={() => setEditorOpen(true)}>Mở Video Editor</Button>
-          </div>
-        )}
+        <div className="flex items-center justify-between gap-2 rounded border border-slate-700/70 bg-slate-900/60 px-3 py-2 text-[11px] text-slate-400">
+          <span>Lồng tiếng, phụ đề, chữ, nhạc nền, cắt clip và timeline kéo thả nằm trong Video Editor.</span>
+          <Button
+            size="small"
+            type="primary"
+            className="!bg-gradient-to-r !from-sky-500 !to-blue-600 font-semibold"
+            icon={<VideoCameraOutlined />}
+            onClick={() => {
+              if (source) {
+                setEditorOpen(true);
+              } else {
+                message.info('💡 Vui lòng dán link video hoặc tải file video lên để mở Video Editor nhé!');
+              }
+            }}
+          >
+            Mở Video Editor
+          </Button>
+        </div>
 
         <div className="flex gap-2 justify-center flex-wrap">
           <Button type="primary" icon={<DownloadOutlined />} loading={exporting} disabled={!source} onClick={download}>Xuất và tải video</Button>
@@ -1718,7 +1786,7 @@ export default function VideoNewsStudio() {
               <div className="space-y-3">
                 <div>
                   <div className={label}>Tên khung</div>
-                  <Input value={saveName} onChange={(e) => setSaveName(e.target.value)} placeholder="VD: Làm Sen - đỏ trắng" onPressEnter={saveFrame} autoFocus />
+                  <Input value={saveName} onChange={(e) => setSaveName(e.target.value)} placeholder="VD: Khung Tin Tức - đỏ trắng" onPressEnter={saveFrame} autoFocus />
                 </div>
                 <div>
                   <div className={label}>Danh mục</div>

@@ -1,5 +1,6 @@
 package com.autopost.saas.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
@@ -9,7 +10,14 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "social_accounts")
+@Table(
+        name = "social_accounts",
+        indexes = {
+                @Index(name = "idx_social_accounts_user_platform", columnList = "user_id, platform"),
+                @Index(name = "idx_social_accounts_platform_id_type", columnList = "platform_account_id, account_type"),
+                @Index(name = "idx_social_accounts_account_type", columnList = "account_type"),
+                @Index(name = "idx_social_accounts_token_status", columnList = "token_status")
+        })
 @Getter
 @Setter
 @NoArgsConstructor
@@ -23,7 +31,7 @@ public class SocialAccount {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
-    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "password"})
+    @JsonIgnore
     private User user;
 
     @Column(nullable = false, length = 50)

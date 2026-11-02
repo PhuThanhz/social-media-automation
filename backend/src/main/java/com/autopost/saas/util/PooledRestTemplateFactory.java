@@ -46,6 +46,6 @@ public final class PooledRestTemplateFactory {
                 .build();
 
         HttpComponentsClientHttpRequestFactory factory = new HttpComponentsClientHttpRequestFactory(httpClient);
-        return new RestTemplate(factory);
+        return LocalServices.withSessionToken(new RestTemplate(factory));
     }
 }

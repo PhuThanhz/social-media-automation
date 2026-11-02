@@ -30,6 +30,10 @@ CREATE TABLE IF NOT EXISTS `social_accounts` (
     `account_type` VARCHAR(50),
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY `idx_social_accounts_user_platform` (`user_id`, `platform`),
+    KEY `idx_social_accounts_platform_id_type` (`platform_account_id`, `account_type`),
+    KEY `idx_social_accounts_account_type` (`account_type`),
+    KEY `idx_social_accounts_token_status` (`token_status`),
     CONSTRAINT `fk_social_accounts_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -77,6 +81,8 @@ CREATE TABLE IF NOT EXISTS `campaigns` (
     `n8n_webhook_url` VARCHAR(500),
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY `idx_campaigns_user_status` (`user_id`, `status`),
+    KEY `idx_campaigns_status` (`status`),
     CONSTRAINT `fk_campaigns_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -99,6 +105,10 @@ CREATE TABLE IF NOT EXISTS `post_queue` (
     `published_group_post_urls` TEXT,
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY `idx_post_queue_status_scheduled_id` (`status`, `scheduled_at`, `id`),
+    KEY `idx_post_queue_status_updated` (`status`, `updated_at`),
+    KEY `idx_post_queue_published_at` (`published_at`),
+    KEY `idx_post_queue_target_fanpage_id` (`target_fanpage_id`),
     CONSTRAINT `fk_post_queue_campaign` FOREIGN KEY (`campaign_id`) REFERENCES `campaigns` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

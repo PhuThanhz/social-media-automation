@@ -1,5 +1,6 @@
 package com.autopost.saas.controller;
 
+import com.autopost.saas.util.LocalServices;
 import com.autopost.saas.service.GeminiService;
 import com.autopost.saas.util.PooledRestTemplateFactory;
 import lombok.RequiredArgsConstructor;
@@ -164,7 +165,7 @@ public class NewsCardController {
 
             @SuppressWarnings("unchecked")
             Map<String, Object> resp = restTemplate.postForObject(
-                    "http://localhost:3001/api/render-news-card", new HttpEntity<>(payload, headers), Map.class);
+                    LocalServices.WORKER_BASE + "/api/render-news-card", new HttpEntity<>(payload, headers), Map.class);
             if (resp == null || !Boolean.TRUE.equals(resp.get("success")) || resp.get("pngBase64") == null) {
                 String err = resp != null && resp.get("error") != null ? resp.get("error").toString() : "Worker không trả về ảnh";
                 return ResponseEntity.status(502).body(Map.of("success", false, "error", err));
@@ -255,7 +256,7 @@ public class NewsCardController {
             Map<String, Object> payload = Map.of("html", html);
             @SuppressWarnings("unchecked")
             Map<String, Object> resp = restTemplate.postForObject(
-                    "http://localhost:3001/api/render-news-card", new HttpEntity<>(payload, headers), Map.class);
+                    LocalServices.WORKER_BASE + "/api/render-news-card", new HttpEntity<>(payload, headers), Map.class);
             if (resp == null || !Boolean.TRUE.equals(resp.get("success")) || resp.get("pngBase64") == null) {
                 String err = resp != null && resp.get("error") != null ? resp.get("error").toString() : "Worker không tạo được khung ảnh";
                 throw new IllegalStateException(err);

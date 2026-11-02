@@ -1,6 +1,6 @@
 // Quét danh sách bài viết từ feed Facebook Group (và Fanpage) — dùng cho tính năng "Quét Group".
 // Tách khỏi server.js để chạy thử độc lập được (node scratch script) mà không khởi động cả worker.
-const { chromium } = require('playwright');
+const browserPool = require('./browserPool');
 const { parseFbPostedTime, dayBoundary } = require('./fb-posted-time');
 
 // Link bài viết của Fanpage (bỏ link ảnh lẻ: ảnh trong bài cũng là <a> nhưng không phải permalink bài)
@@ -284,17 +284,15 @@ async function huntFacebookFeed(params, deps = {}) {
 
   console.log(`[FB_Hunter] 🔍 Bắt đầu quét ${isGlobalSearch ? 'Toàn bộ bài viết Facebook' : isPage ? 'Fanpage' : 'Group'}: ${navUrl} | Từ khóa: "${trimmedKeyword || 'Tất cả'}" | Mục tiêu: ${maxItems} bài viết${dateMode ? ` | Lọc ngày ${new Date(fromTs).toLocaleString('vi-VN')} → ${new Date(toTs).toLocaleString('vi-VN')}` : ''}`);
 
-  let browser = null;
+  // Dùng context từ browserPool (chung process Chromium) thay vì chromium.launch() riêng mỗi lần quét.
+  let releaseContext = null;
   try {
-    browser = await chromium.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-notifications']
-    });
-
-    const context = await browser.newContext({
+    const acquired = await browserPool.acquireContext({
       userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
       viewport: { width: 1280, height: 900 }
     });
+    releaseContext = acquired.release;
+    const context = acquired.context;
 
     if (cookieString && String(cookieString).trim().length > 0) {
       const cookies = String(cookieString).split(';')
@@ -333,7 +331,11 @@ async function huntFacebookFeed(params, deps = {}) {
     });
 
     await page.goto(navUrl, { waitUntil: 'domcontentloaded', timeout: 35000 }).catch(() => { });
-    await page.waitForTimeout(2000);
+    // Chờ ngay khi Feed hoặc Main article xuất hiện, không chờ cứng 2s
+    await Promise.race([
+      page.waitForSelector('div[role="feed"], div[data-pagelet*="FeedUnit"], div[role="main"], [role="article"]', { timeout: 3500 }),
+      page.waitForTimeout(1000)
+    ]).catch(() => {});
 
     // Kiểm tra tính hợp lệ của Cookie: Nếu Facebook từ chối cookie và chuyển sang màn hình đăng nhập
     const isLoginRequired = await page.evaluate(() => {
@@ -351,8 +353,6 @@ async function huntFacebookFeed(params, deps = {}) {
 
     if (isLoginRequired) {
       console.warn(`[FB_Hunter] ⚠️ Cookie Facebook không hợp lệ hoặc đã hết hạn phiên đăng nhập khi quét: ${navUrl}`);
-      await browser.close();
-      browser = null;
       return {
         status: 400,
         body: {
@@ -486,20 +486,53 @@ async function huntFacebookFeed(params, deps = {}) {
 
             // 1. Tìm Tác giả (Tên thành viên đăng bài)
             let rawAuthor = '';
-            const userLink = art.querySelector('a[href*="/user/"], a[href*="/people/"], a[href*="profile.php"]');
-            if (userLink) {
-              rawAuthor = userLink.innerText || '';
+            // Nhận diện tên Group để tránh nhầm Group name với tên tác giả
+            const groupHeaderEl = art.querySelector('h2 a[href*="/groups/"]:not([href*="/user/"]), a[href*="/groups/"]:not([href*="/user/"]) strong');
+            const groupHeaderName = (groupHeaderEl?.innerText || '').trim();
+
+            const authorCandidates = [
+              art.querySelector('a[href*="/user/"] strong, a[href*="/user/"] span, a[href*="/user/"]'),
+              art.querySelector('a[href*="profile.php"] strong, a[href*="profile.php"] span, a[href*="profile.php"]'),
+              art.querySelector('a[href*="/people/"] strong, a[href*="/people/"] span, a[href*="/people/"]'),
+              art.querySelector('h2 a:not([href*="/groups/"]):not([href*="/posts/"]), h3 a:not([href*="/groups/"]):not([href*="/posts/"])'),
+              art.querySelector('h2 strong, h3 strong, [role="article"] h2, [role="article"] h3'),
+            ];
+
+            for (const cand of authorCandidates) {
+              if (!cand) continue;
+              let txt = (cand.innerText || cand.textContent || '').trim();
+              if (!txt) {
+                // Nếu thẻ a là avatar, lấy qua aria-label hoặc alt ảnh
+                txt = (cand.getAttribute('aria-label') || cand.querySelector('img[alt]')?.getAttribute('alt') || '').trim();
+              }
+              if (txt && txt.length >= 2 && !/^(Facebook|Home|Trang chủ|Group|Nhóm|Theo dõi|Follow|Online)$/i.test(txt)) {
+                if (!groupHeaderName || txt.toLowerCase() !== groupHeaderName.toLowerCase()) {
+                  rawAuthor = txt;
+                  break;
+                }
+              }
             }
-            if (!rawAuthor) {
-              const hEl = art.querySelector('h2 strong, h3 strong, h2 a, h3 a, [role="article"] h2, [role="article"] h3');
-              if (hEl) rawAuthor = hEl.innerText || '';
-            }
-            let author = rawAuthor.split('\n')[0]
-              .replace(/Online\s+status\s+in[^\n·•]*/gi, '')
-              .replace(/\s*(?:·|•)\s*(?:Theo dõi|Follow).*$/i, '')
-              .replace(/\s*(?:·|•).*$/i, '')
-              .trim() || 'Thành viên nhóm';
-            if (author.toLowerCase().includes('online status') || author.length < 2) author = 'Thành viên nhóm';
+
+            // Làm sạch triệt để danh xưng, vai trò và badge do Facebook đính kèm
+            const cleanAuthorName = (raw) => {
+              if (!raw) return '';
+              let a = raw.split('\n')[0].trim();
+              a = a
+                .replace(/Online\s+status\s+in[^\n·•]*/gi, '')
+                .replace(/[\s\u00A0]*[·•|–—-][\s\u00A0]*(?:Theo dõi|Follow|Following|Đã theo dõi|Quản trị viên|Admin|Người điều hành|Moderator|Người đóng góp hàng đầu|Top Contributor|Tác giả|Author).*$/i, '')
+                .replace(/\s*\((?:Admin|Quản trị viên|Tác giả|Author|Mod|Người kiểm duyệt)\)\s*/gi, '')
+                .replace(/^bài viết của\s+/i, '')
+                .replace(/^post by\s+/i, '')
+                .replace(/^trang cá nhân của\s+/i, '')
+                .replace(/^profile of\s+/i, '')
+                .trim();
+              if (groupHeaderName && a.toLowerCase() === groupHeaderName.toLowerCase()) return '';
+              if (/^(Facebook|Bài viết Facebook|Video Facebook|Group|Nhóm|Trang chủ|Home|Feed|Reels?|Watch)$/i.test(a)) return '';
+              if (a.toLowerCase().includes('online status') || a.length < 2) return '';
+              return a;
+            };
+
+            let author = cleanAuthorName(rawAuthor) || 'Thành viên nhóm';
 
             // 2. Tìm permalink chuẩn xác của bài viết
             let postUrl = '';
@@ -637,9 +670,10 @@ async function huntFacebookFeed(params, deps = {}) {
                   return true;
                 });
               if (candidates.length > 0) {
-                // Sắp xếp giảm dần theo chiều dài để lấy thẻ chứa đầy đủ tất cả các đoạn văn
-                candidates.sort((a, b) => (b.innerText?.length || 0) - (a.innerText?.length || 0));
-                caption = cleanSeeMoreText(candidates[0]?.innerText || '');
+                // Ghép tất cả các đoạn văn không lồng nhau theo đúng thứ tự hiển thị DOM
+                const topLevelCandidates = candidates.filter((c) => !candidates.some((other) => other !== c && other.contains(c)));
+                const combined = topLevelCandidates.map((c) => (c.innerText || '').trim()).filter(Boolean).join('\n\n');
+                caption = cleanSeeMoreText(combined || candidates[0]?.innerText || '');
               }
             }
 
@@ -1012,8 +1046,8 @@ async function huntFacebookFeed(params, deps = {}) {
       }
     }
 
-    await browser.close();
-    browser = null;
+    await releaseContext();
+    releaseContext = null;
 
     let items;
     let unknownDateCount = 0;
@@ -1088,9 +1122,10 @@ async function huntFacebookFeed(params, deps = {}) {
     } };
 
   } catch (err) {
-    if (browser) await browser.close().catch(() => { });
     console.error('[FB_Group_Hunter] ❌ Lỗi quét Group:', err.message);
     return { status: 500, body: { success: false, error: `Lỗi khi quét Facebook: ${err.message}` } };
+  } finally {
+    await releaseContext?.();
   }
 }
 

@@ -1,13 +1,15 @@
+import { runtime, withSessionToken } from '../config/runtime';
 import { useState } from 'react';
-import { Button, Input, Form, Tag, App, Empty } from 'antd';
-import { DownloadOutlined, CopyOutlined, LinkOutlined } from '@ant-design/icons';
+import { Button, Input, Form, Tag, App, Empty, Card, Typography, Space, Row, Col } from 'antd';
+import { DownloadOutlined, CopyOutlined, LinkOutlined, VideoCameraOutlined } from '@ant-design/icons';
 import { useMutation } from '@tanstack/react-query';
 import api from '../config/axios';
 import PasteLinkInput from '../components/common/PasteLinkInput';
 
 const { TextArea } = Input;
+const { Title, Text } = Typography;
 
-const WORKER_BASE_URL = import.meta.env.VITE_WORKER_BASE_URL || `http://${typeof window !== 'undefined' ? window.location.hostname : 'localhost'}:3001`;
+const WORKER_BASE_URL = runtime.workerBase;
 
 interface ExtractResult {
   success: boolean;
@@ -31,7 +33,7 @@ const SOURCE_COLORS: Record<ExtractResult['sourceType'], string> = {
 };
 
 const getDownloadUrl = (vUrl: string, filename: string) =>
-  `${WORKER_BASE_URL}/api/download-video?url=${encodeURIComponent(vUrl)}&filename=${encodeURIComponent(filename || 'video')}`;
+  withSessionToken(`${WORKER_BASE_URL}/api/download-video?url=${encodeURIComponent(vUrl)}&filename=${encodeURIComponent(filename || 'video')}`);
 
 const DownloadVideo = () => {
   const { message } = App.useApp();
@@ -69,13 +71,20 @@ const DownloadVideo = () => {
   };
 
   return (
-    <div className="app-page max-w-6xl mx-auto">
-      <div className="app-surface app-page-header">
-        <h1 className="app-page-title">Tải video</h1>
-        <p className="app-page-description">Tải video từ TikTok, Douyin, Threads, Facebook</p>
-      </div>
+    <div className="app-page max-w-5xl mx-auto space-y-5">
+      <Card variant="borderless">
+        <Space align="center" size="middle" className="mb-2">
+          <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400 text-lg">
+            <VideoCameraOutlined />
+          </div>
+          <div>
+            <Title level={4} className="!mb-0.5 !text-slate-100">Tải video</Title>
+            <Text className="text-xs text-slate-400">Tải video và bài viết đa phương tiện từ TikTok, Douyin, Threads, Facebook</Text>
+          </div>
+        </Space>
+      </Card>
 
-      <div className="app-surface p-5 sm:p-6">
+      <Card variant="borderless">
         <Form
           form={form}
           layout="vertical"
@@ -86,9 +95,9 @@ const DownloadVideo = () => {
         >
           <Form.Item
             name="url"
-            label="Link video"
+            label={<span className="text-xs font-semibold text-slate-300">Đường dẫn video / bài viết</span>}
             rules={[{ required: true, message: 'Vui lòng dán link video' }]}
-            className="!mb-3"
+            className="!mb-4"
           >
             <PasteLinkInput placeholder="Dán link TikTok, Douyin, Threads hoặc Facebook..." size="large" />
           </Form.Item>
@@ -98,58 +107,61 @@ const DownloadVideo = () => {
             size="large"
             loading={extractMutation.isPending}
             icon={<LinkOutlined />}
+            className="font-semibold px-6 rounded-xl"
           >
             Lấy video
           </Button>
         </Form>
 
         {result && (
-          <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-800 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            <div className="lg:col-span-6">
-              {previewUrl ? (
-                <div className="overflow-hidden rounded-xl bg-black aspect-[9/16] max-h-[560px] w-full mx-auto flex items-center justify-center">
-                  <video key={previewUrl} src={previewUrl} controls className="w-full h-full object-contain" />
-                </div>
-              ) : imageUrls.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {imageUrls.map((url, idx) => (
-                    <a key={url} href={url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
-                      <img src={url} alt={`Ảnh ${idx + 1}`} className="w-full aspect-square object-cover" />
-                    </a>
-                  ))}
-                </div>
-              ) : (
-                <Empty description="Không tìm thấy video" />
-              )}
-            </div>
-
-            <div className="lg:col-span-6 space-y-4">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Tag color={SOURCE_COLORS[result.sourceType] || 'default'} className="!m-0">{result.sourceType}</Tag>
-                {result.quality?.width && result.quality?.height && (
-                  <Tag className="!m-0">{result.quality.width}×{result.quality.height}</Tag>
+          <div className="mt-6 pt-6 border-t border-slate-800">
+            <Row gutter={[24, 24]} align="top">
+              <Col xs={24} lg={12}>
+                {previewUrl ? (
+                  <div className="overflow-hidden rounded-2xl bg-black/90 aspect-[9/16] max-h-[520px] w-full mx-auto flex items-center justify-center border border-slate-800 shadow-xl">
+                    <video key={previewUrl} src={previewUrl} controls className="w-full h-full object-contain" />
+                  </div>
+                ) : imageUrls.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                    {imageUrls.map((url, idx) => (
+                      <a key={url} href={url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl border border-slate-800 hover:border-blue-500 transition-all">
+                        <img src={url} alt={`Ảnh ${idx + 1}`} className="w-full aspect-square object-cover" />
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <Empty description="Không tìm thấy video" />
                 )}
-              </div>
+              </Col>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold">Caption</span>
-                  <Button size="small" icon={<CopyOutlined />} onClick={handleCopyCaption} disabled={!caption}>
-                    Copy
-                  </Button>
+              <Col xs={24} lg={12} className="space-y-4">
+                <Space wrap size="small">
+                  <Tag color={SOURCE_COLORS[result.sourceType] || 'default'} className="!m-0 font-semibold">{result.sourceType}</Tag>
+                  {result.quality?.width && result.quality?.height && (
+                    <Tag className="!m-0 font-mono">{result.quality.width}×{result.quality.height}</Tag>
+                  )}
+                </Space>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Text className="text-xs font-semibold text-slate-300">Nội dung Caption</Text>
+                    <Button size="small" icon={<CopyOutlined />} onClick={handleCopyCaption} disabled={!caption}>
+                      Sao chép
+                    </Button>
+                  </div>
+                  <TextArea rows={6} value={caption} readOnly placeholder="Không có caption" className="rounded-xl font-sans text-xs" />
                 </div>
-                <TextArea rows={6} value={caption} readOnly placeholder="Không có caption" />
-              </div>
 
-              {downloadUrl && (
-                <Button type="primary" size="large" href={downloadUrl} target="_blank" icon={<DownloadOutlined />}>
-                  Tải .MP4
-                </Button>
-              )}
-            </div>
+                {downloadUrl && (
+                  <Button type="primary" size="large" href={downloadUrl} target="_blank" icon={<DownloadOutlined />} className="w-full font-semibold rounded-xl">
+                    Tải về tệp .MP4
+                  </Button>
+                )}
+              </Col>
+            </Row>
           </div>
         )}
-      </div>
+      </Card>
     </div>
   );
 };

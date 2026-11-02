@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import axios from 'axios';
-import { App, Badge, Button, Dropdown, Empty, Input, Modal, Segmented, Space, Switch, Table, Tooltip } from 'antd';
+import { App, Badge, Button, Card, Col, Dropdown, Empty, Flex, Input, Modal, Row, Segmented, Space, Switch, Table, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
   DeleteOutlined,
@@ -356,49 +356,53 @@ export default function PostHunterTab({
   return (
     <div className="space-y-4">
       {/* Tiêu đề + thao tác chính */}
-      <div className="app-surface p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div>
-          <div className="text-[15px] font-semibold text-slate-100">Tự săn bài mới</div>
-          <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
-            Theo dõi Fanpage và Group. Khi có bài mới, hệ thống chờ một khoảng ngắn rồi buff bằng các page của via, xoay vòng để page nào cũng được dùng đều.
-            Lần quét đầu chỉ lấy mốc nên bài cũ không bị buff.
-          </p>
-        </div>
-        <Space className="shrink-0">
-          <Tooltip title="Làm mới">
-            <Button icon={<ReloadOutlined />} onClick={onRefresh} aria-label="Làm mới" />
-          </Tooltip>
-          <Button icon={<SearchOutlined />} onClick={() => setTestOpen(true)}>
-            Quét thử link
-          </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => onAdd()}>
-            Thêm mục tiêu
-          </Button>
-        </Space>
-      </div>
+      <Card variant="borderless">
+        <Flex justify="space-between" align="center" wrap="wrap" gap="middle">
+          <div>
+            <div className="text-[15px] font-semibold text-slate-100">Tự săn bài mới</div>
+            <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
+              Theo dõi Fanpage và Group. Khi có bài mới, hệ thống chờ một khoảng ngắn rồi buff bằng các page của via, xoay vòng để page nào cũng được dùng đều.
+              Lần quét đầu chỉ lấy mốc nên bài cũ không bị buff.
+            </p>
+          </div>
+          <Space className="shrink-0">
+            <Tooltip title="Làm mới">
+              <Button icon={<ReloadOutlined />} onClick={onRefresh} aria-label="Làm mới" />
+            </Tooltip>
+            <Button icon={<SearchOutlined />} onClick={() => setTestOpen(true)}>
+              Quét thử link
+            </Button>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => onAdd()}>
+              Thêm mục tiêu
+            </Button>
+          </Space>
+        </Flex>
+      </Card>
 
       {/* Số liệu vận hành */}
-      <div className="app-surface grid grid-cols-2 lg:grid-cols-5">
-        {statItems.map((item, idx) => (
-          <div key={item.label} className={`px-4 py-3.5 ${idx > 0 ? 'lg:border-l border-slate-800/80' : ''}`}>
-            <div className="app-stat-label">{item.label}</div>
-            <div className="text-xl font-semibold text-slate-100 mt-1">{item.value}</div>
-            <div className={`text-[11px] mt-0.5 ${item.sub.includes('cần xem lại') ? 'text-amber-400' : 'text-slate-500'}`}>{item.sub}</div>
-          </div>
-        ))}
-        <div className="px-4 py-3.5 lg:border-l border-slate-800/80">
-          <div className="app-stat-label">Tự buff bài app đăng</div>
-          <div className="mt-1.5">
-            <Badge status={autoBuffOwnPosts ? 'success' : 'default'} text={<span className="text-sm font-semibold text-slate-100">{autoBuffOwnPosts ? 'Đang bật' : 'Đang tắt'}</span>} />
-          </div>
-          <Button type="link" size="small" className="!p-0 !h-auto text-[11px]" onClick={onOpenSettings}>
-            Cài đặt
-          </Button>
-        </div>
-      </div>
+      <Card variant="borderless" styles={{ body: { padding: '12px 16px' } }}>
+        <Row gutter={[16, 16]} align="middle">
+          {statItems.map((item, idx) => (
+            <Col xs={12} sm={12} lg={idx === 0 ? 5 : 4} key={item.label}>
+              <div className="app-stat-label">{item.label}</div>
+              <div className="text-xl font-semibold text-slate-100 mt-1">{item.value}</div>
+              <div className={`text-[11px] mt-0.5 ${item.sub.includes('cần xem lại') ? 'text-amber-400' : 'text-slate-500'}`}>{item.sub}</div>
+            </Col>
+          ))}
+          <Col xs={24} sm={12} lg={4}>
+            <div className="app-stat-label">Tự buff bài app đăng</div>
+            <div className="mt-1.5">
+              <Badge status={autoBuffOwnPosts ? 'success' : 'default'} text={<span className="text-sm font-semibold text-slate-100">{autoBuffOwnPosts ? 'Đang bật' : 'Đang tắt'}</span>} />
+            </div>
+            <Button type="link" size="small" className="!p-0 !h-auto text-[11px]" onClick={onOpenSettings}>
+              Cài đặt
+            </Button>
+          </Col>
+        </Row>
+      </Card>
 
       {/* Danh sách mục tiêu */}
-      <div className="app-surface overflow-hidden">
+      <Card variant="borderless" styles={{ body: { padding: 0 } }} className="overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 px-4 py-3 border-b border-slate-800/80">
           <Segmented<MonitorFilter>
             size="small"
@@ -446,10 +450,10 @@ export default function PostHunterTab({
               ),
           }}
         />
-      </div>
+      </Card>
 
       {/* Bài bắt gần đây */}
-      <div className="app-surface overflow-hidden">
+      <Card variant="borderless" styles={{ body: { padding: 0 } }} className="overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/80">
           <div className="text-[13px] font-semibold text-slate-100">Bài bắt gần đây</div>
           <Button type="link" size="small" className="!p-0" onClick={onOpenQueue}>
@@ -483,7 +487,7 @@ export default function PostHunterTab({
             ))}
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Quét thử link */}
       <Modal
