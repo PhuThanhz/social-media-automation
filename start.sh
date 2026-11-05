@@ -76,3 +76,4 @@ echo "----------------------------------------------------------"
 echo "💡 Nhấn Ctrl + C để dừng giao diện Frontend."
 
 npm run dev
+

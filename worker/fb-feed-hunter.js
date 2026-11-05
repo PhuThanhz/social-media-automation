@@ -634,6 +634,7 @@ async function huntFacebookFeed(params, deps = {}) {
                 .replace(/(?:^|\n)[\s\u200B\u00A0]*(?:Xem\s+thêm|See\s+more|Hiển\s+thị\s+thêm|Ẩn\s+bớt|See\s+less|Thu\s+gọn)[\s\u200B\u00A0]*$/gim, '')
                 .replace(/[\s\u200B\u00A0]*(?:…|\.{2,})[\s\u200B\u00A0]*(?:Xem\s+thêm|See\s+more)\b/gi, '')
                 .replace(/\n?(?:Translate|Dịch)\s*$/gi, '')
+                .replace(/(?:^|\n)[\s\u200B\u00A0]*(?:Công khai|Public|Chỉ mình tôi|Bạn bè|Friends|Only me|Chia sẻ với:?\s*Công khai|Shared with:?\s*Public)[\s\u200B\u00A0]*$/gim, '')
                 .trim();
 
               // Nếu còn dấu 3 chấm dở dang ở cuối
@@ -661,7 +662,8 @@ async function huntFacebookFeed(params, deps = {}) {
                   if (inNestedArticle(el) || el.closest('[role="toolbar"], form, ul')) return false;
                   const t = (el.innerText || '').trim();
                   if (!t || t.length < 3) return false;
-                  if (t === author || t === 'Facebook' || t === 'Thích' || t === 'Bình luận' || t === 'Chia sẻ') return false;
+                  if (t === author || t === 'Facebook' || t === 'Thích' || t === 'Bình luận' || t === 'Chia sẻ' || /^(?:Công khai|Public|Bạn bè|Friends|Chỉ mình tôi|Only me)$/i.test(t)) return false;
+                  if (/^(?:Chia sẻ với:?\s*(?:Công khai|Public|Bạn bè)|Shared with:?\s*(?:Public|Friends))/i.test(t)) return false;
                   if (/^(?:\d{1,2}\s*(?:phút|giờ|ngày|tháng|mins?|hrs?|d|w|m|y)|vừa xong|hôm qua|hôm nay|thứ\s+\d|\d{1,2}\s+tháng\s+\d{1,2})/i.test(t)) return false;
                   // Chuỗi ký tự bị Facebook xáo (mốc thời gian chống cào / anti-scraping obfuscation)
                   if (t.length > 20 && !/\s/.test(t)) return false;

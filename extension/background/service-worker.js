@@ -117,8 +117,8 @@ async function checkHealth() {
   let workerOk = false;
 
   try {
-    const bRes = await fetch(`${config.backendUrl}/api/auth/me`, { method: 'GET' }).catch(() => null);
-    // Nếu trả về 401 hoặc 200 hoặc 403 tức là backend đang chạy
+    const bRes = await fetch(`${config.backendUrl}/api/queue/counts`, { method: 'GET' }).catch(() => null);
+    // Nếu trả về 200 hoặc 401 hoặc 403 tức là backend đang chạy
     if (bRes && (bRes.status === 200 || bRes.status === 401 || bRes.status === 403)) {
       backendOk = true;
     }
@@ -454,6 +454,38 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'PING_ASSISTED_ENGAGEMENT') {
     sendResponse({ success: true });
     return false;
+  }
+
+  if (request.action === 'ADD_COLLECTED_LINK') {
+    chrome.storage.local.get(['collectedLinks']).then((st) => {
+      let list = Array.isArray(st.collectedLinks) ? st.collectedLinks : [];
+      if (request.item && request.item.url) {
+        list = list.filter(item => item.url !== request.item.url);
+        list.unshift(request.item);
+        if (list.length > 50) list = list.slice(0, 50);
+        chrome.storage.local.set({ collectedLinks: list }).then(() => {
+          sendResponse({ success: true, count: list.length, list });
+        });
+      } else {
+        sendResponse({ success: false, count: list.length, list });
+      }
+    });
+    return true;
+  }
+
+  if (request.action === 'GET_COLLECTED_LINKS') {
+    chrome.storage.local.get(['collectedLinks']).then((st) => {
+      const list = Array.isArray(st.collectedLinks) ? st.collectedLinks : [];
+      sendResponse({ success: true, count: list.length, list });
+    });
+    return true;
+  }
+
+  if (request.action === 'CLEAR_COLLECTED_LINKS') {
+    chrome.storage.local.set({ collectedLinks: [] }).then(() => {
+      sendResponse({ success: true, count: 0, list: [] });
+    });
+    return true;
   }
 
   if (request.action === 'OPEN_PAGE_ENGAGEMENT') {

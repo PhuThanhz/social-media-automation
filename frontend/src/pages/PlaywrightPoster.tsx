@@ -2814,7 +2814,7 @@ const PlaywrightPoster = () => {
     bulkRescheduleTargetScope, setBulkRescheduleTargetScope, bulkRescheduleMode, setBulkRescheduleMode,
     setBulkRescheduleDate, bulkRescheduleDate, setBulkRescheduleStartTime, bulkRescheduleStartTime,
     setBulkRescheduleEndTime, bulkRescheduleEndTime, bulkRescheduleInterval, setBulkRescheduleInterval,
-    bulkRescheduleInterleave, setBulkRescheduleInterleave, bulkRescheduleMaxPerDay,
+    bulkRescheduleInterleave, setBulkRescheduleInterleave, bulkRescheduleSpreadPerGroup, setBulkRescheduleSpreadPerGroup, bulkRescheduleMaxPerDay,
     setBulkRescheduleMaxPerDay, bulkRescheduleSameDayGap, setBulkRescheduleSameDayGap,
     setBulkRescheduleDistributeNicks, bulkRescheduleDistributeNicks, setBulkRescheduleSelectedNicks,
     bulkRescheduleSelectedNicks, viralMaxPerTargetPerDay, setViralMaxPerTargetPerDay, viralMinGapPerTarget,
@@ -5581,6 +5581,8 @@ const PlaywrightPoster = () => {
             setBulkRescheduleInterval={setBulkRescheduleInterval}
             bulkRescheduleInterleave={bulkRescheduleInterleave}
             setBulkRescheduleInterleave={setBulkRescheduleInterleave}
+            bulkRescheduleSpreadPerGroup={bulkRescheduleSpreadPerGroup}
+            setBulkRescheduleSpreadPerGroup={setBulkRescheduleSpreadPerGroup}
             bulkRescheduleMaxPerDay={bulkRescheduleMaxPerDay}
             setBulkRescheduleMaxPerDay={setBulkRescheduleMaxPerDay}
             bulkRescheduleSameDayGap={bulkRescheduleSameDayGap}

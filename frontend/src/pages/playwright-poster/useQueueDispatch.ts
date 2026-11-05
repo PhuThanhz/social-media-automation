@@ -171,7 +171,7 @@ export function useQueueDispatch({ selectedDistributePages, linkItems, customIte
     message.success(`⚡ Đã chia đều ${validItems.length} bài (${summaryStr}) từ ${start.format('HH:mm')} đến ${endTime.format('HH:mm')} (so le ${step}p/bài, mỗi nick nghỉ ${interval}p)!`, 6);
   };
 
-  // ── AUTO-FIX QUEUE: Tự động xếp lại toàn bộ lịch hàng đợi an toàn 1-Click ──
+  // ── AUTO-FIX QUEUE: Tự động xếp lại toàn bộ lịch hàng đợi an toàn 1-Click (Rải đều từng group từ sáng đến tối) ──
   const handleAutoFixQueue = async () => {
     const pendingPosts = (posts || []).filter((p) => p.status === 'PENDING');
     if (pendingPosts.length === 0) {
@@ -185,25 +185,94 @@ export function useQueueDispatch({ selectedDistributePages, linkItems, customIte
         ? twoMainViasTargetValues
         : postingIdentities.slice(0, 2).map(accountTargetValue);
       const k = Math.max(1, targetPool.length);
-      const interval = autoFixInterval || 20;
-      const step = Math.max(5, Math.round(interval / k));
 
-      let start = autoFixStartMode === 'TOMORROW_830'
-        ? dayjs().add(1, 'day').hour(8).minute(30).second(0)
-        : dayjs().add(10, 'minute');
+      const isTomorrow = autoFixStartMode === 'TOMORROW_830';
+      const baseDate = isTomorrow ? dayjs().add(1, 'day') : dayjs();
+      const startH = 8;
+      const startM = 30;
+      const endH = 22;
+      const endM = 30;
 
-      const sorted = [...pendingPosts].sort((a, b) => dayjs(a.scheduledAt || 0).diff(dayjs(b.scheduledAt || 0)));
+      // 1. Phân nhóm theo điểm đăng (Group / Fanpage)
+      const targetBuckets = new Map<string, PostQueue[]>();
+      pendingPosts.forEach((p) => {
+        const raw = (p.targetGroupNames || '').replace(/^GROUP_ONLY_ANON:|^GROUP_ONLY:/, '').trim();
+        const key = raw || p.targetFanpageId || 'PAGE_FEED';
+        if (!targetBuckets.has(key)) targetBuckets.set(key, []);
+        targetBuckets.get(key)!.push(p);
+      });
 
-      const updates = sorted.map((post, idx) => {
+      const targets = Array.from(targetBuckets.entries());
+      const staggerMinutes = targets.length > 6 ? 2 : 3;
+      const minGroupGapMinutes = Math.max(15, autoFixInterval || 20);
+
+      const postTimes = new Map<number, dayjs.Dayjs>();
+      const now = dayjs();
+
+      targets.forEach(([targetKey, targetPosts], targetIdx) => {
+        let remaining = [...targetPosts];
+        let dayOffset = 0;
+        const groupStagger = (targetIdx * staggerMinutes) % 25;
+
+        while (remaining.length > 0 && dayOffset < 365) {
+          const currentDay = baseDate.clone().add(dayOffset, 'day');
+          let startDt = currentDay.clone().hour(startH).minute(startM).second(0).add(groupStagger, 'minute');
+          let endDt = currentDay.clone().hour(endH).minute(endM).second(0);
+
+          if (currentDay.isSame(now, 'day')) {
+            const earliestToday = now.clone().add(10 + groupStagger, 'minute').second(0);
+            if (startDt.isBefore(earliestToday)) {
+              startDt = earliestToday;
+            }
+            if (endDt.diff(startDt, 'minute') < 15) {
+              dayOffset++;
+              continue;
+            }
+          }
+
+          const availableMinutes = Math.max(0, endDt.diff(startDt, 'minute'));
+          const maxFit = Math.max(1, Math.floor(availableMinutes / minGroupGapMinutes) + 1);
+          const batchSize = Math.min(remaining.length, maxFit);
+
+          const dayBatch = remaining.slice(0, batchSize);
+          remaining = remaining.slice(batchSize);
+
+          if (dayBatch.length === 1) {
+            postTimes.set(Number(dayBatch[0].id), startDt.add(Math.round(availableMinutes * 0.45), 'minute'));
+          } else if (dayBatch.length > 1) {
+            const stepMinutes = availableMinutes / (dayBatch.length - 1);
+            for (let j = 0; j < dayBatch.length; j++) {
+              postTimes.set(Number(dayBatch[j].id), startDt.add(Math.round(j * stepMinutes), 'minute'));
+            }
+          }
+
+          dayOffset++;
+        }
+      });
+
+      // 2. Chống trùng giây/phút toàn cục
+      const sortedByTime = pendingPosts.map((p) => ({
+        post: p,
+        time: postTimes.get(Number(p.id)) || (isTomorrow ? baseDate.hour(9).minute(0) : now.add(15, 'minute')),
+      })).sort((a, b) => a.time.valueOf() - b.time.valueOf());
+
+      const minGlobalGapSeconds = 75;
+      let lastTime: dayjs.Dayjs | null = null;
+
+      const updates = sortedByTime.map((item, idx) => {
+        let t = item.time;
+        if (lastTime && t.diff(lastTime, 'second') < minGlobalGapSeconds) {
+          t = lastTime.add(minGlobalGapSeconds, 'second');
+        }
+        lastTime = t;
+
+        const post = item.post;
         let assignedTarget = post.targetFanpageId;
-        // Nếu người dùng bật chia đều tải cho các Via:
         if (autoFixDistributeVias) {
           const isPersonal = post.targetFanpageId?.includes('PERSONAL_PROFILE') || post.targetFanpageId === 'PERSONAL_PROFILE';
           if (isPersonal) {
-            // Nếu bài gốc là đăng dưới tư cách cá nhân, xoay vòng giữa các Via cá nhân
             assignedTarget = targetPool[idx % k];
           } else if (post.targetFanpageId) {
-            // Nếu bài gốc là Fanpage (VD Làm Sen), xoay vòng giữa các Via ĐỒNG QUẢN TRỊ CỦA PAGE ĐÓ, tuyệt đối KHÔNG đè bằng nick cá nhân!
             const curTarget = post.targetFanpageId;
             const platformId = curTarget.split(':')[0];
             const coAdminsForPage = playwrightAccounts.filter(
@@ -215,21 +284,20 @@ export function useQueueDispatch({ selectedDistributePages, linkItems, customIte
           }
         }
 
-        // Tự động sửa lỗi :113 cũ nếu còn sót
         if (assignedTarget && assignedTarget.includes(':113')) {
           assignedTarget = assignedTarget.replace(':113', ':129');
         }
-        const assignedTime = start.add(idx * step, 'minute');
+
         return {
           id: post.id,
-          scheduledAt: assignedTime.format('YYYY-MM-DDTHH:mm:ss'),
+          scheduledAt: t.format('YYYY-MM-DDTHH:mm:ss'),
           targetFanpageId: assignedTarget,
         };
       });
 
       const res = await api.post('/queue/reschedule-batch', { updates });
       if (res.data?.success) {
-        message.success(`🎉 Đã xếp lại lịch an toàn cho ${updates.length} bài viết PENDING! Các bài đã được rải đều so le, không còn bị trùng giờ.`, 7);
+        message.success(`🎉 Đã xếp lại lịch rải đều sáng-tối cho ${updates.length} bài viết PENDING qua ${targets.length} Group/Kênh!`, 7);
         setAutoFixQueueModalVisible(false);
         queryClient.invalidateQueries({ queryKey: ['postQueuePlaywright'] });
         queryClient.invalidateQueries({ queryKey: ['postQueue'] });

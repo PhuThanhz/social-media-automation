@@ -50,6 +50,8 @@ interface BulkRescheduleModalProps {
   setBulkRescheduleInterval: React.Dispatch<React.SetStateAction<number>>;
   bulkRescheduleInterleave: boolean;
   setBulkRescheduleInterleave: React.Dispatch<React.SetStateAction<boolean>>;
+  bulkRescheduleSpreadPerGroup?: boolean;
+  setBulkRescheduleSpreadPerGroup?: React.Dispatch<React.SetStateAction<boolean>>;
   bulkRescheduleMaxPerDay: number;
   setBulkRescheduleMaxPerDay: React.Dispatch<React.SetStateAction<number>>;
   bulkRescheduleSameDayGap: number;
@@ -105,6 +107,8 @@ function BulkRescheduleModal({
   setBulkRescheduleInterval,
   bulkRescheduleInterleave,
   setBulkRescheduleInterleave,
+  bulkRescheduleSpreadPerGroup = true,
+  setBulkRescheduleSpreadPerGroup,
   bulkRescheduleMaxPerDay,
   setBulkRescheduleMaxPerDay,
   bulkRescheduleSameDayGap,
@@ -146,8 +150,9 @@ function BulkRescheduleModal({
   // Khung giờ gợi ý nằm trong bảng chọn giờ (presets) thay cho một hàng nút riêng
   const timeRangePresets = [
     { label: `Từ bây giờ (${today.format('HH:mm')}–)`, value: [today, today.hour() >= 18 ? at(23, 0) : bulkRescheduleEndTime] as [Dayjs, Dayjs] },
+    { label: 'Cả ngày 8h30–22h30', value: [at(8, 30), at(22, 30)] as [Dayjs, Dayjs] },
+    { label: 'Sáng đến tối 8h00–23h00', value: [at(8, 0), at(23, 0)] as [Dayjs, Dayjs] },
     { label: 'Hành chính 9h–18h', value: [at(9, 0), at(18, 0)] as [Dayjs, Dayjs] },
-    { label: 'Cả ngày 8h30–22h', value: [at(8, 30), at(22, 0)] as [Dayjs, Dayjs] },
     { label: 'Trưa & tối 11h30–23h', value: [at(11, 30), at(23, 0)] as [Dayjs, Dayjs] },
     ...(bulkRescheduleMode === 'VIRAL' ? [{ label: 'Toàn ngày 6h30–23h30', value: [at(6, 30), at(23, 30)] as [Dayjs, Dayjs] }] : []),
   ];
@@ -347,10 +352,34 @@ function BulkRescheduleModal({
             )}
 
             {bulkRescheduleMode !== 'VIRAL' && (
-              <SettingRow label="Đan xen Page & Group">
-                <Checkbox checked={bulkRescheduleInterleave} onChange={(e) => setBulkRescheduleInterleave(e.target.checked)}>
-                  Xếp xen kẽ để một kênh không bị đăng nhiều bài sát nhau
-                </Checkbox>
+              <SettingRow label="Phân bổ Group / Kênh" hint="Đảm bảo mọi group đều có bài rải rác từ sáng đến tối">
+                <Radio.Group
+                  value={bulkRescheduleSpreadPerGroup ? 'SPREAD' : (bulkRescheduleInterleave ? 'ROUND_ROBIN' : 'SEQUENTIAL')}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === 'SPREAD') {
+                      setBulkRescheduleSpreadPerGroup?.(true);
+                      setBulkRescheduleInterleave(true);
+                    } else if (v === 'ROUND_ROBIN') {
+                      setBulkRescheduleSpreadPerGroup?.(false);
+                      setBulkRescheduleInterleave(true);
+                    } else {
+                      setBulkRescheduleSpreadPerGroup?.(false);
+                      setBulkRescheduleInterleave(false);
+                    }
+                  }}
+                  className="flex flex-col gap-2"
+                >
+                  <Radio value="SPREAD">
+                    🌅 <strong>Rải đều từng Group từ sáng tới tối</strong> (Khuyên dùng - mọi group đều có bài suốt cả ngày)
+                  </Radio>
+                  <Radio value="ROUND_ROBIN">
+                    🔄 Đan xen vòng tròn (Round-Robin giữa các kênh)
+                  </Radio>
+                  <Radio value="SEQUENTIAL">
+                    ➡️ Tuần tự theo danh sách
+                  </Radio>
+                </Radio.Group>
               </SettingRow>
             )}
             <SettingRow label="Chia cho nhiều nick">

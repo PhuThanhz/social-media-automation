@@ -405,6 +405,7 @@ function cleanScrapedCaption(text) {
     .replace(/(?:^|\n)[\s\u200B\u00A0]*(?:Xem\s+thêm|See\s+more|Hiển\s+thị\s+thêm|Ẩn\s+bớt|See\s+less|Thu\s+gọn)[\s\u200B\u00A0]*$/gim, '')
     .replace(/[\s\u200B\u00A0]*(?:…|\.{2,})[\s\u200B\u00A0]*(?:Xem\s+thêm|See\s+more)\b/gi, '')
     .replace(/\n?(?:Translate|Dịch)\s*$/gi, '')
+    .replace(/(?:^|\n)[\s\u200B\u00A0]*(?:Công khai|Public|Chỉ mình tôi|Bạn bè|Friends|Only me|Chia sẻ với:?\s*Công khai|Shared with:?\s*Public)[\s\u200B\u00A0]*$/gim, '')
     .trim();
 
   if (isFacebookObfuscatedOrGarbageText(cleaned)) return '';
@@ -8685,6 +8686,7 @@ app.post('/api/scrape-content', async (req, res) => {
               .replace(/(?:^|\n)[\s\u200B\u00A0]*(?:Xem\s+thêm|See\s+more|Hiển\s+thị\s+thêm|Ẩn\s+bớt|See\s+less|Thu\s+gọn)[\s\u200B\u00A0]*$/gim, '')
               .replace(/[\s\u200B\u00A0]*(?:…|\.{2,})[\s\u200B\u00A0]*(?:Xem\s+thêm|See\s+more)\b/gi, '')
               .replace(/\n?(?:Translate|Dịch)\s*$/gi, '')
+              .replace(/(?:^|\n)[\s\u200B\u00A0]*(?:Công khai|Public|Chỉ mình tôi|Bạn bè|Friends|Only me|Chia sẻ với:?\s*Công khai|Shared with:?\s*Public)[\s\u200B\u00A0]*$/gim, '')
               .trim();
 
             // Xoá ký tự mồ côi 1-2 chữ cái ở dòng cuối cùng do bị cắt ngang trước nút xem thêm (VD: "\nK" hay "\nĐ")
@@ -8777,9 +8779,9 @@ app.post('/api/scrape-content', async (req, res) => {
               if (!clone || typeof clone.querySelectorAll !== 'function') {
                 return (node.innerText || node.textContent || '').trim();
               }
-              clone.querySelectorAll('div[role="button"], span[role="button"], [role="button"]').forEach(btn => {
+              clone.querySelectorAll('div[role="button"], span[role="button"], [role="button"], [aria-label*="đối tượng" i], [aria-label*="Chia sẻ với" i]').forEach(btn => {
                 const bText = (btn.textContent || '').trim();
-                if (/(?:…|\.{3})?\s*(?:Xem thêm|See more|Hiển thị thêm|Ẩn bớt|See less|Thu gọn)/i.test(bText)) {
+                if (/(?:…|\.{3})?\s*(?:Xem thêm|See more|Hiển thị thêm|Ẩn bớt|See less|Thu gọn)/i.test(bText) || /^(Công khai|Public|Bạn bè|Friends|Chỉ mình tôi|Only me)$/i.test(bText)) {
                   btn.remove();
                 }
               });
@@ -8836,7 +8838,8 @@ app.post('/api/scrape-content', async (req, res) => {
           const isNoiseText = (t) => {
             if (!t || t.length < 2) return true;
             if (/^[\d.,\s]+[KMkm]?\+?$/i.test(t)) return true;
-            if (/^(Thích|Bình luận|Chia sẻ|Like|Comment|Share|Reels|Gửi|Send|Đăng|Post|Facebook|Theo dõi|Follow|Home|Trang chủ)$/i.test(t)) return true;
+            if (/^(Thích|Bình luận|Chia sẻ|Like|Comment|Share|Reels|Gửi|Send|Đăng|Post|Facebook|Theo dõi|Follow|Home|Trang chủ|Công khai|Public|Bạn bè|Friends|Chỉ mình tôi|Only me|Chỉnh sửa đối tượng)$/i.test(t.trim())) return true;
+            if (/^(Chia sẻ với:?\s*(?:Công khai|Public|Bạn bè|Friends)|Shared with:?\s*(?:Public|Friends))/i.test(t.trim())) return true;
             if (/^(\d+\s*(?:phút|giờ|ngày|tháng|năm|h|m|d|w|y|mins?|hrs?|days?)|vừa xong|just now|yesterday|hôm qua)/i.test(t.trim())) return true;
             if (isFacebookGarbageInsideBrowser(t)) return true;
             return false;

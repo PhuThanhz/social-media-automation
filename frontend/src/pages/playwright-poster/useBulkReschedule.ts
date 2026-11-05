@@ -27,10 +27,11 @@ export function useBulkReschedule({ desiredMinInterval, posts, selectedRowKeys, 
   const [bulkRescheduleTargetScope, setBulkRescheduleTargetScope] = useState<'ALL' | 'SELECTED'>('ALL');
   const [bulkRescheduleMode, setBulkRescheduleMode] = useState<RescheduleMode>('WINDOW');
   const [bulkRescheduleDate, setBulkRescheduleDate] = useState<Dayjs>(dayjs());
-  const [bulkRescheduleStartTime, setBulkRescheduleStartTime] = useState<Dayjs>(dayjs().hour(9).minute(0).second(0));
-  const [bulkRescheduleEndTime, setBulkRescheduleEndTime] = useState<Dayjs>(dayjs().hour(18).minute(0).second(0));
+  const [bulkRescheduleStartTime, setBulkRescheduleStartTime] = useState<Dayjs>(dayjs().hour(8).minute(30).second(0));
+  const [bulkRescheduleEndTime, setBulkRescheduleEndTime] = useState<Dayjs>(dayjs().hour(22).minute(30).second(0));
   const [bulkRescheduleInterval, setBulkRescheduleInterval] = useState<number>(60);
   const [bulkRescheduleInterleave, setBulkRescheduleInterleave] = useState<boolean>(true);
+  const [bulkRescheduleSpreadPerGroup, setBulkRescheduleSpreadPerGroup] = useState<boolean>(true);
   const [bulkRescheduleMaxPerDay, setBulkRescheduleMaxPerDay] = useState<number>(-1);
   const [bulkRescheduleSameDayGap, setBulkRescheduleSameDayGap] = useState<number>(30);
   const [bulkRescheduleDistributeNicks, setBulkRescheduleDistributeNicks] = useState<boolean>(false);
@@ -186,6 +187,148 @@ export function useBulkReschedule({ desiredMinInterval, posts, selectedRowKeys, 
     return result;
   }, []);
 
+  // Thuật toán "Rải đều từng Group từ sáng tới tối" (Per-Group Day-Long Spread)
+  // Đảm bảo MỌI GROUP ĐỀU CÓ BÀI TRẢI ĐỀU TỪ SÁNG ĐẾN TỐI, không bị dồn cục vào một khung giờ (VD chỉ đăng từ 20h-22h).
+  // Đồng thời tự động so le (stagger) giữa các group để không bị trùng giờ.
+  const computeGroupSpreadSchedule = useCallback((
+    postList: PostQueue[],
+    targetDate: any,
+    start: any,
+    end: any,
+    maxPerDay?: number,
+    minIntervalMinutes?: number,
+    sameDayMinGap: number = 10
+  ): Map<number, Dayjs> => {
+    const result = new Map<number, Dayjs>();
+    if (!postList || postList.length === 0) return result;
+
+    const now = dayjs();
+    const baseDate = dayjs.isDayjs(targetDate) && targetDate.isValid() ? targetDate : dayjs(targetDate || new Date());
+    const startObj = dayjs.isDayjs(start) && start.isValid() ? start : dayjs(start || new Date());
+    const endObj = dayjs.isDayjs(end) && end.isValid() ? end : dayjs(end || new Date());
+
+    const startH = startObj.isValid() ? startObj.hour() : 8;
+    const startM = startObj.isValid() ? startObj.minute() : 30;
+    const endH = endObj.isValid() ? endObj.hour() : 22;
+    const endM = endObj.isValid() ? endObj.minute() : 30;
+
+    // 1. Phân nhóm các bài theo Điểm đăng (Group ID hoặc Page ID)
+    const targetBuckets = new Map<string, PostQueue[]>();
+    postList.forEach((p) => {
+      const key = normalizeTargetKey(p.targetGroupNames, p.targetFanpageId);
+      if (!targetBuckets.has(key)) targetBuckets.set(key, []);
+      targetBuckets.get(key)!.push(p);
+    });
+
+    const targets = Array.from(targetBuckets.entries());
+    const staggerInterval = targets.length > 6 ? 2 : 3; // 2-3 phút so le giữa các group
+    const effectiveMinInterval = Math.max(15, minIntervalMinutes || desiredMinInterval || 30);
+    const effectiveMaxPerDay = maxPerDay !== undefined ? maxPerDay : -1;
+
+    const rawAssigned: { id: number; targetKey: string; time: Dayjs }[] = [];
+
+    // 2. Tính toán cho từng target độc lập để rải đều từ đầu ngày đến cuối ngày
+    targets.forEach(([targetKey, targetPosts], targetIdx) => {
+      let remaining = [...targetPosts];
+      let dayOffset = 0;
+      const groupStagger = (targetIdx * staggerInterval) % 25;
+
+      while (remaining.length > 0 && dayOffset < 365) {
+        const currentDay = baseDate.clone().add(dayOffset, 'day');
+        let startDt = currentDay.clone().hour(startH).minute(startM).second(0).add(groupStagger, 'minute');
+        let endDt = currentDay.clone().hour(endH).minute(endM).second(0);
+
+        if (endDt.isBefore(startDt)) {
+          endDt = endDt.add(1, 'day');
+        }
+
+        // Bảo vệ giờ quá khứ nếu là hôm nay
+        if (currentDay.isSame(now, 'day')) {
+          const earliestToday = now.clone().add(3 + groupStagger, 'minute').second(0);
+          if (startDt.isBefore(earliestToday)) {
+            startDt = earliestToday;
+          }
+          const latestToday = currentDay.clone().hour(23).minute(30).second(0);
+          const usableEnd = effectiveMaxPerDay === 0 && endDt.isBefore(latestToday) ? latestToday : endDt;
+          if (usableEnd.diff(startDt, 'minute') < 15) {
+            dayOffset++;
+            continue;
+          }
+        }
+
+        // Chế độ "Đăng trong ngày": kéo giờ kết thúc tối đa 23:30 nếu cần
+        const dayGap = Math.max(1, sameDayMinGap);
+        if (effectiveMaxPerDay === 0 && remaining.length > 1) {
+          const latest = currentDay.clone().hour(23).minute(30).second(0);
+          if (endDt.isBefore(latest)) {
+            const needMinutes = (remaining.length - 1) * dayGap;
+            if (endDt.diff(startDt, 'minute') < needMinutes) {
+              const wanted = startDt.add(needMinutes, 'minute');
+              endDt = wanted.isBefore(latest) ? wanted : latest;
+            }
+          }
+        }
+
+        const availableMinutes = Math.max(0, endDt.diff(startDt, 'minute'));
+        const maxFit = Math.max(1, Math.floor(availableMinutes / effectiveMinInterval) + 1);
+
+        let batchSize = remaining.length;
+        if (effectiveMaxPerDay === -1) {
+          // Tự động chống dồn: xếp tối đa số bài phù hợp cho ngày này
+          batchSize = Math.min(remaining.length, maxFit);
+        } else if (effectiveMaxPerDay > 0) {
+          batchSize = Math.min(remaining.length, Math.min(effectiveMaxPerDay, maxFit));
+        } else {
+          // 0 = Đăng hết trong 1 ngày
+          batchSize = remaining.length;
+        }
+
+        const dayBatch = remaining.slice(0, batchSize);
+        remaining = remaining.slice(batchSize);
+
+        if (dayBatch.length === 1) {
+          // Nếu chỉ có 1 bài cho group này trong ngày:
+          // Xếp vào khoảng giữa trưa hoặc chiều (45% khung giờ) có tính so le
+          const midOffset = Math.round(availableMinutes * 0.45);
+          rawAssigned.push({
+            id: Number(dayBatch[0].id),
+            targetKey,
+            time: startDt.add(midOffset, 'minute'),
+          });
+        } else if (dayBatch.length > 1) {
+          // RẢI ĐỀU TỪ ĐẦU KHUNG ĐẾN CUỐI KHUNG GIỜ:
+          const stepMinutes = availableMinutes / (dayBatch.length - 1);
+          for (let j = 0; j < dayBatch.length; j++) {
+            const postTime = startDt.add(Math.round(j * stepMinutes), 'minute');
+            rawAssigned.push({
+              id: Number(dayBatch[j].id),
+              targetKey,
+              time: postTime,
+            });
+          }
+        }
+
+        dayOffset++;
+      }
+    });
+
+    // 3. Chống trùng giây/phút toàn cục: Đảm bảo giữa 2 bài bất kỳ có tối thiểu 60-90 giây
+    rawAssigned.sort((a, b) => a.time.valueOf() - b.time.valueOf());
+    const minGlobalSeconds = 75; // 1 phút 15 giây
+    let lastTime: Dayjs | null = null;
+
+    for (let i = 0; i < rawAssigned.length; i++) {
+      let t = rawAssigned[i].time;
+      if (lastTime && t.diff(lastTime, 'second') < minGlobalSeconds) {
+        t = lastTime.add(minGlobalSeconds, 'second');
+      }
+      result.set(rawAssigned[i].id, t);
+      lastTime = t;
+    }
+
+    return result;
+  }, [desiredMinInterval]);
+
   // Danh sách bài viết được nhắm đến để phân bổ lại giờ
   const rescheduleTargetPosts = useMemo(() => {
     const allPending = (posts || []).filter((p) => p.status === 'PENDING');
@@ -247,6 +390,34 @@ export function useBulkReschedule({ desiredMinInterval, posts, selectedRowKeys, 
     }
     let scheduledTimes: Dayjs[] = [];
     if (bulkRescheduleMode === 'WINDOW') {
+      if (bulkRescheduleSpreadPerGroup) {
+        const spreadMap = computeGroupSpreadSchedule(
+          rescheduleTargetPosts,
+          bulkRescheduleDate,
+          bulkRescheduleStartTime,
+          bulkRescheduleEndTime,
+          bulkRescheduleMaxPerDay,
+          desiredMinInterval,
+          bulkRescheduleSameDayGap
+        );
+        const defaultFallback = dayjs.isDayjs(bulkRescheduleDate) ? bulkRescheduleDate : dayjs();
+        return rescheduleTargetPosts.map((p, idx) => {
+          let assignedNickValue: string | undefined = undefined;
+          let assignedNickName: string | undefined = undefined;
+          if (bulkRescheduleDistributeNicks && bulkRescheduleSelectedNicks.length > 0) {
+            assignedNickValue = bulkRescheduleSelectedNicks[idx % bulkRescheduleSelectedNicks.length];
+            const matched = postingIdentities.find((a) => accountTargetValue(a) === assignedNickValue);
+            assignedNickName = matched?.pageName || assignedNickValue;
+          }
+          return {
+            post: p,
+            newTime: spreadMap.get(Number(p.id)) || defaultFallback.add(idx * 15, 'minute'),
+            assignedNickValue,
+            assignedNickName,
+          };
+        });
+      }
+
       scheduledTimes = computeTimeWindowSchedule(
         bulkRescheduleDate,
         bulkRescheduleStartTime,
@@ -278,7 +449,7 @@ export function useBulkReschedule({ desiredMinInterval, posts, selectedRowKeys, 
         assignedNickName,
       };
     });
-  }, [rescheduleTargetPosts, bulkRescheduleMode, bulkRescheduleDate, bulkRescheduleStartTime, bulkRescheduleEndTime, bulkRescheduleInterval, bulkRescheduleMaxPerDay, bulkRescheduleSameDayGap, desiredMinInterval, computeTimeWindowSchedule, posts, viralMaxPerTargetPerDay, viralMinGapPerTarget, viralMinGapGlobal, viralJitter, viralSeed, bulkRescheduleDistributeNicks, bulkRescheduleSelectedNicks, postingIdentities]);
+  }, [rescheduleTargetPosts, bulkRescheduleMode, bulkRescheduleDate, bulkRescheduleStartTime, bulkRescheduleEndTime, bulkRescheduleInterval, bulkRescheduleMaxPerDay, bulkRescheduleSameDayGap, desiredMinInterval, bulkRescheduleSpreadPerGroup, computeGroupSpreadSchedule, computeTimeWindowSchedule, posts, viralMaxPerTargetPerDay, viralMinGapPerTarget, viralMinGapGlobal, viralJitter, viralSeed, bulkRescheduleDistributeNicks, bulkRescheduleSelectedNicks, postingIdentities]);
 
   // Thống kê nhanh cho preview: số ngày, số bài giờ vàng, khoảng cách thực tế
   const reschedulePreviewStats = useMemo(() => {
@@ -349,6 +520,7 @@ export function useBulkReschedule({ desiredMinInterval, posts, selectedRowKeys, 
 
   return {
     computeTimeWindowSchedule,
+    computeGroupSpreadSchedule,
     bulkRescheduleModalVisible,
     setBulkRescheduleModalVisible,
     bulkRescheduleTargetScope,
@@ -365,6 +537,8 @@ export function useBulkReschedule({ desiredMinInterval, posts, selectedRowKeys, 
     setBulkRescheduleInterval,
     bulkRescheduleInterleave,
     setBulkRescheduleInterleave,
+    bulkRescheduleSpreadPerGroup,
+    setBulkRescheduleSpreadPerGroup,
     bulkRescheduleMaxPerDay,
     setBulkRescheduleMaxPerDay,
     bulkRescheduleSameDayGap,
