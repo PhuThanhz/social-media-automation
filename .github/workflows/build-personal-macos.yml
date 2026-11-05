@@ -57,7 +57,13 @@ jobs:
       - name: Verify bundled runtime startup
         working-directory: frontend
         run: |
-          APP="src-tauri/target/${{ matrix.target }}/release/bundle/macos/ToolZutter Personal.app"
+          DMG=$(find "src-tauri/target/${{ matrix.target }}/release/bundle/dmg" -name '*.dmg' -print -quit)
+          MOUNT="$RUNNER_TEMP/ToolZutter Personal mounted"
+          mkdir -p "$MOUNT"
+          hdiutil attach "$DMG" -nobrowse -readonly -mountpoint "$MOUNT"
+          trap 'hdiutil detach "$MOUNT"' EXIT
+          APP="$MOUNT/ToolZutter Personal.app"
+          codesign --verify --deep --strict "$APP"
           node scripts/smoke-sidecar.mjs "$APP/Contents/Resources/sidecar"
       - name: Upload installable DMG
         uses: actions/upload-artifact@v4
