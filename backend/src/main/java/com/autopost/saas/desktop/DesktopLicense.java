@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -44,11 +45,19 @@ public class DesktopLicense {
     }
 
     private final ObjectMapper objectMapper;
+    @Value("${desktop.personal:false}")
+    private boolean personal;
+
+    public boolean isPersonal() { return personal; }
     private volatile Claims cached;
     private volatile long cachedAt;
 
     /** Token hợp lệ hiện tại; rỗng nếu chưa kích hoạt, sai chữ ký, sai máy hoặc hết hạn */
     public Optional<Claims> current() {
+        if (personal) {
+            return Optional.of(new Claims("PERSONAL", "", "Bản dùng riêng",
+                    Integer.MAX_VALUE, Integer.MAX_VALUE, null, 0, Long.MAX_VALUE));
+        }
         long now = System.currentTimeMillis();
         if (now - cachedAt > CACHE_MS) {
             cached = load();

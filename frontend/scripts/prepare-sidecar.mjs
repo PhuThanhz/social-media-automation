@@ -4,7 +4,7 @@
  *
  *   npm run sidecar:prepare
  *
- * Cần: JDK 21 có jlink (JAVA_HOME), Node để chạy npm, mạng để tải dependency.
+ * Cần: JDK 17+ có jlink (JAVA_HOME), Node để chạy npm, mạng để tải dependency.
  * Phải chạy trên đúng hệ điều hành của bản cài (macOS build bản mac, Windows build bản Windows):
  * JRE, Node và ffmpeg đều là binary theo nền tảng.
  *
@@ -44,7 +44,7 @@ function javaHome() {
   if (process.platform === 'darwin') {
     return execFileSync('/usr/libexec/java_home', ['-v', '21']).toString().trim();
   }
-  throw new Error('Thiếu JAVA_HOME (JDK 21)');
+  throw new Error('Thiếu JAVA_HOME (JDK 17+)');
 }
 
 function step(name) {
@@ -73,11 +73,14 @@ if (!process.env.SKIP_BACKEND) {
 
 if (!process.env.SKIP_JRE) {
   step('JRE (jlink)');
+  const jlink = path.join(JAVA_HOME, 'bin', exe('jlink'));
+  const jdkMajor = Number.parseInt(execFileSync(jlink, ['--version']).toString(), 10);
+  if (jdkMajor < 17) throw new Error('Cần JDK 17 trở lên để đóng gói backend');
   fs.rmSync(path.join(out, 'jre'), { recursive: true, force: true });
-  run(path.join(JAVA_HOME, 'bin', exe('jlink')), [
+  run(jlink, [
     '--add-modules', JRE_MODULES.join(','),
     '--include-locales', 'en,vi',
-    '--strip-debug', '--no-man-pages', '--no-header-files', '--compress', 'zip-6',
+    '--strip-debug', '--no-man-pages', '--no-header-files', '--compress', jdkMajor >= 21 ? 'zip-6' : '2',
     '--output', path.join(out, 'jre'),
   ]);
   // jlink tạo vài file chỉ đọc → bundler Tauri không ghi đè được ở lần build sau

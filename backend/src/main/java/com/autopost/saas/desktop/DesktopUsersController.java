@@ -70,6 +70,7 @@ public class DesktopUsersController {
 
     private Map<String, Object> plan() {
         Map<String, Object> plan = new LinkedHashMap<>();
+        plan.put("personal", license.isPersonal());
         license.current().ifPresent(c -> {
             plan.put("client", c.client());
             plan.put("licenseExp", c.licenseExp());

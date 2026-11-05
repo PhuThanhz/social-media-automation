@@ -16,6 +16,7 @@ interface DesktopUser {
 }
 
 interface Plan {
+  personal?: boolean;
   client?: string;
   licenseExp?: number | null;
   maxUsers: number;
@@ -194,7 +195,7 @@ const DesktopUsers = () => {
             <Card variant="borderless" size="small">
               <Statistic
                 title={<span className="text-xs text-slate-400 font-medium">Người dùng</span>}
-                value={`${plan.usedUsers} / ${plan.maxUsers}`}
+                value={plan.personal ? `${plan.usedUsers} / Không giới hạn` : `${plan.usedUsers} / ${plan.maxUsers}`}
                 valueStyle={{ fontSize: 16, fontWeight: 700, color: atLimit ? '#f59e0b' : '#39d497' }}
               />
             </Card>
@@ -203,7 +204,7 @@ const DesktopUsers = () => {
             <Card variant="borderless" size="small">
               <Statistic
                 title={<span className="text-xs text-slate-400 font-medium">Tài khoản (Via, Fanpage…)</span>}
-                value={`${plan.usedAccounts} / ${plan.maxAccounts}`}
+                value={plan.personal ? `${plan.usedAccounts} / Không giới hạn` : `${plan.usedAccounts} / ${plan.maxAccounts}`}
                 valueStyle={{ fontSize: 16, fontWeight: 700, color: plan.usedAccounts >= plan.maxAccounts ? '#f59e0b' : '#39d497' }}
               />
             </Card>

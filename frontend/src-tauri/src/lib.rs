@@ -1,7 +1,12 @@
 mod desktop_io;
 mod hwid;
+#[cfg(not(feature = "personal"))]
+mod license;
+#[cfg(feature = "personal")]
+#[path = "license_personal.rs"]
 mod license;
 mod sidecar;
+mod runtime_paths;
 
 use tauri::Manager;
 

@@ -26,6 +26,7 @@ worker:
 
 desktop:
   mode: true
+  personal: ${DESKTOP_PERSONAL:false}
 
 management:
   endpoints:

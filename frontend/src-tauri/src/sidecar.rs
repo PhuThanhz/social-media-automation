@@ -20,6 +20,7 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager};
 
 use crate::license;
+use crate::runtime_paths::runtime_path;
 
 const BACKEND_PORT: u16 = 47081;
 const WORKER_PORT: u16 = 47001;
@@ -256,8 +257,8 @@ fn ensure_chromium(p: &Paths, node: &Path, force: bool, services: &Services) -> 
 }
 
 fn boot(app: &AppHandle, services: &Services) -> Result<(), String> {
-    let res = app.path().resource_dir().map_err(|e| e.to_string())?.join("sidecar");
-    let data = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let res = runtime_path(&app.path().resource_dir().map_err(|e| e.to_string())?).join("sidecar");
+    let data = runtime_path(&app.path().app_data_dir().map_err(|e| e.to_string())?);
 
     // Bản dev chưa đóng gói sidecar: dùng backend/worker dev đang chạy, không token
     if !res.join("backend.jar").exists() {
@@ -314,6 +315,7 @@ fn boot(app: &AppHandle, services: &Services) -> Result<(), String> {
             .env("DESKTOP_WORKER_TOKEN", &worker_token)
             .env("APP_JWT_SECRET", &jwt_secret)
             .env("LICENSE_PUBLIC_KEY", crate::license::PUBLIC_KEY)
+            .env("DESKTOP_PERSONAL", cfg!(feature = "personal").to_string())
             .env("DESKTOP_HWID", &hwid)
             .env("PARENT_PID", &parent_pid)
             .env("FFMPEG_PATH", &ffmpeg)

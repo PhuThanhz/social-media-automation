@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "sidecar:prepare": "node scripts/prepare-sidecar.mjs"
+    "sidecar:prepare": "node scripts/prepare-sidecar.mjs",
+    "desktop:build:personal": "tauri build --features personal --config src-tauri/tauri.personal.conf.json --bundles nsis",
+    "desktop:build:personal:macos": "tauri build --features personal --config src-tauri/tauri.personal.conf.json --bundles dmg"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",
