@@ -20,11 +20,6 @@ jobs:
             node_arch: arm64
             java_arch: aarch64
             label: Apple-Silicon
-          - runner: macos-15-intel
-            target: x86_64-apple-darwin
-            node_arch: x64
-            java_arch: x64
-            label: Intel
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     steps:

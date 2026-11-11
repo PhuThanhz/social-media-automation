@@ -51,6 +51,7 @@ import NewsCardModal, { type NewsCardSource } from '../components/modals/NewsCar
 import PostDetailModal from '../components/modals/PostDetailModal';
 import QuickUpdateCookieModal from '../components/modals/QuickUpdateCookieModal';
 import PostingWindowPanel, { POSTING_WINDOW_QUERY_KEY } from '../components/common/PostingWindowPanel';
+import QueuePowerPanel from '../components/common/QueuePowerPanel';
 import HistoryPanel from './playwright-poster/HistoryPanel';
 import ComposeAdvancedOptions from './playwright-poster/ComposeAdvancedOptions';
 import ComposeContentSection from './playwright-poster/ComposeContentSection';
@@ -5706,6 +5707,8 @@ const PlaywrightPoster = () => {
           }}
         />
       )}
+
+      {workspaceTab === 'history' && <QueuePowerPanel />}
 
       {/* BẢNG LỊCH SỬ ĐĂNG BÀI VỚI BỘ LỌC THÔNG MINH */}
       {workspaceTab === 'history' && (
