@@ -112,7 +112,7 @@ function ArticleBatchModal({
       }
       open={showArticleBatchModal}
       onClose={() => setShowArticleBatchModal(false)}
-      width="95vw"
+      size="95vw"
       destroyOnClose
       className="dark-theme-drawer"
       extra={
@@ -146,7 +146,7 @@ function ArticleBatchModal({
                   <span className="animate-pulse text-emerald-400">📡</span> RADA THEO DÕI TIN TỨC MỚI 24/7:
                 </span>
                 {radarLastSweepTime && (
-                  <Tag color="cyan" className="text-[10px] font-bold border-0 px-2 py-0.5 rounded-full">
+                  <Tag color="cyan" className="!text-xs font-bold border-0 px-2.5 py-0.5 rounded-full">
                     Vừa quét: {radarLastSweepTime}
                   </Tag>
                 )}
@@ -282,7 +282,7 @@ function ArticleBatchModal({
                       setNewChannelCategory((activeCategoryTab as any) || 'bds');
                       setShowAddChannelModal(true);
                     }}
-                    className="text-[11px] text-blue-400 border-blue-600/60 hover:bg-blue-950/50 rounded-lg font-semibold"
+                    className="text-xs text-blue-300 border-blue-600/60 hover:bg-blue-950/50 rounded-lg font-semibold"
                   >
                     + Thêm Kênh Mới
                   </Button>
@@ -297,7 +297,7 @@ function ArticleBatchModal({
                         title={
                           <div className="text-xs p-0.5">
                             <div className="font-bold text-blue-300">{ch.name}</div>
-                            <div className="font-mono text-[11px] text-slate-300 break-all">{ch.url}</div>
+                            <div className="font-mono text-xs text-slate-200 break-all">{ch.url}</div>
                           </div>
                         }
                         placement="top"
@@ -330,7 +330,7 @@ function ArticleBatchModal({
                         title={
                           <div className="text-xs p-0.5">
                             <div className="font-bold text-emerald-300">{ch.name}</div>
-                            <div className="font-mono text-[11px] text-slate-300 break-all">{ch.url}</div>
+                            <div className="font-mono text-xs text-slate-200 break-all">{ch.url}</div>
                           </div>
                         }
                         placement="top"
@@ -359,26 +359,26 @@ function ArticleBatchModal({
                   size="small"
                   icon={<SearchOutlined />}
                   onClick={() => setShowChannelUrlList(!showChannelUrlList)}
-                  className="p-0 text-[11px] text-blue-400 hover:text-blue-300 font-bold flex items-center gap-1"
+                  className="p-0 text-xs text-blue-400 hover:text-blue-300 font-bold flex items-center gap-1"
                 >
                   {showChannelUrlList ? '▼ Ẩn danh sách đường link URL khai báo' : '🔍 Xem chi tiết đường link URL khai báo cho từng kênh nút bấm'}
                 </Button>
 
                 {showChannelUrlList && (
                   <div className="mt-2.5 p-3 bg-slate-950/80 rounded-xl border border-slate-800 space-y-2">
-                    <div className="text-[11px] font-bold text-slate-300 pb-1 border-b border-slate-800/80 flex items-center justify-between">
+                    <div className="text-xs font-bold text-slate-200 pb-1 border-b border-slate-800/80 flex items-center justify-between">
                       <span>🔗 ĐƯỜNG LINK KHAI BÁO CỦA CÁC KÊNH [{activeCategoryTab.toUpperCase()}]:</span>
-                      <span className="text-[10px] text-slate-500 font-normal">Rê chuột vào nút bấm để xem nhanh</span>
+                      <span className="text-xs text-slate-300 font-normal">Rê chuột vào nút bấm để xem nhanh</span>
                     </div>
                     <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
                       {customChannels
                         .filter((c) => c.category === activeCategoryTab)
                         .map((ch) => (
-                          <div key={ch.id} className="flex items-center justify-between gap-2 p-1.5 bg-slate-900/60 rounded-lg border border-slate-800/50 text-xs">
+                          <div key={ch.id} className="flex items-center justify-between gap-2 p-2 bg-slate-900/60 rounded-lg border border-slate-800/50 text-xs">
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-1.5">
-                                <span className="font-bold text-slate-200 text-xs truncate">{ch.name}</span>
-                                <Tag color={ch.type === 'rss' ? 'green' : 'blue'} className="text-[10px] border-0 px-1.5 py-0 rounded">
+                                <span className="font-bold text-slate-100 text-xs truncate">{ch.name}</span>
+                                <Tag color={ch.type === 'rss' ? 'green' : 'blue'} className="!text-xs border-0 px-1.5 py-0.5 rounded">
                                   {ch.type === 'rss' ? 'RSS 24/7' : 'Web Scraper'}
                                 </Tag>
                               </div>
@@ -386,7 +386,7 @@ function ArticleBatchModal({
                                 href={ch.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-[11px] font-mono text-blue-400 hover:underline truncate block"
+                                className="text-xs font-mono text-blue-400 hover:underline truncate block"
                               >
                                 {ch.url}
                               </a>
@@ -398,7 +398,7 @@ function ArticleBatchModal({
                                 navigator.clipboard.writeText(ch.url);
                                 message.success(`Đã copy link của ${ch.name}`);
                               }}
-                              className="text-[10px] text-slate-400 hover:text-slate-100 hover:bg-slate-800 rounded px-2 h-6 shrink-0"
+                              className="text-xs text-slate-300 hover:text-white hover:bg-slate-800 rounded px-2 h-7 shrink-0"
                             >
                               Copy Link
                             </Button>
@@ -462,7 +462,7 @@ function ArticleBatchModal({
 
             {articleBatchEnableAi && (
               <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
                   Phong cách biên tập lại nội dung:
                 </label>
                 <Select
@@ -598,7 +598,7 @@ function ArticleBatchModal({
                         }`}
                     >
                       {item.imported && (
-                        <div className="absolute -top-2 -right-2 z-10 bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md border border-emerald-400/60">
+                        <div className="absolute -top-2 -right-2 z-10 bg-emerald-600 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-md border border-emerald-400/60">
                           ✓ Đã nạp
                         </div>
                       )}
@@ -624,10 +624,10 @@ function ArticleBatchModal({
                         {/* 2. Nguồn & Thời gian đăng */}
                         <div className="flex items-center justify-between gap-1 flex-wrap">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <Tag color="cyan" className="font-bold text-[10px] uppercase border-0 rounded-md px-2 py-0.5">
+                            <Tag color="cyan" className="font-bold !text-xs uppercase border-0 rounded-md px-2 py-0.5">
                               {item.source || 'Tin Tức'}
                             </Tag>
-                            <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/80 border border-emerald-800/60 px-2 py-0.5 rounded-md flex items-center gap-1">
+                            <span className="text-xs font-mono text-emerald-300 bg-emerald-950/80 border border-emerald-800/60 px-2 py-0.5 rounded-md flex items-center gap-1">
                               🕒 {item.publishedTime || 'Mới xuất bản 24h'}
                             </span>
                           </div>
@@ -642,29 +642,29 @@ function ArticleBatchModal({
                         </div>
 
                         {/* 3. Tiêu đề & Nội dung Sapo */}
-                        <h4 className="text-xs font-bold text-slate-100 leading-snug line-clamp-2 hover:text-blue-300">
+                        <h4 className="text-[13px] font-bold text-slate-100 leading-snug line-clamp-2 hover:text-blue-300">
                           {item.title}
                         </h4>
 
                         {item.sapo && (
-                          <p className="text-[11px] text-slate-400 line-clamp-3 leading-relaxed">
+                          <p className="text-xs text-slate-300 line-clamp-3 leading-relaxed">
                             {item.sapo}
                           </p>
                         )}
                       </div>
 
                       {/* 4. Footer link bài gốc & trạng thái */}
-                      <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px]">
+                      <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-xs">
                         <a
                           href={item.url}
                           target="_blank"
                           rel="noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className="text-slate-400 hover:text-blue-400 truncate max-w-[200px] flex items-center gap-1"
+                          className="text-slate-300 hover:text-blue-400 truncate max-w-[200px] flex items-center gap-1"
                         >
                           🌐 Xem bài gốc
                         </a>
-                        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${item.selected ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                        <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${item.selected ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300'}`}>
                           {item.selected ? '✓ Được chọn' : 'Đã bỏ chọn'}
                         </span>
                       </div>

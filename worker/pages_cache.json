@@ -2,8 +2,8 @@
   "100009194846268": {
     "uid": "100009194846268",
     "viaName": "Làm Kinh Tế",
-    "updatedAt": "2026-10-18T09:17:38.120Z",
-    "count": 25,
+    "updatedAt": "2026-11-08T14:55:12.538Z",
+    "count": 26,
     "pages": [
       {
         "id": "61586984840264",
@@ -129,6 +129,11 @@
         "id": "100091970486196",
         "name": "Đại Sảnh Liên Minh Huyền Thoại",
         "url": "https://www.facebook.com/profile.php?id=100091970486196"
+      },
+      {
+        "id": "61596141190700",
+        "name": "Tiệm Len Nhà Phú",
+        "url": "https://www.facebook.com/profile.php?id=61596141190700"
       }
     ]
   },

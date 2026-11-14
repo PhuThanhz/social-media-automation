@@ -480,8 +480,8 @@ export default function VideoEditor(props: Props) {
         <div className="flex flex-col h-screen bg-[#0f1117] text-white">
           {/* Thanh trên */}
           <div className="flex items-center gap-2 px-3 h-11 border-b border-slate-800 bg-[#161b27] flex-shrink-0">
-            <span className="text-[13px] font-semibold pl-1">Video Editor</span>
-            <span className="text-[11px] text-slate-500 truncate max-w-[28vw]">{source.title}</span>
+            <span className="text-sm font-semibold pl-1">Video Editor</span>
+            <span className="text-xs text-slate-400 truncate max-w-[28vw]">{source.title}</span>
             <div className="flex items-center ml-2">
               <Tooltip title="Hoàn tác"><Button size="small" type="text" icon={<UndoOutlined />} disabled={!canUndo} onClick={undo} /></Tooltip>
               <Tooltip title="Làm lại"><Button size="small" type="text" icon={<RedoOutlined />} disabled={!canRedo} onClick={redo} /></Tooltip>
@@ -502,10 +502,10 @@ export default function VideoEditor(props: Props) {
 
           <div className="flex flex-1 min-h-0">
             {/* Thanh icon */}
-            <div className="w-[64px] flex-shrink-0 bg-[#121620] border-r border-slate-800 flex flex-col items-center py-2 gap-1">
+            <div className="w-[72px] flex-shrink-0 bg-[#121620] border-r border-slate-800 flex flex-col items-center py-2 gap-1">
               {LEFT_TABS.map((t) => (
                 <button key={t.value} type="button" onClick={() => setTab(t.value)}
-                  className={`w-[54px] h-[50px] rounded-md flex flex-col items-center justify-center gap-1 text-[10px] transition-colors ${tab === t.value ? 'bg-blue-600/20 text-blue-300' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/70'}`}>
+                  className={`w-[62px] h-[54px] rounded-md flex flex-col items-center justify-center gap-1 text-xs transition-colors ${tab === t.value ? 'bg-blue-600/20 text-blue-300' : 'text-slate-300 hover:text-white hover:bg-slate-800/70'}`}>
                   {t.icon}
                   <span>{t.label}</span>
                 </button>

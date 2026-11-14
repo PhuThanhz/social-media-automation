@@ -33,6 +33,8 @@ class PublishingControlCenterControllerTest {
     private PostQueueRepository postQueueRepository;
     private SocialAccountRepository socialAccountRepository;
     private PublishingControlCenterController controller;
+    private com.autopost.saas.scheduler.CampaignScheduler campaignScheduler;
+    private com.autopost.saas.service.PostingWindowService postingWindowService;
 
     private User testUser;
     private Authentication auth;
@@ -44,13 +46,18 @@ class PublishingControlCenterControllerTest {
         userRepository = Mockito.mock(UserRepository.class);
         postQueueRepository = Mockito.mock(PostQueueRepository.class);
         socialAccountRepository = Mockito.mock(SocialAccountRepository.class);
+        campaignScheduler = Mockito.mock(com.autopost.saas.scheduler.CampaignScheduler.class);
+        postingWindowService = Mockito.mock(com.autopost.saas.service.PostingWindowService.class);
+        Mockito.when(postingWindowService.defaultGapSeconds()).thenReturn(120);
 
         controller = new PublishingControlCenterController(
                 controlCenterService,
                 preflightService,
                 userRepository,
                 postQueueRepository,
-                socialAccountRepository
+                socialAccountRepository,
+                campaignScheduler,
+                postingWindowService
         );
 
         testUser = new User();
@@ -133,11 +140,22 @@ class PublishingControlCenterControllerTest {
 
         when(postQueueRepository.findById(99L)).thenReturn(Optional.of(post));
         when(preflightService.validatePost(isNull(), eq(post))).thenReturn(PreflightResult.success());
+        when(controlCenterService.preflightCheckPost(eq(10L), eq(99L), any())).thenReturn(PreflightResult.success());
 
         ResponseEntity<?> res = controller.preflightCheckPost(99L, auth);
         assertEquals(200, res.getStatusCode().value());
         assertTrue(res.getBody() instanceof PreflightResult);
         assertTrue(((PreflightResult) res.getBody()).isValid());
+    }
+
+    @Test
+    @DisplayName("bulk-reschedule xếp lại theo lịch đăng chung (khung giờ + làn nick)")
+    void bulkRescheduleUsesSharedSchedule() {
+        when(controlCenterService.bulkReschedulePosts(eq(10L), anyList(), any(), anyInt())).thenReturn(2);
+        Map<String, Object> body = new HashMap<>();
+        body.put("postIds", List.of(1, 2));
+        controller.bulkReschedule(body, auth);
+        Mockito.verify(campaignScheduler).packContinuousFrom(List.of(1L, 2L), 120, null);
     }
 }
 

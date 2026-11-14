@@ -464,9 +464,9 @@ public class VideoToolController {
                     targetLimit = Integer.parseInt(reqBody.get("limit").toString());
                 } catch (Exception ignored) {}
             }
-            // Worker đã chỉ đếm bài CHƯA ĐĂNG (nhờ excludeUrls/excludeIds bên dưới) nên chỉ cần dư thêm ít bài cho
-            // phần lọc trùng theo nội dung ở cuối — gấp 3 như trước làm mỗi lần quét lâu gấp ~2-3 lần mà không thêm bài mới
-            int rawLimit = Math.min(Math.max(targetLimit + 10, 15), 60);
+            // Worker đếm bài CHƯA ĐĂNG (loại trừ theo excludeUrls, excludeIds và excludeSnippets)
+            // nên chuyển targetLimit trực tiếp sang Worker để Worker cuộn sâu đến khi đủ số bài MỚI yêu cầu
+            int rawLimit = Math.min(Math.max(targetLimit, 5), 100);
             // Lọc theo ngày (dateFrom/dateTo dạng YYYY-MM-DD): Worker tự dừng khi cuộn qua ngày bắt đầu,
             // nên cho phép lấy nhiều hơn để vẫn đủ bài mới sau khi lọc trùng
             boolean dateMode = (reqBody.get("dateFrom") != null && !reqBody.get("dateFrom").toString().isBlank())
@@ -477,22 +477,28 @@ public class VideoToolController {
             reqBody.put("limit", rawLimit);
 
             String cookieString = (String) reqBody.get("cookieString");
-            if (cookieString == null || cookieString.isBlank()) {
-                // Tự động lấy Cookie Facebook cá nhân hoặc Fanpage còn hạn (VD: Làm Sen) từ CSDL
+            boolean isProvidedCookieExpired = false;
+            if (cookieString != null && !cookieString.isBlank()) {
+                String cUser = com.autopost.saas.service.SocialAccountService.extractCUser(cookieString);
+                if (cUser != null) {
+                    isProvidedCookieExpired = socialAccountRepository.findAll().stream()
+                            .anyMatch(a -> "EXPIRED".equalsIgnoreCase(a.getTokenStatus())
+                                    && a.getAccessToken() != null
+                                    && a.getAccessToken().contains("c_user=" + cUser));
+                }
+            }
+
+            if (cookieString == null || cookieString.isBlank() || isProvidedCookieExpired) {
+                // Tự động fallback sang Cookie Facebook còn hạn (tokenStatus == "OK") từ CSDL
                 try {
-                    cookieString = socialAccountRepository.findAll().stream()
-                            .filter(a -> a.getAccessToken() != null && !a.getAccessToken().isBlank())
-                            .sorted((a, b) -> {
-                                boolean aOk = "OK".equals(a.getTokenStatus());
-                                boolean bOk = "OK".equals(b.getTokenStatus());
-                                if (aOk && !bOk) return -1;
-                                if (!aOk && bOk) return 1;
-                                return Long.compare(b.getId(), a.getId());
-                            })
+                    String healthyCookie = socialAccountRepository.findAll().stream()
+                            .filter(a -> a.getAccessToken() != null && !a.getAccessToken().isBlank() && "OK".equalsIgnoreCase(a.getTokenStatus()))
+                            .sorted((a, b) -> Long.compare(b.getId(), a.getId()))
                             .map(com.autopost.saas.entity.SocialAccount::getAccessToken)
                             .findFirst()
                             .orElse(null);
-                    if (cookieString != null) {
+                    if (healthyCookie != null) {
+                        cookieString = healthyCookie;
                         reqBody.put("cookieString", cookieString);
                     }
                 } catch (Exception ignored) {}

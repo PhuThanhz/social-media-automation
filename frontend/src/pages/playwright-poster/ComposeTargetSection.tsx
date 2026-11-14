@@ -11,7 +11,9 @@ import {
   Radio,
   Switch,
   App,
+  TimePicker,
 } from 'antd';
+import dayjs, { type Dayjs } from 'dayjs';
 import {
   AppstoreOutlined,
   SendOutlined,
@@ -35,6 +37,10 @@ import {
   SaveOutlined,
   UserOutlined,
   DeploymentUnitOutlined,
+  EyeInvisibleOutlined,
+  BulbOutlined,
+  BarChartOutlined,
+  AimOutlined,
 } from '@ant-design/icons';
 import type { FormInstance } from 'antd';
 import type { SocialAccount, PostMode } from './types';
@@ -44,6 +50,12 @@ interface ComposeTargetSectionProps {
   postMode: PostMode;
   groupStaggerInterval: number;
   setGroupStaggerInterval: React.Dispatch<React.SetStateAction<number>>;
+  groupTimingMode: 'SPREAD_DAY' | 'STAGGER';
+  setGroupTimingMode: React.Dispatch<React.SetStateAction<'SPREAD_DAY' | 'STAGGER'>>;
+  groupSpreadStart: Dayjs;
+  setGroupSpreadStart: React.Dispatch<React.SetStateAction<Dayjs>>;
+  groupSpreadEnd: Dayjs;
+  setGroupSpreadEnd: React.Dispatch<React.SetStateAction<Dayjs>>;
   validLinkCount: number;
   setQuickCookieModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setQuickCookieTargetId: React.Dispatch<React.SetStateAction<number>>;
@@ -104,6 +116,12 @@ export default function ComposeTargetSection({
   postMode,
   groupStaggerInterval,
   setGroupStaggerInterval,
+  groupTimingMode,
+  setGroupTimingMode,
+  groupSpreadStart,
+  setGroupSpreadStart,
+  groupSpreadEnd,
+  setGroupSpreadEnd,
   validLinkCount,
   setQuickCookieModalOpen,
   setQuickCookieTargetId,
@@ -159,7 +177,7 @@ export default function ComposeTargetSection({
 }: ComposeTargetSectionProps) {
   const { message } = App.useApp();
   return (
-    <section className="poster-form-section">
+    <section id="poster-step-2" className="poster-form-section">
       <div className="poster-section-heading">
         <span className="poster-step-number">2</span>
         <div>
@@ -176,7 +194,7 @@ export default function ComposeTargetSection({
           message={
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <span className="text-xs sm:text-sm font-semibold text-red-400">
-                ⚠️ Fanpage <b>{selectedTargetAccount?.pageName || selectedTargetAccount?.platformAccountId}</b> đang <b>BỊ HẾT HẠN COOKIE</b>! Bài đăng chắc chắn sẽ bị lỗi nếu không cập nhật cookie mới.
+                Fanpage <b>{selectedTargetAccount?.pageName || selectedTargetAccount?.platformAccountId}</b> đang <b>BỊ HẾT HẠN COOKIE</b>! Bài đăng chắc chắn sẽ bị lỗi nếu không cập nhật cookie mới.
               </span>
               <Button
                 type="primary"
@@ -189,7 +207,7 @@ export default function ComposeTargetSection({
                 }}
                 className="font-extrabold text-xs rounded-lg h-8 px-3 shadow-md shrink-0 self-start sm:self-auto"
               >
-                ⚡ Cập Nhật Cookie Ngay
+                Cập Nhật Cookie Ngay
               </Button>
             </div>
           }
@@ -198,9 +216,9 @@ export default function ComposeTargetSection({
       )}
 
       {/* THANH COMBO THƯỜNG DÙNG (SPEED PRESETS BAR) */}
-      <div className="mb-5 p-3 rounded-xl bg-slate-900/80 border border-slate-800 shadow-md flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+      <div className="poster-preset-bar">
         {/* Khối chọn cấu hình */}
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center gap-2.5 flex-wrap flex-1 min-w-0">
           <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center shrink-0">
             <AppstoreOutlined className="text-xs" />
           </div>
@@ -208,7 +226,7 @@ export default function ComposeTargetSection({
           <Select
             value={selectedPresetId}
             placeholder={savedPresets.length === 0 ? "Chưa có cấu hình nào được lưu" : "Chọn cấu hình để áp dụng nhanh..."}
-            className="min-w-[280px] sm:min-w-[340px] max-w-full flex-1"
+            className="poster-preset-select"
             size="middle"
             allowClear
             disabled={savedPresets.length === 0}
@@ -222,21 +240,21 @@ export default function ComposeTargetSection({
               if (!p) return option.label;
               return (
                 <div className="flex items-center justify-between gap-2 py-0.5 group">
-                  <span className="truncate text-xs font-medium text-slate-200">
-                    {p.name} <span className="text-slate-400 font-normal">({p.selectedGroupIds.length > 0 ? `${p.selectedGroupIds.length} nhóm` : 'Tự chọn nhóm'} • {p.selectedFanpageIds.length} page)</span>
+                  <span className="truncate text-[13px] font-medium text-slate-100">
+                    {p.name} <span className="text-slate-300 font-normal">({p.selectedGroupIds.length > 0 ? `${p.selectedGroupIds.length} nhóm` : 'Tự chọn nhóm'} • {p.selectedFanpageIds.length} page)</span>
                   </span>
                   <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                     <Tooltip title="Đổi tên cấu hình">
                       <Button
                         size="small"
                         type="text"
-                        icon={<EditOutlined className="text-[11px] text-sky-400" />}
+                        icon={<EditOutlined className="text-xs text-sky-400" />}
                         onClick={(e) => {
                           e.stopPropagation();
                           setEditingPreset({ id: p.id, name: p.name });
                           setEditingPresetName(p.name);
                         }}
-                        className="!p-1 h-6 w-6 text-slate-400 hover:text-white hover:bg-slate-700"
+                        className="!p-1 h-7 w-7 text-slate-300 hover:text-white hover:bg-slate-700"
                       />
                     </Tooltip>
                     <Tooltip title="Xóa cấu hình">
@@ -254,9 +272,9 @@ export default function ComposeTargetSection({
                         <Button
                           size="small"
                           type="text"
-                          icon={<DeleteOutlined className="text-[11px] text-rose-400" />}
+                          icon={<DeleteOutlined className="text-xs text-rose-400" />}
                           onClick={(e) => e.stopPropagation()}
-                          className="!p-1 h-6 w-6 text-slate-400 hover:text-rose-300 hover:bg-rose-950/40"
+                          className="!p-1 h-7 w-7 text-slate-300 hover:text-rose-300 hover:bg-rose-950/40"
                         />
                       </Popconfirm>
                     </Tooltip>
@@ -344,12 +362,12 @@ export default function ComposeTargetSection({
                       <div className="text-sm font-bold text-slate-100 flex items-center gap-2 flex-wrap">
                         <span>Nhóm Facebook nhận bài</span>
                         {activeSelectedGroupIds.length > 0 ? (
-                          <Tag color="emerald" className="!rounded-full font-bold text-xs !m-0 border-0 bg-emerald-500/20 text-emerald-300">
-                            ✓ Đã chọn {activeSelectedGroupIds.length} nhóm
+                          <Tag color="emerald" className="!rounded-full font-bold text-xs !m-0 border-0 bg-emerald-500/20 text-emerald-300 inline-flex items-center gap-1">
+                            <CheckCircleOutlined /> Đã chọn {activeSelectedGroupIds.length} nhóm
                           </Tag>
                         ) : (
-                          <Tag color="warning" className="!rounded-full font-semibold text-xs !m-0 border-0 bg-amber-500/20 text-amber-300">
-                            ⚠️ Chưa chọn nhóm
+                          <Tag color="warning" className="!rounded-full font-semibold text-xs !m-0 border-0 bg-amber-500/20 text-amber-300 inline-flex items-center gap-1">
+                            <WarningOutlined /> Chưa chọn nhóm
                           </Tag>
                         )}
                       </div>
@@ -378,7 +396,7 @@ export default function ComposeTargetSection({
                   <Select
                     mode="multiple"
                     size="large"
-                    placeholder="🔍 Gõ tên hoặc ID nhóm Facebook để tìm kiếm và chọn nhanh..."
+                    placeholder="Gõ tên hoặc ID nhóm Facebook để tìm kiếm và chọn nhanh..."
                     showSearch
                     allowClear
                     optionFilterProp="filterLabel"
@@ -389,7 +407,7 @@ export default function ComposeTargetSection({
                       const strip = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
                       return strip(label).includes(strip(query));
                     }}
-                    className="w-full [&_.ant-select-arrow]:!top-4"
+                    className="w-full"
                     options={unifiedGroupOptions}
                   />
                 </Form.Item>
@@ -416,24 +434,24 @@ export default function ComposeTargetSection({
                           ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
                           : 'bg-slate-800/80 border-slate-700/60 text-slate-400'
                         }`}>
-                        🕵️
+                        <EyeInvisibleOutlined />
                       </div>
                       <div className="min-w-0">
-                        <div className="text-xs font-bold flex items-center gap-2 flex-wrap">
-                          <span className={isAnonymous ? 'text-amber-200' : 'text-slate-200'}>
+                        <div className="text-[13px] font-bold flex items-center gap-2 flex-wrap">
+                          <span className={isAnonymous ? 'text-amber-200' : 'text-slate-100'}>
                             Đăng ẩn danh vào Group
                           </span>
                           {isAnonymous ? (
-                            <Tag color="warning" className="!rounded-full text-[10px] font-bold !m-0 !px-2 border-0 bg-amber-500/20 text-amber-300">
+                            <Tag color="warning" className="!rounded-full !text-xs font-bold !m-0 !px-2 border-0 bg-amber-500/20 text-amber-300">
                               Ẩn danh tính {selectedTargetAccount?.pageName ? selectedTargetAccount.pageName.replace(/^👤\s*Nick Cá Nhân\s*\((.*)\)$/, '$1') : 'Nick cá nhân'}
                             </Tag>
                           ) : (
-                            <span className="text-[11px] text-slate-500 font-normal">
+                            <span className="text-xs text-slate-300 font-normal">
                               Thành viên ẩn danh
                             </span>
                           )}
                         </div>
-                        <div className="text-[11px] text-slate-400 truncate">
+                        <div className="text-xs text-slate-300 truncate">
                           Xuất bản bài dưới tư cách "Thành viên ẩn danh", bảo vệ danh tính tài khoản thật.
                         </div>
                       </div>
@@ -498,7 +516,7 @@ export default function ComposeTargetSection({
 
           {/* Hướng dẫn ngắn gọn, dễ hiểu cho người mới */}
           <div className="text-xs text-slate-300 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80 flex items-start gap-2 select-none">
-            <span className="text-sky-400 font-bold shrink-0 text-sm mt-[-1px]">💡</span>
+            <BulbOutlined className="text-sky-400 shrink-0 text-sm mt-0.5" />
             <span className="leading-relaxed">
               <b>Hướng dẫn:</b> Chọn Fanpage hoặc Nick cá nhân để đứng tên đăng bài vào Nhóm. Nếu chọn từ 2 tài khoản trở lên, hệ thống sẽ <b>tự động xoay vòng chia đều bài</b> để bảo vệ tài khoản an toàn chống checkpoint Facebook!
             </span>
@@ -516,14 +534,14 @@ export default function ComposeTargetSection({
               onClick={handleResetToSingleTarget}
               className={`h-8 px-3 rounded-lg text-xs font-semibold transition-all border cursor-pointer flex items-center gap-1.5 ${
                 activeSelectedFanpageIds.length === 1 && !isTwoViaActive
-                  ? 'bg-blue-500/20 text-blue-300 border-blue-500/50 shadow-xs ring-1 ring-blue-500/30'
+                  ? 'bg-blue-500/20 text-blue-300 border-blue-500/50 shadow-sm ring-1 ring-blue-500/30'
                   : 'bg-slate-800/80 text-slate-300 border-slate-700/80 hover:border-slate-600 hover:bg-slate-700/80 hover:text-white'
               }`}
               title="Đăng bằng 1 tài khoản đơn lẻ (Chế độ tiêu chuẩn)"
             >
               <UserOutlined className="text-xs text-slate-400" />
               <span>1 Tài khoản đơn lẻ</span>
-              {activeSelectedFanpageIds.length === 1 && !isTwoViaActive && <span className="text-xs font-bold text-blue-400">✓</span>}
+              {activeSelectedFanpageIds.length === 1 && !isTwoViaActive && <CheckCircleOutlined className="text-xs text-blue-400" />}
             </button>
 
             {/* Tất cả Page */}
@@ -559,14 +577,14 @@ export default function ComposeTargetSection({
                 onClick={handleQuickSelectTwoVias}
                 className={`h-8 px-3 rounded-lg text-xs font-semibold transition-all border cursor-pointer flex items-center gap-1.5 ${
                   isTwoViaActive
-                    ? 'bg-blue-500/20 text-blue-300 border-blue-500/50 shadow-xs ring-1 ring-blue-500/30'
+                    ? 'bg-blue-500/20 text-blue-300 border-blue-500/50 shadow-sm ring-1 ring-blue-500/30'
                     : 'bg-slate-800/80 text-slate-300 border-slate-700/80 hover:border-slate-600 hover:bg-slate-700/80 hover:text-white'
                 }`}
                 title="Dùng 2 Nick Via chạy song song để tăng gấp đôi tốc độ và chống checkpoint"
               >
                 <ThunderboltOutlined className="text-xs text-amber-400" />
                 <span>Song song 2 Via (Chống Spam)</span>
-                {isTwoViaActive && <span className="text-xs font-bold text-blue-400">✓</span>}
+                {isTwoViaActive && <CheckCircleOutlined className="text-xs text-blue-400" />}
               </button>
             )}
 
@@ -615,7 +633,7 @@ export default function ComposeTargetSection({
               <Select
                 mode="multiple"
                 size="large"
-                placeholder="🔍 Gõ tên Page hoặc Nick cá nhân để tìm kiếm và chọn nhanh..."
+                placeholder="Gõ tên Page hoặc Nick cá nhân để tìm kiếm và chọn nhanh..."
                 showSearch
                 allowClear
                 optionFilterProp="filterLabel"
@@ -638,19 +656,19 @@ export default function ComposeTargetSection({
                   const isCoAdmin = coAdmins.length > 1;
 
                   return (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-xs font-medium text-slate-200 mr-2 my-1 shadow-xs">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-xs font-medium text-slate-200 mr-2 my-1 shadow-sm">
                       {isPersonal ? <UserOutlined className="text-slate-400 text-xs" /> : <FileTextOutlined className="text-slate-400 text-xs" />}
                       <span className="font-semibold text-slate-100">{name}</span>
                       {isCoAdmin && (
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/35" title="Trang có nhiều Nick Via cùng làm quản trị viên">
+                        <span className="px-1.5 py-0.5 rounded text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/35" title="Trang có nhiều Nick Via cùng làm quản trị viên">
                           Co-Admin
                         </span>
                       )}
-                      {viaName && <span className="text-[11px] font-normal text-slate-400 bg-slate-900/60 px-1.5 py-0.5 rounded border border-slate-700/60">qua {viaName}</span>}
+                      {viaName && <span className="text-xs font-normal text-slate-300 bg-slate-900/60 px-1.5 py-0.5 rounded border border-slate-700/60">qua {viaName}</span>}
                       {closable && (
                         <CloseOutlined
                           onClick={onClose}
-                          className="text-slate-400 hover:text-rose-400 text-[10px] ml-0.5 cursor-pointer transition-colors"
+                          className="text-slate-300 hover:text-rose-400 text-xs ml-0.5 cursor-pointer transition-colors"
                         />
                       )}
                     </span>
@@ -664,7 +682,7 @@ export default function ComposeTargetSection({
                     setGroupDistributionMode('PAGE_PER_GROUP');
                   }
                 }}
-                className="w-full [&_.ant-select-arrow]:!top-4"
+                className="w-full"
                 options={unifiedAccountOptions}
               />
             </Form.Item>
@@ -680,7 +698,7 @@ export default function ComposeTargetSection({
 
             {/* Báo hiệu và nút hỗ trợ thông minh khi chọn Page đồng quản trị (Co-admin) */}
             {selectedCoAdminPageNames.length > 0 && !isAllCoAdminsSelected && (
-              <div className="mt-2.5 p-3 rounded-xl bg-purple-950/50 border border-purple-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-xs">
+              <div className="mt-2.5 p-3 rounded-xl bg-purple-950/40 border border-purple-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-sm">
                 <div className="flex items-center gap-2 text-xs text-purple-200">
                   <ThunderboltFilled className="text-purple-400 text-sm shrink-0" />
                   <span>
@@ -691,10 +709,10 @@ export default function ComposeTargetSection({
                   size="small"
                   type="primary"
                   icon={<ThunderboltOutlined />}
-                  className="bg-purple-600 hover:bg-purple-500 text-xs font-bold rounded-lg h-7.5 px-3 shrink-0"
+                  className="bg-purple-600 hover:bg-purple-500 text-xs font-bold rounded-lg h-8 px-3 shrink-0"
                   onClick={handleAutoSelectBothViasForSelectedPages}
                 >
-                  ⚡ Bật song song 2 Via
+                  Bật song song 2 Via
                 </Button>
               </div>
             )}
@@ -702,7 +720,9 @@ export default function ComposeTargetSection({
             {selectedCoAdminPageNames.length > 0 && isAllCoAdminsSelected && (
               <div className="mt-2.5 p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/40 flex items-center justify-between gap-2 text-xs text-emerald-200">
                 <div className="flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center shrink-0">✓</span>
+                  <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center shrink-0">
+                    <CheckCircleOutlined />
+                  </span>
                   <span>
                     Đang bật <b>chạy song song cho trang {selectedCoAdminPageNames.join(', ')}</b>: Hệ thống sẽ tự động dùng cả 2 Via luân phiên đăng bài vào các nhóm để chống checkpoint!
                   </span>
@@ -723,13 +743,21 @@ export default function ComposeTargetSection({
         {/* Tóm tắt nhanh Nơi đăng & Người đăng */}
         {postMode !== 'FANPAGE_ONLY' && (
           <div className="px-4 py-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-slate-300 flex items-center justify-between gap-2 flex-wrap">
-            <span className="flex items-center gap-2">
-              <span className="text-emerald-400 font-bold">👥 {activeSelectedGroupIds.length} Nhóm nhận bài</span>
-              <span className="text-slate-600">➔</span>
-              <span className="text-sky-400 font-bold">👤 {activeSelectedFanpageIds.length} Người đăng / Page đại diện</span>
+            <span className="flex items-center gap-2 flex-wrap">
+              <span className="text-emerald-400 font-bold inline-flex items-center gap-1.5">
+                <TeamOutlined /> {activeSelectedGroupIds.length} Nhóm nhận bài
+              </span>
+              <span className="text-slate-600">→</span>
+              <span className="text-sky-400 font-bold inline-flex items-center gap-1.5">
+                <UserOutlined /> {activeSelectedFanpageIds.length} Người đăng / Page đại diện
+              </span>
             </span>
-            <span className="text-slate-400 text-[11px]">
-              {activeSelectedGroupIds.length === 0 ? '⚠️ Hãy chọn ít nhất 1 nhóm ở cột bên trái' : '✓ Sẵn sàng xuất bản'}
+            <span className="text-slate-300 text-xs inline-flex items-center gap-1.5">
+              {activeSelectedGroupIds.length === 0 ? (
+                <><WarningOutlined className="text-amber-400" /> Hãy chọn ít nhất 1 nhóm ở cột bên trái</>
+              ) : (
+                <><CheckCircleOutlined className="text-emerald-400" /> Sẵn sàng xuất bản</>
+              )}
             </span>
           </div>
         )}
@@ -755,28 +783,12 @@ export default function ComposeTargetSection({
                     onChange={(val) => setDistributionStrategy(val)}
                     className="w-full"
                     options={[
-                      { value: 'ROUND_ROBIN', label: '🔄 Xoay vòng đều (Bài 1 ➔ Kênh A, Bài 2 ➔ Kênh B...)' },
-                      { value: 'DAILY_QUOTA', label: '🎯 Cân bằng theo chỉ tiêu ngày (Ưu tiên kênh thiếu bài)' },
-                      { value: 'STAGGERED', label: '⏰ Đăng so le giờ (Mỗi kênh cách nhau vài phút)' },
+                      { value: 'ROUND_ROBIN', label: 'Xoay vòng đều (Bài 1 → Kênh A, Bài 2 → Kênh B...)' },
+                      { value: 'DAILY_QUOTA', label: 'Cân bằng theo chỉ tiêu ngày (Ưu tiên kênh thiếu bài)' },
                     ]}
                   />
                 </div>
 
-                {distributionStrategy === 'STAGGERED' && (
-                  <div>
-                    <label className="text-xs font-semibold text-slate-300 block mb-1.5">
-                      Khoảng cách so le giữa các kênh (phút):
-                    </label>
-                    <InputNumber
-                      min={1}
-                      max={120}
-                      value={staggerIntervalMinutes}
-                      onChange={(v) => setStaggerIntervalMinutes(v || 2)}
-                      className="w-full"
-                      addonAfter="phút / kênh"
-                    />
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -792,10 +804,10 @@ export default function ComposeTargetSection({
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-bold text-slate-100 flex flex-wrap items-center gap-2">
-                    <span>⚡ Phân bổ Page / Nick đăng bài vào {activeSelectedGroupIds.length} Nhóm</span>
-                    <Tag color="cyan" className="!rounded-full text-[11px] font-bold shrink-0 m-0">Smart Allocation</Tag>
+                    <span>Phân bổ Page / Nick đăng bài vào {activeSelectedGroupIds.length} Nhóm</span>
+                    <Tag color="cyan" className="!rounded-full !text-xs font-bold shrink-0 m-0">Smart Allocation</Tag>
                   </div>
-                  <div className="text-xs text-slate-400 mt-0.5">
+                  <div className="text-[13px] text-slate-300 mt-0.5">
                     Tuỳ chỉnh số Page xuất bản (1 Page, 2 Page hoặc {activeSelectedGroupIds.length} Page) cho {activeSelectedGroupIds.length} Nhóm đã chọn.
                   </div>
                 </div>
@@ -808,13 +820,13 @@ export default function ComposeTargetSection({
                 className="shrink-0 flex flex-wrap sm:flex-nowrap"
               >
                 <Radio.Button value="PAGE_PER_GROUP" className="text-xs">
-                  🛡️ 1 Page / Nhóm (Khuyên dùng)
+                  <span className="inline-flex items-center gap-1"><SafetyCertificateOutlined /> 1 Page / Nhóm (Khuyên dùng)</span>
                 </Radio.Button>
                 <Radio.Button value="ROUND_ROBIN_POSTS" className="text-xs">
-                  🔄 Xoay vòng qua Nhóm
+                  <span className="inline-flex items-center gap-1"><SyncOutlined /> Xoay vòng qua Nhóm</span>
                 </Radio.Button>
                 <Radio.Button value="CROSS_ALL" className="text-xs">
-                  ⚡ Tất cả Page x Tất cả Nhóm
+                  <span className="inline-flex items-center gap-1"><ThunderboltOutlined /> Tất cả Page × Tất cả Nhóm</span>
                 </Radio.Button>
               </Radio.Group>
             </div>
@@ -823,11 +835,12 @@ export default function ComposeTargetSection({
             <div className="bg-slate-950/70 p-3.5 rounded-xl border border-indigo-900/50 text-xs text-slate-300 space-y-2.5">
               <div className="flex flex-wrap items-center justify-between gap-2 font-semibold text-indigo-200">
                 <span className="flex items-center gap-1.5">
-                  <span>📊 Dự kiến phân bổ công việc:</span>
-                  <span className="text-slate-400 font-normal">({validLinkCount || 10} bài x {activeSelectedGroupIds.length} Nhóm x {Math.max(1, activeSelectedFanpageIds.length)} Page)</span>
+                  <BarChartOutlined className="text-indigo-400" />
+                  <span>Dự kiến phân bổ công việc:</span>
+                  <span className="text-slate-400 font-normal">({validLinkCount || 10} bài × {activeSelectedGroupIds.length} Nhóm × {Math.max(1, activeSelectedFanpageIds.length)} Page)</span>
                 </span>
-                <Tag color="purple" className="!rounded-full font-mono text-xs px-2.5 py-0.5 font-bold">
-                  🎯 Tạo tổng cộng: {calculatedTotalQueueCount} bài queue
+                <Tag color="purple" className="!rounded-full font-mono text-xs px-2.5 py-0.5 font-bold inline-flex items-center gap-1">
+                  <AimOutlined /> Tạo tổng cộng: {calculatedTotalQueueCount} bài queue
                 </Tag>
               </div>
 
@@ -859,35 +872,124 @@ export default function ComposeTargetSection({
               )}
             </div>
 
-            {/* Hiển thị ô giãn cách khoảng cách thời gian khi chọn từ 2 Nhóm trở lên */}
+            {/* Cấu hình phân bổ thời gian cho Nhóm: Rải đều cả ngày vs Cuốn chiếu nối đuôi */}
             {hasMultipleGroupsSelected && (
-              <div className="pt-2 border-t border-indigo-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center shrink-0 text-purple-300">
-                    <ClockCircleOutlined className="text-sm" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-purple-200 flex items-center gap-1.5">
-                      <span>⏱️ Khoảng cách thời gian đăng giữa các nhóm:</span>
-                      <Tag color="purple" className="!rounded-full text-[10px] font-mono">Khuyên dùng: 2 - 3 phút (tự động cuốn chiếu)</Tag>
+              <div className="pt-3 border-t border-indigo-500/20 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center shrink-0 text-purple-300">
+                      <ClockCircleOutlined className="text-sm" />
                     </div>
-                    <div className="text-xs text-slate-400 mt-0.5">
-                      Tự động rải giãn thời gian giữa các nhóm để đảm bảo an toàn tuyệt đối cho tài khoản.
+                    <div>
+                      <div className="text-xs font-bold text-purple-200 flex items-center gap-1.5">
+                        <span>Phân bổ thời gian đăng giữa các nhóm:</span>
+                      </div>
+                      <div className="text-xs text-slate-400 mt-0.5">
+                        {groupTimingMode === 'SPREAD_DAY'
+                          ? 'Tự động rải đều và xen kẽ các nhóm suốt cả ngày, không bị dồn cục vào 1 khung giờ.'
+                          : 'Đăng các nhóm nối đuôi nhau liên tục với khoảng giãn cách ngắn.'}
+                      </div>
                     </div>
                   </div>
+
+                  <Radio.Group
+                    size="small"
+                    value={groupTimingMode}
+                    onChange={(e) => setGroupTimingMode(e.target.value)}
+                    className="self-start sm:self-auto shrink-0 bg-slate-950/80 p-0.5 rounded-lg border border-purple-500/30"
+                  >
+                    <Radio.Button value="SPREAD_DAY" className="!rounded-md text-xs font-semibold">
+                      <span className="inline-flex items-center gap-1"><AimOutlined /> Rải đều cả ngày</span>
+                    </Radio.Button>
+                    <Radio.Button value="STAGGER" className="!rounded-md text-xs">
+                      <span className="inline-flex items-center gap-1"><ClockCircleOutlined /> Cuốn chiếu ({groupStaggerInterval}p)</span>
+                    </Radio.Button>
+                  </Radio.Group>
                 </div>
-                <div className="flex items-center gap-2 shrink-0 bg-slate-950/70 p-1.5 rounded-xl border border-purple-500/30 self-start sm:self-auto">
-                  <span className="text-xs text-slate-300 font-semibold pl-1.5">Giãn cách:</span>
-                  <InputNumber
-                    min={1}
-                    max={1440}
-                    value={groupStaggerInterval}
-                    onChange={(val) => setGroupStaggerInterval(val || 2)}
-                    addonAfter="phút"
-                    className="w-28"
-                    size="middle"
-                  />
-                </div>
+
+                {groupTimingMode === 'SPREAD_DAY' ? (
+                  <div className="bg-slate-950/60 p-3 rounded-xl border border-purple-500/20 space-y-2.5">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 text-xs text-purple-200">
+                        <span className="font-semibold text-slate-300">Khung giờ rải:</span>
+                        <span>Từ</span>
+                        <TimePicker
+                          format="HH:mm"
+                          size="small"
+                          value={groupSpreadStart}
+                          onChange={(t) => t && setGroupSpreadStart(t)}
+                          className="w-24 bg-slate-900 border-purple-500/30"
+                        />
+                        <span>Đến</span>
+                        <TimePicker
+                          format="HH:mm"
+                          size="small"
+                          value={groupSpreadEnd}
+                          onChange={(t) => t && setGroupSpreadEnd(t)}
+                          className="w-24 bg-slate-900 border-purple-500/30"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-1 text-xs">
+                        <Button
+                          size="small"
+                          type="text"
+                          className="!text-xs !px-2 !h-7 text-purple-300 hover:text-white"
+                          onClick={() => {
+                            setGroupSpreadStart(dayjs().startOf('day').add(8, 'hour').add(30, 'minute'));
+                            setGroupSpreadEnd(dayjs().startOf('day').add(22, 'hour').add(30, 'minute'));
+                          }}
+                        >
+                          Cả ngày (08:30 - 22:30)
+                        </Button>
+                        <Button
+                          size="small"
+                          type="text"
+                          className="!text-xs !px-2 !h-7 text-purple-300 hover:text-white"
+                          onClick={() => {
+                            setGroupSpreadStart(dayjs().add(5, 'minute'));
+                            setGroupSpreadEnd(dayjs().add(6, 'hour'));
+                          }}
+                        >
+                          6 tiếng tới
+                        </Button>
+                      </div>
+                    </div>
+
+                    {(() => {
+                      const numGroups = Math.max(1, activeSelectedGroupIds.length);
+                      const postCount = Math.max(1, validLinkCount || 1);
+                      const totalSpanMins = Math.max(30, groupSpreadEnd.diff(groupSpreadStart, 'minute'));
+                      const gapPerHour = (totalSpanMins / 60 / postCount).toFixed(1);
+                      const interGroupGap = Math.min(15, Math.max(2, Math.floor(totalSpanMins / postCount / numGroups)));
+                      return (
+                        <div className="text-xs text-emerald-300 bg-emerald-950/30 border border-emerald-500/20 px-3 py-2 rounded-lg flex items-center gap-1.5">
+                          <CheckCircleOutlined />
+                          <span>
+                            Dự kiến: <b>{numGroups} nhóm</b> nhận đều bài suốt ngày. Mỗi nhóm cách nhau ~<b>{gapPerHour} tiếng/bài</b>. Các nhóm đăng xen kẽ xoay vòng cách nhau <b>{interGroupGap} phút</b>.
+                          </span>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-2 bg-slate-950/70 p-2.5 rounded-xl border border-purple-500/30">
+                    <span className="text-xs text-slate-300">
+                      Đăng lần lượt từng nhóm cách nhau:
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <InputNumber
+                        min={1}
+                        max={1440}
+                        value={groupStaggerInterval}
+                        onChange={(val) => setGroupStaggerInterval(val || 2)}
+                        addonAfter="phút"
+                        className="w-28"
+                        size="small"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

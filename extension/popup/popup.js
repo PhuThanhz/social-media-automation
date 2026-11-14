@@ -73,6 +73,59 @@ async function checkHealth() {
   });
 }
 
+// Gửi message tới tab, nếu tab chưa có Content Script thì tự động inject ngay lập tức
+async function sendMessageWithAutoInject(tab, message) {
+  return new Promise((resolve) => {
+    let responded = false;
+    const timer = setTimeout(() => {
+      if (!responded) {
+        responded = true;
+        resolve(null);
+      }
+    }, 2500);
+
+    chrome.tabs.sendMessage(tab.id, message, async (res) => {
+      if (responded) return;
+      if (!chrome.runtime.lastError && res) {
+        responded = true;
+        clearTimeout(timer);
+        return resolve(res);
+      }
+
+      // Thử tự động inject content script nếu tab mở trước khi cài/cập nhật extension
+      try {
+        if (chrome.scripting) {
+          try {
+            await chrome.scripting.insertCSS({
+              target: { tabId: tab.id },
+              files: ['content/content-style.css']
+            });
+          } catch (_) {}
+          await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ['content/content-script.js']
+          });
+        }
+        setTimeout(() => {
+          if (responded) return;
+          chrome.tabs.sendMessage(tab.id, message, (retryRes) => {
+            if (responded) return;
+            responded = true;
+            clearTimeout(timer);
+            resolve(retryRes || null);
+          });
+        }, 300);
+      } catch (err) {
+        if (!responded) {
+          responded = true;
+          clearTimeout(timer);
+          resolve(null);
+        }
+      }
+    });
+  });
+}
+
 // Lấy thông tin bài viết từ Tab đang mở
 async function loadCurrentTabPost() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -92,38 +145,48 @@ async function loadCurrentTabPost() {
     return;
   }
 
-  // Thử gửi message tới Content Script
-  chrome.tabs.sendMessage(tab.id, { action: 'GET_PAGE_LINKS' }, (res) => {
-    if (chrome.runtime.lastError || !res) {
-      currentDetectedPost = {
-        url: tab.url,
-        title: tab.title || 'Facebook'
-      };
-      if (tab.url.endsWith('facebook.com/') || tab.url === 'https://www.facebook.com') {
-        titleEl.textContent = 'Trang chủ Facebook (F5 để nhận diện bài)';
-        urlEl.textContent = 'Hãy F5 lại tab Facebook hoặc click vào 1 bài viết/Reel cụ thể.';
-      } else {
-        titleEl.textContent = tab.title || 'Bài viết';
-        urlEl.textContent = tab.url;
-      }
+  titleEl.textContent = 'Đang nhận diện bài viết...';
+  urlEl.textContent = 'Đang tìm link sạch trên trang...';
+
+  const res = await sendMessageWithAutoInject(tab, { action: 'GET_PAGE_LINKS' });
+
+  if (!res) {
+    currentDetectedPost = {
+      url: tab.url,
+      title: tab.title || 'Facebook'
+    };
+    if (tab.url.endsWith('facebook.com/') || tab.url === 'https://www.facebook.com') {
+      titleEl.textContent = 'Bảng tin Facebook (Cuộn xem bài viết)';
+      urlEl.textContent = 'Bấm "Quét Bài Đang Thấy" hoặc cuộn tới bài viết cụ thể.';
     } else {
-      currentDetectedPost = res.current || { url: tab.url, title: tab.title };
-      if (res.links && res.links.length > 0 && (!currentDetectedPost.url || currentDetectedPost.url.endsWith('facebook.com/') || currentDetectedPost.url === tab.url)) {
-        currentDetectedPost.url = res.links[0];
+      titleEl.textContent = tab.title || 'Bài viết';
+      urlEl.textContent = tab.url;
+    }
+  } else {
+    currentDetectedPost = res.current || { url: tab.url, title: tab.title };
+    const validLinks = (res.links || []).filter(l => !l.includes('/reel/?s=') && !l.endsWith('/reel/') && !l.endsWith('/watch') && !l.endsWith('facebook.com/') && l !== 'https://www.facebook.com');
+
+    if (validLinks.length > 0) {
+      if (!currentDetectedPost.url || currentDetectedPost.url.includes('/reel/?s=') || currentDetectedPost.url.endsWith('facebook.com/') || currentDetectedPost.url === tab.url) {
+        currentDetectedPost.url = validLinks[0];
       }
-      titleEl.textContent = currentDetectedPost.title || 'Bài viết Facebook / Threads';
+      titleEl.textContent = currentDetectedPost.title || 'Bài viết trên màn hình';
+      urlEl.textContent = currentDetectedPost.url;
+    } else {
+      titleEl.textContent = currentDetectedPost.title || 'Bài viết Facebook';
       urlEl.textContent = currentDetectedPost.url || tab.url;
     }
+  }
 
-    if (currentDetectedPost.url && (currentDetectedPost.url === 'https://www.facebook.com/' || currentDetectedPost.url === 'https://www.facebook.com')) {
-      document.getElementById('btn-send-current').disabled = true;
-      document.getElementById('btn-send-current').title = 'Vui lòng mở 1 bài viết/Reel cụ thể hoặc dùng tab Quét Hàng Loạt';
-    } else {
-      document.getElementById('btn-send-current').disabled = false;
-      document.getElementById('btn-send-current').title = '';
-    }
-    document.getElementById('btn-copy-current').disabled = false;
-  });
+  const isHomeOrEmpty = !currentDetectedPost.url || currentDetectedPost.url.endsWith('facebook.com/') || currentDetectedPost.url === 'https://www.facebook.com';
+  if (isHomeOrEmpty) {
+    document.getElementById('btn-send-current').disabled = true;
+    document.getElementById('btn-send-current').title = 'Vui lòng cuộn đến 1 bài viết cụ thể hoặc bấm tab Quét Hàng Loạt';
+  } else {
+    document.getElementById('btn-send-current').disabled = false;
+    document.getElementById('btn-send-current').title = '';
+  }
+  document.getElementById('btn-copy-current').disabled = false;
 }
 
 // Cập nhật giao diện danh sách batch
@@ -146,11 +209,27 @@ function renderBatchList() {
   batchScrapedUrls.forEach((url, idx) => {
     const item = document.createElement('div');
     item.className = 'batch-item';
+    item.style.display = 'flex';
+    item.style.alignItems = 'center';
+    item.style.justifyContent = 'space-between';
+    item.style.gap = '8px';
     item.innerHTML = `
-      <input type="checkbox" class="chk-batch-item" data-url="${encodeURIComponent(url)}" checked>
-      <span class="batch-item-url" title="${url}">${idx + 1}. ${url}</span>
+      <div style="display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1;">
+        <input type="checkbox" class="chk-batch-item" data-url="${encodeURIComponent(url)}" checked>
+        <span class="batch-item-url" title="${url}" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px;">${idx + 1}. ${url}</span>
+      </div>
+      <button class="btn-copy-single" data-url="${encodeURIComponent(url)}" title="Copy link này" style="padding: 3px 8px; font-size: 11px; border-radius: 6px; border: 1px solid #3b82f6; background: #1e3a8a; color: #fff; cursor: pointer; flex-shrink: 0;">📋 Copy</button>
     `;
     listEl.appendChild(item);
+  });
+
+  listEl.querySelectorAll('.btn-copy-single').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const u = decodeURIComponent(btn.dataset.url);
+      await copyToClipboard(u);
+      showAlert(`📋 Đã copy link vào clipboard!`, 'success', 2500);
+    });
   });
 }
 
@@ -162,16 +241,15 @@ async function scanPageLinks(isDeep = false) {
   showAlert(isDeep ? '⏳ Đang cuộn trang và cào sâu...' : '⏳ Đang quét bài...', 'info');
 
   const action = isDeep ? 'SCROLL_AND_COLLECT' : 'GET_PAGE_LINKS';
-  chrome.tabs.sendMessage(tab.id, { action, scrollCount: 4 }, (res) => {
-    if (chrome.runtime.lastError || !res || !res.links || res.links.length === 0) {
-      showAlert('⚠️ Hãy F5 lại trang Facebook một lần rồi bấm quét lại nhé!', 'error', 4500);
-      return;
-    }
+  const res = await sendMessageWithAutoInject(tab, { action, scrollCount: 4 });
+  if (!res || !res.links || res.links.length === 0) {
+    showAlert('⚠️ Không tìm thấy bài viết nào trên màn hình. Hãy cuộn xem bài rồi quét lại nhé!', 'error', 4500);
+    return;
+  }
 
-    batchScrapedUrls = res.links;
-    renderBatchList();
-    showAlert(`🎉 Đã quét được ${res.links.length} bài viết / Reels!`, 'success');
-  });
+  batchScrapedUrls = res.links.filter(l => !l.includes('/reel/?s=') && !l.endsWith('/reel/') && !l.endsWith('/watch') && !l.endsWith('facebook.com/') && l !== 'https://www.facebook.com');
+  renderBatchList();
+  showAlert(`🎉 Đã quét được ${batchScrapedUrls.length} bài viết / Reels!`, 'success');
 }
 
 // Tải Cookie FB hiện tại
@@ -199,12 +277,79 @@ function loadFacebookCookies() {
   });
 }
 
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// Tải danh sách các bài viết đã thu thập (copy / đẩy từ Newfeed)
+async function loadCollectedLinks() {
+  chrome.runtime.sendMessage({ action: 'GET_COLLECTED_LINKS' }, (res) => {
+    const list = res && Array.isArray(res.list) ? res.list : [];
+    const countEl = document.getElementById('collected-count');
+    const sendNumEl = document.getElementById('collected-send-num');
+    const container = document.getElementById('collected-list');
+    const sendBtn = document.getElementById('btn-send-all-collected');
+
+    if (countEl) countEl.textContent = list.length;
+    if (sendNumEl) sendNumEl.textContent = list.length;
+
+    if (list.length === 0) {
+      if (container) {
+        container.innerHTML = `
+          <div class="empty-state" style="padding: 10px; font-size: 11px; text-align: center; color: #94a3b8;">
+            Chưa copy bài nào. Hãy bấm [Copy Link] hoặc [Đẩy sang Tool] trên Newfeed để gom bài!
+          </div>
+        `;
+      }
+      if (sendBtn) sendBtn.style.display = 'none';
+      return;
+    }
+
+    if (sendBtn) sendBtn.style.display = 'block';
+
+    if (container) {
+      container.innerHTML = list.map((item, idx) => `
+        <div class="batch-item" style="padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+          <div style="min-width: 0; flex: 1;">
+            <div style="font-size: 11px; font-weight: 600; color: #f1f5f9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              ${idx + 1}. ${escapeHtml(item.title || 'Bài viết Facebook')}
+            </div>
+            <div style="font-size: 10px; color: #60a5fa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              ${escapeHtml(item.url)}
+            </div>
+          </div>
+          <button class="btn-text btn-copy-one-collected" data-url="${escapeHtml(item.url)}" style="font-size: 11px; padding: 2px 6px; flex-shrink: 0;" title="Copy riêng link này">
+            📋
+          </button>
+        </div>
+      `).join('');
+
+      container.querySelectorAll('.btn-copy-one-collected').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const u = btn.getAttribute('data-url');
+          if (u) {
+            await copyToClipboard(u);
+            showAlert('📋 Đã copy link bài viết!', 'success');
+          }
+        });
+      });
+    }
+  });
+}
+
 // Khởi chạy khi popup mở
 document.addEventListener('DOMContentLoaded', async () => {
   initTabs();
   checkHealth();
   loadCurrentTabPost();
   loadFacebookCookies();
+  loadCollectedLinks();
 
   // Load config vào settings
   chrome.runtime.sendMessage({ action: 'GET_CONFIG' }, (cfg) => {
@@ -243,10 +388,72 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Nút Copy link sạch hiện tại
   document.getElementById('btn-copy-current').addEventListener('click', async () => {
-    if (currentDetectedPost && currentDetectedPost.url) {
-      await copyToClipboard(currentDetectedPost.url);
-      showAlert('📋 Đã copy link vào clipboard!', 'success');
+    let url = currentDetectedPost && currentDetectedPost.url;
+    const isInvalid = !url || url.endsWith('facebook.com/') || url === 'https://www.facebook.com';
+
+    if (isInvalid) {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tab) {
+        const res = await sendMessageWithAutoInject(tab, { action: 'GET_PAGE_LINKS' });
+        const validLinks = (res?.links || []).filter(l => !l.includes('/reel/?s=') && !l.endsWith('/reel/') && !l.endsWith('/watch') && !l.endsWith('facebook.com/') && l !== 'https://www.facebook.com');
+        if (validLinks.length > 0) {
+          url = validLinks[0];
+          currentDetectedPost = { url, title: 'Bài viết đang thấy' };
+          document.getElementById('current-post-url').textContent = url;
+        }
+      }
     }
+
+    if (url && !url.endsWith('facebook.com/') && url !== 'https://www.facebook.com') {
+      await copyToClipboard(url);
+      showAlert(`📋 Đã copy link vào clipboard!`, 'success');
+    } else {
+      showAlert('⚠️ Chưa nhận diện được bài viết cụ thể. Hãy bấm tab "Quét Hàng Loạt" để lấy toàn bộ bài nhé!', 'error', 3500);
+    }
+  });
+
+  // ── Sự kiện cho danh sách Đã Thu Thập (Collected Links) ──
+  document.getElementById('btn-copy-all-collected')?.addEventListener('click', () => {
+    chrome.runtime.sendMessage({ action: 'GET_COLLECTED_LINKS' }, async (res) => {
+      const list = res?.list || [];
+      if (list.length === 0) return showAlert('⚠️ Chưa có link nào để copy', 'error');
+      const allUrls = list.map(item => item.url).join('\n');
+      await copyToClipboard(allUrls);
+      showAlert(`📋 Đã copy toàn bộ ${list.length} link vào clipboard!`, 'success');
+    });
+  });
+
+  document.getElementById('btn-clear-collected')?.addEventListener('click', () => {
+    chrome.runtime.sendMessage({ action: 'CLEAR_COLLECTED_LINKS' }, () => {
+      loadCollectedLinks();
+      showAlert('🗑️ Đã xoá sạch danh sách thu thập', 'success');
+    });
+  });
+
+  document.getElementById('btn-send-all-collected')?.addEventListener('click', () => {
+    chrome.runtime.sendMessage({ action: 'GET_COLLECTED_LINKS' }, (res) => {
+      const list = res?.list || [];
+      if (list.length === 0) return;
+      const urls = list.map(item => item.url);
+      const btn = document.getElementById('btn-send-all-collected');
+      btn.disabled = true;
+      btn.innerHTML = '<span>⏳</span> Đang gửi cả danh sách sang Tool...';
+      const publishNow = document.getElementById('chk-publish-now')?.checked || false;
+
+      chrome.runtime.sendMessage({
+        action: 'SEND_URLS_TO_QUEUE',
+        urls,
+        options: { publishNow }
+      }, (resp) => {
+        btn.disabled = false;
+        btn.innerHTML = `<span>🚀</span> Đẩy Toàn Bộ (${list.length}) Bài Vào Hàng Đợi Tool`;
+        if (resp && resp.success) {
+          showAlert(`🎉 Đã thêm thành công ${urls.length} bài vào Hàng Đợi ToolZutter!`, 'success');
+        } else {
+          showAlert(`❌ Lỗi gửi: ${resp?.message || 'Lỗi server'}`, 'error');
+        }
+      });
+    });
   });
 
   // Nút Quét bài đang thấy

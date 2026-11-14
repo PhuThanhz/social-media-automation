@@ -80,15 +80,15 @@ function KpiTargetsModal({
         <div className="max-h-[60vh] overflow-y-auto pr-1 space-y-5">
           {kpiFanpageAccounts.length > 0 && (
             <div>
-              <div className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+              <div className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2 flex items-center gap-1.5">
                 <FacebookFilled className="text-blue-600" /> Fanpage
               </div>
               <div className="grid sm:grid-cols-2 gap-2">
                 {kpiFanpageAccounts.map((a) => (
                   <div key={a.id} className="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50">
                     <div className="min-w-0">
-                      <span className="font-bold text-xs text-slate-800 block truncate">{a.pageName || `#${a.id}`}</span>
-                      <span className="text-[10px] text-slate-400 font-mono">ID kết nối: {a.id}</span>
+                      <span className="font-bold text-[13px] text-slate-800 block truncate">{a.pageName || `#${a.id}`}</span>
+                      <span className="text-xs text-slate-500 font-mono">ID kết nối: {a.id}</span>
                     </div>
                     <InputNumber
                       min={0}
@@ -107,7 +107,7 @@ function KpiTargetsModal({
             <div>
               <Divider className="!my-3" />
               <div className="flex items-center justify-between gap-2 mb-2">
-                <div className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                <div className="text-xs font-bold text-slate-600 uppercase tracking-wide flex items-center gap-1.5">
                   <TeamOutlined className="text-purple-600" /> Group
                 </div>
               </div>
@@ -115,17 +115,17 @@ function KpiTargetsModal({
               {kpiGroupAccounts.length > 1 && (
                 <div className="flex flex-wrap items-center gap-2 p-3 mb-3 rounded-xl border border-dashed border-purple-300 bg-purple-50/60">
                   <ThunderboltOutlined className="text-purple-600" />
-                  <span className="text-[11px] font-semibold text-purple-700 shrink-0">Áp dụng nhanh cho tất cả Group:</span>
+                  <span className="text-xs font-semibold text-purple-700 shrink-0">Áp dụng nhanh cho tất cả Group:</span>
                   <Select
-                    size="small"
+                    size="middle"
                     placeholder="Chọn Fanpage"
                     value={bulkGroupFanpageId}
                     onChange={setBulkGroupFanpageId}
-                    className="w-40"
+                    className="w-44"
                     options={kpiFanpageAccounts.map((fp) => ({ value: fp.id, label: fp.pageName || `#${fp.id}` }))}
                   />
                   <Button
-                    size="small"
+                    size="middle"
                     type="primary"
                     disabled={!bulkGroupFanpageId}
                     loading={bulkGroupApplying}
@@ -143,8 +143,8 @@ function KpiTargetsModal({
                     <div key={a.id} className="p-3 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
-                          <span className="font-bold text-xs text-slate-800 block truncate">{a.pageName || `#${a.id}`}</span>
-                          <span className="text-[10px] text-slate-400 font-mono">ID kết nối: {a.id}</span>
+                          <span className="font-bold text-[13px] text-slate-800 block truncate">{a.pageName || `#${a.id}`}</span>
+                          <span className="text-xs text-slate-500 font-mono">ID kết nối: {a.id}</span>
                         </div>
                         <InputNumber
                           min={0}

@@ -72,7 +72,7 @@ function CustomCreModal({
         </div>
 
         <div className="space-y-2">
-          <div className="text-[11px] font-bold text-slate-400">Gợi ý nhanh (Bấm để chọn ngay):</div>
+          <div className="text-xs font-bold text-slate-300">Gợi ý nhanh (Bấm để chọn ngay):</div>
           <div className="flex flex-wrap gap-1.5">
             {['Sưu tầm', 'ST', 'Nguồn tổng hợp', 'Internet', 'Gia đình', 'Fanpage', 'TikTok'].map((preset) => (
               <Tag

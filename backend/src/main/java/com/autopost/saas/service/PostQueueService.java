@@ -47,6 +47,8 @@ public class PostQueueService {
     private final WorkerRouterService workerRouterService;
     private final ViaCookieFollowService viaCookieFollowService;
     private final NickThrottleService nickThrottleService;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private PostingWindowService postingWindowService;
     private final SocialAccountService socialAccountService;
     private final com.autopost.saas.repository.PostExecutionAttemptRepository postExecutionAttemptRepository;
     private final com.autopost.saas.publishing.service.PublishingPreflightService publishingPreflightService;
@@ -505,7 +507,7 @@ public class PostQueueService {
         long startPublishMillis = System.currentTimeMillis();
 
         // Giới hạn số bài/ngày cho Fanpage này (tránh bị Facebook đánh dấu spam khi đăng dồn dập).
-        // Nếu đã đạt giới hạn, dời bài này sang đúng giờ đó của ngày mai thay vì đăng luôn.
+        // Nếu đã đạt giới hạn, dời bài sang giờ mở khung đăng của ngày mai (khung tắt thì 08:00 sáng mai).
         if (account.getMaxPostsPerDay() != null && account.getMaxPostsPerDay() > 0) {
             LocalDateTime startOfDay = LocalDateTime.now().toLocalDate().atStartOfDay();
             long publishedToday = postQueueRepository.countPublishedTodayForFanpage(account.getPlatformAccountId(), startOfDay);
@@ -513,7 +515,7 @@ public class PostQueueService {
                 log.info("⏸️ Fanpage {} đã đạt giới hạn {} bài/ngày (đã đăng {} bài hôm nay) — dời Post ID {} sang ngày mai.",
                         account.getPageName(), account.getMaxPostsPerDay(), publishedToday, postId);
                 post.setStatus("PENDING");
-                post.setScheduledAt(LocalDateTime.now().plusDays(1));
+                post.setScheduledAt(nextDayOpening(LocalDateTime.now()));
                 postQueueRepository.save(post);
                 return false;
             }
@@ -1069,6 +1071,28 @@ public class PostQueueService {
                         }
                     }
                 }
+            }
+        }
+
+        // Ưu tiên đưa các kết nối thuộc Via Huỳnh Thạnh Phú (UID: 100009194846268) lên hàng đầu,
+        // nhưng nếu người dùng đã chỉ định đích danh preferredConnectionId thì giữ nguyên ở vị trí đầu.
+        if (candidates.size() > 1) {
+            SocialAccount first = candidates.get(0);
+            boolean keepExplicitFirst = preferredConnectionId != null && first.getId().equals(preferredConnectionId);
+            List<SocialAccount> rest = new ArrayList<>(keepExplicitFirst ? candidates.subList(1, candidates.size()) : candidates);
+            rest.sort((a, b) -> {
+                String cUserA = extractCUserFromAccount(a);
+                String cUserB = extractCUserFromAccount(b);
+                boolean isPhuA = "100009194846268".equals(cUserA);
+                boolean isPhuB = "100009194846268".equals(cUserB);
+                if (isPhuA && !isPhuB) return -1;
+                if (!isPhuA && isPhuB) return 1;
+                return 0;
+            });
+            if (keepExplicitFirst) {
+                candidates.clear();
+                candidates.add(first);
+                candidates.addAll(rest);
             }
         }
 
@@ -2202,5 +2226,17 @@ public class PostQueueService {
 
         log.info("🔄 [Reset Failed] Đã chuyển thành công {} bài lỗi về PENDING với bước nhảy {}s/bài.", failedPosts.size(), step);
         return failedPosts.size();
+    }
+
+    /** Đầu khung giờ đăng của ngày hôm sau (dùng khi nick/page đã đủ số bài trong ngày). */
+    LocalDateTime nextDayOpening(LocalDateTime now) {
+        java.time.LocalTime open = java.time.LocalTime.of(8, 0);
+        try {
+            if (postingWindowService != null && postingWindowService.get().enabled()) {
+                open = postingWindowService.get().start();
+            }
+        } catch (Exception ignored) {
+        }
+        return now.toLocalDate().plusDays(1).atTime(open);
     }
 }

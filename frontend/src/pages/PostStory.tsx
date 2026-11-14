@@ -20,6 +20,8 @@ import {
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
 import api from '../config/axios';
+import ScheduleChoice from '../components/common/ScheduleChoice';
+import type { ScheduleMode, ScheduleValue } from '../components/common/postingSchedule';
 import PostStoryLogPanel from '../components/common/PostStoryLogPanel';
 import { DEFAULT_FANPAGE_PLATFORM_ACCOUNT_ID } from '../config/constants';
 
@@ -84,7 +86,10 @@ const PostStory = () => {
   const [targetMode, setTargetMode] = useState<'SELECT' | 'DIRECT'>('SELECT');
   const [mediaType, setMediaType] = useState<'video' | 'photo'>('video');
   const [saveConnection, setSaveConnection] = useState<boolean>(true);
-  const [scheduleMode, setScheduleMode] = useState<'GOLDEN_HOURS' | 'NOW' | 'LATER'>('GOLDEN_HOURS');
+  // Thời gian đăng: Đăng ngay / Xếp vào lịch / Hẹn giờ — giờ cụ thể theo Lịch đăng chung (badge trên header)
+  const [storySchedule, setStorySchedule] = useState<ScheduleValue>({ mode: 'QUEUE' });
+  const scheduleMode = storySchedule.mode;
+  const setScheduleMode = (mode: ScheduleMode) => setStorySchedule((prev) => ({ ...prev, mode }));
   const [step, setStep] = useState<0 | 1 | 2>(0);
 
   // Link Shopee / Affiliate (mặc định tắt)
@@ -92,7 +97,6 @@ const PostStory = () => {
 
   // Danh sách link Story dạng text
   const [storyUrlsText, setStoryUrlsText] = useState<string>('');
-  const [batchIntervalMinutes, setBatchIntervalMinutes] = useState<number>(15);
 
   // Danh sách Clips đã trích xuất/xem trước
   const [clips, setClips] = useState<StoryClipItem[]>([]);
@@ -112,67 +116,6 @@ const PostStory = () => {
   const timerRef = useRef<any>(null);
   const startTimeRef = useRef<number>(0);
 
-  // 4 Khung Giờ Vàng Chuẩn của Facebook Story
-  const goldenHourSlots = [
-    { name: 'Sáng', emoji: '', hour: 8, minute: 0, tagColor: 'orange', desc: '07:30 - 08:30' },
-    { name: 'Trưa', emoji: '', hour: 12, minute: 0, tagColor: 'cyan', desc: '11:45 - 12:45' },
-    { name: 'Tối', emoji: '', hour: 20, minute: 0, tagColor: 'purple', desc: '19:45 - 20:45' },
-    { name: 'Đêm', emoji: '', hour: 22, minute: 30, tagColor: 'indigo', desc: '22:30 - 23:30' },
-  ];
-
-  // Tính toán trước danh sách mốc Giờ Vàng cho từng Story
-  const goldenTimeline = useMemo(() => {
-    const totalClips = clips.length > 0 ? clips.length : (storyUrlsText.split('\n').filter(u => u.trim()).length || 1);
-    const now = dayjs();
-    const result: Array<{ index: number; slotName: string; emoji: string; time: Dayjs; label: string; tagColor: string; desc: string }> = [];
-
-    let currentDay = now.startOf('day');
-    let searchSlotIndex = 0;
-
-    // Tìm slot giờ vàng đầu tiên vẫn còn ở tương lai trong ngày hôm nay
-    let firstSlotFound = false;
-    for (let i = 0; i < goldenHourSlots.length; i++) {
-      const slotTime = currentDay.hour(goldenHourSlots[i].hour).minute(goldenHourSlots[i].minute);
-      if (slotTime.isAfter(now.add(10, 'minute'))) {
-        searchSlotIndex = i;
-        firstSlotFound = true;
-        break;
-      }
-    }
-    if (!firstSlotFound) {
-      currentDay = currentDay.add(1, 'day');
-      searchSlotIndex = 0;
-    }
-
-    for (let c = 0; c < totalClips; c++) {
-      const slot = goldenHourSlots[searchSlotIndex];
-      // Jitter ngẫu nhiên +1 đến +5 phút để tự nhiên
-      const jitterMins = ((c * 3 + 2) % 6);
-      const scheduledTime = currentDay.hour(slot.hour).minute(slot.minute).add(jitterMins, 'minute');
-
-      const isToday = scheduledTime.isSame(now, 'day');
-      const isTomorrow = scheduledTime.isSame(now.add(1, 'day'), 'day');
-      const dayLabel = isToday ? 'Hôm nay' : (isTomorrow ? 'Ngày mai' : scheduledTime.format('DD/MM'));
-
-      result.push({
-        index: c + 1,
-        slotName: slot.name,
-        emoji: slot.emoji,
-        time: scheduledTime,
-        label: `${slot.emoji} ${slot.name} (${dayLabel}) lúc ${scheduledTime.format('HH:mm')}`,
-        tagColor: slot.tagColor,
-        desc: slot.desc
-      });
-
-      searchSlotIndex++;
-      if (searchSlotIndex >= goldenHourSlots.length) {
-        searchSlotIndex = 0;
-        currentDay = currentDay.add(1, 'day');
-      }
-    }
-
-    return result;
-  }, [clips.length, storyUrlsText]);
 
   // Modal Đặt KPI Story & Bộ lọc giao diện
   const [kpiModalOpen, setKpiModalOpen] = useState(false);
@@ -741,7 +684,6 @@ const PostStory = () => {
 
     const total = itemsToPost.length;
     const results: StoryResultItem[] = [];
-    const baseScheduleTime: Dayjs = values.scheduledAt || dayjs().add(15, 'minute');
 
     for (let i = 0; i < total; i++) {
       const item = itemsToPost[i];
@@ -752,25 +694,24 @@ const PostStory = () => {
       const targetMediaUrl = item.resolvedMediaUrl || item.originalUrl;
       const clipTitle = item.title || `Story #${storyIndex}`;
 
-      if (scheduleMode === 'GOLDEN_HOURS') {
-        const goldenSlot = goldenTimeline[i] || goldenTimeline[0];
-        const itemScheduledAt = goldenSlot.time;
-        setCurrentProgressText(`🌟 [${storyIndex}/${total}] Lên lịch Giờ Vàng (${goldenSlot.label}) cho: ${clipTitle.slice(0, 30)}...`);
+      if (scheduleMode === 'QUEUE') {
+        setCurrentProgressText(`[${storyIndex}/${total}] Xếp vào lịch đăng: ${clipTitle.slice(0, 35)}...`);
 
         try {
           const res = await api.post('/queue/schedule-story', {
             connectionId: values.connectionId,
             mediaUrl: targetMediaUrl,
-            scheduledAt: itemScheduledAt.format('YYYY-MM-DDTHH:mm:ss'),
+            scheduleMode: 'QUEUE',
             affiliateLink: affiliateLink.trim() || undefined,
           });
           if (res.data?.success) {
+            const queuedAt = res.data?.item?.scheduledAt;
             results.push({
               url: item.originalUrl,
               resolvedMediaUrl: targetMediaUrl,
               title: clipTitle,
               success: true,
-              scheduledAt: `${goldenSlot.emoji} ${itemScheduledAt.format('HH:mm · DD/MM/YYYY')} (${goldenSlot.slotName})`
+              scheduledAt: queuedAt ? dayjs(queuedAt).format('HH:mm · DD/MM/YYYY') : 'Đã xếp vào lịch'
             });
           } else {
             results.push({
@@ -790,24 +731,26 @@ const PostStory = () => {
             error: err?.response?.data?.message || err.message || 'Lỗi mạng'
           });
         }
-      } else if (scheduleMode === 'LATER') {
-        const itemScheduledAt = baseScheduleTime.add(i * batchIntervalMinutes, 'minute');
-        setCurrentProgressText(`[${storyIndex}/${total}] Đang lên lịch Story: ${clipTitle.slice(0, 35)} lúc ${itemScheduledAt.format('HH:mm DD/MM')}...`);
+      } else if (scheduleMode === 'AT') {
+        const startAt: Dayjs = storySchedule.at || dayjs().add(15, 'minute');
+        setCurrentProgressText(`[${storyIndex}/${total}] Đang hẹn giờ Story: ${clipTitle.slice(0, 35)} từ ${startAt.format('HH:mm DD/MM')}...`);
 
         try {
           const res = await api.post('/queue/schedule-story', {
             connectionId: values.connectionId,
             mediaUrl: targetMediaUrl,
-            scheduledAt: itemScheduledAt.format('YYYY-MM-DDTHH:mm:ss'),
+            scheduleMode: 'AT',
+            scheduledAt: startAt.format('YYYY-MM-DDTHH:mm:ss'),
             affiliateLink: affiliateLink.trim() || undefined,
           });
           if (res.data?.success) {
+            const queuedAt = res.data?.item?.scheduledAt;
             results.push({
               url: item.originalUrl,
               resolvedMediaUrl: targetMediaUrl,
               title: clipTitle,
               success: true,
-              scheduledAt: itemScheduledAt.format('HH:mm · DD/MM/YYYY')
+              scheduledAt: dayjs(queuedAt || startAt).format('HH:mm · DD/MM/YYYY')
             });
           } else {
             results.push({
@@ -956,7 +899,7 @@ const PostStory = () => {
                 href={link}
                 target="_blank"
                 rel="noreferrer"
-                className="text-[11px] text-blue-400 hover:text-blue-300 hover:underline font-mono truncate block max-w-[220px]"
+                className="text-xs text-blue-300 hover:text-blue-200 hover:underline font-mono truncate block max-w-[240px]"
                 title={link}
               >
                 {link}
@@ -976,8 +919,8 @@ const PostStory = () => {
         const pageName = matchedConn?.pageName || `Fanpage (${pageId || 'Mặc định'})`;
         return (
           <div>
-            <span className="font-semibold text-slate-200 text-xs block">{pageName}</span>
-            <Tag color="purple" className="text-[10px] !mt-1 font-bold">
+            <span className="font-semibold text-slate-100 text-[13px] block">{pageName}</span>
+            <Tag color="purple" className="!text-xs !mt-1 font-bold">
               {matchedConn?.accountType || 'PERSONAL_COOKIE'}
             </Tag>
           </div>
@@ -1118,11 +1061,11 @@ const PostStory = () => {
               </span>
             </div>
             {totalHasKpiCount > 0 ? (
-              <Tag color={totalAchievedCount === totalHasKpiCount ? 'success' : 'processing'} className="text-[11px] font-semibold !m-0">
+              <Tag color={totalAchievedCount === totalHasKpiCount ? 'success' : 'processing'} className="!text-xs font-semibold !m-0">
                 {totalAchievedCount}/{totalHasKpiCount} trang đạt KPI
               </Tag>
             ) : (
-              <Tag className="!bg-[#1c2433] !text-slate-400 !border-[#2a374d] text-[11px] !m-0">
+              <Tag className="!bg-[#1c2433] !text-slate-300 !border-[#2a374d] !text-xs !m-0">
                 Chưa gán KPI ({fanpageConnections.length} trang)
               </Tag>
             )}
@@ -1171,7 +1114,7 @@ const PostStory = () => {
           <>
             {/* Thanh tìm kiếm & hướng dẫn nhanh */}
             <div className="flex items-center justify-between gap-3 pt-1 border-t border-[#1c2636]">
-              <span className="text-[11px] text-slate-400 hidden sm:inline">
+              <span className="text-xs text-slate-300 hidden sm:inline">
                 Bấm vào thẻ Fanpage bên dưới để chọn nhanh trang đăng Story
               </span>
               {(kpiFilterMode === 'ALL' || fanpageStoryKpiStats.length > 6) && (
@@ -1243,26 +1186,26 @@ const PostStory = () => {
                         <div className="flex items-center justify-between gap-1 mb-2">
                           <div className="flex items-center gap-1.5 overflow-hidden">
                             <FacebookFilled className="text-blue-400 text-xs shrink-0" />
-                            <span className="font-bold text-slate-200 text-xs truncate" title={stat.connection.pageName}>
+                            <span className="font-bold text-slate-100 text-[13px] truncate" title={stat.connection.pageName}>
                               {stat.connection.pageName || stat.connection.platformAccountId}
                             </span>
                           </div>
                           {stat.hasKpi ? (
                             stat.isAchieved ? (
-                              <Tag color="success" className="font-bold text-[10px] !m-0">
+                              <Tag color="success" className="font-bold !text-xs !m-0">
                                 Đạt KPI
                               </Tag>
                             ) : (
-                              <Tag color="warning" className="font-bold text-[10px] !m-0">
+                              <Tag color="warning" className="font-bold !text-xs !m-0">
                                 Thiếu {stat.remaining} Story
                               </Tag>
                             )
                           ) : stat.publishedToday > 0 ? (
-                            <Tag color="blue" className="text-[10px] !m-0 font-medium">
+                            <Tag color="blue" className="!text-xs !m-0 font-medium">
                               Đã đăng {stat.publishedToday}
                             </Tag>
                           ) : (
-                            <Tag className="!bg-[#1c2433] !text-slate-400 !border-[#2a374d] text-[10px] !m-0">
+                            <Tag className="!bg-[#1c2433] !text-slate-300 !border-[#2a374d] !text-xs !m-0">
                               Chưa đặt KPI
                             </Tag>
                           )}
@@ -1270,16 +1213,16 @@ const PostStory = () => {
 
                         {/* Thanh tiến trình KPI */}
                         <div className="space-y-1">
-                          <div className="flex items-center justify-between text-[11px]">
-                            <span className="text-slate-400">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-slate-300">
                               {stat.hasKpi ? 'Tiến độ hôm nay:' : 'Đã đăng hôm nay:'}
                             </span>
-                            <span className="font-bold text-slate-200">
+                            <span className="font-bold text-slate-100">
                               {stat.hasKpi ? (
                                 <>
                                   {stat.publishedToday} / {stat.targetCount} Story
                                   {stat.pendingToday > 0 && (
-                                    <span className="text-purple-400 font-normal text-[10px] ml-1">
+                                    <span className="text-purple-300 font-normal text-xs ml-1">
                                       (+{stat.pendingToday} chờ)
                                     </span>
                                   )}
@@ -1288,7 +1231,7 @@ const PostStory = () => {
                                 <>
                                   {stat.publishedToday} Story
                                   {stat.pendingToday > 0 && (
-                                    <span className="text-purple-400 font-normal text-[10px] ml-1">
+                                    <span className="text-purple-300 font-normal text-xs ml-1">
                                       (+{stat.pendingToday} chờ)
                                     </span>
                                   )}
@@ -1340,15 +1283,15 @@ const PostStory = () => {
           current={step}
           className="dark-steps"
           items={[
-            { title: <span className="font-semibold text-slate-200 text-xs">Nhập Link & Trích Xuất Clip</span>, description: <span className="text-[11px] text-slate-400">Xem trước video & chọn Fanpage</span> },
+            { title: <span className="font-semibold text-slate-100 text-[13px]">Nhập Link & Trích Xuất Clip</span>, description: <span className="text-xs text-slate-300">Xem trước video & chọn Fanpage</span> },
             {
-              title: <span className="font-semibold text-slate-200 text-xs">Đang Xử Lý</span>,
-              description: <span className="text-[11px] text-slate-400">{isProcessing ? currentProgressText : 'Upload lên Story Facebook'}</span>,
+              title: <span className="font-semibold text-slate-100 text-[13px]">Đang Xử Lý</span>,
+              description: <span className="text-xs text-slate-300">{isProcessing ? currentProgressText : 'Upload lên Story Facebook'}</span>,
               icon: step === 1 ? <LoadingOutlined className="text-purple-400" /> : undefined
             },
             {
-              title: <span className="font-semibold text-slate-200 text-xs">Kết Quả</span>,
-              description: <span className="text-[11px] text-slate-400">{step === 2 ? `${successCount} thành công, ${failCount} lỗi` : 'Chờ hoàn thành'}</span>,
+              title: <span className="font-semibold text-slate-100 text-[13px]">Kết Quả</span>,
+              description: <span className="text-xs text-slate-300">{step === 2 ? `${successCount} thành công, ${failCount} lỗi` : 'Chờ hoàn thành'}</span>,
               icon: step === 2 ? (failCount === 0 ? <CheckCircleOutlined className="text-emerald-400" /> : <WarningOutlined className="text-amber-400" />) : undefined
             }
           ]}
@@ -1374,10 +1317,10 @@ const PostStory = () => {
                 <ClockCircleOutlined />
               </div>
               <div className="text-left">
-                <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Thời gian đang chạy</div>
+                <div className="text-xs uppercase font-bold text-slate-300 tracking-wider">Thời gian đang chạy</div>
                 <div className="text-xl font-black font-mono text-purple-300 flex items-center gap-2">
                   {Math.floor(elapsedSeconds / 60).toString().padStart(2, '0')}:{(elapsedSeconds % 60).toString().padStart(2, '0')}
-                  <span className="text-[11px] font-normal text-slate-400 font-sans">
+                  <span className="text-xs font-normal text-slate-300 font-sans">
                     (Ước tính ~20s - 35s / Story)
                   </span>
                 </div>
@@ -1392,7 +1335,7 @@ const PostStory = () => {
               className="mt-2"
             />
             
-            <div className="text-[11px] text-slate-400 mt-2 bg-[#0d131d] p-3 rounded-xl border border-[#202a3a]">
+            <div className="text-xs text-slate-300 mt-2 bg-[#0d131d] p-3 rounded-xl border border-[#202a3a]">
               Playwright đang tự động giải mã video, nạp file và chia sẻ lên Story theo thứ tự an toàn...
             </div>
           </div>
@@ -1420,8 +1363,8 @@ const PostStory = () => {
             }
             subTitle={
               <span className="text-slate-400 text-xs">
-                {scheduleMode === 'LATER'
-                  ? 'Các Story đã được lên lịch tự động đăng vào các khung giờ đã chọn.'
+                {scheduleMode !== 'NOW'
+                  ? 'Các Story đã được xếp vào lịch đăng chung.'
                   : 'Các Story đã xuất bản đang được Facebook phân phối trên bảng tin 24h của Fanpage.'}
               </span>
             }
@@ -1451,7 +1394,7 @@ const PostStory = () => {
                   <div className="flex items-center gap-2 overflow-hidden">
                     <span className="font-bold shrink-0">{item.success ? <CheckCircleFilled className="text-emerald-400 mr-1" /> : <CloseCircleFilled className="text-rose-400 mr-1" />} #{idx + 1}</span>
                     <span className="font-semibold text-slate-200 truncate max-w-xs">{item.title || item.url}</span>
-                    <span className="font-mono text-slate-400 text-[11px] truncate max-w-xs">({item.url})</span>
+                    <span className="font-mono text-slate-300 text-xs truncate max-w-xs">({item.url})</span>
                   </div>
                   <div>
                     {item.success ? (
@@ -1649,146 +1592,13 @@ const PostStory = () => {
                   <Text className="font-bold text-slate-200 text-sm flex items-center gap-2">
                     Thời điểm xuất bản Story:
                   </Text>
-                  {scheduleMode === 'GOLDEN_HOURS' && (
-                    <Tag color="purple" className="font-bold text-[10px] uppercase">
-                      Tự động tối ưu tương tác
-                    </Tag>
-                  )}
                 </div>
 
-                <Radio.Group value={scheduleMode} onChange={(e) => setScheduleMode(e.target.value)} className="w-full">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    
-                    {/* Option 1: Khung Giờ Vàng */}
-                    <div
-                      className={`p-3.5 rounded-xl border transition-all ${targetMode === 'DIRECT' ? 'opacity-50 border-[#202a3a] bg-[#10151f]' : 'cursor-pointer'} ${
-                        scheduleMode === 'GOLDEN_HOURS'
-                          ? 'border-purple-500 bg-purple-950/40 shadow-sm ring-1 ring-purple-500/40 text-purple-200'
-                          : 'border-[#202a3a] bg-[#111722] hover:border-purple-500/40 hover:bg-[#151f2e] text-slate-300'
-                      }`}
-                      onClick={() => targetMode !== 'DIRECT' && setScheduleMode('GOLDEN_HOURS')}
-                    >
-                      <Radio value="GOLDEN_HOURS" disabled={targetMode === 'DIRECT'}>
-                        <span className="font-bold text-xs sm:text-sm text-slate-100">Phân Bổ Giờ Vàng</span>
-                      </Radio>
-                      <div className="text-[11px] text-purple-300/80 mt-1 pl-6">
-                        Tự động rải Story vào 4 mốc vàng: Sáng, Trưa, Tối, Đêm
-                      </div>
-                    </div>
-
-                    {/* Option 2: Đăng ngay */}
-                    <div
-                      className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
-                        scheduleMode === 'NOW'
-                          ? 'border-purple-500 bg-purple-950/40 shadow-sm ring-1 ring-purple-500/40 text-purple-200'
-                          : 'border-[#202a3a] bg-[#111722] hover:border-purple-500/40 hover:bg-[#151f2e] text-slate-300'
-                      }`}
-                      onClick={() => setScheduleMode('NOW')}
-                    >
-                      <Radio value="NOW">
-                        <span className="font-bold text-xs sm:text-sm text-slate-100">Đăng ngay tất cả</span>
-                      </Radio>
-                      <div className="text-[11px] text-slate-400 mt-1 pl-6">
-                        Xuất bản tất cả clip Story lên Fanpage ngay lập tức
-                      </div>
-                    </div>
-
-                    {/* Option 3: Lên lịch thủ công */}
-                    <div
-                      className={`p-3.5 rounded-xl border transition-all ${targetMode === 'DIRECT' ? 'opacity-50 border-[#202a3a] bg-[#10151f]' : 'cursor-pointer'} ${
-                        scheduleMode === 'LATER'
-                          ? 'border-purple-500 bg-purple-950/40 shadow-sm ring-1 ring-purple-500/40 text-purple-200'
-                          : 'border-[#202a3a] bg-[#111722] hover:border-purple-500/40 hover:bg-[#151f2e] text-slate-300'
-                      }`}
-                      onClick={() => targetMode !== 'DIRECT' && setScheduleMode('LATER')}
-                    >
-                      <Radio value="LATER" disabled={targetMode === 'DIRECT'}>
-                        <span className="font-bold text-xs sm:text-sm text-slate-100">Tự chọn giờ</span>
-                      </Radio>
-                      <div className="text-[11px] text-slate-400 mt-1 pl-6">
-                        Chọn ngày giờ bắt đầu và khoảng cách tùy chỉnh
-                      </div>
-                    </div>
-                  </div>
-                </Radio.Group>
-
-                {/* Timeline Xem trước Phân Bổ Giờ Vàng */}
-                {scheduleMode === 'GOLDEN_HOURS' && (
-                  <div className="mt-4 pt-4 border-t border-[#202a3a] space-y-3">
-                    <div className="flex items-center justify-between text-xs text-slate-300">
-                      <span className="font-bold text-purple-300 flex items-center gap-1.5">
-                        Lộ trình phát hành Giờ Vàng tự động ({goldenTimeline.length} Story):
-                      </span>
-                      <span className="text-[11px] text-slate-400">
-                        (Mỗi Story giãn cách ngẫu nhiên ±3p để bảo đảm an toàn)
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                      {goldenTimeline.map((item, idx) => (
-                        <div
-                          key={idx}
-                          className="bg-[#111722] p-2.5 rounded-xl border border-purple-900/40 flex items-center justify-between gap-2 shadow-sm"
-                        >
-                          <div className="flex items-center gap-2 overflow-hidden">
-                            <span className="w-6 h-6 rounded-lg bg-purple-950 border border-purple-700/50 flex items-center justify-center font-bold text-xs text-purple-300 shrink-0">
-                              #{item.index}
-                            </span>
-                            <div className="overflow-hidden">
-                              <div className="font-bold text-slate-200 text-xs truncate">
-                                {item.slotName} ({item.time.format('DD/MM')})
-                              </div>
-                              <div className="text-[10px] text-slate-400">
-                                {item.desc}
-                              </div>
-                            </div>
-                          </div>
-                          <Tag color="purple" className="font-mono font-bold text-xs !m-0">
-                            {item.time.format('HH:mm')}
-                          </Tag>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Tùy chỉnh lịch thủ công */}
-                {scheduleMode === 'LATER' && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 pt-3 border-t border-[#202a3a]">
-                    <Form.Item
-                      name="scheduledAt"
-                      label={<span className="font-semibold text-slate-300 text-xs">Thời điểm bắt đầu Story 1</span>}
-                      rules={[{ required: scheduleMode === 'LATER', message: 'Chọn ngày giờ bắt đầu!' }]}
-                      className="!mb-0"
-                      initialValue={dayjs().add(15, 'minute')}
-                    >
-                      <DatePicker
-                        showTime
-                        format="HH:mm DD/MM/YYYY"
-                        size="large"
-                        style={{ width: '100%' }}
-                        className="rounded-xl"
-                        disabledDate={(current) => current && current < dayjs().startOf('day')}
-                        placeholder="Chọn ngày giờ bắt đầu Story 1"
-                      />
-                    </Form.Item>
-
-                    <div>
-                      <span className="font-semibold text-slate-300 text-xs block mb-2">Khoảng cách giữa các Story:</span>
-                      <Space align="center">
-                        <InputNumber
-                          min={5}
-                          max={1440}
-                          value={batchIntervalMinutes}
-                          onChange={(val) => setBatchIntervalMinutes(val || 15)}
-                          size="large"
-                          className="rounded-xl w-28"
-                        />
-                        <span className="text-xs text-slate-400">phút / 1 Story tiếp theo</span>
-                      </Space>
-                    </div>
-                  </div>
-                )}
+                <ScheduleChoice
+                  value={storySchedule}
+                  onChange={setStorySchedule}
+                  modes={targetMode === 'DIRECT' ? ['NOW'] : ['NOW', 'QUEUE', 'AT']}
+                />
               </div>
 
 
@@ -1811,7 +1621,7 @@ const PostStory = () => {
                     >
                       <VideoCameraOutlined className="text-xl text-purple-400 mb-1.5" />
                       <div className="font-bold text-slate-100 text-sm">Video Story</div>
-                      <div className="text-[11px] text-slate-400 mt-0.5">File .MP4 hoặc link Reels / Threads / TikTok</div>
+                      <div className="text-xs text-slate-300 mt-0.5">File .MP4 hoặc link Reels / Threads / TikTok</div>
                     </div>
                     <div
                       className={`p-3.5 rounded-xl border cursor-pointer transition-all text-center flex flex-col items-center justify-center ${
@@ -1823,7 +1633,7 @@ const PostStory = () => {
                     >
                       <PictureOutlined className="text-xl text-pink-400 mb-1.5" />
                       <div className="font-bold text-slate-100 text-sm">Photo Story</div>
-                      <div className="text-[11px] text-slate-400 mt-0.5">Ảnh JPG/PNG — tỉ lệ 9:16</div>
+                      <div className="text-xs text-slate-300 mt-0.5">Ảnh JPG/PNG — tỉ lệ 9:16</div>
                     </div>
                   </div>
                 </Radio.Group>
@@ -1896,12 +1706,12 @@ const PostStory = () => {
                   allowClear
                 />
 
-                <div className="mt-2.5 flex items-center justify-between flex-wrap gap-2 text-[11px] text-slate-400">
+                <div className="mt-2.5 flex items-center justify-between flex-wrap gap-2 text-xs text-slate-300">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-emerald-400 font-medium">Hỗ trợ link:</span>
                     <span>Threads</span> • <span>TikTok</span> • <span>Reels / FB</span> • <span>Video MP4 trực tiếp</span>
                   </div>
-                  <span className="text-slate-500">Hệ thống sẽ tự động bóc tách video MP4 sắc nét</span>
+                  <span className="text-slate-300">Hệ thống sẽ tự động bóc tách video MP4 sắc nét</span>
                 </div>
               </div>
 
@@ -1952,7 +1762,7 @@ const PostStory = () => {
                                     ? 'gold'
                                     : 'cyan'
                                 }
-                                className="!font-bold text-[10px] uppercase !m-0"
+                                className="!font-bold !text-xs uppercase !m-0"
                               >
                                 {clip.sourceType || 'LINK'}
                               </Tag>
@@ -1965,12 +1775,12 @@ const PostStory = () => {
                             <div className="shrink-0">
                               {clip.status === 'loading' && <Spin size="small" />}
                               {clip.status === 'success' && (
-                                <Tag color="success" className="text-[10px] font-bold !m-0">
+                                <Tag color="success" className="!text-xs font-bold !m-0">
                                   <CheckCircleFilled /> Sẵn sàng
                                 </Tag>
                               )}
                               {clip.status === 'error' && (
-                                <Tag color="error" className="text-[10px] font-bold !m-0">
+                                <Tag color="error" className="!text-xs font-bold !m-0">
                                   <CloseCircleFilled /> Lỗi trích xuất
                                 </Tag>
                               )}
@@ -2021,7 +1831,7 @@ const PostStory = () => {
                           </div>
 
                           {/* URL link text */}
-                          <div className="text-[11px] font-mono text-slate-400 truncate mb-3" title={clip.originalUrl}>
+                          <div className="text-xs font-mono text-slate-300 truncate mb-3" title={clip.originalUrl}>
                             🔗 {clip.originalUrl}
                           </div>
                         </div>
@@ -2122,8 +1932,8 @@ const PostStory = () => {
                     background: (clips.length === 0 && !storyUrlsText.trim()) ? undefined : 'linear-gradient(135deg, #7c3aed, #db2777)',
                   }}
                 >
-                  {scheduleMode === 'LATER'
-                    ? `Lên Lịch Cho ${clips.length || 1} Story Tự Động`
+                  {scheduleMode !== 'NOW'
+                    ? `Lên lịch ${clips.length || 1} Story`
                     : `Đăng Ngay ${clips.length || 1} Story Lên Fanpage Facebook`}
                 </Button>
               </Form.Item>
@@ -2210,7 +2020,7 @@ const PostStory = () => {
                     <span className="font-bold text-slate-200 text-xs block truncate max-w-[240px]">
                       {conn.pageName || conn.platformAccountId}
                     </span>
-                    <span className="text-[10px] text-slate-500 font-mono">
+                    <span className="text-xs text-slate-300 font-mono">
                       ID: {conn.platformAccountId}
                     </span>
                   </div>

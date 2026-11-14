@@ -36,7 +36,7 @@ const LAYOUTS: Array<{ value: FrameLayout; label: string; thumb: ReactNode }> = 
 ];
 
 const Label = ({ children, extra }: { children: ReactNode; extra?: ReactNode }) => (
-  <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1.5"><span>{children}</span>{extra}</div>
+  <div className="flex items-center justify-between text-xs text-slate-300 mb-1.5"><span>{children}</span>{extra}</div>
 );
 
 function Swatch({ bg, accent, decor, on, onClick, title }: { bg: string; accent: string; decor?: string; on: boolean; onClick: () => void; title: string }) {
@@ -123,7 +123,7 @@ export default function FramePanel({ ctl }: { ctl: FrameCtl }) {
           {LAYOUTS.map((l) => (
             <button key={l.value} type="button" onClick={() => ctl.setLayout(l.value)} className="group flex flex-col items-center gap-1">
               <span className={`relative w-full aspect-[9/14] rounded-md overflow-hidden bg-slate-700/60 border-2 transition ${f.layout === l.value ? 'border-blue-500' : 'border-transparent group-hover:border-slate-500'}`}>{l.thumb}</span>
-              <span className={`text-[10px] ${f.layout === l.value ? 'text-blue-300' : 'text-slate-400'}`}>{l.label}</span>
+              <span className={`text-xs ${f.layout === l.value ? 'text-blue-300' : 'text-slate-300'}`}>{l.label}</span>
             </button>
           ))}
         </div>
@@ -201,7 +201,7 @@ export default function FramePanel({ ctl }: { ctl: FrameCtl }) {
                     </div>
                   )}
                   <div>
-                    <Label extra={f.logoUrl && <button type="button" className="text-[11px] text-slate-400 hover:text-red-400" onClick={() => ctl.setFrame({ logoUrl: '' })}>Bỏ logo</button>}>Logo trên khung</Label>
+                    <Label extra={f.logoUrl && <button type="button" className="text-xs text-slate-300 hover:text-red-400" onClick={() => ctl.setFrame({ logoUrl: '' })}>Bỏ logo</button>}>Logo trên khung</Label>
                     <div className="flex flex-wrap gap-1.5">
                       {ctl.logos.map((lg) => (
                         <Tooltip key={lg.url} title={lg.name}>
@@ -217,7 +217,7 @@ export default function FramePanel({ ctl }: { ctl: FrameCtl }) {
                     </div>
                   </div>
                   {f.layout === 'card' && f.decorUrl && (
-                    <div className="flex items-center justify-between text-[11px] text-slate-400">Nền màu chuyển sau ảnh trang trí <Switch size="small" checked={f.decorGradient} onChange={(v) => ctl.setFrame({ decorGradient: v })} /></div>
+                    <div className="flex items-center justify-between text-xs text-slate-300">Nền màu chuyển sau ảnh trang trí <Switch size="small" checked={f.decorGradient} onChange={(v) => ctl.setFrame({ decorGradient: v })} /></div>
                   )}
                 </>
               )}

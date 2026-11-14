@@ -3,6 +3,7 @@ import type React from 'react';
 import {
   Button,
   Input,
+  Select,
   Tag,
   Progress,
   Tooltip,
@@ -25,9 +26,12 @@ import {
   UserOutlined,
   CopyOutlined,
   MenuFoldOutlined,
+  TeamOutlined,
+  BulbOutlined,
+  InboxOutlined,
 } from '@ant-design/icons';
-import type { PostLinkItem, ItemPreview } from './types';
-import { cleanMarkdownAsterisks } from './shared';
+import type { PostLinkItem, ItemPreview, SocialAccount } from './types';
+import { cleanMarkdownAsterisks, buildExtraGroupOptions, filterSelectByLabel } from './shared';
 
 interface SwipeReviewModalProps {
   isMediaVideo: (url: string, kind?: string) => boolean;
@@ -51,6 +55,9 @@ interface SwipeReviewModalProps {
   replaceOrAppendCreditText: (caption: string, creditText: string) => string;
   openCustomCreModal: (targetItemId?: string) => void;
   openHashtagModal: (targetItemId?: string) => void;
+  groupAccountsWithId?: SocialAccount[];
+  primaryGroupIds?: string[];
+  onExtraGroupIdsChange?: (itemId: string, groupIds: string[]) => void;
 }
 
 // Duyệt nhanh từng bài (kiểu Tinder) với Drag cử chỉ thực thụ, Phím tắt siêu tốc & Preload mượt mà
@@ -76,6 +83,9 @@ function SwipeReviewModal({
   replaceOrAppendCreditText,
   openCustomCreModal,
   openHashtagModal,
+  groupAccountsWithId = [],
+  primaryGroupIds = [],
+  onExtraGroupIdsChange,
 }: SwipeReviewModalProps) {
   const { message } = App.useApp();
 
@@ -164,7 +174,8 @@ function SwipeReviewModal({
       const isInputFocused = activeEl && (
         activeEl.tagName === 'INPUT' ||
         activeEl.tagName === 'TEXTAREA' ||
-        activeEl.getAttribute('contenteditable') === 'true'
+        activeEl.getAttribute('contenteditable') === 'true' ||
+        Boolean(activeEl.closest('.ant-select'))
       );
 
       // Khi người dùng đang gõ phím chỉnh sửa trong textarea:
@@ -294,6 +305,12 @@ function SwipeReviewModal({
   const charCount = (localCaption || '').length;
   const wordCount = (localCaption || '').trim() ? (localCaption || '').trim().split(/\s+/).length : 0;
 
+  const extraGroupOptions = buildExtraGroupOptions(groupAccountsWithId, primaryGroupIds);
+  const activeExtraGroupIds = activeSwipeItem?.extraGroupIds || [];
+  const keptWithExtraGroupsCount = swipeReviewItems.filter(
+    (item) => swipeDecisions[item.id] !== 'REJECT' && (item.extraGroupIds?.length || 0) > 0
+  ).length;
+
   return (
     <Modal
       open={swipeReviewOpen}
@@ -360,7 +377,7 @@ function SwipeReviewModal({
                 }}
               >
                 {activeSwipeMediaUrls.length > 0 && (
-                  <div className="absolute top-2 right-2 z-10 opacity-75 group-hover:opacity-100 transition-opacity bg-slate-950/80 text-sky-300 border border-sky-500/40 text-[10px] font-bold px-2 py-1 rounded-md flex items-center gap-1 shadow-md">
+                  <div className="absolute top-2 right-2 z-10 opacity-85 group-hover:opacity-100 transition-opacity bg-slate-950/85 text-sky-300 border border-sky-500/40 text-xs font-bold px-2.5 py-1 rounded-md flex items-center gap-1 shadow-md">
                     <ZoomInOutlined /> Phóng To [Space]
                   </div>
                 )}
@@ -423,8 +440,8 @@ function SwipeReviewModal({
                       {swipeDecisions[activeSwipeItem.id] === 'KEEP' ? 'Đang giữ' : 'Đang bỏ'}
                     </Tag>
                   )}
-                  <Tag color="purple" className="!rounded-md text-xs font-bold">
-                    ✏️ Sửa trực tiếp [Ctrl+↵ để Giữ]
+                  <Tag color="purple" className="!rounded-md text-xs font-bold inline-flex items-center gap-1">
+                    <EditOutlined /> Sửa trực tiếp [Ctrl+↵ để Giữ]
                   </Tag>
                 </div>
               </div>
@@ -532,7 +549,7 @@ function SwipeReviewModal({
                     }}
                     className="text-xs text-amber-300 hover:text-amber-200 bg-amber-950/40 border border-amber-800/40 rounded px-1.5"
                   >
-                    🧹 Xóa dấu *
+                    Xóa dấu *
                   </Button>
                 </Tooltip>
                 {activeSwipeItem.inputType !== 'MANUAL' && (
@@ -558,18 +575,63 @@ function SwipeReviewModal({
                   onBlur={flushCaptionToParent}
                   placeholder="Soạn hoặc sửa caption trực tiếp... Nhấn Ctrl+Enter để Giữ và chuyển bài tiếp theo."
                   autoSize={false}
-                  className="w-full flex-1 !h-full min-h-[450px] sm:min-h-[500px] bg-slate-900/90 border-slate-700/80 text-slate-100 text-xs sm:text-sm p-3.5 rounded-xl focus:border-blue-500 focus:ring-1 focus:ring-blue-500 placeholder:text-slate-500 resize-none font-sans leading-relaxed shadow-inner"
+                  className="w-full flex-1 !h-full min-h-[260px] sm:min-h-[320px] bg-slate-900/90 border-slate-700/80 text-slate-100 text-xs sm:text-sm p-3.5 rounded-xl focus:border-blue-500 focus:ring-1 focus:ring-blue-500 placeholder:text-slate-500 resize-none font-sans leading-relaxed shadow-inner"
                 />
               </div>
 
+              {/* Đăng thêm bài này sang các Group chỉ định khác ngoài nhóm chính */}
+              {onExtraGroupIdsChange && extraGroupOptions.length > 0 && (
+                <div className="p-2.5 rounded-xl bg-indigo-950/35 border border-indigo-500/30 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-indigo-200 flex items-center gap-1.5">
+                      <TeamOutlined className="text-indigo-400" />
+                      <span>Đăng thêm sang nhóm khác</span>
+                      {activeExtraGroupIds.length > 0 && (
+                        <Tag color="geekblue" className="!m-0 !rounded-md !text-[11px] font-bold">
+                          +{activeExtraGroupIds.length} nhóm
+                        </Tag>
+                      )}
+                    </span>
+                    {activeExtraGroupIds.length > 0 && (
+                      <Button
+                        size="small"
+                        type="link"
+                        className="!p-0 !h-auto text-xs text-slate-400 hover:text-rose-300"
+                        onClick={() => onExtraGroupIdsChange(activeSwipeItem.id, [])}
+                      >
+                        Xóa hết
+                      </Button>
+                    )}
+                  </div>
+                  <Select
+                    mode="multiple"
+                    size="middle"
+                    allowClear
+                    showSearch
+                    placeholder="Chọn thêm nhóm muốn đăng chéo bài này (để trống nếu chỉ đăng nhóm chính)..."
+                    value={activeExtraGroupIds}
+                    onChange={(vals: string[]) => onExtraGroupIdsChange(activeSwipeItem.id, vals)}
+                    options={extraGroupOptions}
+                    optionLabelProp="name"
+                    filterOption={filterSelectByLabel}
+                    maxTagCount="responsive"
+                    className="w-full"
+                    getPopupContainer={(trigger) => trigger.parentElement || document.body}
+                  />
+                </div>
+              )}
+
               {activeSwipeItem.url && (
-                <a href={activeSwipeItem.url} target="_blank" rel="noreferrer" className="poster-swipe-source mt-1">
+                <a href={activeSwipeItem.url} target="_blank" rel="noreferrer" className="poster-swipe-source mt-1.5">
                   <LinkOutlined /> Xem bài nguồn gốc
                 </a>
               )}
-              <div className="poster-swipe-hint text-[11px] text-slate-400 mt-1 flex items-center justify-between">
-                <span>💡 Kéo chuột/vuốt trái-phải hoặc dùng phím tắt để duyệt siêu tốc. Tự động lưu khi Giữ.</span>
-                <span className="text-slate-500 hidden sm:inline">Phím: [D/→] Giữ · [A/←] Bỏ · [Z] Lùi · [↑/↓] Đổi ảnh</span>
+              <div className="poster-swipe-hint text-xs text-slate-300 mt-1.5 flex items-center justify-between">
+                <span className="inline-flex items-center gap-1.5">
+                  <BulbOutlined className="text-amber-400" />
+                  Kéo chuột/vuốt trái-phải hoặc dùng phím tắt để duyệt siêu tốc. Tự động lưu khi Giữ.
+                </span>
+                <span className="text-slate-300 hidden sm:inline">Phím: [D/→] Giữ · [A/←] Bỏ · [Z] Lùi · [↑/↓] Đổi ảnh</span>
               </div>
             </div>
           </div>
@@ -610,7 +672,9 @@ function SwipeReviewModal({
         </div>
       ) : swipeReviewItems.length === 0 ? (
         <div className="poster-swipe-complete py-10 text-center">
-          <div className="text-4xl mb-3">📭</div>
+          <div className="mb-3 flex justify-center">
+            <InboxOutlined className="text-4xl text-slate-400" />
+          </div>
           <h2 className="text-base font-bold text-slate-100">Chưa có bài viết nào trong danh sách duyệt</h2>
           <p className="text-xs text-slate-400 mb-4">Vui lòng quét và chọn bài viết từ Group hoặc dán link bài trước khi mở duyệt Tinder.</p>
           <Button type="primary" onClick={() => setSwipeReviewOpen(false)}>Đóng</Button>
@@ -622,6 +686,9 @@ function SwipeReviewModal({
           <p>
             Giữ <b>{Object.values(swipeDecisions).filter((decision) => decision === 'KEEP').length}</b> bài ·
             Bỏ <strong>{Object.values(swipeDecisions).filter((decision) => decision === 'REJECT').length}</strong> bài
+            {keptWithExtraGroupsCount > 0 && (
+              <> · <span className="text-indigo-300 font-bold">{keptWithExtraGroupsCount} bài đăng thêm nhóm khác</span></>
+            )}
           </p>
           <div>
             <Button onClick={() => { setSwipeReviewIndex(0); setSwipeMediaIndex(0); }}>Duyệt lại</Button>

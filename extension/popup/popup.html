@@ -14,7 +14,7 @@
         <div class="logo-icon">⚡</div>
         <div class="brand-text">
           <h1>ToolZutter</h1>
-          <span class="version">Scraper Helper v1.0</span>
+          <span class="version">Scraper Helper v1.4.4</span>
         </div>
       </div>
       <div class="status-badges">
@@ -60,6 +60,28 @@
             <input type="checkbox" id="chk-publish-now">
             <span>Đăng ngay lập tức (Bỏ qua hàng đợi)</span>
           </label>
+        </div>
+
+        <!-- DANH SÁCH BÀI VỪA COPY / THU THẬP KHI LƯỚT NEWFEED -->
+        <div class="card" id="card-collected" style="margin-top: 10px;">
+          <div class="card-header-row">
+            <span class="card-title" style="display: flex; align-items: center; gap: 6px;">
+              <span>📚</span>
+              <span>Đã Thu Thập (<span id="collected-count" style="color: #60a5fa; font-weight: 700;">0</span> bài)</span>
+            </span>
+            <div class="btn-link-group">
+              <button id="btn-copy-all-collected" class="btn-text" title="Copy toàn bộ các link đã thu thập">📋 Copy hết</button>
+              <button id="btn-clear-collected" class="btn-text" style="color: #ef4444;" title="Xoá danh sách thu thập">🗑️ Xoá</button>
+            </div>
+          </div>
+          <div id="collected-list" class="batch-list-container" style="max-height: 150px; overflow-y: auto; margin-top: 8px;">
+            <div class="empty-state" style="padding: 10px; font-size: 11px; text-align: center; color: #94a3b8;">
+              Chưa copy bài nào. Hãy bấm [Copy Link] hoặc [Đẩy sang Tool] trên Newfeed để gom bài!
+            </div>
+          </div>
+          <button id="btn-send-all-collected" class="btn btn-primary" style="margin-top: 10px; width: 100%; display: none;">
+            <span>🚀</span> Đẩy Toàn Bộ (<span id="collected-send-num">0</span>) Bài Vào Hàng Đợi Tool
+          </button>
         </div>
       </section>
 

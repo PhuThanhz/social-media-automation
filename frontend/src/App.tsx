@@ -14,8 +14,6 @@ const About = lazy(() => import('./pages/About'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const ThreadsStudio = lazy(() => import('./pages/ThreadsStudio'));
 const Connections = lazy(() => import('./pages/Connections'));
-const PostQueueView = lazy(() => import('./pages/PostQueueView'));
-const ContentCalendar = lazy(() => import('./pages/ContentCalendar'));
 const DownloadVideo = lazy(() => import('./pages/DownloadVideo'));
 const VideoLibrary = lazy(() => import('./pages/VideoLibrary'));
 const PostStory = lazy(() => import('./pages/PostStory'));
@@ -24,8 +22,6 @@ const NewsCardStudio = lazy(() => import('./pages/NewsCardStudio'));
 const VideoNewsStudio = lazy(() => import('./pages/VideoNewsStudio'));
 const BuffEngagement = lazy(() => import('./pages/BuffEngagement'));
 const SystemLogs = lazy(() => import('./pages/SystemLogs'));
-const NewsRadar = lazy(() => import('./pages/NewsRadar'));
-const EconomyJob = lazy(() => import('./pages/EconomyJob'));
 const ViralHunter = lazy(() => import('./pages/ViralHunter'));
 const LicenseManager = lazy(() => import('./pages/LicenseManager'));
 const DesktopUsers = lazy(() => import('./pages/DesktopUsers'));
@@ -51,7 +47,19 @@ function App() {
           colorError: '#ff7188',
           borderRadius: 12,
           controlHeight: 40,
-          fontFamily: "'Plus Jakarta Sans', sans-serif",
+          controlHeightSM: 32,
+          controlHeightLG: 46,
+          fontSize: 14,
+          fontSizeSM: 13,
+          fontSizeLG: 16,
+          fontSizeXL: 20,
+          fontSizeHeading1: 30,
+          fontSizeHeading2: 24,
+          fontSizeHeading3: 20,
+          fontSizeHeading4: 18,
+          fontSizeHeading5: 16,
+          fontFamily: "'Be Vietnam Pro', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+          fontFamilyCode: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
           colorBgBase: '#080d16',
           colorBgLayout: '#080d16',
           colorBgContainer: 'rgba(13, 22, 38, 0.85)',
@@ -59,14 +67,19 @@ function App() {
           colorBorder: '#2b3a50',
           colorBorderSecondary: '#202d3f',
           colorTextHeading: '#ffffff',
-          colorText: '#eef3fa',
-          colorTextSecondary: '#b8c7db',
+          colorText: '#f1f5fb',
+          colorTextSecondary: '#cbd5e1',
+          colorTextTertiary: '#9fb1c9',
+          colorTextPlaceholder: '#8da2be',
           boxShadowSecondary: '0 20px 55px rgba(0, 0, 0, 0.42)',
         },
         components: {
           Button: {
             fontWeight: 600,
-            borderRadius: 8,
+            borderRadius: 10,
+            contentFontSize: 14,
+            contentFontSizeSM: 13,
+            contentFontSizeLG: 15,
             controlHeightLG: 44,
             primaryShadow: '0 4px 12px rgba(37, 99, 235, 0.18)',
           },
@@ -76,20 +89,25 @@ function App() {
           },
           Table: {
             borderRadius: 10,
+            fontSize: 14,
             headerBg: 'rgba(255, 255, 255, 0.05)',
-            headerColor: '#d0d9e6',
+            headerColor: '#dbe5f2',
             headerSplitColor: 'transparent',
             rowHoverBg: 'rgba(255, 255, 255, 0.06)',
             cellPaddingBlock: 14,
             cellPaddingInline: 16,
           },
           Tag: {
-            borderRadius: 6,
+            borderRadius: 7,
+            fontSizeSM: 12.5,
           },
           Menu: {
-            itemBorderRadius: 9,
-            itemHeight: 42,
+            itemBorderRadius: 10,
+            itemHeight: 44,
             itemMarginInline: 8,
+            fontSize: 14,
+            iconSize: 16,
+            groupTitleFontSize: 12,
             darkItemBg: 'transparent',
             darkItemSelectedBg: 'rgba(255, 255, 255, 0.16)',
             darkItemSelectedColor: '#ffffff',
@@ -99,7 +117,7 @@ function App() {
             itemHoverColor: '#ffffff',
             itemSelectedColor: '#38bdf8',
             inkBarColor: '#38bdf8',
-            titleFontSize: 13,
+            titleFontSize: 14,
           },
           Segmented: {
             itemSelectedBg: '#293752',
@@ -108,9 +126,14 @@ function App() {
             contentBg: '#0f172a',
             headerBg: '#0f172a',
             borderRadiusLG: 16,
+            titleFontSize: 18,
           },
           Drawer: {
             colorBgElevated: '#0f172a',
+          },
+          Form: {
+            labelFontSize: 13.5,
+            labelColor: '#dbe5f2',
           },
           Input: {
             colorBgContainer: 'rgba(15, 23, 42, 0.7)',
@@ -125,8 +148,8 @@ function App() {
             borderRadiusLG: 14,
           },
           Statistic: {
-            titleFontSize: 13,
-            contentFontSize: 26,
+            titleFontSize: 14,
+            contentFontSize: 28,
           }
         }
       }}

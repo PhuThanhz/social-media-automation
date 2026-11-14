@@ -113,7 +113,7 @@ const DesktopLicenseGuard: React.FC<LicenseGuardModalProps> = ({ onAuthorized })
 
         <div>
           <h2 className="text-xl font-bold text-white tracking-tight">Xác Thực Bản Quyền Phần Mềm</h2>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-[13px] text-slate-300 mt-1">
             Ứng dụng Desktop tự động hóa ToolZutter
           </p>
         </div>
@@ -131,7 +131,7 @@ const DesktopLicenseGuard: React.FC<LicenseGuardModalProps> = ({ onAuthorized })
         {/* Khối hiển thị mã HWID */}
         <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3 text-left space-y-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
               <DesktopOutlined className="text-cyan-400" /> Mã phần cứng máy (HWID):
             </span>
             <Tooltip title="Sao chép gửi cho Admin cấp bản quyền">
@@ -140,23 +140,23 @@ const DesktopLicenseGuard: React.FC<LicenseGuardModalProps> = ({ onAuthorized })
                 type="text"
                 icon={<CopyOutlined />}
                 onClick={copyHWID}
-                className="!text-xs !text-cyan-400 hover:!text-cyan-300"
+                className="!text-xs !text-cyan-300 hover:!text-cyan-200"
               >
                 Sao chép
               </Button>
             </Tooltip>
           </div>
-          <div className="font-mono text-xs font-bold text-cyan-300 bg-slate-950/80 p-2 rounded-lg border border-slate-800/80 select-all break-all">
+          <div className="font-mono text-[13px] font-bold text-cyan-300 bg-slate-950/80 p-2 rounded-lg border border-slate-800/80 select-all break-all">
             {hwid}
           </div>
-          <p className="text-[10px] text-slate-500 italic">
+          <p className="text-xs text-slate-300 italic">
             * Mỗi bản quyền được khóa cứng vào đúng máy tính này để bảo mật dữ liệu và chống dùng chung.
           </p>
         </div>
 
         {/* Khối nhập License Key */}
         <div className="space-y-2 text-left pt-1">
-          <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+          <label className="text-[13px] font-semibold text-slate-200 flex items-center gap-1.5">
             <KeyOutlined className="text-blue-400" /> Nhập License Key của bạn:
           </label>
           <Input.Password
@@ -183,9 +183,9 @@ const DesktopLicenseGuard: React.FC<LicenseGuardModalProps> = ({ onAuthorized })
           </Button>
         </div>
 
-        <div className="pt-1 text-[11px] text-slate-500 flex items-center justify-center gap-1.5">
+        <div className="pt-1 text-xs text-slate-300 flex items-center justify-center gap-1.5">
           <span>Hỗ trợ kỹ thuật & Gia hạn bản quyền:</span>
-          <span className="text-slate-400 font-medium">Admin Thạnh Phú</span>
+          <span className="text-slate-100 font-medium">Admin Thạnh Phú</span>
         </div>
       </div>
     </Modal>

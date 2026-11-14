@@ -71,8 +71,8 @@ export function WaveformTrack({ url, color = '#3b82f6', height = 48, label, onRe
     <div className="flex items-center gap-2 w-full">
       {label && (
         <span
-          className="text-[10px] font-semibold text-slate-400 whitespace-nowrap flex-shrink-0"
-          style={{ width: 44, textAlign: 'right' }}
+          className="text-xs font-semibold text-slate-300 whitespace-nowrap flex-shrink-0"
+          style={{ width: 52, textAlign: 'right' }}
         >
           {label}
         </span>

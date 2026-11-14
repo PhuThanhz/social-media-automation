@@ -1,20 +1,18 @@
 import type React from 'react';
+import type { ScheduleValue } from '../../components/common/postingSchedule';
 import { useState, useMemo } from 'react';
 import { Modal, Input, type FormInstance, App } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
 import { getStoredGeminiKeys } from '../../components/modals/AiSettingsModal';
 import api from '../../config/axios';
-import { cleanMarkdownAsterisks } from './shared';
+import { buildScrapeAccountOptions, cleanMarkdownAsterisks, resolveActiveScrapeAccount } from './shared';
 import type { PostLinkItem, SocialAccount, ItemPreview } from './types';
 
 interface GroupHunterParams {
   setBulkText: React.Dispatch<React.SetStateAction<string>>;
   setBulkDrawerPreviews: React.Dispatch<React.SetStateAction<Record<string, { loading: boolean; error?: string; caption?: string; author?: string; mediaUrls?: string[]; mediaKinds?: ("video" | "image")[]; originalMediaUrls?: string[]; originalMediaKinds?: ("video" | "image")[]; videoCount?: number; imageCount?: number; affiliateComment?: string; skipComment?: boolean; includeCredit?: boolean; watermarkRemoved?: boolean; }>>>;
   formatMultiLineCaption: (text: string) => string;
-  setCustomDrawerScheduledTimes: React.Dispatch<React.SetStateAction<Record<string, Dayjs>>>;
-  setBulkStartMode: React.Dispatch<React.SetStateAction<"NOW" | "TIME">>;
-  setBulkStartTime: React.Dispatch<React.SetStateAction<Dayjs>>;
-  setBulkInterval: React.Dispatch<React.SetStateAction<number>>;
+  setScheduleChoice: (v: ScheduleValue) => void;
   form: FormInstance<any>;
   setBulkModalVisible: React.Dispatch<React.SetStateAction<boolean>>;
   setPreviews: React.Dispatch<React.SetStateAction<Record<string, ItemPreview>>>;
@@ -24,15 +22,16 @@ interface GroupHunterParams {
   setSwipeDecisions: React.Dispatch<React.SetStateAction<Record<string, "KEEP" | "REJECT">>>;
   setSwipeReviewOpen: React.Dispatch<React.SetStateAction<boolean>>;
   linkItems: PostLinkItem[];
-  // Khai báo sau lời gọi hook trong trang cha — đọc lười qua hàm để tránh lỗi truy cập trước khi khởi tạo
+  socialAccounts?: SocialAccount[];
+  // Khai báo sau lời gọi hook trong trang cha — đọc lười qua hàm trong callback để tránh lỗi truy cập trước khi khởi tạo
   late: () => {
-    socialAccounts: SocialAccount[];
+    socialAccounts?: SocialAccount[];
     setSmartGroupId: React.Dispatch<React.SetStateAction<string>>;
   };
 }
 
 // Săn / quét bài viết Facebook Group & Fanpage, đưa bài đã chọn vào danh sách đăng — tách từ PlaywrightPoster (state và hàm giữ nguyên, chỉ chuyển chỗ)
-export function useGroupHunter({ setBulkText, setBulkDrawerPreviews, formatMultiLineCaption, setCustomDrawerScheduledTimes, setBulkStartMode, setBulkStartTime, setBulkInterval, form, setBulkModalVisible, setPreviews, setLinkItems, setSwipeReviewIndex, setSwipeMediaIndex, setSwipeDecisions, setSwipeReviewOpen, linkItems, late }: GroupHunterParams) {
+export function useGroupHunter({ setBulkText, setBulkDrawerPreviews, formatMultiLineCaption, setScheduleChoice, form, setBulkModalVisible, setPreviews, setLinkItems, setSwipeReviewIndex, setSwipeMediaIndex, setSwipeDecisions, setSwipeReviewOpen, linkItems, socialAccounts, late }: GroupHunterParams) {
   const { message } = App.useApp();
   // ── SĂN / QUÉT BÀI VIẾT FACEBOOK GROUP (Group Hunter) ─────────────────────────
   const [groupHunterDrawerVisible, setGroupHunterDrawerVisible] = useState(false);
@@ -83,6 +82,32 @@ export function useGroupHunter({ setBulkText, setBulkDrawerPreviews, formatMulti
   const [favoriteGroupSearch, setFavoriteGroupSearch] = useState('');
   const [favoriteGroupsExpanded, setFavoriteGroupsExpanded] = useState(false);
   const [favoriteGroupCategoryFilter, setFavoriteGroupCategoryFilter] = useState<'ALL' | 'PHIM' | 'GENERAL'>('ALL');
+
+  // Via/Cookie được chọn để quét Group/Fanpage (lưu theo user lựa chọn, mặc định ưu tiên Via cá nhân OK)
+  const [selectedScrapeAccountId, setSelectedScrapeAccountId] = useState<number | null>(() => {
+    try {
+      const saved = localStorage.getItem('toolzutter_hunt_scrape_via_id');
+      const parsed = saved ? Number(saved) : NaN;
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    } catch {
+      return null;
+    }
+  });
+  const setGroupHunterScrapeAccountId = (id: number | null) => {
+    setSelectedScrapeAccountId(id);
+    try {
+      if (id != null && Number.isFinite(id)) localStorage.setItem('toolzutter_hunt_scrape_via_id', String(id));
+      else localStorage.removeItem('toolzutter_hunt_scrape_via_id');
+    } catch {}
+  };
+  const scrapeAccountOptions = useMemo(
+    () => buildScrapeAccountOptions(socialAccounts || []),
+    [socialAccounts],
+  );
+  const activeScrapeAccount = useMemo(
+    () => resolveActiveScrapeAccount(scrapeAccountOptions, selectedScrapeAccountId),
+    [scrapeAccountOptions, selectedScrapeAccountId],
+  );
 
   // Danh sách Group yêu thích do người dùng lưu
   const [favoriteGroups, setFavoriteGroups] = useState<Array<{ name: string; url: string }>>(() => {
@@ -197,9 +222,7 @@ export function useGroupHunter({ setBulkText, setBulkDrawerPreviews, formatMulti
     }
     setGroupHunterLoading(true);
     try {
-      const activeCookieAcc = (late().socialAccounts || []).find((a) => a.pageName?.toLowerCase().includes('làm sen') && a.accessToken)
-        || (late().socialAccounts || []).find((a) => a.accessToken && a.accessToken.trim().length > 0 && a.tokenStatus === 'OK')
-        || (late().socialAccounts || []).find((a) => a.accessToken && a.accessToken.trim().length > 0);
+      const activeCookieAcc = activeScrapeAccount;
 
       const res = await api.post('/tools/hunt-facebook-group', {
         groupUrl: groupHunterTarget.trim(),
@@ -474,57 +497,9 @@ export function useGroupHunter({ setBulkText, setBulkDrawerPreviews, formatMulti
       return next;
     });
 
+    // Tự lên lịch = "Xếp vào lịch" theo Lịch đăng chung (khung giờ + giãn cách do server xếp)
     if (groupHunterAutoSchedule) {
-      if (groupHunterScheduleMode === 'GOLDEN_HOURS') {
-        // Tự động phân bổ vào các khung giờ vàng nhiều người xem nhất (Sáng 8h15, Trưa 12h, Chiều 18h10, Tối 20h45)
-        const goldenHourDefs = [
-          { h: 8, m: 15 },
-          { h: 12, m: 0 },
-          { h: 18, m: 10 },
-          { h: 20, m: 45 },
-        ];
-        const assignedSlots: Dayjs[] = [];
-        let curDay = dayjs().hour() >= 21 ? dayjs().add(1, 'day') : dayjs();
-
-        for (let i = 0; i < selected.length; i++) {
-          let found = false;
-          while (!found) {
-            for (const g of goldenHourDefs) {
-              const jitterMinutes = Math.floor(Math.random() * 14) - 7; // Thêm độ lệch tự nhiên -7 đến +7 phút
-              const candidate = curDay.hour(g.h).minute(g.m).add(jitterMinutes, 'minute').second(0);
-              // Phải sau thời điểm hiện tại ít nhất 15 phút và cách các slot đã gán ít nhất 90 phút
-              if (candidate.isAfter(dayjs().add(15, 'minute')) && !assignedSlots.some((s) => Math.abs(s.diff(candidate, 'minute')) < 90)) {
-                assignedSlots.push(candidate);
-                found = true;
-                break;
-              }
-            }
-            if (!found) {
-              curDay = curDay.add(1, 'day');
-            }
-          }
-        }
-
-        // Lưu thời gian lên lịch chuẩn xác riêng cho từng URL
-        setCustomDrawerScheduledTimes((prev) => {
-          const next = { ...prev };
-          selected.forEach((it, idx) => {
-            if (assignedSlots[idx]) {
-              next[it.url] = assignedSlots[idx];
-            }
-          });
-          return next;
-        });
-
-        setBulkStartMode('TIME');
-        if (assignedSlots[0]) {
-          setBulkStartTime(assignedSlots[0]);
-        }
-      } else {
-        setBulkStartMode('TIME');
-        setBulkStartTime(dayjs().add(groupHunterInterval, 'minute'));
-        setBulkInterval(groupHunterInterval);
-      }
+      setScheduleChoice({ mode: 'QUEUE' });
     }
 
     // Tự động khớp và chọn Nhóm đích tương ứng với Group vừa cào bài
@@ -549,13 +524,7 @@ export function useGroupHunter({ setBulkText, setBulkDrawerPreviews, formatMulti
     setGroupHunterDrawerVisible(false);
     setBulkModalVisible(true);
     message.success(
-      `🚀 Đã chuyển ${selected.length} bài viết vào danh sách đăng! ${
-        groupHunterAutoSchedule
-          ? groupHunterScheduleMode === 'GOLDEN_HOURS'
-            ? '🌟 Đã kích hoạt rải lịch tự động theo các Khung Giờ Vàng (sáng, trưa, tối)!'
-            : `Đã kích hoạt rải lịch tự động mỗi ${groupHunterInterval} phút!`
-          : ''
-      }`
+      `Đã chuyển ${selected.length} bài viết vào danh sách đăng.${groupHunterAutoSchedule ? ' Bài sẽ được xếp vào lịch đăng chung.' : ''}`
     );
   };
 
@@ -566,47 +535,16 @@ export function useGroupHunter({ setBulkText, setBulkDrawerPreviews, formatMulti
       return;
     }
 
-    // Tính slot hẹn giờ (nếu bật tự động lên lịch)
-    const assignedSlots: Dayjs[] = [];
     if (groupHunterAutoSchedule) {
-      if (groupHunterScheduleMode === 'GOLDEN_HOURS') {
-        const goldenHourDefs = [
-          { h: 8, m: 15 },
-          { h: 12, m: 0 },
-          { h: 18, m: 10 },
-          { h: 20, m: 45 },
-        ];
-        let curDay = dayjs().hour() >= 21 ? dayjs().add(1, 'day') : dayjs();
-        for (let i = 0; i < selected.length; i++) {
-          let found = false;
-          while (!found) {
-            for (const g of goldenHourDefs) {
-              const jitterMinutes = Math.floor(Math.random() * 14) - 7;
-              const candidate = curDay.hour(g.h).minute(g.m).add(jitterMinutes, 'minute').second(0);
-              if (candidate.isAfter(dayjs().add(15, 'minute')) && !assignedSlots.some((s) => Math.abs(s.diff(candidate, 'minute')) < 90)) {
-                assignedSlots.push(candidate);
-                found = true;
-                break;
-              }
-            }
-            if (!found) curDay = curDay.add(1, 'day');
-          }
-        }
-      } else {
-        const interval = groupHunterInterval || 60;
-        const start = dayjs().add(interval, 'minute');
-        for (let i = 0; i < selected.length; i++) {
-          assignedSlots.push(start.add(i * interval, 'minute'));
-        }
-      }
+      setScheduleChoice({ mode: 'QUEUE' });
     }
 
     // Tạo trực tiếp linkItems
     const newItems: PostLinkItem[] = selected.map((it, idx) => ({
       id: Math.random().toString(36).substring(2, 9),
       url: it.url,
-      isNow: !groupHunterAutoSchedule,
-      scheduledAt: assignedSlots[idx] || dayjs().add((idx + 1) * 10, 'minute'),
+      isNow: true,
+      scheduledAt: dayjs(),
       includeCredit: true,
       skipComment: false,
       affiliateLink: '',
@@ -747,5 +685,8 @@ export function useGroupHunter({ setBulkText, setBulkDrawerPreviews, formatMulti
     filteredGroupHunterPosts,
     handleImportGroupHunterPosts,
     handleImportAndSwipeGroupHunterPosts,
+    scrapeAccountOptions,
+    activeScrapeAccount,
+    setGroupHunterScrapeAccountId,
   };
 }

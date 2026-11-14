@@ -394,15 +394,15 @@ function isPersonalCookieAccount(account: any) {
 }
 
 const REACTIONS = [
-  { key: 'LIKE', label: 'Thích (Like)', emoji: '👍', color: '#1877f2' },
-  { key: 'LOVE', label: 'Yêu thích (Love)', emoji: '❤️', color: '#f33e58' },
-  { key: 'CARE', label: 'Thương thương (Care)', emoji: '🥰', color: '#f7b125' },
-  { key: 'RANDOM_POSITIVE', label: 'Ngẫu nhiên Tích Cực (Like/Love/Care)', emoji: '🎲', color: '#ec4899' },
-  { key: 'RANDOM_ALL', label: 'Ngẫu nhiên Đa Dạng (Like/Love/Care/Haha/Wow)', emoji: '🎲', color: '#8b5cf6' },
-  { key: 'HAHA', label: 'Haha', emoji: '😆', color: '#f7b125' },
-  { key: 'WOW', label: 'Wow', emoji: '😮', color: '#f7b125' },
-  { key: 'SAD', label: 'Buồn (Sad)', emoji: '😢', color: '#f7b125' },
-  { key: 'ANGRY', label: 'Phẫn nộ (Angry)', emoji: '😡', color: '#e9710f' },
+  { key: 'LIKE', label: 'Thích (Like)', shortLabel: 'Thích', emoji: '👍', color: '#1877f2' },
+  { key: 'LOVE', label: 'Yêu thích (Love)', shortLabel: 'Yêu', emoji: '❤️', color: '#f33e58' },
+  { key: 'CARE', label: 'Thương thương (Care)', shortLabel: 'Thương', emoji: '🥰', color: '#f7b125' },
+  { key: 'RANDOM_POSITIVE', label: 'Ngẫu nhiên Tích Cực (Like/Love/Care)', shortLabel: 'Tích cực', emoji: '🎲', color: '#ec4899' },
+  { key: 'RANDOM_ALL', label: 'Ngẫu nhiên Đa Dạng (Like/Love/Care/Haha/Wow)', shortLabel: 'Đa dạng', emoji: '🎲', color: '#8b5cf6' },
+  { key: 'HAHA', label: 'Haha', shortLabel: 'Haha', emoji: '😆', color: '#f7b125' },
+  { key: 'WOW', label: 'Wow', shortLabel: 'Wow', emoji: '😮', color: '#f7b125' },
+  { key: 'SAD', label: 'Buồn (Sad)', shortLabel: 'Buồn', emoji: '😢', color: '#f7b125' },
+  { key: 'ANGRY', label: 'Phẫn nộ (Angry)', shortLabel: 'Phẫn nộ', emoji: '😡', color: '#e9710f' },
 ];
 
 const getInitials = (name: string): string => {
@@ -2166,7 +2166,7 @@ export default function BuffEngagement() {
                             Bài viết cần tăng tương tác
                           </span>
                           {targetPostUrl && (
-                            <span className="px-2.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-blue-950/90 text-blue-300 border border-blue-700/60 shadow-sm">
+                            <span className="px-2.5 py-0.5 rounded-md text-xs font-mono font-bold bg-blue-950/90 text-blue-300 border border-blue-700/60 shadow-sm">
                               {targetPostUrl.includes('/groups/')
                                 ? 'Nhóm Facebook'
                                 : targetPostUrl.includes('/reel')
@@ -2175,7 +2175,7 @@ export default function BuffEngagement() {
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-slate-400 mt-0.5">
+                        <p className="text-[13px] text-slate-300 mt-0.5">
                           Dán link bài viết Group (kín/công khai), Fanpage, Profile cá nhân hoặc Reels để hệ thống tự động nhận diện.
                         </p>
                       </div>
@@ -2331,16 +2331,16 @@ export default function BuffEngagement() {
                       {/* Dropdown chọn nick mẹ */}
                       <div>
                         <div className="flex items-center justify-between mb-1.5">
-                          <label className="text-xs font-semibold text-slate-300">
+                          <label className="text-[13px] font-semibold text-slate-200">
                             Tài khoản Facebook sở hữu Page:
                           </label>
                           {currentViaAccount && (
-                            <span className="text-[11px] text-blue-400 font-mono">
+                            <span className="text-xs text-blue-400 font-mono">
                               c_user: {extractCUser(currentViaAccount.cookieString || currentViaAccount.accessToken) || 'N/A'}
                             </span>
                           )}
                           {selectedAccountId === 'ALL_VIAS' && (
-                            <span className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1">
+                            <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                               {actorMode === 'VIAS'
                                 ? `Gộp ${fbAccounts.length} Nick Via (${selectedPageIds.length}/${scannedPages.length})`
@@ -2390,17 +2390,17 @@ export default function BuffEngagement() {
                       {selectedAccountId === 'CUSTOM' && (
                         <div className="space-y-3 p-3.5 rounded-xl border border-slate-800 bg-slate-950/70">
                           <div className="flex items-center justify-between">
-                            <label className="text-xs font-bold text-slate-200">
+                            <label className="text-[13px] font-bold text-slate-200">
                               Nhập Cookie nick Facebook mẹ:
                             </label>
-                            <span className="text-[11px] text-slate-400">
+                            <span className="text-xs text-slate-300">
                               (Chứa <b>c_user</b> & <b>xs</b>)
                             </span>
                           </div>
 
                           <Row gutter={10}>
                             <Col span={10}>
-                              <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                              <label className="block text-xs font-semibold text-slate-300 mb-1">
                                 c_user:
                               </label>
                               <Input
@@ -2424,7 +2424,7 @@ export default function BuffEngagement() {
                               />
                             </Col>
                             <Col span={14}>
-                              <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                              <label className="block text-xs font-semibold text-slate-300 mb-1">
                                 xs:
                               </label>
                               <Input.Password
@@ -2451,7 +2451,7 @@ export default function BuffEngagement() {
                             placeholder="Dán toàn bộ cookie dài vào đây..."
                             value={customCookie}
                             onChange={(e) => setCustomCookie(e.target.value)}
-                            className="font-mono text-[11px] rounded-xl bg-slate-900 border-slate-700 text-slate-100"
+                            className="font-mono text-xs rounded-xl bg-slate-900 border-slate-700 text-slate-100"
                           />
                         </div>
                       )}
@@ -2461,28 +2461,28 @@ export default function BuffEngagement() {
                         <button
                           type="button"
                           onClick={() => setActorMode('FANPAGES')}
-                          className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                          className={`flex-1 py-2 px-3 rounded-lg text-[13px] font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                             actorMode === 'FANPAGES'
                               ? 'bg-blue-600 text-white'
-                              : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                              : 'text-slate-300 hover:text-white hover:bg-slate-900'
                           }`}
                         >
                           <span>Page</span>
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-950 border border-blue-700 text-blue-300">
+                          <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-blue-950 border border-blue-700 text-blue-300">
                             {scannedPages.length}
                           </span>
                         </button>
                         <button
                           type="button"
                           onClick={() => setActorMode('VIAS')}
-                          className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                          className={`flex-1 py-2 px-3 rounded-lg text-[13px] font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                             actorMode === 'VIAS'
                               ? 'bg-blue-600 text-white'
-                              : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                              : 'text-slate-300 hover:text-white hover:bg-slate-900'
                           }`}
                         >
                           <span>Nick cá nhân</span>
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 border border-emerald-700 text-emerald-300">
+                          <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-emerald-950 border border-emerald-700 text-emerald-300">
                             {fbAccounts.length}
                           </span>
                         </button>
@@ -2557,19 +2557,19 @@ export default function BuffEngagement() {
                                     >
                                       {getInitials(page.name)}
                                     </div>
-                                    <div className="min-w-0">
-                                      <div className="font-bold text-xs truncate max-w-[125px] sm:max-w-[135px]" title={page.name}>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="font-bold text-[13px] truncate" title={page.name}>
                                         {page.name}
                                       </div>
-                                      <div className="flex items-center gap-1 text-[10px] font-mono text-slate-400 truncate">
-                                        <span>ID: {page.id}</span>
+                                      <div className="flex items-center flex-wrap gap-1.5 text-xs font-mono text-slate-300 mt-0.5">
+                                        <span className="truncate">ID: {page.id}</span>
                                         {actorMode === 'VIAS' ? (
-                                          <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/80 font-sans font-medium">
+                                          <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/80 font-sans font-medium shrink-0">
                                             Via
                                           </span>
                                         ) : (
                                           page.viaName && selectedAccountId === 'ALL_VIAS' && (
-                                            <span className="text-[9px] px-1 py-0.2 rounded bg-blue-950/80 text-blue-300 border border-blue-800/80 font-sans font-medium">
+                                            <span className="text-xs px-1.5 py-0.5 rounded bg-blue-950/80 text-blue-300 border border-blue-800/80 font-sans font-medium shrink-0">
                                               {page.viaName}
                                             </span>
                                           )
@@ -2728,10 +2728,10 @@ export default function BuffEngagement() {
                         {/* 2. Reaction Picker (Floating Dock Style) */}
                         {engagementMode !== 'COMMENT_ONLY' && (
                           <div>
-                            <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                            <label className="block text-[13px] font-semibold text-slate-200 mb-2">
                               Chọn cảm xúc (Reaction):
                             </label>
-                            <div className="flex items-center justify-between gap-1 p-1.5 rounded-xl bg-slate-950/80 border border-slate-800">
+                            <div className="flex flex-wrap items-stretch gap-1.5 p-2 rounded-xl bg-slate-950/80 border border-slate-800">
                               {REACTIONS.map((r) => {
                                 const isSelected = selectedReaction === r.key;
                                 return (
@@ -2739,15 +2739,15 @@ export default function BuffEngagement() {
                                     key={r.key}
                                     type="button"
                                     onClick={() => setSelectedReaction(r.key)}
-                                    className={`flex-1 py-1.5 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
+                                    className={`flex-1 min-w-[68px] py-2 px-1.5 rounded-xl flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
                                       isSelected
-                                        ? 'bg-blue-600/40 text-white font-semibold '
-                                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+                                        ? 'bg-blue-600/45 text-white font-semibold ring-1 ring-blue-400/50'
+                                        : 'text-slate-300 hover:text-white hover:bg-slate-900/60'
                                     }`}
                                     title={r.label}
                                   >
                                     <span className="text-xl sm:text-2xl leading-none">{r.emoji}</span>
-                                    <span className="text-[10px] font-semibold">{r.label.split(' ')[0]}</span>
+                                    <span className="text-xs font-semibold whitespace-nowrap">{r.shortLabel}</span>
                                   </button>
                                 );
                               })}
@@ -2757,32 +2757,32 @@ export default function BuffEngagement() {
 
                         {/* 3. Tùy chọn Mô phỏng người dùng, Tốc độ & Chống Checkpoint */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/80 border border-emerald-900/60 text-xs shadow-sm">
+                          <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-slate-950/80 border border-emerald-900/60 text-[13px] shadow-sm">
                             <div className="flex items-center gap-2">
                               <div>
-                                <span className="text-slate-200 font-bold block">Mô phỏng người dùng</span>
-                                <span className="text-[10px] text-slate-400">Lướt xem bài tự nhiên</span>
+                                <span className="text-slate-100 font-bold block">Mô phỏng người dùng</span>
+                                <span className="text-xs text-slate-300">Lướt xem bài tự nhiên</span>
                               </div>
                             </div>
                             <Checkbox
                               checked={enableHumanBehavior}
                               onChange={(e) => setEnableHumanBehavior(e.target.checked)}
-                              className="text-emerald-400 font-bold"
+                              className="text-emerald-400 font-bold shrink-0"
                             >
                               Bật
                             </Checkbox>
                           </div>
 
-                          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-xs shadow-sm">
+                          <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-[13px] shadow-sm">
                             <div>
-                              <span className="text-slate-200 font-bold block">Giãn cách:</span>
-                              <span className="text-[10px] text-slate-400">Nghỉ giữa 2 nick</span>
+                              <span className="text-slate-100 font-bold block">Giãn cách:</span>
+                              <span className="text-xs text-slate-300">Nghỉ giữa 2 nick</span>
                             </div>
                             <Select
-                              size="small"
+                              size="middle"
                               value={delayMs}
                               onChange={(val) => setDelayMs(val)}
-                              className="w-32"
+                              className="w-44 shrink-0"
                               options={
                                 engagementMode !== 'LIKE_ONLY'
                                   ? [
@@ -2799,28 +2799,28 @@ export default function BuffEngagement() {
                             />
                           </div>
 
-                          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/80 border border-blue-900/60 text-xs shadow-sm">
+                          <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-slate-950/80 border border-blue-900/60 text-[13px] shadow-sm">
                             <div>
                               <span className="text-blue-300 font-bold block flex items-center gap-1">
                                 <span>Chế độ Siêu Tốc</span>
                               </span>
-                              <span className="text-[10px] text-slate-400">Đổi Page ngay trên bài (tiết kiệm 15s)</span>
+                              <span className="text-xs text-slate-300">Đổi Page ngay trên bài (tiết kiệm 15s)</span>
                             </div>
                             <Checkbox
                               checked={fastSwitch}
                               onChange={(e) => setFastSwitch(e.target.checked)}
-                              className="text-blue-400 font-bold"
+                              className="text-blue-400 font-bold shrink-0"
                             >
                               Bật
                             </Checkbox>
                           </div>
 
-                          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950/80 border border-amber-900/60 text-xs shadow-sm">
+                          <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-slate-950/80 border border-amber-900/60 text-[13px] shadow-sm">
                             <div>
                               <span className="text-amber-300 font-bold block flex items-center gap-1">
                                 <span>Bảo vệ BM & Via</span>
                               </span>
-                              <span className="text-[10px] text-slate-400">Batch Cooldown & dừng khi bị chặn</span>
+                              <span className="text-xs text-slate-300">Batch Cooldown & dừng khi bị chặn</span>
                             </div>
                             <Checkbox
                               checked={antiCheckpointGuard}
@@ -2943,7 +2943,7 @@ export default function BuffEngagement() {
                             <Row gutter={[8, 8]}>
                               <Col span={6}>
                                 <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-center">
-                                  <div className="text-[10px] font-bold text-slate-400 uppercase">Tổng số</div>
+                                  <div className="text-xs font-bold text-slate-300 uppercase">Tổng số</div>
                                   <div className="text-base sm:text-lg font-semibold text-slate-100 mt-0.5">
                                     {autoBuffProgress.total || batchOrders.length}
                                   </div>
@@ -2951,7 +2951,7 @@ export default function BuffEngagement() {
                               </Col>
                               <Col span={6}>
                                 <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-800/50 text-center">
-                                  <div className="text-[10px] font-bold text-emerald-400 uppercase">Thành công</div>
+                                  <div className="text-xs font-bold text-emerald-400 uppercase">Thành công</div>
                                   <div className="text-base sm:text-lg font-semibold text-emerald-300 mt-0.5">
                                     {autoBuffProgress.success || batchOrders.filter((o) => o.status === 'COMPLETED').length}
                                   </div>
@@ -2959,7 +2959,7 @@ export default function BuffEngagement() {
                               </Col>
                               <Col span={6}>
                                 <div className="p-2.5 rounded-xl bg-blue-950/40 border border-blue-800/50 text-center">
-                                  <div className="text-[10px] font-bold text-blue-400 uppercase">Đã like</div>
+                                  <div className="text-xs font-bold text-blue-400 uppercase">Đã like</div>
                                   <div className="text-base sm:text-lg font-semibold text-blue-300 mt-0.5">
                                     {autoBuffProgress.alreadyLiked}
                                   </div>
@@ -2967,7 +2967,7 @@ export default function BuffEngagement() {
                               </Col>
                               <Col span={6}>
                                 <div className="p-2.5 rounded-xl bg-rose-950/40 border border-rose-800/50 text-center">
-                                  <div className="text-[10px] font-bold text-rose-400 uppercase">Lỗi</div>
+                                  <div className="text-xs font-bold text-rose-400 uppercase">Lỗi</div>
                                   <div className="text-base sm:text-lg font-semibold text-rose-300 mt-0.5">
                                     {autoBuffProgress.failed || batchOrders.filter((o) => o.status === 'FAILED').length}
                                   </div>
@@ -2978,7 +2978,7 @@ export default function BuffEngagement() {
                             {/* Glowing Progress Banner when running */}
                             {autoBuffProgress.status === 'RUNNING' && (
                               <div className="p-3 rounded-xl bg-blue-950/40 border border-blue-500/50 space-y-2">
-                                <div className="flex items-center justify-between text-xs text-blue-200">
+                                <div className="flex items-center justify-between text-[13px] text-blue-200">
                                   <span className="flex items-center gap-1.5 font-bold">
                                     <LoadingOutlined spin className="text-blue-400" />
                                     <span>Đang xử lý: <b className="text-white">{autoBuffProgress.currentRunningPageName || 'Đang mở Facebook...'}</b></span>
@@ -3009,12 +3009,12 @@ export default function BuffEngagement() {
                               <div className="space-y-1.5 max-h-[320px] overflow-y-auto pr-1">
                                 {batchOrders.map((order) => (
                                   <div key={order.id} className="p-2 rounded-lg border border-slate-800 bg-slate-950/40 space-y-1">
-                                    <div className="flex items-center justify-between gap-2 text-xs">
-                                      <span className="text-slate-300 truncate min-w-0">
+                                    <div className="flex items-center justify-between gap-2 text-[13px]">
+                                      <span className="text-slate-200 truncate min-w-0">
                                         #{order.orderNumber} {order.url}
                                       </span>
                                       <Tag
-                                        className="text-[10px] m-0 shrink-0"
+                                        className="!text-xs m-0 shrink-0"
                                         color={
                                           order.status === 'COMPLETED'
                                             ? 'success'
@@ -3037,10 +3037,10 @@ export default function BuffEngagement() {
                                       </Tag>
                                     </div>
                                     {order.status === 'RUNNING' && order.currentRunningPageName && (
-                                      <div className="text-[11px] text-slate-400 truncate">Đang chạy: {order.currentRunningPageName}</div>
+                                      <div className="text-xs text-slate-300 truncate">Đang chạy: {order.currentRunningPageName}</div>
                                     )}
                                     {order.status === 'FAILED' && order.error && (
-                                      <div className="text-[11px] text-rose-300 truncate">{order.error}</div>
+                                      <div className="text-xs text-rose-300 truncate">{order.error}</div>
                                     )}
                                   </div>
                                 ))}
@@ -3075,7 +3075,7 @@ export default function BuffEngagement() {
                                   >
                                     <div className="flex items-center gap-2 min-w-0 flex-1">
                                       <div
-                                        className={`w-6 h-6 shrink-0 rounded-lg text-white font-semibold text-[9px] flex items-center justify-center ${getAvatarGradient(
+                                        className={`w-6 h-6 shrink-0 rounded-lg text-white font-semibold text-xs flex items-center justify-center ${getAvatarGradient(
                                           detail.pageName
                                         )} shadow-sm`}
                                       >
@@ -3083,15 +3083,15 @@ export default function BuffEngagement() {
                                       </div>
                                       <div className="min-w-0 flex-1">
                                         <div className="flex items-center gap-1.5">
-                                          <span className="font-bold text-xs text-slate-100 truncate">
+                                          <span className="font-bold text-[13px] text-slate-100 truncate">
                                             {detail.pageName}
                                           </span>
                                           {engagementMode !== 'COMMENT_ONLY' && (
-                                            <span className="text-xs">{reactionObj.emoji}</span>
+                                            <span className="text-[13px]">{reactionObj.emoji}</span>
                                           )}
                                         </div>
                                         {detail.commentText && (
-                                          <div className="text-[10px] text-blue-300 italic truncate max-w-[240px]">
+                                          <div className="text-xs text-blue-300 italic truncate max-w-[240px]">
                                             "{detail.commentText}"
                                           </div>
                                         )}
@@ -3100,34 +3100,34 @@ export default function BuffEngagement() {
 
                                     <div className="shrink-0">
                                       {isWaiting && (
-                                        <span className="text-[10px] text-slate-400 font-medium">Chờ lượt</span>
+                                        <span className="text-xs text-slate-300 font-medium">Chờ lượt</span>
                                       )}
                                       {isRunning && (
-                                        <Tag color="processing" icon={<LoadingOutlined spin />} className="font-bold text-[10px] m-0">
+                                        <Tag color="processing" icon={<LoadingOutlined spin />} className="font-bold !text-xs m-0">
                                           Đang like...
                                         </Tag>
                                       )}
                                       {isSuccess && (
-                                        <Tag color="success" icon={<CheckCircleFilled />} className="text-[10px] m-0">
+                                        <Tag color="success" icon={<CheckCircleFilled />} className="!text-xs m-0">
                                           {detail.message || 'Thành công'}
                                         </Tag>
                                       )}
                                       {isAlreadyLiked && (
-                                        <Tag color="blue" icon={<CheckOutlined />} className="text-[10px] m-0">
+                                        <Tag color="blue" icon={<CheckOutlined />} className="!text-xs m-0">
                                           Đã like trước
                                         </Tag>
                                       )}
                                       {detail.status === 'UNVERIFIED' && (
-                                        <Tag color="warning" className="text-[10px] m-0">Chưa xác nhận</Tag>
+                                        <Tag color="warning" className="!text-xs m-0">Chưa xác nhận</Tag>
                                       )}
                                       {detail.status === 'NO_BUTTON' && (
-                                        <Tag color="error" className="text-[10px] m-0">Không thấy nút Like</Tag>
+                                        <Tag color="error" className="!text-xs m-0">Không thấy nút Like</Tag>
                                       )}
                                       {detail.status === 'SKIPPED' && (
-                                        <Tag className="text-[10px] m-0">{detail.message || 'Bỏ qua'}</Tag>
+                                        <Tag className="!text-xs m-0">{detail.message || 'Bỏ qua'}</Tag>
                                       )}
                                       {detail.status === 'ERROR' && (
-                                        <Tag color="error" className="text-[10px] m-0">{detail.error || 'Lỗi'}</Tag>
+                                        <Tag color="error" className="!text-xs m-0">{detail.error || 'Lỗi'}</Tag>
                                       )}
                                     </div>
                                   </div>
@@ -3479,12 +3479,12 @@ export default function BuffEngagement() {
                         return (
                           <div
                             key={task.id}
-                            className="py-3 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs"
+                            className="py-3 flex flex-col md:flex-row md:items-center justify-between gap-3 text-[13px]"
                           >
                             <div className="space-y-1 flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span
-                                  className={`px-2 py-0.5 rounded font-mono font-bold text-[10px] uppercase border ${
+                                  className={`px-2 py-0.5 rounded font-mono font-bold text-xs uppercase border ${
                                     isQueued
                                       ? 'bg-amber-950/80 text-amber-300 border-amber-700/60'
                                       : isRunning
@@ -3500,11 +3500,11 @@ export default function BuffEngagement() {
                                   {isFailed && 'Thất bại'}
                                 </span>
 
-                                <span className="font-semibold text-slate-200">
+                                <span className="font-semibold text-slate-100">
                                   Mục tiêu: {task.targetLikes === 'ALL' ? 'xoay vòng page' : `${task.targetLikes || 30} like`} ({task.reactionType})
                                 </span>
 
-                                <span className="text-[11px] text-slate-400">
+                                <span className="text-xs text-slate-300">
                                   • Nguồn: {String(task.source || '').startsWith('POST_HUNTER')
                                     ? `Post Hunter${task.monitorName ? ` (${task.monitorName})` : ''}`
                                     : task.source === 'AUTO_OWN_POST'
@@ -3513,25 +3513,25 @@ export default function BuffEngagement() {
                                 </span>
 
                                 {task.runAfter && isQueued && (
-                                  <span className="text-[11px] text-amber-400/90 font-mono">
+                                  <span className="text-xs text-amber-400/90 font-mono">
                                     • Lên lịch: {new Date(task.runAfter).toLocaleTimeString()}
                                   </span>
                                 )}
 
                                 {isCompleted && task.result && (
-                                  <span className="text-[11px] text-emerald-400 font-semibold font-mono">
+                                  <span className="text-xs text-emerald-400 font-semibold font-mono">
                                     • Thành công {task.result.success}/{task.result.total}
                                   </span>
                                 )}
 
                                 {isFailed && task.error && (
-                                  <span className="text-[11px] text-rose-400 truncate max-w-xs">
+                                  <span className="text-xs text-rose-400 truncate max-w-xs">
                                     • Lỗi: {task.error}
                                   </span>
                                 )}
                               </div>
 
-                              <div className="text-slate-400 truncate font-mono text-[11px]">
+                              <div className="text-slate-300 truncate font-mono text-xs">
                                 <a
                                   href={task.targetUrl}
                                   target="_blank"
@@ -3578,13 +3578,13 @@ export default function BuffEngagement() {
                 <Row gutter={[12, 12]}>
                   <Col xs={12} sm={6}>
                     <Card variant="borderless" styles={{ body: { padding: '14px', textAlign: 'center' } }}>
-                      <div className="text-[11px] font-bold text-slate-400 uppercase">Tổng lượt chạy</div>
+                      <div className="text-xs font-bold text-slate-300 uppercase">Tổng lượt chạy</div>
                       <div className="text-2xl font-semibold text-slate-100 mt-1">{buffLogs.length}</div>
                     </Card>
                   </Col>
                   <Col xs={12} sm={6}>
                     <Card variant="borderless" styles={{ body: { padding: '14px', textAlign: 'center' } }}>
-                      <div className="text-[11px] font-bold text-emerald-400 uppercase">Like thành công</div>
+                      <div className="text-xs font-bold text-emerald-400 uppercase">Like thành công</div>
                       <div className="text-2xl font-semibold text-emerald-400 mt-1">
                         {buffLogs.reduce((acc, l) => acc + (l.successCount || 0), 0)}
                       </div>
@@ -3592,7 +3592,7 @@ export default function BuffEngagement() {
                   </Col>
                   <Col xs={12} sm={6}>
                     <Card variant="borderless" styles={{ body: { padding: '14px', textAlign: 'center' } }}>
-                      <div className="text-[11px] font-bold text-blue-400 uppercase">Đã like trước đó</div>
+                      <div className="text-xs font-bold text-blue-400 uppercase">Đã like trước đó</div>
                       <div className="text-2xl font-semibold text-blue-400 mt-1">
                         {buffLogs.reduce((acc, l) => acc + (l.alreadyLikedCount || 0), 0)}
                       </div>
@@ -3600,7 +3600,7 @@ export default function BuffEngagement() {
                   </Col>
                   <Col xs={12} sm={6}>
                     <Card variant="borderless" styles={{ body: { padding: '14px', textAlign: 'center' } }}>
-                      <div className="text-[11px] font-bold text-rose-400 uppercase">Lỗi / Thất Bại</div>
+                      <div className="text-xs font-bold text-rose-400 uppercase">Lỗi / Thất Bại</div>
                       <div className="text-2xl font-semibold text-rose-400 mt-1">
                         {buffLogs.reduce((acc, l) => acc + (l.failedCount || 0), 0)}
                       </div>
@@ -3709,38 +3709,38 @@ export default function BuffEngagement() {
                             {/* Top row of card */}
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-mono text-xs text-slate-400 bg-slate-900 px-2 py-0.5 rounded-lg border border-slate-800">
+                                <span className="font-mono text-xs text-slate-300 bg-slate-900 px-2 py-0.5 rounded-lg border border-slate-800">
                                   {dateFormatted}
                                 </span>
-                                <Tag color={log.type === 'BATCH' ? 'purple' : 'blue'} className="m-0 font-bold text-[10px]">
+                                <Tag color={log.type === 'BATCH' ? 'purple' : 'blue'} className="m-0 font-bold !text-xs">
                                   {log.type === 'BATCH' ? 'Hàng loạt' : 'Đơn lẻ'}
                                 </Tag>
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-800 text-slate-200 border border-slate-700/60">
-                                  {reactionObj.emoji} {reactionObj.label.split(' ')[0]}
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-slate-800 text-slate-200 border border-slate-700/60">
+                                  {reactionObj.emoji} {reactionObj.shortLabel || reactionObj.label.split(' ')[0]}
                                 </span>
                                 {log.accountName && (
-                                  <span className="text-xs text-slate-400">
-                                    Via: <b className="text-slate-200">{log.accountName}</b>
+                                  <span className="text-[13px] text-slate-300">
+                                    Via: <b className="text-slate-100">{log.accountName}</b>
                                   </span>
                                 )}
                               </div>
 
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <Tag color="success" className="m-0 text-[11px] font-bold" icon={<CheckCircleFilled />}>
+                                <Tag color="success" className="m-0 !text-xs font-bold" icon={<CheckCircleFilled />}>
                                   {log.successCount} thành công
                                 </Tag>
                                 {log.commentCount !== undefined && log.commentCount > 0 && (
-                                  <Tag color="cyan" className="m-0 text-[11px] font-bold" icon={<CommentOutlined />}>
+                                  <Tag color="cyan" className="m-0 !text-xs font-bold" icon={<CommentOutlined />}>
                                     {log.commentCount} cmt
                                   </Tag>
                                 )}
                                 {log.alreadyLikedCount > 0 && (
-                                  <Tag color="blue" className="m-0 text-[11px]" icon={<CheckOutlined />}>
+                                  <Tag color="blue" className="m-0 !text-xs" icon={<CheckOutlined />}>
                                     {log.alreadyLikedCount} đã like trước
                                   </Tag>
                                 )}
                                 {log.failedCount > 0 && (
-                                  <Tag color="error" className="m-0 text-[11px]">
+                                  <Tag color="error" className="m-0 !text-xs">
                                     {log.failedCount} lỗi
                                   </Tag>
                                 )}
@@ -3753,7 +3753,7 @@ export default function BuffEngagement() {
                                 href={log.targetUrl}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="font-mono text-xs text-blue-400 hover:text-blue-300 truncate flex-1 block"
+                                className="font-mono text-[13px] text-blue-400 hover:text-blue-300 truncate flex-1 block"
                               >
                                 {log.targetUrl}
                               </a>
@@ -3783,13 +3783,13 @@ export default function BuffEngagement() {
 
                             {/* Bottom: List of Fanpages in this log */}
                             <div>
-                              <div className="text-[11px] font-semibold text-slate-400 mb-1 flex items-center justify-between">
+                              <div className="text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
                                 <span>Danh sách {log.details.length} Fanpage đã tham gia lượt buff này:</span>
                                 <Button
                                   size="small"
                                   type="link"
                                   onClick={() => setSelectedLogDetail(log)}
-                                  className="text-[11px] p-0 h-auto text-blue-400 hover:underline"
+                                  className="text-xs p-0 h-auto text-blue-400 hover:underline"
                                 >
                                   Xem chi tiết tất cả ({log.details.length} Page)
                                 </Button>
@@ -3798,7 +3798,7 @@ export default function BuffEngagement() {
                                 {log.details.map((d, dIdx) => (
                                   <span
                                     key={d.pageId + dIdx}
-                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium border ${
+                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium border ${
                                       d.status === 'SUCCESS'
                                         ? 'bg-emerald-950/60 border-emerald-800/60 text-emerald-300'
                                         : d.status === 'ALREADY_LIKED'
@@ -3927,19 +3927,19 @@ export default function BuffEngagement() {
             {/* Quick Metrics */}
             <div className="grid grid-cols-4 gap-2">
               <div className="p-2.5 rounded-xl bg-slate-100 border border-slate-200 text-center">
-                <div className="text-[10px] text-slate-500 font-bold uppercase">Tổng Page</div>
+                <div className="text-xs text-slate-600 font-bold uppercase">Tổng Page</div>
                 <div className="text-lg font-semibold text-slate-800">{selectedLogDetail.totalPages}</div>
               </div>
               <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-center">
-                <div className="text-[10px] text-emerald-600 font-bold uppercase">Thành công</div>
+                <div className="text-xs text-emerald-700 font-bold uppercase">Thành công</div>
                 <div className="text-lg font-semibold text-emerald-600">{selectedLogDetail.successCount}</div>
               </div>
               <div className="p-2.5 rounded-xl bg-blue-50 border border-blue-200 text-center">
-                <div className="text-[10px] text-blue-600 font-bold uppercase">Đã Like Trước</div>
+                <div className="text-xs text-blue-700 font-bold uppercase">Đã Like Trước</div>
                 <div className="text-lg font-semibold text-blue-600">{selectedLogDetail.alreadyLikedCount}</div>
               </div>
               <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-center">
-                <div className="text-[10px] text-rose-600 font-bold uppercase">Thất bại / Lỗi</div>
+                <div className="text-xs text-rose-700 font-bold uppercase">Thất bại / Lỗi</div>
                 <div className="text-lg font-semibold text-rose-600">{selectedLogDetail.failedCount}</div>
               </div>
             </div>
@@ -3965,23 +3965,23 @@ export default function BuffEngagement() {
                   return (
                     <div
                       key={detail.pageId + idx}
-                      className="p-2 rounded-lg bg-white border border-slate-200 flex items-center justify-between gap-3 text-xs"
+                      className="p-2 rounded-lg bg-white border border-slate-200 flex items-center justify-between gap-3 text-[13px]"
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="font-bold text-slate-400 font-mono text-[10px]">#{idx + 1}</span>
+                        <span className="font-bold text-slate-500 font-mono text-xs">#{idx + 1}</span>
                         <div className="min-w-0">
                           <div className="font-semibold text-slate-800 truncate">{detail.pageName}</div>
                           {detail.commentText && (
-                            <div className="text-[11px] text-blue-600 italic truncate max-w-[320px] font-medium">
+                            <div className="text-xs text-blue-600 italic truncate max-w-[320px] font-medium">
                               "{detail.commentText}"
                             </div>
                           )}
-                          <div className="font-mono text-[10px] text-slate-400">ID: {detail.pageId}</div>
+                          <div className="font-mono text-xs text-slate-500">ID: {detail.pageId}</div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {detail.message && (
-                          <span className="text-[11px] text-slate-400 hidden sm:inline truncate max-w-[200px]" title={detail.message}>
+                          <span className="text-xs text-slate-500 hidden sm:inline truncate max-w-[200px]" title={detail.message}>
                             {detail.message}
                           </span>
                         )}
@@ -4012,24 +4012,24 @@ export default function BuffEngagement() {
               <div className="font-bold text-base text-slate-100">
                 Danh sách Page cho từng nick
               </div>
-              <div className="text-[11px] text-slate-400 font-normal">
+              <div className="text-xs text-slate-300 font-normal">
                 Danh sách Fanpage được lưu cố định cho từng Via, bảo đảm đủ số lượng Page khi thả Like (không lo rớt page).
               </div>
             </div>
           </div>
         }
       >
-        <div className="py-2 space-y-4 text-xs">
+        <div className="py-2 space-y-4 text-[13px]">
           {/* Thanh chọn tài khoản Via cần cấu hình */}
           <div className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3">
-            <div className="text-xs font-bold text-slate-300 mb-2 flex items-center justify-between">
+            <div className="text-[13px] font-bold text-slate-200 mb-2 flex items-center justify-between">
               <span>Chọn tài khoản Via bạn muốn cấu hình i_user:</span>
-              <span className="text-[11px] text-blue-400 font-medium">
+              <span className="text-xs text-blue-400 font-medium">
                 (Bấm chọn từng Via để xem và quản lý)
               </span>
             </div>
             <Segmented
-              className="bg-slate-900 border border-slate-800 text-xs w-full"
+              className="bg-slate-900 border border-slate-800 text-[13px] w-full"
               block
               value={targetViaForModal}
               onChange={(val) => setTargetViaForModal(val as number | 'CUSTOM')}
@@ -4042,7 +4042,7 @@ export default function BuffEngagement() {
                     label: (
                       <div className="flex items-center justify-center gap-1.5 py-1">
                         <span className="font-bold text-slate-200">{a.pageName || a.platformAccountId}</span>
-                        <Tag color={count > 0 ? 'blue' : 'default'} className="!m-0 text-[10px] font-mono">
+                        <Tag color={count > 0 ? 'blue' : 'default'} className="!m-0 !text-xs font-mono">
                           {count} Page
                         </Tag>
                       </div>
@@ -4053,8 +4053,8 @@ export default function BuffEngagement() {
                   value: 'CUSTOM',
                   label: (
                     <div className="flex items-center justify-center gap-1.5 py-1">
-                      <span className="text-slate-300">Cookie thủ công</span>
-                      <Tag color={getStoredPagesForVia('custom_manual').length > 0 ? 'cyan' : 'default'} className="!m-0 text-[10px] font-mono">
+                      <span className="text-slate-200">Cookie thủ công</span>
+                      <Tag color={getStoredPagesForVia('custom_manual').length > 0 ? 'cyan' : 'default'} className="!m-0 !text-xs font-mono">
                         {getStoredPagesForVia('custom_manual').length} Page
                       </Tag>
                     </div>
@@ -4069,15 +4069,15 @@ export default function BuffEngagement() {
             <div className="flex items-center gap-2">
               <CheckCircleFilled className="text-emerald-400 text-base" />
               <div>
-                <div className="text-xs font-bold text-slate-200">
+                <div className="text-[13px] font-bold text-slate-100">
                   Đang cấu hình cho: <span className="text-blue-400">{modalViaAccount?.pageName || (targetViaForModal === 'CUSTOM' ? 'Cookie thủ công' : 'Via Facebook')}</span>
                   {modalViaAccount && (
-                    <span className="font-mono text-[10px] text-slate-400 ml-2">
+                    <span className="font-mono text-xs text-slate-300 ml-2">
                       (c_user: {extractCUser(modalViaAccount.cookieString || modalViaAccount.accessToken) || 'N/A'})
                     </span>
                   )}
                 </div>
-                <div className="text-[11px] text-slate-400 mt-0.5">
+                <div className="text-xs text-slate-300 mt-0.5">
                   Via này hiện có <b className="font-bold text-emerald-400">{currentModalPages.length} Fanpage</b> được lưu cố định.
                 </div>
               </div>
@@ -4198,12 +4198,12 @@ export default function BuffEngagement() {
                     danger
                     size="small"
                     onClick={handleClearPagesForTargetVia}
-                    className="text-[11px] !p-0 !h-auto"
+                    className="text-xs !p-0 !h-auto"
                   >
                     Xóa tất cả để dán lại
                   </Button>
                 )}
-                <span className="text-[11px] text-slate-400">
+                <span className="text-xs text-slate-300">
                   (Đã lưu vĩnh viễn trong máy)
                 </span>
               </div>
@@ -4211,7 +4211,7 @@ export default function BuffEngagement() {
 
             <div className="max-h-56 overflow-y-auto space-y-1.5 pr-1 border border-slate-800 rounded-xl p-2 bg-slate-950/60">
               {currentModalPages.length === 0 ? (
-                <div className="text-center py-6 text-slate-400">
+                <div className="text-center py-6 text-slate-300">
                   Chưa có Fanpage nào được lưu cho Via này. Hãy dán danh sách ở trên để lưu!
                 </div>
               ) : (
@@ -4221,16 +4221,16 @@ export default function BuffEngagement() {
                     className="flex items-center justify-between p-2 rounded-lg bg-slate-900/80 hover:bg-slate-850 transition-colors border border-slate-800/80"
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-300 grid place-items-center text-[10px] font-bold">
+                      <span className="w-6 h-6 rounded-full bg-slate-800 text-slate-200 grid place-items-center text-xs font-bold">
                         {idx + 1}
                       </span>
-                      <span className="font-bold text-slate-200 truncate max-w-[280px]" title={page.name}>
+                      <span className="font-bold text-slate-100 truncate max-w-[280px]" title={page.name}>
                         {page.name}
                       </span>
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-[11px] font-mono text-blue-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                      <span className="text-xs font-mono text-blue-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
                         i_user: {page.id}
                       </span>
                       <Button
@@ -4260,7 +4260,7 @@ export default function BuffEngagement() {
             </div>
             <div>
               <div>AI SEEDING STUDIO & BỘ TRỘN SPINTAX</div>
-              <div className="text-[11px] font-normal text-slate-400">
+              <div className="text-xs font-normal text-slate-300">
                 Sinh bình luận tự nhiên theo ngành hàng, chống trùng lặp và né thuật toán quét bot của Meta.
               </div>
             </div>
@@ -4283,10 +4283,10 @@ export default function BuffEngagement() {
           },
         }}
       >
-        <div className="space-y-4 pt-3 text-xs sm:text-sm">
+        <div className="space-y-4 pt-3 text-[13px] sm:text-sm">
           {/* 1. Chọn Ngành Nghề / Niche */}
           <div className="space-y-2">
-            <label className="font-bold text-slate-300 block">Chủ đề bài viết:</label>
+            <label className="font-bold text-slate-200 block">Chủ đề bài viết:</label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {Object.entries(SEEDING_NICHE_PRESETS).map(([key, item]) => {
                 const isSelected = selectedNiche === key;
@@ -4301,11 +4301,11 @@ export default function BuffEngagement() {
                     className={`p-2.5 rounded-xl border text-left transition-all flex items-center gap-2 ${
                       isSelected
                         ? 'bg-blue-600/30 border-blue-500 text-white'
-                        : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                        : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700'
                     }`}
                   >
                     
-                    <span className="font-bold text-xs truncate">{item.label}</span>
+                    <span className="font-bold text-[13px] truncate">{item.label}</span>
                   </button>
                 );
               })}
@@ -4314,13 +4314,13 @@ export default function BuffEngagement() {
 
           {/* 2. Mẫu Cấu Trúc Spintax Gốc */}
           <div className="space-y-1.5 p-3 rounded-xl bg-slate-950/80 border border-slate-800">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-slate-300">
+            <div className="flex items-center justify-between text-[13px]">
+              <span className="font-bold text-slate-200">
                 Cấu trúc Spintax gốc của ngành "{SEEDING_NICHE_PRESETS[selectedNiche]?.label}":
               </span>
-              <span className="text-[11px] text-slate-500 font-mono">Cú pháp: {'{A|B|C} {D|E}'}</span>
+              <span className="text-xs text-slate-400 font-mono">Cú pháp: {'{A|B|C} {D|E}'}</span>
             </div>
-            <div className="space-y-1 font-mono text-[11px] text-blue-300 max-h-36 overflow-y-auto pr-1">
+            <div className="space-y-1 font-mono text-xs text-blue-300 max-h-36 overflow-y-auto pr-1">
               {SEEDING_NICHE_PRESETS[selectedNiche]?.templates.map((tmpl, idx) => (
                 <div key={idx} className="p-1.5 rounded bg-slate-900/80 border border-slate-800/80">
                   {tmpl}
@@ -4332,7 +4332,7 @@ export default function BuffEngagement() {
           {/* 3. Live Spintax Tester */}
           <div className="space-y-2 p-3.5 rounded-xl bg-slate-950 border border-slate-800">
             <div className="flex items-center justify-between">
-              <span className="font-bold text-blue-300 flex items-center gap-1.5 text-xs">
+              <span className="font-bold text-blue-300 flex items-center gap-1.5 text-[13px]">
                 <ThunderboltFilled className="text-amber-400" />
                 Kết quả thực tế khi Bot đi bình luận (Đã xoay Spintax ngẫu nhiên):
               </span>
@@ -4344,7 +4344,7 @@ export default function BuffEngagement() {
                   setPreviewSamples(tmpls.map(resolveSpintax));
                   message.info('Đã xoay biến thể Spintax mới!');
                 }}
-                className="text-[11px] bg-slate-900 border-slate-700 text-slate-300 hover:text-white"
+                className="text-xs bg-slate-900 border-slate-700 text-slate-200 hover:text-white"
               >
                 Xoay Thử Lại
               </Button>
@@ -4354,9 +4354,9 @@ export default function BuffEngagement() {
               {previewSamples.map((sample, idx) => (
                 <div
                   key={idx}
-                  className="flex items-start gap-2 p-2 rounded-lg bg-slate-900/60 border border-slate-800/60 text-slate-200 text-xs"
+                  className="flex items-start gap-2 p-2 rounded-lg bg-slate-900/60 border border-slate-800/60 text-slate-200 text-[13px]"
                 >
-                  <span className="text-[10px] font-bold text-blue-400 shrink-0 select-none">#{idx + 1}</span>
+                  <span className="text-xs font-bold text-blue-400 shrink-0 select-none">#{idx + 1}</span>
                   <span className="flex-1">{sample}</span>
                 </div>
               ))}
@@ -4439,9 +4439,9 @@ export default function BuffEngagement() {
       >
         <div className="space-y-5 py-1 text-slate-200">
           <section className="space-y-3">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Mục tiêu</div>
+            <div className="text-xs font-semibold uppercase tracking-wider text-slate-300">Mục tiêu</div>
             <div>
-              <label className="text-xs text-slate-300 mb-1 block">
+              <label className="text-[13px] text-slate-200 mb-1 block">
                 Link Fanpage hoặc Group <span className="text-rose-400">*</span>
               </label>
               <Input
@@ -4458,7 +4458,7 @@ export default function BuffEngagement() {
             </div>
             <Row gutter={12}>
               <Col span={15}>
-                <label className="text-xs text-slate-300 mb-1 block">Tên hiển thị</label>
+                <label className="text-[13px] text-slate-200 mb-1 block">Tên hiển thị</label>
                 <Input
                   placeholder="VD: Group nguồn hàng, Page chính"
                   value={monTargetName}
@@ -4466,7 +4466,7 @@ export default function BuffEngagement() {
                 />
               </Col>
               <Col span={9}>
-                <label className="text-xs text-slate-300 mb-1 block">Loại</label>
+                <label className="text-[13px] text-slate-200 mb-1 block">Loại</label>
                 <Select
                   value={monTargetType}
                   onChange={(val) => setMonTargetType(val)}
@@ -4480,16 +4480,16 @@ export default function BuffEngagement() {
               </Col>
             </Row>
             {monTargetType === 'GROUP' && (
-              <div className="text-[11px] text-slate-400">
+              <div className="text-xs text-slate-300">
                 Với Group riêng tư, ít nhất một via phải là thành viên thì mới đọc được bài.
               </div>
             )}
           </section>
 
           <section className="space-y-3 pt-4 border-t border-slate-800">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Cách buff</div>
+            <div className="text-xs font-semibold uppercase tracking-wider text-slate-300">Cách buff</div>
             <div>
-              <label className="text-xs text-slate-300 mb-1 block">Số lượt mỗi bài</label>
+              <label className="text-[13px] text-slate-200 mb-1 block">Số lượt mỗi bài</label>
               <div className="flex items-center gap-3">
                 <Segmented
                   value={monTargetLikes === 'ALL' ? 'ALL' : 'FIXED'}
@@ -4510,7 +4510,7 @@ export default function BuffEngagement() {
                   />
                 )}
               </div>
-              <div className="text-[11px] text-slate-500 mt-1">
+              <div className="text-xs text-slate-400 mt-1">
                 {monTargetLikes === 'ALL'
                   ? `Mỗi bài dùng tối đa ${systemSettings.maxPagesPerPost || 150} page (đổi trong Cài đặt), ưu tiên page ít dùng nhất hôm nay để mọi page được chia đều.`
                   : 'Lấy đúng số page này, ưu tiên page ít dùng nhất hôm nay.'}
@@ -4518,7 +4518,7 @@ export default function BuffEngagement() {
             </div>
             <Row gutter={12}>
               <Col span={8}>
-                <label className="text-xs text-slate-300 mb-1 block">Cảm xúc</label>
+                <label className="text-[13px] text-slate-200 mb-1 block">Cảm xúc</label>
                 <Select
                   value={monReaction}
                   onChange={(val) => setMonReaction(val)}
@@ -4532,7 +4532,7 @@ export default function BuffEngagement() {
                 />
               </Col>
               <Col span={8}>
-                <label className="text-xs text-slate-300 mb-1 block">Chờ sau khi phát hiện</label>
+                <label className="text-[13px] text-slate-200 mb-1 block">Chờ sau khi phát hiện</label>
                 <Select
                   value={monDelayMinutes}
                   onChange={(val) => setMonDelayMinutes(val)}
@@ -4546,7 +4546,7 @@ export default function BuffEngagement() {
                 />
               </Col>
               <Col span={8}>
-                <label className="text-xs text-slate-300 mb-1 block">Chu kỳ quét</label>
+                <label className="text-[13px] text-slate-200 mb-1 block">Chu kỳ quét</label>
                 <Select
                   value={monInterval}
                   onChange={(val) => setMonInterval(val)}
@@ -4562,7 +4562,7 @@ export default function BuffEngagement() {
               </Col>
             </Row>
             <div>
-              <label className="text-xs text-slate-300 mb-1 block">Via thực hiện</label>
+              <label className="text-[13px] text-slate-200 mb-1 block">Via thực hiện</label>
               <Select
                 value={monViaMode}
                 onChange={(val) => setMonViaMode(val)}
@@ -4578,8 +4578,8 @@ export default function BuffEngagement() {
           <section className="space-y-3 pt-4 border-t border-slate-800">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Bình luận</div>
-                <div className="text-[11px] text-slate-500 mt-0.5">Mỗi page để lại một bình luận ngẫu nhiên, hỗ trợ Spintax.</div>
+                <div className="text-xs font-semibold uppercase tracking-wider text-slate-300">Bình luận</div>
+                <div className="text-xs text-slate-400 mt-0.5">Mỗi page để lại một bình luận ngẫu nhiên, hỗ trợ Spintax.</div>
               </div>
               <Switch checked={monEnableComment} onChange={setMonEnableComment} />
             </div>
@@ -4669,7 +4669,7 @@ export default function BuffEngagement() {
                 <div className="space-y-1 min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-slate-100">{v.viaName || `Via ${v.uid}`}</span>
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-medium ${
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-mono font-medium ${
                       v.isLive
                         ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                         : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
@@ -4678,15 +4678,15 @@ export default function BuffEngagement() {
                       {v.isLive ? 'LIVE' : v.status === 'CHECKPOINT' ? 'CHECKPOINT' : 'EXPIRED'}
                     </span>
                     {v.proxyUrl && (
-                      <Tag color="purple" className="text-[10px] font-mono">
+                      <Tag color="purple" className="!text-xs font-mono">
                         Proxy: {v.proxyUrl.split('@').pop() || 'Private'}
                       </Tag>
                     )}
                   </div>
-                  <div className="text-[11px] text-slate-400 font-mono">UID: {v.uid || 'N/A'} {v.name && `· Tên Facebook: ${v.name}`}</div>
-                  {v.error && <div className="text-[11px] text-rose-400">{v.error}</div>}
+                  <div className="text-xs text-slate-300 font-mono">UID: {v.uid || 'N/A'} {v.name && `· Tên Facebook: ${v.name}`}</div>
+                  {v.error && <div className="text-xs text-rose-400">{v.error}</div>}
                 </div>
-                <div className="shrink-0 text-right text-[11px] text-slate-500 font-mono">
+                <div className="shrink-0 text-right text-xs text-slate-400 font-mono">
                   {new Date(v.checkedAt).toLocaleTimeString('vi-VN')}
                 </div>
               </div>
@@ -4723,34 +4723,34 @@ export default function BuffEngagement() {
         width={660}
         className="dark-modal"
       >
-        <div className="space-y-4 py-2 text-slate-200 text-xs">
-          <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-300 flex items-start gap-3">
+        <div className="space-y-4 py-2 text-slate-200 text-[13px]">
+          <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-200 flex items-start gap-3">
             <BellOutlined className="text-blue-400 text-lg mt-0.5 shrink-0" />
             <div>
               <div className="font-semibold text-slate-100">Giám Sát Thời Gian Thực Qua Telegram</div>
-              <div className="text-[11px] text-slate-400 mt-0.5">
+              <div className="text-xs text-slate-300 mt-0.5">
                 Khi có Via bị checkpoint/hết hạn hoặc máy săn bài phát hiện bài viết mới, bot sẽ thông báo tức thì về điện thoại để bạn xử lý ngay lập tức.
               </div>
             </div>
           </div>
 
           <div className="space-y-3.5 bg-slate-900/80 p-4 rounded-xl border border-slate-800">
-            <div className="text-xs font-semibold text-slate-300 uppercase tracking-wider text-[11px]">Thông Tin Kết Nối Telegram</div>
+            <div className="text-xs font-semibold text-slate-200 uppercase tracking-wider">Thông Tin Kết Nối Telegram</div>
             <div>
-              <label className="block text-slate-300 font-medium mb-1">
+              <label className="block text-slate-200 font-medium mb-1">
                 Telegram Bot Token:
               </label>
               <Input
                 placeholder={systemSettings.telegramBotTokenMasked ? `Đã lưu: ${systemSettings.telegramBotTokenMasked} (nhập để thay)` : 'Ví dụ: 7891234567:AAH...'}
                 value={systemSettings.telegramBotToken}
                 onChange={(e) => setSystemSettings({ ...systemSettings, telegramBotToken: e.target.value })}
-                className="bg-slate-950 border-slate-700 text-slate-100 font-mono text-xs rounded-lg"
+                className="bg-slate-950 border-slate-700 text-slate-100 font-mono text-[13px] rounded-lg"
               />
-              <div className="text-[11px] text-slate-500 mt-1">Lấy token từ @BotFather trên Telegram.</div>
+              <div className="text-xs text-slate-400 mt-1">Lấy token từ @BotFather trên Telegram.</div>
             </div>
 
             <div>
-              <label className="block text-slate-300 font-medium mb-1">
+              <label className="block text-slate-200 font-medium mb-1">
                 Telegram Chat ID:
               </label>
               <div className="flex gap-2">
@@ -4758,7 +4758,7 @@ export default function BuffEngagement() {
                   placeholder="Ví dụ: 123456789 hoặc -100123456789"
                   value={systemSettings.telegramChatId}
                   onChange={(e) => setSystemSettings({ ...systemSettings, telegramChatId: e.target.value })}
-                  className="bg-slate-950 border-slate-700 text-slate-100 font-mono text-xs rounded-lg flex-1"
+                  className="bg-slate-950 border-slate-700 text-slate-100 font-mono text-[13px] rounded-lg flex-1"
                 />
                 <Button
                   loading={testingTelegram}
@@ -4769,17 +4769,17 @@ export default function BuffEngagement() {
                   Gửi Tin Test
                 </Button>
               </div>
-              <div className="text-[11px] text-slate-500 mt-1">Lấy Chat ID từ @userinfobot hoặc @getmyid_bot trên Telegram.</div>
+              <div className="text-xs text-slate-400 mt-1">Lấy Chat ID từ @userinfobot hoặc @getmyid_bot trên Telegram.</div>
             </div>
           </div>
 
           <div className="space-y-3 bg-slate-900/80 p-4 rounded-xl border border-slate-800">
-            <div className="text-xs font-semibold text-slate-300 uppercase tracking-wider text-[11px]">Chính Sách Cảnh Báo Tự Động</div>
+            <div className="text-xs font-semibold text-slate-200 uppercase tracking-wider">Chính Sách Cảnh Báo Tự Động</div>
 
             <div className="flex items-center justify-between py-1.5 border-b border-slate-800/60">
               <div>
-                <div className="font-medium text-slate-200">Cảnh báo tức thì khi Via bị Checkpoint hoặc hết hạn</div>
-                <div className="text-[11px] text-slate-400">Tự động cô lập Via lỗi để bảo vệ an toàn cho dàn BM.</div>
+                <div className="font-medium text-slate-100">Cảnh báo tức thì khi Via bị Checkpoint hoặc hết hạn</div>
+                <div className="text-xs text-slate-300">Tự động cô lập Via lỗi để bảo vệ an toàn cho dàn BM.</div>
               </div>
               <Switch
                 size="small"
@@ -4790,8 +4790,8 @@ export default function BuffEngagement() {
 
             <div className="flex items-center justify-between py-1.5 border-b border-slate-800/60">
               <div>
-                <div className="font-medium text-slate-200">Thông báo khi Post Hunter phát hiện bài viết mới</div>
-                <div className="text-[11px] text-slate-400">Gửi link bài viết và đếm ngược thời gian chờ buff tự động.</div>
+                <div className="font-medium text-slate-100">Thông báo khi Post Hunter phát hiện bài viết mới</div>
+                <div className="text-xs text-slate-300">Gửi link bài viết và đếm ngược thời gian chờ buff tự động.</div>
               </div>
               <Switch
                 size="small"
@@ -4802,8 +4802,8 @@ export default function BuffEngagement() {
 
             <div className="flex items-center justify-between py-1.5">
               <div>
-                <div className="font-medium text-slate-200">Thông báo khi hoàn tất chiến dịch Buff tương tác</div>
-                <div className="text-[11px] text-slate-400">Báo cáo tỷ lệ like/comment thành công và tổng thời gian thực thi.</div>
+                <div className="font-medium text-slate-100">Thông báo khi hoàn tất chiến dịch Buff tương tác</div>
+                <div className="text-xs text-slate-300">Báo cáo tỷ lệ like/comment thành công và tổng thời gian thực thi.</div>
               </div>
               <Switch
                 size="small"
@@ -4814,12 +4814,12 @@ export default function BuffEngagement() {
           </div>
 
           <div className="space-y-3 bg-slate-900/80 p-4 rounded-xl border border-slate-800">
-            <div className="text-xs font-semibold text-slate-300 uppercase tracking-wider text-[11px]">Tự buff bài app vừa đăng</div>
+            <div className="text-xs font-semibold text-slate-200 uppercase tracking-wider">Tự buff bài app vừa đăng</div>
 
             <div className="flex items-center justify-between py-1.5 border-b border-slate-800/60">
               <div>
-                <div className="font-medium text-slate-200">Bật tự buff bài app vừa đăng</div>
-                <div className="text-[11px] text-slate-400">Đăng xong là nạp vào hàng đợi, buff xoay vòng bằng các page của mọi via (tối đa theo "Số page tối đa cho mỗi bài").</div>
+                <div className="font-medium text-slate-100">Bật tự buff bài app vừa đăng</div>
+                <div className="text-xs text-slate-300">Đăng xong là nạp vào hàng đợi, buff xoay vòng bằng các page của mọi via (tối đa theo "Số page tối đa cho mỗi bài").</div>
               </div>
               <Switch
                 size="small"
@@ -4829,7 +4829,7 @@ export default function BuffEngagement() {
             </div>
 
             <div className="flex items-center justify-between py-1.5 border-b border-slate-800/60">
-              <span className="text-slate-300">Bài đăng lên Fanpage</span>
+              <span className="text-slate-200">Bài đăng lên Fanpage</span>
               <Switch
                 size="small"
                 disabled={!systemSettings.autoBuffOwnPosts}
@@ -4839,7 +4839,7 @@ export default function BuffEngagement() {
             </div>
 
             <div className="flex items-center justify-between py-1.5 border-b border-slate-800/60">
-              <span className="text-slate-300">Bài đăng vào Group</span>
+              <span className="text-slate-200">Bài đăng vào Group</span>
               <Switch
                 size="small"
                 disabled={!systemSettings.autoBuffOwnPosts}
@@ -4849,7 +4849,7 @@ export default function BuffEngagement() {
             </div>
 
             <div className="flex items-center justify-between gap-3">
-              <span className="text-slate-300">Chờ sau khi đăng (phút):</span>
+              <span className="text-slate-200">Chờ sau khi đăng (phút):</span>
               <InputNumber
                 min={0}
                 max={120}
@@ -4861,12 +4861,12 @@ export default function BuffEngagement() {
             </div>
 
             <div className="flex items-center justify-between gap-3">
-              <span className="text-slate-300">Loại cảm xúc:</span>
+              <span className="text-slate-200">Loại cảm xúc:</span>
               <Select
                 disabled={!systemSettings.autoBuffOwnPosts}
                 value={systemSettings.autoBuffReaction || 'RANDOM_POSITIVE'}
                 onChange={(val) => setSystemSettings({ ...systemSettings, autoBuffReaction: val })}
-                className="w-48 text-xs"
+                className="w-48 text-[13px]"
                 options={[
                   { value: 'RANDOM_POSITIVE', label: 'Like / Love / Care' },
                   { value: 'LIKE', label: 'Chỉ Thích (Like)' },
@@ -4878,9 +4878,9 @@ export default function BuffEngagement() {
           </div>
 
           <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800 space-y-2.5">
-            <div className="text-xs font-semibold text-slate-300 uppercase tracking-wider text-[11px]">Giới hạn lượt mỗi Page</div>
+            <div className="text-xs font-semibold text-slate-200 uppercase tracking-wider">Giới hạn lượt mỗi Page</div>
             <div className="flex items-center justify-between">
-              <span className="text-slate-300">Giới hạn tương tác tối đa mỗi Fanpage trong 1 ngày:</span>
+              <span className="text-slate-200">Giới hạn tương tác tối đa mỗi Fanpage trong 1 ngày:</span>
               <InputNumber
                 min={5}
                 max={100}
@@ -4890,7 +4890,7 @@ export default function BuffEngagement() {
               />
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-slate-300">Số page tối đa cho mỗi bài (chế độ xoay vòng):</span>
+              <span className="text-slate-200">Số page tối đa cho mỗi bài (chế độ xoay vòng):</span>
               <InputNumber
                 min={5}
                 max={2000}
@@ -4900,7 +4900,7 @@ export default function BuffEngagement() {
               />
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-slate-300">Số via chạy song song:</span>
+              <span className="text-slate-200">Số via chạy song song:</span>
               <InputNumber
                 min={1}
                 max={12}
@@ -4909,7 +4909,7 @@ export default function BuffEngagement() {
                 className="bg-slate-950 border-slate-700 text-blue-300 font-semibold"
               />
             </div>
-            <div className="text-[11px] text-slate-400">
+            <div className="text-xs text-slate-300">
               Mỗi via song song là một trình duyệt (~400 MB RAM); máy 16 GB nên để 4. Khuyến nghị 20–30 lượt/ngày. Page đã đủ lượt sẽ được bỏ qua và hiện "Đã đủ N lượt hôm nay"; giới hạn tính lại từ 0h (giờ Việt Nam).
             </div>
           </div>

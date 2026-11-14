@@ -201,7 +201,7 @@ const PasteLinkInput: React.FC<PasteLinkInputProps> = ({
       </Modal>
 
       {platform && (
-        <div className="flex items-center gap-2 text-[11px] px-1">
+        <div className="flex items-center gap-2 text-xs px-1">
           <Tag color={platform.color} icon={platform.icon} className="!mr-0 font-bold rounded-md">
             {platform.name}
           </Tag>

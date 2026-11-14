@@ -308,14 +308,14 @@ const LicenseManager: React.FC = () => {
               </Tag>
             </Tooltip>
             {(r.client_os || r.app_version) && (
-              <div className="text-[11px] text-slate-400 mt-1">
+              <div className="text-xs text-slate-300 mt-1">
                 {OS_LABEL[r.client_os || ''] || r.client_os}
                 {r.app_version ? ` · app v${r.app_version}` : ''}
               </div>
             )}
           </div>
         ) : (
-          <span className="text-slate-500 italic text-xs">Chưa gắn máy</span>
+          <span className="text-slate-400 italic text-xs">Chưa gắn máy</span>
         )
       ),
     },
@@ -359,7 +359,7 @@ const LicenseManager: React.FC = () => {
       width: 150,
       className: 'whitespace-nowrap',
       render: (_: any, r: LicenseItem) => {
-        if (!r.last_ping_at) return <span className="text-slate-500 text-xs">Chưa mở app</span>;
+        if (!r.last_ping_at) return <span className="text-slate-400 text-xs">Chưa mở app</span>;
         const diffMins = Math.floor((Date.now() - new Date(r.last_ping_at).getTime()) / 60000);
         const isOnline = diffMins < 5;
         return (
@@ -367,9 +367,9 @@ const LicenseManager: React.FC = () => {
             {isOnline ? (
               <Badge status="processing" text={<span className="text-emerald-400 font-semibold text-xs whitespace-nowrap">● Đang mở Tool</span>} />
             ) : (
-              <span className="text-slate-400 text-xs">{diffMins < 60 ? `${diffMins} phút trước` : `${Math.floor(diffMins / 60)} giờ trước`}</span>
+              <span className="text-slate-300 text-xs">{diffMins < 60 ? `${diffMins} phút trước` : `${Math.floor(diffMins / 60)} giờ trước`}</span>
             )}
-            {r.last_ip && <div className="text-[10px] text-slate-500">IP: {r.last_ip}</div>}
+            {r.last_ip && <div className="text-xs text-slate-400">IP: {r.last_ip}</div>}
           </div>
         );
       },
@@ -635,10 +635,10 @@ const LicenseManager: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <span>{isKill ? '🔴' : isBind ? '🟢' : '📝'}</span>
                     <strong>{log.action}</strong>
-                    <span className="text-blue-400 font-bold">{log.license_key}</span>
-                    {log.details && <span className="text-slate-400">({log.details})</span>}
+                    <span className="text-blue-300 font-bold">{log.license_key}</span>
+                    {log.details && <span className="text-slate-300">({log.details})</span>}
                   </div>
-                  <div className="text-slate-500 text-[11px]">
+                  <div className="text-slate-400 text-xs">
                     {log.ip && `${log.ip} • `}{new Date(log.timestamp).toLocaleTimeString('vi-VN')}
                   </div>
                 </div>

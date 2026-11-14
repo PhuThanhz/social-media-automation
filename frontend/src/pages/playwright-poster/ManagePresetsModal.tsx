@@ -66,19 +66,19 @@ function ManagePresetsModal({
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold text-sm text-slate-100">{p.name}</span>
                       {isSelected && (
-                        <Tag color="cyan" className="!text-[10px] !m-0 !rounded-md font-bold">
+                        <Tag color="cyan" className="!text-xs !m-0 !rounded-md font-bold">
                           Đang áp dụng
                         </Tag>
                       )}
                     </div>
-                    <div className="flex items-center gap-2.5 text-xs text-slate-400 mt-1 flex-wrap">
-                      <Tag color="gold" className="!text-[11px] !m-0 !rounded-md">
+                    <div className="flex items-center gap-2.5 text-xs text-slate-300 mt-1 flex-wrap">
+                      <Tag color="gold" className="!text-xs !m-0 !rounded-md">
                         👥 {p.selectedGroupIds?.length > 0 ? `${p.selectedGroupIds.length} Nhóm` : 'Tự chọn Nhóm'}
                       </Tag>
-                      <Tag color="blue" className="!text-[11px] !m-0 !rounded-md">
+                      <Tag color="blue" className="!text-xs !m-0 !rounded-md">
                         📄 {p.selectedFanpageIds?.length || 0} Page/Nick
                       </Tag>
-                      <span className="text-[11px] text-slate-500 font-mono">
+                      <span className="text-xs text-slate-300 font-mono">
                         {p.postMode === 'GROUP_ONLY' ? 'Chỉ đăng Group' : p.postMode === 'FANPAGE_ONLY' ? 'Chỉ Fanpage' : 'Cả Page & Group'}
                       </span>
                     </div>

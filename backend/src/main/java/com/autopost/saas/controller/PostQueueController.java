@@ -368,7 +368,9 @@ public class PostQueueController {
             scheduledTimes = stList.stream().map(Object::toString).toList();
         }
 
-        boolean publishNow = Boolean.TRUE.equals(requestBody.get("publishNow")) || "true".equals(requestBody.get("publishNow"));
+        // 3 cách chọn giờ duy nhất: NOW (đăng ngay) / QUEUE (xếp vào lịch theo cài đặt chung) / AT (hẹn giờ cụ thể)
+        String scheduleMode = resolveScheduleMode(requestBody);
+        boolean publishNow = "NOW".equals(scheduleMode);
         String targetFanpageId = (String) requestBody.get("targetFanpageId");
         if (targetFanpageId == null || targetFanpageId.trim().isEmpty() || "null".equalsIgnoreCase(targetFanpageId.trim())) {
             User currentUser = resolveUser(authentication);
@@ -429,6 +431,10 @@ public class PostQueueController {
         LocalDateTime baseScheduledAt;
         if (publishNow) {
             baseScheduledAt = LocalDateTime.now();
+        } else if ("QUEUE".equals(scheduleMode)) {
+            // Giờ tạm (đủ xa để scheduler không chộp bài trong lúc còn đang cào các link khác);
+            // packContinuous ở cuối request sẽ xếp lại đúng giờ theo lịch đăng chung.
+            baseScheduledAt = LocalDateTime.now().plusHours(1);
         } else {
             String scheduledAtRaw = (String) requestBody.get("scheduledAt");
             if (scheduledAtRaw != null && !scheduledAtRaw.trim().isEmpty()) {
@@ -552,6 +558,9 @@ public class PostQueueController {
                 } catch (Exception ex) {
                     scheduledAtForItem = baseScheduledAt.plusMinutes((long) i * intervalMinutes);
                 }
+            } else if (!"AT".equals(scheduleMode)) {
+                // Đăng ngay / Xếp vào lịch: giờ do server quyết (QUEUE được xếp lại bằng packContinuous ở cuối)
+                scheduledAtForItem = baseScheduledAt;
             } else {
                 scheduledAtForItem = baseScheduledAt.plusMinutes((long) i * intervalMinutes);
             }
@@ -733,25 +742,65 @@ public class PostQueueController {
             }
         }
 
-        // Chế độ "Nối đuôi liên tục": bỏ giờ tạm từ frontend, xếp bài mới vào khoảng trống sớm nhất
-        // của đúng làn nick sẽ đăng nó (không chồng giờ lên các bài đang chờ sẵn).
-        boolean appendToQueue = Boolean.TRUE.equals(requestBody.get("appendToQueue")) || "true".equals(String.valueOf(requestBody.get("appendToQueue")));
+        // Chế độ "Nối đuôi liên tục" hoặc "Rải đều theo nhóm":
+        boolean isSpreadGroups = "SPREAD_DAY".equalsIgnoreCase(String.valueOf(requestBody.get("groupTimingMode")));
+        boolean appendToQueue = "QUEUE".equals(scheduleMode) && !isSpreadGroups;
+
+        String skippedNote = skippedDuplicates.isEmpty() ? ""
+                : " Bỏ qua " + skippedDuplicates.size() + " bài trùng đã có trong Lịch đăng cho cùng nhóm.";
+
+        // Nếu người dùng chọn rải đều các nhóm
+        if (!publishNow && !allCreated.isEmpty() && isSpreadGroups) {
+            LocalDateTime spreadStart = null;
+            LocalDateTime spreadEnd = null;
+            if (requestBody.get("groupSpreadStart") != null && !requestBody.get("groupSpreadStart").toString().isBlank()) {
+                try { spreadStart = LocalDateTime.parse(requestBody.get("groupSpreadStart").toString()); } catch (Exception ignored) {}
+            }
+            if (requestBody.get("groupSpreadEnd") != null && !requestBody.get("groupSpreadEnd").toString().isBlank()) {
+                try { spreadEnd = LocalDateTime.parse(requestBody.get("groupSpreadEnd").toString()); } catch (Exception ignored) {}
+            }
+            Map<String, Object> spreadResult = campaignScheduler.spreadEvenlyByGroups(
+                    allCreated.stream().map(PostQueue::getId).toList(), spreadStart, spreadEnd, null);
+
+            String finishFormatted = spreadResult.get("estimatedFinishAt") != null
+                    ? LocalDateTime.parse(spreadResult.get("estimatedFinishAt").toString()).format(java.time.format.DateTimeFormatter.ofPattern("HH:mm dd/MM"))
+                    : "";
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "🎯 Đã thêm " + allCreated.size() + " bài và rải đều lịch cho " + spreadResult.getOrDefault("groupCount", 0) + " nhóm"
+                            + (!finishFormatted.isEmpty() ? ", dự kiến hoàn tất lúc " + finishFormatted : "") + "." + skippedNote,
+                    "count", allCreated.size(),
+                    "cachedUrls", allCachedUrls,
+                    "skippedDuplicates", skippedDuplicates,
+                    "estimatedFinishAt", spreadResult.getOrDefault("estimatedFinishAt", ""),
+                    "items", allCreated.stream()
+                            .map(p -> Map.of(
+                                    "id", p.getId(),
+                                    "originalUrl", p.getOriginalUrl() != null ? p.getOriginalUrl() : "",
+                                    "status", p.getStatus() != null ? p.getStatus() : ""))
+                            .toList()
+            ));
+        }
         // Bài hẹn giờ (không phải "Đăng ngay") rơi ngoài khung giờ đăng chung → đưa vào trong khung
         int windowDeferred = 0;
         int windowMoved = 0;
-        if (!publishNow && !allCreated.isEmpty() && !appendToQueueRequested(requestBody) && postingWindowService.get().enabled()) {
+        if (!publishNow && !allCreated.isEmpty() && !appendToQueue && !isSpreadGroups && postingWindowService.get().enabled()) {
             Map<String, Object> fitted = campaignScheduler.fitIntoWindow(allCreated.stream().map(PostQueue::getId).toList());
             windowMoved = ((Number) fitted.getOrDefault("updated", 0)).intValue();
             windowDeferred = ((Number) fitted.getOrDefault("deferredCount", 0)).intValue();
+        }
+        // "Hẹn giờ" nhiều bài chỉ với 1 mốc (không gửi giờ riêng từng bài): bắt đầu từ mốc đó, mỗi nick nối đuôi
+        if ("AT".equals(scheduleMode) && scheduledTimes == null && !allCreated.isEmpty()
+                && requestBody.get("scheduleMode") != null) {
+            campaignScheduler.packContinuousFrom(allCreated.stream().map(PostQueue::getId).toList(),
+                    postingWindowService.defaultGapSeconds(), baseScheduledAt);
         }
         String windowNote = windowMoved == 0 ? ""
                 : " " + windowMoved + " bài hẹn ngoài khung giờ đăng đã được dời vào khung"
                         + (windowDeferred > 0 ? " (" + windowDeferred + " bài không kịp hôm nay, xem đề xuất ở mục Khung giờ đăng)." : ".");
 
-        String skippedNote = skippedDuplicates.isEmpty() ? ""
-                : " Bỏ qua " + skippedDuplicates.size() + " bài trùng đã có trong Lịch đăng cho cùng nhóm.";
         if (appendToQueue && !publishNow && !allCreated.isEmpty()) {
-            int gapSeconds = parseGapSeconds(requestBody.get("gapSeconds"));
+            int gapSeconds = postingWindowService.defaultGapSeconds();
             // Chỉ xếp nối đuôi cho các bài MỚI tạo (allCreated), giữ nguyên giờ các bài cũ đang chờ
             Map<String, Object> packed = campaignScheduler.packContinuous(
                     allCreated.stream().map(PostQueue::getId).toList(), gapSeconds);
@@ -847,6 +896,22 @@ public class PostQueueController {
         return Boolean.TRUE.equals(requestBody.get("appendToQueue")) || "true".equals(String.valueOf(requestBody.get("appendToQueue")));
     }
 
+    /**
+     * Chế độ chọn giờ: "scheduleMode" = NOW | QUEUE | AT. Request cũ (publishNow / appendToQueue) vẫn được hiểu
+     * để không gãy các client chưa cập nhật.
+     */
+    static String resolveScheduleMode(Map<String, Object> body) {
+        Object raw = body.get("scheduleMode");
+        if (raw != null) {
+            String v = raw.toString().trim().toUpperCase();
+            if (v.equals("NOW") || v.equals("QUEUE") || v.equals("AT")) return v;
+        }
+        Object pn = body.get("publishNow");
+        if (Boolean.TRUE.equals(pn) || "true".equalsIgnoreCase(String.valueOf(pn))) return "NOW";
+        if (appendToQueueRequested(body)) return "QUEUE";
+        return "AT";
+    }
+
     /** Khung giờ đăng chung (VD 09:00–23:00) — ngoài khung scheduler không tự đăng bài theo lịch. */
     @GetMapping("/posting-window")
     public ResponseEntity<Map<String, Object>> getPostingWindow() {
@@ -855,7 +920,8 @@ public class PostQueueController {
                 "enabled", w.enabled(),
                 "start", w.start().toString(),
                 "end", w.end().toString(),
-                "minGapSeconds", w.minGapSeconds()));
+                "minGapSeconds", w.minGapSeconds(),
+                "maxPostsPerHourPerNick", postingWindowService.maxPostsPerHourPerNick()));
     }
 
     /** Lưu khung giờ; khi bật thì đưa ngay các bài đang hẹn ngoài khung vào trong khung. */
@@ -875,6 +941,10 @@ public class PostQueueController {
             result.put("start", saved.start().toString());
             result.put("end", saved.end().toString());
             result.put("minGapSeconds", saved.minGapSeconds());
+            if (body.get("maxPostsPerHourPerNick") != null) {
+                postingWindowService.saveMaxPostsPerHourPerNick(Integer.parseInt(body.get("maxPostsPerHourPerNick").toString()));
+            }
+            result.put("maxPostsPerHourPerNick", postingWindowService.maxPostsPerHourPerNick());
             boolean rescheduleExisting = Boolean.parseBoolean(String.valueOf(body.get("rescheduleExisting")));
             if (saved.enabled() && rescheduleExisting) {
                 Map<String, Object> fitted = campaignScheduler.spreadEvenly((int) saved.minGapSeconds());
@@ -951,7 +1021,7 @@ public class PostQueueController {
             result.put("targetCount", targetFanpageIds.size());
 
             if (rescheduleToday && !updated.isEmpty()) {
-                int gapSeconds = postingWindowService.get().minGapSeconds() > 0 ? (int) postingWindowService.get().minGapSeconds() : 120;
+                int gapSeconds = postingWindowService.defaultGapSeconds();
                 // Chỉ dồn lịch cho các bài vừa chuyển nick vào làn mới, không xáo trộn toàn bộ hàng đợi
                 Map<String, Object> packed = campaignScheduler.packContinuous(
                         updated.stream().map(PostQueue::getId).toList(), gapSeconds);
@@ -966,12 +1036,14 @@ public class PostQueueController {
         }
     }
 
-    private static int parseGapSeconds(Object raw) {
+    /** Giãn cách: mặc định lấy từ cài đặt lịch đăng chung, chỉ ghi đè khi request gửi rõ gapSeconds. */
+    private int parseGapSeconds(Object raw) {
+        int fallback = postingWindowService.defaultGapSeconds();
         try {
-            int value = raw == null ? 120 : Integer.parseInt(raw.toString());
+            int value = raw == null ? fallback : Integer.parseInt(raw.toString());
             return Math.max(0, Math.min(value, 3600));
         } catch (NumberFormatException e) {
-            return 120;
+            return fallback;
         }
     }
 
@@ -988,6 +1060,41 @@ public class PostQueueController {
         }
         Map<String, Object> result = new java.util.LinkedHashMap<>(campaignScheduler.packContinuous(ids, gapSeconds));
         result.put("success", true);
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Phân bổ đều toàn bộ các nhóm (Group-Interleaved Day Distribution):
+     * Xếp lại giờ các bài PENDING của từng nhóm xen kẽ nhau, rải đều suốt ngày/khung thời gian.
+     * Body: { ids?: Long[], startTime?: string, endTime?: string, minGroupGapMinutes?: number }
+     */
+    @PostMapping("/spread-groups")
+    public ResponseEntity<Map<String, Object>> spreadGroups(@RequestBody(required = false) Map<String, Object> body) {
+        List<Long> ids = null;
+        if (body != null && body.get("ids") instanceof List<?> rawIds && !rawIds.isEmpty()) {
+            ids = rawIds.stream().map(v -> Long.parseLong(v.toString())).toList();
+        }
+        LocalDateTime start = null;
+        LocalDateTime end = null;
+        Integer minGapMinutes = null;
+        if (body != null) {
+            if (body.get("startTime") != null && !body.get("startTime").toString().isBlank()) {
+                try {
+                    start = LocalDateTime.parse(body.get("startTime").toString());
+                } catch (Exception ignored) {}
+            }
+            if (body.get("endTime") != null && !body.get("endTime").toString().isBlank()) {
+                try {
+                    end = LocalDateTime.parse(body.get("endTime").toString());
+                } catch (Exception ignored) {}
+            }
+            if (body.get("minGroupGapMinutes") != null) {
+                try {
+                    minGapMinutes = Integer.parseInt(body.get("minGroupGapMinutes").toString());
+                } catch (Exception ignored) {}
+            }
+        }
+        Map<String, Object> result = campaignScheduler.spreadEvenlyByGroups(ids, start, end, minGapMinutes);
         return ResponseEntity.ok(result);
     }
 
@@ -1197,8 +1304,12 @@ public class PostQueueController {
             scheduledTimes = stList.stream().map(Object::toString).toList();
         }
 
-        Boolean publishNow = requestBody.get("publishNow") instanceof Boolean ? (Boolean) requestBody.get("publishNow") : true;
+        // Mặc định cũ của endpoint này là đăng ngay khi không gửi gì
+        String groupScheduleMode = (requestBody.get("scheduleMode") == null && requestBody.get("publishNow") == null)
+                ? "NOW" : resolveScheduleMode(requestBody);
+        Boolean publishNow = "NOW".equals(groupScheduleMode);
         Integer intervalMinutes = requestBody.get("intervalMinutes") instanceof Number ? ((Number) requestBody.get("intervalMinutes")).intValue() : 15;
+        List<Long> queuedGroupPostIds = new ArrayList<>();
         LocalDateTime baseScheduledAt = LocalDateTime.now();
         if (!publishNow) {
             String scheduledAtRaw = (String) requestBody.get("scheduledAt");
@@ -1348,6 +1459,7 @@ public class PostQueueController {
                     results.add(Map.of("url", url, "success", true, "message", "Đã đăng thành công"));
                     successCount++;
                 } else {
+                    queuedGroupPostIds.add(queueItem.getId());
                     results.add(Map.of("url", url, "success", true, "message", "Đã lên lịch đăng lúc " + scheduledAtForItem));
                     successCount++;
                 }
@@ -1359,6 +1471,10 @@ public class PostQueueController {
                 }
                 results.add(Map.of("url", url, "success", false, "message", e.getMessage() != null ? e.getMessage() : "Lỗi không xác định"));
             }
+        }
+
+        if ("QUEUE".equals(groupScheduleMode) && !queuedGroupPostIds.isEmpty()) {
+            campaignScheduler.packContinuous(queuedGroupPostIds, postingWindowService.defaultGapSeconds());
         }
 
         return ResponseEntity.ok(Map.of(
@@ -1724,9 +1840,13 @@ public class PostQueueController {
             }
 
             Object scheduledAtRaw = body.get("scheduledAt");
-            boolean publishNow = scheduledAtRaw == null || scheduledAtRaw.toString().trim().isEmpty();
+            boolean hasAt = scheduledAtRaw != null && !scheduledAtRaw.toString().trim().isEmpty();
+            String storyMode = body.get("scheduleMode") != null ? resolveScheduleMode(body) : (hasAt ? "AT" : "NOW");
+            if ("AT".equals(storyMode) && !hasAt) storyMode = "NOW";
+            boolean publishNow = "NOW".equals(storyMode);
+            boolean queueStory = "QUEUE".equals(storyMode);
             LocalDateTime scheduledAt;
-            if (publishNow) {
+            if (publishNow || queueStory) {
                 scheduledAt = LocalDateTime.now();
             } else {
                 try {
@@ -1752,6 +1872,11 @@ public class PostQueueController {
                     .scheduledAt(scheduledAt)
                     .build();
             post = postQueueRepository.save(post);
+            if (queueStory || (!publishNow && body.get("scheduleMode") != null)) {
+                // Xếp vào lịch (từ bây giờ) / Hẹn giờ (từ mốc đã chọn): nối đuôi các bài đang chờ của cùng nick
+                campaignScheduler.packContinuousFrom(List.of(post.getId()), postingWindowService.defaultGapSeconds(),
+                        queueStory ? null : scheduledAt);
+            }
 
             if (publishNow) {
                 boolean published = postQueueService.publishPostNow(post.getId());

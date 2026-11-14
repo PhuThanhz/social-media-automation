@@ -159,7 +159,7 @@ const SubtitleTimeline = ({ srtContent, duration, currentTime, onChange, onSeek 
 
   if (!segments.length) {
     return (
-      <div className="text-[11px] text-slate-500 italic px-1 py-2">
+      <div className="text-xs text-slate-300 italic px-1 py-2">
         Chưa có phụ đề — bấm "Tự Động Tạo Vietsub" để hiện timeline chỉnh từng dòng tại đây.
       </div>
     );
@@ -167,7 +167,7 @@ const SubtitleTimeline = ({ srtContent, duration, currentTime, onChange, onSeek 
 
   return (
     <div className="space-y-1">
-      <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono px-0.5">
+      <div className="flex items-center justify-between text-xs text-slate-300 font-mono px-0.5">
         <span>0:00</span>
         <span>{formatClock(effectiveDuration)}</span>
       </div>
@@ -194,7 +194,7 @@ const SubtitleTimeline = ({ srtContent, duration, currentTime, onChange, onSeek 
                 title={seg.text}
                 className="flex-1 h-full px-1 flex items-center overflow-hidden cursor-grab active:cursor-grabbing"
               >
-                <span className="text-[9px] text-white font-semibold truncate">{seg.text}</span>
+                <span className="text-[11px] text-white font-semibold truncate">{seg.text}</span>
               </div>
               <div
                 onPointerDown={handlePointerDown(idx, 'right')}
@@ -208,7 +208,7 @@ const SubtitleTimeline = ({ srtContent, duration, currentTime, onChange, onSeek 
           className="absolute top-0 bottom-0 w-0.5 bg-cyan-400 pointer-events-none shadow-[0_0_6px_rgba(34,211,238,0.9)]"
         />
       </div>
-      <div className="text-[10px] text-slate-500 px-0.5">
+      <div className="text-xs text-slate-300 px-0.5">
         Kéo giữa khối để dời thời điểm, kéo 2 mép để chỉnh độ dài từng câu sub.
       </div>
     </div>

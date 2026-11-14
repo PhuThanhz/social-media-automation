@@ -47,6 +47,8 @@ public class ThreadsController {
     private final UserRepository userRepository;
     private final GeminiService geminiService;
     private final ScraperService scraperService;
+    private final com.autopost.saas.scheduler.CampaignScheduler campaignScheduler;
+    private final com.autopost.saas.service.PostingWindowService postingWindowService;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final RestTemplate restTemplate = PooledRestTemplateFactory.create(10000, 120000);
 
@@ -398,7 +400,16 @@ public class ThreadsController {
         return result;
     }
 
+    private static boolean isQueueMode(Map<String, Object> body) {
+        return body.get("scheduleMode") != null && "QUEUE".equalsIgnoreCase(body.get("scheduleMode").toString().trim());
+    }
+
     private LocalDateTime resolveStartTime(Map<String, Object> body) {
+        Object mode = body.get("scheduleMode");
+        if (mode != null) {
+            String m = mode.toString().trim().toUpperCase();
+            if (m.equals("NOW") || m.equals("QUEUE")) return LocalDateTime.now();
+        }
         if (boolOf(body.get("publishNow"))) return LocalDateTime.now();
         Object raw = body.get("scheduledAt");
         if (raw == null || raw.toString().isBlank()) return null;
@@ -488,6 +499,13 @@ public class ThreadsController {
                     start.plusMinutes((long) i * stagger)));
             created.add(postDto(post));
             log.info("🧵 [Threads Studio] Tạo Post ID {} cho nick {} lúc {}", post.getId(), account.getPageName(), post.getScheduledAt());
+        }
+        boolean atMode = body.get("scheduleMode") != null && "AT".equalsIgnoreCase(body.get("scheduleMode").toString().trim());
+        if ((isQueueMode(body) || atMode) && !created.isEmpty()) {
+            // Xếp vào lịch (từ bây giờ) hoặc Hẹn giờ (từ mốc đã chọn): mỗi nick nối đuôi bài đang chờ của nó
+            List<Long> ids = created.stream().map(m -> Long.valueOf(m.get("id").toString())).toList();
+            campaignScheduler.packContinuousFrom(ids, postingWindowService.defaultGapSeconds(), atMode ? start : null);
+            created = postQueueRepository.findAllById(ids).stream().map(this::postDto).toList();
         }
         return ResponseEntity.ok(Map.of("success", true, "count", created.size(), "posts", created));
     }

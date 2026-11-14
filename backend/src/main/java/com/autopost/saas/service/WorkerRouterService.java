@@ -63,23 +63,26 @@ public class WorkerRouterService {
         return buildFullUrl(base, apiPath);
     }
 
+    private final AtomicInteger scrapingIndex = new AtomicInteger(0);
+
     /**
-     * Dành cho CÀO BÀI & TẢI MEDIA: Ưu tiên gửi sang Worker 2 (3002) nếu có, fallback về Worker 1.
+     * Dành cho CÀO BÀI & TẢI MEDIA: Luân phiên (Round-Robin) chia đều tải giữa toàn bộ các Worker
+     * đang sống (Port 3001, Port 3002...) để tăng tốc độ cào song song lên gấp 2-3 lần.
      */
     public String getScrapingWorkerUrl(String apiPath) {
-        String base;
-        if (workerUrls.size() > 1) {
-            String worker2 = workerUrls.get(1);
-            if (isWorkerAlive(worker2)) {
-                base = worker2;
-            } else {
-                log.warn("⚠️ Worker cào bài ({}) không phản hồi, tự động chuyển về Worker chính ({})", worker2, workerUrls.get(0));
-                base = workerUrls.get(0);
-            }
-        } else {
-            base = workerUrls.get(0);
+        if (workerUrls.isEmpty()) return LocalServices.WORKER_BASE;
+        if (workerUrls.size() == 1) return buildFullUrl(workerUrls.get(0), apiPath);
+
+        List<String> aliveWorkers = workerUrls.stream()
+                .filter(this::isWorkerAlive)
+                .toList();
+
+        if (aliveWorkers.isEmpty()) {
+            return buildFullUrl(workerUrls.get(0), apiPath);
         }
-        return buildFullUrl(base, apiPath);
+
+        int idx = Math.abs(scrapingIndex.getAndIncrement() % aliveWorkers.size());
+        return buildFullUrl(aliveWorkers.get(idx), apiPath);
     }
 
     public String getDefaultWorkerUrl(String apiPath) {

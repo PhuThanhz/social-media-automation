@@ -74,7 +74,7 @@ const LogTerminalPanel = ({ source = 'worker', defaultLineLimit = 300, compact =
           ]}
         />
         <div className="flex items-center gap-2">
-          <label className="flex items-center gap-1.5 text-[10px] text-slate-400"><Switch size="small" checked={autoScroll} onChange={setAutoScroll} /> Tự cuộn</label>
+          <label className="flex items-center gap-1.5 text-xs text-slate-300"><Switch size="small" checked={autoScroll} onChange={setAutoScroll} /> Tự cuộn</label>
           <Tooltip title={paused ? 'Tiếp tục tự động cập nhật' : 'Tạm dừng tự động cập nhật'}>
             <Button size="small" type={paused ? 'primary' : 'default'} icon={paused ? <PlayCircleOutlined /> : <PauseCircleOutlined />} onClick={() => setPaused(!paused)} />
           </Tooltip>

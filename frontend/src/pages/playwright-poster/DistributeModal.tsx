@@ -148,7 +148,7 @@ function DistributeModal({
                   <div className="flex items-center justify-between py-0.5">
                     <span className={isPersonal ? 'text-indigo-400 font-bold' : 'text-slate-200'}>
                       {isPersonal ? `👤 ${acc.pageName || 'Nick Cá Nhân'}` : `🚩 ${acc.pageName || acc.platformAccountId}`}
-                      {viaNameOf(acc) && <span className="ml-1.5 text-[11px] font-normal text-slate-400">· {viaNameOf(acc)}</span>}
+                      {viaNameOf(acc) && <span className="ml-1.5 text-xs font-normal text-slate-300">· {viaNameOf(acc)}</span>}
                     </span>
                   </div>
                 </Option>
@@ -187,7 +187,7 @@ function DistributeModal({
                         {isPersonal ? '👤 ' : '🚩 '}
                         {matchedAcc?.pageName || targetVal}
                       </div>
-                      <div className="text-[10px] text-slate-400 truncate">
+                      <div className="text-xs text-slate-300 truncate">
                         Bài #{assignedIndices.join(', #')}
                       </div>
                     </div>

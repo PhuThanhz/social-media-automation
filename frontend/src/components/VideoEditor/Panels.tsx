@@ -100,15 +100,15 @@ const Title = ({ children, extra }: { children: ReactNode; extra?: ReactNode }) 
 const Block = ({ children }: { children: ReactNode }) => <div className="pb-4 mb-4 border-b border-slate-800/80 last:border-0 last:mb-0 space-y-2">{children}</div>;
 const Field = ({ label, children, value }: { label: string; children: ReactNode; value?: ReactNode }) => (
   <div>
-    <div className="flex items-center justify-between text-[11px] text-slate-400 leading-5"><span>{label}</span>{value != null && <span className="text-slate-300 font-mono">{value}</span>}</div>
+    <div className="flex items-center justify-between text-xs text-slate-300 leading-5"><span>{label}</span>{value != null && <span className="text-slate-200 font-mono">{value}</span>}</div>
     {children}
   </div>
 );
 const Line = ({ label, children }: { label: string; children: ReactNode }) => (
-  <div className="flex items-center justify-between gap-2 min-h-7"><span className="text-[11px] text-slate-400">{label}</span><div className="flex items-center">{children}</div></div>
+  <div className="flex items-center justify-between gap-2 min-h-7"><span className="text-xs text-slate-300">{label}</span><div className="flex items-center">{children}</div></div>
 );
 const More = ({ children, label = 'Tuỳ chỉnh' }: { children: ReactNode; label?: string }) => (
-  <Collapse ghost size="small" className="[&_.ant-collapse-header]:!px-0 [&_.ant-collapse-header]:!py-1 [&_.ant-collapse-content-box]:!px-0 [&_.ant-collapse-header-text]:!text-[11px] [&_.ant-collapse-header-text]:!text-slate-400"
+  <Collapse ghost size="small" className="[&_.ant-collapse-header]:!px-0 [&_.ant-collapse-header]:!py-1 [&_.ant-collapse-content-box]:!px-0 [&_.ant-collapse-header-text]:!text-xs [&_.ant-collapse-header-text]:!text-slate-300"
     items={[{ key: '1', label, children: <div className="space-y-2">{children}</div> }]} />
 );
 const toColor = (c: unknown) => (typeof c === 'string' ? c : (c as { toRgbString?: () => string })?.toRgbString?.() || '#ffffff');
@@ -181,7 +181,7 @@ function VideoProps({ deps }: { deps: PanelDeps }) {
         {deps.vt.fit === 'cover' && <Field label="Tâm cắt" value={`${deps.vt.focusY}%`}><Slider className="!my-1" min={0} max={100} value={deps.vt.focusY} onChange={(x) => deps.onVideoTransform({ focusY: x })} /></Field>}
       </Block>
       <Block>
-        <Title extra={deps.hasAudio ? undefined : <span className="text-[11px] text-slate-500">Clip không có tiếng</span>}>Tiếng gốc</Title>
+        <Title extra={deps.hasAudio ? undefined : <span className="text-xs text-slate-400">Clip không có tiếng</span>}>Tiếng gốc</Title>
         <Field label="Âm lượng" value={`${Math.round(v.volume * 100)}%`}><Slider className="!my-1" min={0} max={2} step={0.05} disabled={!deps.hasAudio} value={v.volume} onChange={(x) => setV({ volume: x }, 'vol')} /></Field>
         <Field label="Khi có giọng đọc" value={`${Math.round(v.duckVolume * 100)}%`}><Slider className="!my-1" min={0} max={1} step={0.05} disabled={!deps.hasAudio} value={v.duckVolume} onChange={(x) => setV({ duckVolume: x }, 'duck')} /></Field>
       </Block>
@@ -336,7 +336,7 @@ function CaptionsPanel({ deps }: { deps: PanelDeps }) {
           <div className="space-y-1 max-h-80 overflow-y-auto pr-1">
             {p.captions.map((c) => (
               <div key={c.id} className={`flex items-start gap-1.5 group rounded px-1 ${sel?.type === 'caption' && sel.id === c.id ? 'bg-blue-500/10' : ''}`}>
-                <button type="button" className="text-[10px] font-mono text-blue-400 pt-1.5 w-9 shrink-0 text-left" onClick={() => { deps.seek(c.start); select({ type: 'caption', id: c.id }); }}>{fmtTime(c.start)}</button>
+                <button type="button" className="text-xs font-mono text-blue-400 pt-1.5 w-11 shrink-0 text-left" onClick={() => { deps.seek(c.start); select({ type: 'caption', id: c.id }); }}>{fmtTime(c.start)}</button>
                 <TextArea size="small" variant="borderless" autoSize value={c.text} onFocus={() => { select({ type: 'caption', id: c.id }); deps.seek(c.start); }}
                   onChange={(e) => update((pp) => ({ ...pp, captions: pp.captions.map((x) => (x.id === c.id ? retime({ ...x, text: e.target.value }) : x)) }), { key: `cap:${c.id}` })} />
                 <Button size="small" type="text" danger className="opacity-0 group-hover:opacity-100" icon={<DeleteOutlined />} onClick={() => update((pp) => ({ ...pp, captions: pp.captions.filter((x) => x.id !== c.id) }))} />
@@ -408,7 +408,7 @@ function VoiceComposer({ deps, clip, onDone }: { deps: PanelDeps; clip?: VoiceCl
       <TextArea value={text} onChange={(e) => setText(e.target.value)} autoSize={{ minRows: 3, maxRows: 8 }} placeholder="Nội dung cần đọc" />
       <div className="flex flex-wrap gap-1">
         {['Tự nhiên hơn', 'Ngắn gọn hơn', 'Kể chuyện cuốn hút', 'Hài hước'].map((st) => (
-          <Button key={st} size="small" type="text" className="!px-1.5 !text-[11px] !text-violet-300" loading={aiBusy === st} icon={aiBusy === st ? undefined : <ThunderboltOutlined />} onClick={() => aiRewrite(st)}>{st}</Button>
+          <Button key={st} size="small" type="text" className="!px-1.5 !text-xs !text-violet-300" loading={aiBusy === st} icon={aiBusy === st ? undefined : <ThunderboltOutlined />} onClick={() => aiRewrite(st)}>{st}</Button>
         ))}
       </div>
       <Select size="small" className="w-full" value={voice} options={VOICES} onChange={setVoice} />
@@ -477,17 +477,17 @@ function AudioPanel({ deps }: { deps: PanelDeps }) {
             <div key={v.id} className={`flex items-center gap-2 rounded px-2 py-1.5 border cursor-pointer ${sel?.type === 'voice' && sel.id === v.id ? 'border-blue-500 bg-blue-500/10' : 'border-slate-700 hover:border-slate-500'}`}
               onClick={() => { select({ type: 'voice', id: v.id }); deps.seek(v.start); }}>
               <button type="button" className="text-blue-300" onClick={(e) => { e.stopPropagation(); toggle(v.url, v.trimIn ?? 0, v.trimOut); }}>{playing === v.url ? <PauseOutlined /> : <CaretRightOutlined />}</button>
-              <span className="text-[12px] text-slate-200 flex-1 truncate">{v.text}</span>
-              <span className="text-[10px] text-slate-500 font-mono">{fmtTime(v.start)}</span>
+              <span className="text-[13px] text-slate-200 flex-1 truncate">{v.text}</span>
+              <span className="text-xs text-slate-400 font-mono">{fmtTime(v.start)}</span>
             </div>
           ))}
         </Block>
       )}
       <Block>
-        <Title extra={p.bgm && <Button size="small" type="text" danger className="!text-[11px]" onClick={() => setBgm(null)}>Bỏ nhạc</Button>}>Nhạc nền</Title>
+        <Title extra={p.bgm && <Button size="small" type="text" danger className="!text-xs" onClick={() => setBgm(null)}>Bỏ nhạc</Button>}>Nhạc nền</Title>
         {deps.hasAudio && p.bgm && (
           <div className={`rounded border px-2.5 py-2 space-y-1.5 ${p.video.volume > 0 ? 'border-amber-500/50 bg-amber-500/5' : 'border-slate-700'}`}>
-            <div className="text-[11px] text-slate-300">Clip gốc thường đã có nhạc sẵn — để cả hai sẽ bị lẫn tiếng.</div>
+            <div className="text-xs text-slate-300">Clip gốc thường đã có nhạc sẵn — để cả hai sẽ bị lẫn tiếng.</div>
             <Segmented size="small" block value={p.video.volume > 0 ? 'both' : 'new'}
               onChange={(x) => {
                 if (x === 'new') update((pp) => ({ ...pp, video: { ...pp.video, volume: 0, duckVolume: 0 } }));
@@ -646,7 +646,7 @@ export function AiPanel({ deps, autoPrompt, onAutoDone }: { deps: PanelDeps; aut
           <div key={i} className={m.role === 'user' ? 'flex justify-end' : ''}>
             <div className={`rounded-lg px-2.5 py-1.5 text-[12px] max-w-[92%] ${m.role === 'user' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-200'}`}>
               {m.text}
-              {!!m.done?.length && <ul className="mt-1 space-y-0.5 text-[11px] text-emerald-300">{m.done.map((d, k) => <li key={k}>✓ {d}</li>)}</ul>}
+              {!!m.done?.length && <ul className="mt-1 space-y-0.5 text-xs text-emerald-300">{m.done.map((d, k) => <li key={k}>✓ {d}</li>)}</ul>}
             </div>
           </div>
         ))}
@@ -657,7 +657,7 @@ export function AiPanel({ deps, autoPrompt, onAutoDone }: { deps: PanelDeps; aut
         <TextArea value={input} onChange={(e) => setInput(e.target.value)} autoSize={{ minRows: 2, maxRows: 5 }} placeholder="Nhờ AI chỉnh video… (Enter để gửi)"
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input); } }} />
         <div className="flex items-center justify-between mt-1.5">
-          <span className="text-[10px] text-slate-500">Ctrl/⌘+Z để hoàn tác thay đổi của AI</span>
+          <span className="text-xs text-slate-400">Ctrl/⌘+Z để hoàn tác thay đổi của AI</span>
           <Button type="primary" size="small" icon={<SendOutlined />} loading={busy} disabled={!input.trim()} onClick={() => send(input)}>Gửi</Button>
         </div>
       </div>
@@ -766,9 +766,9 @@ export function LeftPanel({ tab, deps }: { tab: LeftTab; deps: PanelDeps }) {
         <Block>
           <Title>Chữ đang có</Title>
           {[...p.overlays].reverse().filter((l) => l.kind === 'text').map((l) => (
-            <div key={l.id} className="flex items-center gap-2 text-[12px] text-slate-300 px-2 py-1.5 rounded border border-slate-700 hover:border-slate-500 cursor-pointer" onClick={() => { select({ type: 'overlay', id: l.id }); deps.seek(l.start); }}>
+              <div key={l.id} className="flex items-center gap-2 text-[13px] text-slate-200 px-2 py-1.5 rounded border border-slate-700 hover:border-slate-500 cursor-pointer" onClick={() => { select({ type: 'overlay', id: l.id }); deps.seek(l.start); }}>
               <span className="flex-1 truncate">{(l as TextLayer).text}</span>
-              <span className="text-[10px] text-slate-500 font-mono">{fmtTime(l.start)}</span>
+              <span className="text-xs text-slate-400 font-mono">{fmtTime(l.start)}</span>
             </div>
           ))}
         </Block>
@@ -786,9 +786,9 @@ export function Inspector({ deps }: { deps: PanelDeps }) {
   const select = useEditor((s) => s.select);
   const D = timelineDuration(p);
   if (!sel) return (
-    <div className="h-full flex flex-col items-center justify-center text-center gap-2 text-slate-500 px-4">
-      <div className="text-[12px]">Chọn một clip trên timeline hoặc một phần tử trên video để chỉnh.</div>
-      <div className="text-[11px] font-mono text-slate-600">{fmtTime(D)} · {p.voices.length} giọng · {p.overlays.length} lớp · {p.captions.length} phụ đề</div>
+    <div className="h-full flex flex-col items-center justify-center text-center gap-2 text-slate-400 px-4">
+      <div className="text-[13px]">Chọn một clip trên timeline hoặc một phần tử trên video để chỉnh.</div>
+      <div className="text-xs font-mono text-slate-400">{fmtTime(D)} · {p.voices.length} giọng · {p.overlays.length} lớp · {p.captions.length} phụ đề</div>
     </div>
   );
   if (sel.type === 'video') return <VideoProps deps={deps} />;

@@ -145,9 +145,9 @@ function ViralHunterDrawer({
                       key={num}
                       type="button"
                       onClick={() => setHunterLimit(num)}
-                      className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-all ${hunterLimit === num
+                      className={`px-2 py-0.5 rounded text-xs font-bold transition-all ${hunterLimit === num
                         ? 'bg-rose-500 text-white shadow-xs'
-                        : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                        : 'bg-slate-800 text-slate-300 hover:text-white'
                         }`}
                     >
                       {num}
@@ -196,7 +196,7 @@ function ViralHunterDrawer({
                 onClick={() => {
                   setHunterTarget(item.handle);
                 }}
-                className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 hover:bg-rose-500/20 hover:text-rose-300 border border-slate-700 transition-colors font-mono text-[11px]"
+                className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-200 hover:bg-rose-500/20 hover:text-rose-300 border border-slate-700 transition-colors font-mono text-xs"
               >
                 {item.label}
               </button>
@@ -288,9 +288,9 @@ function ViralHunterDrawer({
                       ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-xs'
                       : 'bg-slate-800 text-slate-400 border-slate-700'
                       }`}
-                    title="Tự động chia đều các bài vào khung giờ vàng mỗi ngày (11h30 trưa & 19h45 tối)"
+                    title="Bài nhập vào sẽ được xếp vào lịch đăng chung (khung giờ + giãn cách cài ở Lịch đăng trên header)"
                   >
-                    <span>📅 Rải lịch tự động</span>
+                    <span>Xếp vào lịch đăng</span>
                     <span className={`w-2 h-2 rounded-full ${hunterAutoSchedule ? 'bg-emerald-400' : 'bg-slate-500'}`} />
                   </button>
                 </div>
@@ -306,7 +306,7 @@ function ViralHunterDrawer({
                   Đã xếp hạng Viral
                 </Tag>
                 {hunterHideImported && hunterResults.some((i) => i.isAlreadyImported) && (
-                  <Tag color="default" className="!text-[11px] !m-0 !bg-slate-800 !text-slate-400 border-slate-700">
+                  <Tag color="default" className="!text-xs !m-0 !bg-slate-800 !text-slate-300 border-slate-700">
                     Đã ẩn {hunterResults.filter((i) => i.isAlreadyImported).length} video đã đăng
                   </Tag>
                 )}
@@ -368,11 +368,11 @@ function ViralHunterDrawer({
                           <div className="w-full h-full flex items-center justify-center text-slate-600 text-xs">No Cover</div>
                         )}
                         {item.duration && (
-                          <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-md bg-black/80 text-[10px] text-white font-mono font-bold">
+                          <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-md bg-black/80 text-xs text-white font-mono font-bold">
                             {item.duration}
                           </span>
                         )}
-                        <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-rose-600/90 text-[10px] text-white font-bold">
+                        <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-rose-600/90 text-xs text-white font-bold">
                           #{idx + 1}
                         </span>
                       </div>
@@ -397,17 +397,17 @@ function ViralHunterDrawer({
                             target="_blank"
                             rel="noreferrer"
                             onClick={(e) => e.stopPropagation()}
-                            className="text-[11px] text-slate-400 hover:text-rose-400 underline font-mono flex items-center gap-1"
+                            className="text-xs text-slate-300 hover:text-rose-400 underline font-mono flex items-center gap-1"
                           >
                             Xem trên TikTok ↗
                           </a>
                         </div>
 
-                        <p className="text-xs text-slate-200 line-clamp-3 font-medium mb-0">
+                        <p className="text-[13px] text-slate-100 line-clamp-3 font-medium mb-0">
                           {item.title || item.desc || 'Video không có tiêu đề'}
                         </p>
 
-                        <div className="flex items-center gap-2 pt-1 flex-wrap text-[11px]">
+                        <div className="flex items-center gap-2 pt-1 flex-wrap text-xs">
                           <span className="px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 font-bold border border-amber-500/20">
                             👁️ {viewStr} views
                           </span>
@@ -417,7 +417,7 @@ function ViralHunterDrawer({
                             </span>
                           )}
                           {item.isAlreadyImported && (
-                            <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 text-[10px]">
+                            <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 text-xs">
                               {item.postStatus === 'PUBLISHED' ? '✅ ĐÃ XUẤT BẢN' : '📅 ĐÃ CÓ TRONG LỊCH'}
                             </span>
                           )}

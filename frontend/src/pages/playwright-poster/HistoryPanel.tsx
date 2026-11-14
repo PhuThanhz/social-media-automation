@@ -1,4 +1,4 @@
-import type React from 'react';
+import React, { useState } from 'react';
 import { App, Button, Card, Input, Select, Table, Tooltip, Popover, Popconfirm } from 'antd';
 import type { TableProps } from 'antd';
 import {
@@ -28,6 +28,11 @@ import {
   CloseOutlined,
   ThunderboltFilled,
   ApartmentOutlined,
+  BarChartOutlined,
+  FileTextOutlined,
+  FlagOutlined,
+  UserOutlined,
+  FacebookFilled,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { GroupStatItem, PendingPageBreakdownItem, PostQueue, SocialAccount } from './types';
@@ -36,14 +41,15 @@ import { EMPTY_GROUP_STAT, PAGE_PALETTE, stripEmojiPrefix } from './shared';
 interface HistoryPanelProps {
   selectedRowKeys: React.Key[];
   setSelectedRowKeys: React.Dispatch<React.SetStateAction<React.Key[]>>;
-  setBulkRescheduleModalVisible: React.Dispatch<React.SetStateAction<boolean>>;
-  setBulkRescheduleTargetScope: React.Dispatch<React.SetStateAction<"ALL" | "SELECTED">>;
+  /** Xếp lại lịch theo cài đặt chung: ids = chỉ các bài này, bỏ trống = cả hàng đợi. */
+  onRepack: (ids?: React.Key[]) => void;
+  /** Rải đều các bài của toàn bộ các nhóm suốt cả ngày (xen kẽ nhóm, không dồn cục). */
+  onSpreadGroups?: (ids?: React.Key[]) => void;
   isBulkProcessing: boolean;
   setReassignModalVisible: React.Dispatch<React.SetStateAction<boolean>>;
   setReassignSelectedNicks: React.Dispatch<React.SetStateAction<string[]>>;
   isReassigning: boolean;
   setResetFailedModalVisible: React.Dispatch<React.SetStateAction<boolean>>;
-  setAutoFixQueueModalVisible: React.Dispatch<React.SetStateAction<boolean>>;
   historyGroupFilter: string;
   setHistoryGroupFilter: React.Dispatch<React.SetStateAction<string>>;
   setHistoryPageFilter: React.Dispatch<React.SetStateAction<string>>;
@@ -75,14 +81,13 @@ interface HistoryPanelProps {
 export default function HistoryPanel({
   selectedRowKeys,
   setSelectedRowKeys,
-  setBulkRescheduleModalVisible,
-  setBulkRescheduleTargetScope,
+  onRepack,
+  onSpreadGroups,
   isBulkProcessing,
   setReassignModalVisible,
   setReassignSelectedNicks,
   isReassigning,
   setResetFailedModalVisible,
-  setAutoFixQueueModalVisible,
   historyGroupFilter,
   setHistoryGroupFilter,
   setHistoryPageFilter,
@@ -110,6 +115,7 @@ export default function HistoryPanel({
   setHistoryTablePage,
 }: HistoryPanelProps) {
   const { message } = App.useApp();
+  const [overviewTab, setOverviewTab] = useState<'GROUPS' | 'PAGES'>('GROUPS');
   return (
     <Card
       className="poster-history-card border border-slate-700/60 bg-slate-900/90 shadow-lg rounded-2xl overflow-hidden backdrop-blur-md"
@@ -122,7 +128,7 @@ export default function HistoryPanel({
             </div>
             <div className="flex items-center gap-2.5 flex-wrap">
               <span className="font-bold text-base text-slate-100 tracking-tight">Lịch sử & Hàng đợi bài đăng</span>
-              <span className="px-2.5 py-0.5 rounded-lg bg-blue-500/15 text-blue-300 font-mono text-xs font-semibold border border-blue-400/30 shadow-2xs">
+              <span className="px-2.5 py-0.5 rounded-lg bg-blue-500/15 text-blue-300 font-mono text-xs font-semibold border border-blue-400/30 shadow-sm">
                 {(filteredHistoryPosts?.length || 0).toLocaleString()} / {(posts?.length || 0).toLocaleString()} bài
               </span>
             </div>
@@ -136,7 +142,7 @@ export default function HistoryPanel({
                   icon={<ThunderboltOutlined />}
                   loading={isBulkProcessing}
                   onClick={() => setResetFailedModalVisible(true)}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl h-8 px-3 border-none shadow-xs flex items-center gap-1.5 transition-all"
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl h-8 px-3 border-none shadow-sm flex items-center gap-1.5 transition-all"
                 >
                   Chuyển về Chờ đăng ({postCounts.failed})
                 </Button>
@@ -153,7 +159,7 @@ export default function HistoryPanel({
                     type="primary"
                     icon={<RedoOutlined />}
                     loading={isBulkProcessing}
-                    className="bg-blue-600 hover:bg-blue-500 text-xs font-bold rounded-xl h-8 px-3 border-none shadow-xs transition-all"
+                    className="bg-blue-600 hover:bg-blue-500 text-xs font-bold rounded-xl h-8 px-3 border-none shadow-sm transition-all"
                   >
                     Đăng lại tất cả bài lỗi ({postCounts.failed})
                   </Button>
@@ -213,15 +219,22 @@ export default function HistoryPanel({
 
             <Button
               size="small"
+              icon={<ApartmentOutlined />}
+              disabled={isBulkProcessing}
+              onClick={() => onSpreadGroups ? onSpreadGroups(selectedRowKeys.length > 0 ? selectedRowKeys : undefined) : onRepack(selectedRowKeys.length > 0 ? selectedRowKeys : undefined)}
+              className="bg-indigo-600/30 hover:bg-blue-600/30 text-indigo-200 border border-indigo-500/40 font-bold text-xs rounded-xl h-8 px-3 transition-all"
+            >
+              Rải đều các nhóm
+            </Button>
+
+            <Button
+              size="small"
               icon={<ScheduleOutlined />}
               disabled={isBulkProcessing}
-              onClick={() => {
-                setBulkRescheduleTargetScope(selectedRowKeys.length > 0 ? 'SELECTED' : 'ALL');
-                setBulkRescheduleModalVisible(true);
-              }}
+              onClick={() => onRepack(selectedRowKeys.length > 0 ? selectedRowKeys : undefined)}
               className="bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 border border-slate-700 font-medium text-xs rounded-xl h-8 px-3 transition-all"
             >
-              Chia lại giờ
+              Xếp lại lịch
             </Button>
 
             <Button
@@ -232,9 +245,9 @@ export default function HistoryPanel({
                 setReassignSelectedNicks([]);
                 setReassignModalVisible(true);
               }}
-              className="bg-purple-600/20 hover:bg-purple-600/35 text-purple-300 border border-purple-500/40 font-semibold text-xs rounded-xl h-8 px-3 transition-all"
+              className="bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 font-semibold text-xs rounded-xl h-8 px-3 transition-all"
             >
-              🔀 Đổi Nick / Chia tải
+              Đổi Nick / Chia tải
             </Button>
 
             <Popconfirm
@@ -284,7 +297,7 @@ export default function HistoryPanel({
           <AppstoreOutlined className="text-blue-400 text-sm" />
           <span>Tất cả</span>
           <span
-            className={`px-2 py-0.5 text-[11px] rounded-full font-mono font-bold transition-colors ${
+            className={`px-2 py-0.5 text-xs rounded-full font-mono font-bold transition-colors ${
               historyStatusFilter === 'ALL'
                 ? 'bg-blue-500/40 text-blue-100 border border-blue-300/40 shadow-xs'
                 : 'bg-blue-900/50 text-blue-300 border border-blue-500/30'
@@ -307,7 +320,7 @@ export default function HistoryPanel({
           <SyncOutlined spin={postCounts.processing > 0} className="text-purple-400 text-sm" />
           <span>Đang đăng</span>
           <span
-            className={`px-2 py-0.5 text-[11px] rounded-full font-mono font-bold transition-colors ${
+            className={`px-2 py-0.5 text-xs rounded-full font-mono font-bold transition-colors ${
               historyStatusFilter === 'PROCESSING'
                 ? 'bg-purple-500/40 text-purple-100 border border-purple-300/40 shadow-xs'
                 : 'bg-purple-900/50 text-purple-300 border border-purple-500/30'
@@ -330,7 +343,7 @@ export default function HistoryPanel({
           <ClockCircleOutlined className="text-amber-400 text-sm" />
           <span>Chờ đăng</span>
           <span
-            className={`px-2 py-0.5 text-[11px] rounded-full font-mono font-bold transition-colors ${
+            className={`px-2 py-0.5 text-xs rounded-full font-mono font-bold transition-colors ${
               historyStatusFilter === 'PENDING'
                 ? 'bg-amber-500/40 text-amber-100 border border-amber-300/50 shadow-xs'
                 : 'bg-amber-900/60 text-amber-200 border border-amber-500/40'
@@ -353,7 +366,7 @@ export default function HistoryPanel({
           <CheckCircleOutlined className="text-emerald-400 text-sm" />
           <span>Đã đăng</span>
           <span
-            className={`px-2 py-0.5 text-[11px] rounded-full font-mono font-bold transition-colors ${
+            className={`px-2 py-0.5 text-xs rounded-full font-mono font-bold transition-colors ${
               historyStatusFilter === 'PUBLISHED'
                 ? 'bg-emerald-500/40 text-emerald-100 border border-emerald-300/50 shadow-xs'
                 : 'bg-emerald-900/60 text-emerald-200 border border-emerald-500/40'
@@ -376,7 +389,7 @@ export default function HistoryPanel({
           <CloseCircleOutlined className="text-rose-400 text-sm" />
           <span>Lỗi đăng</span>
           <span
-            className={`px-2 py-0.5 text-[11px] rounded-full font-mono font-bold transition-colors ${
+            className={`px-2 py-0.5 text-xs rounded-full font-mono font-bold transition-colors ${
               historyStatusFilter === 'FAILED'
                 ? 'bg-rose-500/40 text-rose-100 border border-rose-300/40 shadow-xs'
                 : 'bg-rose-900/50 text-rose-300 border border-rose-500/30'
@@ -393,25 +406,42 @@ export default function HistoryPanel({
           {/* Lọc theo Nhóm & Fanpage */}
           <Select
             size="middle"
-            value={historyGroupFilter}
+            value={historyPageFilter !== 'ALL' ? `PAGE:${historyPageFilter}` : historyGroupFilter}
             onChange={(val) => {
-              setHistoryGroupFilter(val);
-              setHistoryPageFilter('ALL');
+              if (val.startsWith('PAGE:')) {
+                setHistoryGroupFilter('ALL');
+                setHistoryPageFilter(val.replace('PAGE:', ''));
+                setOverviewTab('PAGES');
+              } else {
+                setHistoryGroupFilter(val);
+                setHistoryPageFilter('ALL');
+                setOverviewTab('GROUPS');
+              }
             }}
             className="w-full sm:w-80 rounded-xl font-medium"
             suffixIcon={<TeamOutlined className="text-slate-400" />}
             showSearch
-            optionFilterProp="children"
+            optionFilterProp="label"
             options={[
               { value: 'ALL', label: 'Tất cả Nhóm & Fanpage' },
-              ...groupAccountsWithId.map((g) => {
-                const stat = groupStatsMap.get(g.platformAccountId) || EMPTY_GROUP_STAT;
-                const groupName = stripEmojiPrefix(g.pageName) || g.platformAccountId;
-                return {
-                  value: g.platformAccountId,
-                  label: `${groupName} · ID ${g.id} (Đã đăng ${stat.publishedToday} · Chờ ${stat.pendingCount} · Lỗi ${stat.failedCount})`,
-                };
-              }),
+              {
+                label: `📄 Fanpage / Nick đăng (${currentPendingDistribution.pagesList.length})`,
+                options: currentPendingDistribution.pagesList.map((p) => ({
+                  value: `PAGE:${p.pageName}`,
+                  label: `${p.isAnon ? '👤 [Nick cá nhân] ' : '📄 [Page] '}${p.pageName} (Chờ ${p.count} · Đã đăng ${p.publishedToday || 0}${p.failedCount ? ` · Lỗi ${p.failedCount}` : ''})`,
+                })),
+              },
+              {
+                label: `👥 Nhóm Facebook đích (${groupAccountsWithId.length} Nhóm)`,
+                options: groupAccountsWithId.map((g) => {
+                  const stat = groupStatsMap.get(g.platformAccountId) || EMPTY_GROUP_STAT;
+                  const groupName = stripEmojiPrefix(g.pageName) || g.platformAccountId;
+                  return {
+                    value: g.platformAccountId,
+                    label: `${groupName} · ID ${g.id} (Đã đăng ${stat.publishedToday} · Chờ ${stat.pendingCount} · Lỗi ${stat.failedCount})`,
+                  };
+                }),
+              },
             ]}
           />
 
@@ -445,83 +475,177 @@ export default function HistoryPanel({
         )}
       </div>
 
-      {/* THỐNG KÊ CHI TIẾT THEO TỪNG NHÓM: HÔM NAY ĐÃ ĐĂNG (xanh), CHỜ ĐĂNG (cam), LỖI (đỏ) */}
-      {groupAccountsWithId.length > 0 && (() => {
+      {/* THỐNG KÊ CHI TIẾT THEO TỪNG NHÓM HOẶC THEO FANPAGE */}
+      {(groupAccountsWithId.length > 0 || currentPendingDistribution.pagesList.length > 0) && (() => {
         const totalPublishedToday = groupAccountsWithId.reduce((acc, g) => acc + (groupStatsMap.get(g.platformAccountId)?.publishedToday || 0), 0);
         const totalPending = groupAccountsWithId.reduce((acc, g) => acc + (groupStatsMap.get(g.platformAccountId)?.pendingCount || 0), 0);
         const totalFailed = groupAccountsWithId.reduce((acc, g) => acc + (groupStatsMap.get(g.platformAccountId)?.failedCount || 0), 0);
+
+        const totalPagesPending = currentPendingDistribution.pagesList.reduce((acc, p) => acc + (p.count || 0), 0);
+        const totalPagesPublished = currentPendingDistribution.pagesList.reduce((acc, p) => acc + (p.publishedToday || 0), 0);
+        const totalPagesFailed = currentPendingDistribution.pagesList.reduce((acc, p) => acc + (p.failedCount || 0), 0);
 
         return (
           <div className="pb-3 mb-4 border-b border-slate-800/70">
             {/* Thanh điều khiển trên cùng */}
             <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
               <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 text-[11px] font-bold text-slate-300 shrink-0 shadow-2xs backdrop-blur-sm">
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs font-bold text-slate-200 shrink-0 shadow-sm backdrop-blur-sm">
                   <CalendarOutlined className="text-blue-400 text-xs" />
                   <span>Hôm nay</span>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setHistoryGroupFilter('ALL');
-                    setHistoryPageFilter('ALL');
-                  }}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 border backdrop-blur-sm cursor-pointer ${
-                    historyGroupFilter === 'ALL'
-                      ? 'border-blue-500/80 bg-blue-600/25 text-blue-100 shadow-sm shadow-blue-950/40 ring-1 ring-blue-500/30'
-                      : 'border-slate-800/80 bg-slate-900/60 text-slate-400 hover:border-slate-700 hover:bg-slate-800/70 hover:text-slate-200'
-                  }`}
-                >
-                  <GlobalOutlined className={historyGroupFilter === 'ALL' ? 'text-blue-400' : 'text-slate-400'} />
-                  <span>Tất cả ({groupAccountsWithId.length} nhóm)</span>
-                </button>
-
-                {/* Thống kê nhanh toàn hệ thống hôm nay */}
-                <div className="hidden sm:flex items-center gap-2.5 px-3 py-1 rounded-xl bg-slate-900/50 border border-slate-800/60 text-[11px]">
-                  <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
-                    <CheckCircleFilled className="text-[10px]" />
-                    <strong className="font-mono">{totalPublishedToday}</strong> đã đăng
-                  </span>
-                  <span className="text-slate-700">|</span>
-                  <span className="flex items-center gap-1.5 text-amber-300 font-medium">
-                    <ClockCircleFilled className="text-[10px]" />
-                    <strong className="font-mono">{totalPending}</strong> bài chờ
-                    {postCounts.processing > 0 ? (
-                      <span className="text-[10px] text-blue-300 font-normal">
-                        ({postCounts.pending} chờ + {postCounts.processing} đang chạy)
-                      </span>
-                    ) : null}
-                  </span>
-                  {totalFailed > 0 && (
-                    <>
-                      <span className="text-slate-700">|</span>
-                      <span className="flex items-center gap-1.5 text-rose-400 font-medium animate-pulse">
-                        <CloseCircleFilled className="text-[10px]" />
-                        <strong className="font-mono">{totalFailed}</strong> lỗi
-                      </span>
-                    </>
-                  )}
+                {/* Tab chuyển đổi chế độ xem: Nhóm đích VS Fanpage / Nick */}
+                <div className="flex items-center bg-slate-950/80 p-0.5 rounded-xl border border-slate-800 shadow-inner">
+                  <button
+                    type="button"
+                    onClick={() => setOverviewTab('GROUPS')}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      overviewTab === 'GROUPS'
+                        ? 'bg-blue-600 text-white shadow-sm shadow-blue-900/50'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <TeamOutlined />
+                    <span>Nhóm đích ({groupAccountsWithId.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOverviewTab('PAGES')}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      overviewTab === 'PAGES'
+                        ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-900/50'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <FileTextOutlined />
+                    <span>Fanpage / Nick ({currentPendingDistribution.pagesList.length})</span>
+                  </button>
                 </div>
+
+                {overviewTab === 'GROUPS' ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHistoryGroupFilter('ALL');
+                        setHistoryPageFilter('ALL');
+                      }}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 border backdrop-blur-sm cursor-pointer ${
+                        historyGroupFilter === 'ALL'
+                          ? 'border-blue-500/80 bg-blue-600/25 text-blue-100 shadow-sm shadow-blue-950/40 ring-1 ring-blue-500/30'
+                          : 'border-slate-800/80 bg-slate-900/60 text-slate-300 hover:border-slate-700 hover:bg-slate-800/70 hover:text-white'
+                      }`}
+                    >
+                      <GlobalOutlined className={historyGroupFilter === 'ALL' ? 'text-blue-400' : 'text-slate-300'} />
+                      <span>Tất cả ({groupAccountsWithId.length} nhóm)</span>
+                    </button>
+
+                    {/* Thống kê nhanh toàn hệ thống hôm nay */}
+                    <div className="hidden sm:flex items-center gap-2.5 px-3 py-1 rounded-xl bg-slate-900/50 border border-slate-800/60 text-xs">
+                      <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
+                        <CheckCircleFilled className="text-xs" />
+                        <strong className="font-mono">{totalPublishedToday}</strong> đã đăng
+                      </span>
+                      <span className="text-slate-700">|</span>
+                      <span className="flex items-center gap-1.5 text-amber-300 font-medium">
+                        <ClockCircleFilled className="text-xs" />
+                        <strong className="font-mono">{totalPending}</strong> bài chờ
+                        {postCounts.processing > 0 ? (
+                          <span className="text-xs text-blue-300 font-normal">
+                            ({postCounts.pending} chờ + {postCounts.processing} đang chạy)
+                          </span>
+                        ) : null}
+                      </span>
+                      {totalFailed > 0 && (
+                        <>
+                          <span className="text-slate-700">|</span>
+                          <span className="flex items-center gap-1.5 text-rose-400 font-medium animate-pulse">
+                            <CloseCircleFilled className="text-xs" />
+                            <strong className="font-mono">{totalFailed}</strong> lỗi
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHistoryPageFilter('ALL');
+                        setHistoryGroupFilter('ALL');
+                      }}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 border backdrop-blur-sm cursor-pointer ${
+                        historyPageFilter === 'ALL'
+                          ? 'border-indigo-500/80 bg-indigo-600/25 text-indigo-100 shadow-sm shadow-indigo-950/40 ring-1 ring-indigo-500/30'
+                          : 'border-slate-800/80 bg-slate-900/60 text-slate-300 hover:border-slate-700 hover:bg-slate-800/70 hover:text-white'
+                      }`}
+                    >
+                      <GlobalOutlined className={historyPageFilter === 'ALL' ? 'text-indigo-400' : 'text-slate-300'} />
+                      <span>Tất cả ({currentPendingDistribution.pagesList.length} Page)</span>
+                    </button>
+
+                    {/* Thống kê nhanh toàn bộ Fanpage */}
+                    <div className="hidden sm:flex items-center gap-2.5 px-3 py-1 rounded-xl bg-slate-900/50 border border-slate-800/60 text-xs">
+                      <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
+                        <CheckCircleFilled className="text-xs" />
+                        <strong className="font-mono">{totalPagesPublished}</strong> đã đăng
+                      </span>
+                      <span className="text-slate-700">|</span>
+                      <span className="flex items-center gap-1.5 text-amber-300 font-medium">
+                        <ClockCircleFilled className="text-xs" />
+                        <strong className="font-mono">{totalPagesPending}</strong> bài chờ
+                      </span>
+                      {totalPagesFailed > 0 && (
+                        <>
+                          <span className="text-slate-700">|</span>
+                          <span className="flex items-center gap-1.5 text-rose-400 font-medium animate-pulse">
+                            <CloseCircleFilled className="text-xs" />
+                            <strong className="font-mono">{totalPagesFailed}</strong> lỗi
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
 
-              {historyGroupFilter !== 'ALL' && (
-                <Button
-                  size="small"
-                  type="text"
-                  icon={<ClearOutlined />}
-                  onClick={() => {
-                    setHistoryGroupFilter('ALL');
-                    setHistoryPageFilter('ALL');
-                  }}
-                  className="text-xs text-blue-400 hover:text-blue-300 font-semibold cursor-pointer"
-                >
-                  Bỏ chọn nhóm (Xem tất cả)
-                </Button>
+              {overviewTab === 'GROUPS' ? (
+                historyGroupFilter !== 'ALL' && (
+                  <Button
+                    size="small"
+                    type="text"
+                    icon={<ClearOutlined />}
+                    onClick={() => {
+                      setHistoryGroupFilter('ALL');
+                      setHistoryPageFilter('ALL');
+                    }}
+                    className="text-xs text-blue-400 hover:text-blue-300 font-semibold cursor-pointer"
+                  >
+                    Bỏ chọn nhóm (Xem tất cả)
+                  </Button>
+                )
+              ) : (
+                historyPageFilter !== 'ALL' && (
+                  <Button
+                    size="small"
+                    type="text"
+                    icon={<ClearOutlined />}
+                    onClick={() => {
+                      setHistoryGroupFilter('ALL');
+                      setHistoryPageFilter('ALL');
+                    }}
+                    className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold cursor-pointer"
+                  >
+                    Bỏ chọn Page (Xem tất cả)
+                  </Button>
+                )
               )}
             </div>
 
             {/* Lưới các nhóm dạng Card cao cấp, rộng rãi, dễ đọc */}
+            {overviewTab === 'GROUPS' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
               {groupAccountsWithId.map((g) => {
                 const stat = groupStatsMap.get(g.platformAccountId) || EMPTY_GROUP_STAT;
@@ -535,68 +659,69 @@ export default function HistoryPanel({
                 else if (stat.publishedToday > 0) dotBg = 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]';
 
                 const popoverContent = (
-                  <div className="p-1 space-y-2 max-w-[320px] text-xs">
+                  <div className="p-1 space-y-2 text-xs" style={{ width: 320, maxWidth: 'calc(100vw - 32px)' }}>
                     <div className="font-bold text-slate-100 flex items-center justify-between gap-2 border-b border-slate-700/60 pb-1.5">
                       <span className="truncate">{groupName}</span>
-                      <span className="text-slate-400 font-mono text-[10px] shrink-0">#{g.id}</span>
+                      <span className="text-slate-300 font-mono text-[11px] shrink-0">#{g.id}</span>
                     </div>
-                    <div className="grid grid-cols-3 gap-1.5 text-[11px] text-center">
-                      <div className="p-1 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-                        <div className="font-bold">{stat.publishedToday}</div>
-                        <div className="text-[10px] text-slate-400">Hôm nay</div>
+                    <div className="grid grid-cols-3 gap-1.5 text-center">
+                      <div className="px-1.5 py-1 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                        <div className="font-bold text-sm leading-tight">{stat.publishedToday}</div>
+                        <div className="text-[11px] text-slate-300">Hôm nay</div>
                       </div>
-                      <div className="p-1 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
-                        <div className="font-bold">{stat.pendingCount}</div>
-                        <div className="text-[10px] text-slate-400">Chờ đăng</div>
+                      <div className="px-1.5 py-1 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                        <div className="font-bold text-sm leading-tight">{stat.pendingCount}</div>
+                        <div className="text-[11px] text-slate-300">Chờ đăng</div>
                       </div>
-                      <div className="p-1 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20">
-                        <div className="font-bold">{stat.failedCount}</div>
-                        <div className="text-[10px] text-slate-400">Bị lỗi</div>
+                      <div className="px-1.5 py-1 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20">
+                        <div className="font-bold text-sm leading-tight">{stat.failedCount}</div>
+                        <div className="text-[11px] text-slate-300">Bị lỗi</div>
                       </div>
                     </div>
 
-                    {/* MỐC THỜI GIAN RẢI BÀI (TIMELINE SPREAD & BÀI CUỐI) */}
+                    {/* MỐC THỜI GIAN RẢI BÀI GỌN GÀNG */}
                     {stat.pendingCount > 0 && stat.lastScheduledAt ? (
-                      <div className="p-2 rounded-lg bg-slate-800/90 border border-slate-700/60 space-y-1.5">
-                        <div className="flex items-center justify-between text-[11px] font-semibold text-slate-200">
-                          <span className="flex items-center gap-1 text-amber-300">
-                            ⏱️ Lịch rải bài trong ngày:
+                      <div className="p-2 rounded-lg bg-slate-800/80 border border-slate-700/60 space-y-1.5">
+                        <div className="flex items-center justify-between gap-2 text-xs font-semibold">
+                          <span className="inline-flex items-center gap-1.5 text-amber-300">
+                            <ClockCircleOutlined />
+                            <span>Lịch rải bài</span>
                           </span>
                           {stat.avgGapMinutes ? (
-                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                              ~{stat.avgGapMinutes} phút/bài
+                            <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                              ~{stat.avgGapMinutes}p/bài
                             </span>
                           ) : null}
                         </div>
 
-                        <div className="grid grid-cols-2 gap-1.5 text-[11px]">
-                          <div className="bg-slate-900/80 p-1.5 rounded border border-slate-700/40">
-                            <div className="text-[10px] text-slate-400">Bài kế tiếp:</div>
-                            <div className="font-mono font-bold text-blue-300 mt-0.5">
+                        <div className="flex items-center justify-between gap-2 text-[11px] bg-slate-900/80 px-2 py-1.5 rounded border border-slate-700/40">
+                          <span className="text-slate-300">
+                            Kế tiếp:{' '}
+                            <b className="font-mono text-blue-300">
                               {stat.nextScheduledAt ? dayjs(stat.nextScheduledAt).format('HH:mm') : '—'}
-                            </div>
-                          </div>
-                          <div className="bg-slate-900/80 p-1.5 rounded border border-slate-700/40">
-                            <div className="text-[10px] text-slate-400">Bài cuối cùng:</div>
-                            <div className="font-mono font-bold text-amber-300 mt-0.5">
-                              🏁 {stat.todayFinishTimeText || '—'}
-                            </div>
-                          </div>
+                            </b>
+                          </span>
+                          <span className="text-slate-300 inline-flex items-center gap-1">
+                            <FlagOutlined className="text-amber-400" />
+                            <span>Xong:</span>
+                            <b className="font-mono text-amber-300">{stat.todayFinishTimeText || '—'}</b>
+                          </span>
                         </div>
 
                         {stat.hourlySlots && stat.hourlySlots.length > 0 && (
                           <div className="pt-1 border-t border-slate-700/40">
-                            <div className="text-[10px] text-slate-400 mb-1">
-                              📊 Khung giờ rải bài (không dồn 1 cục):
+                            <div className="text-[11px] text-slate-300 mb-1 inline-flex items-center gap-1">
+                              <BarChartOutlined className="text-sky-400" />
+                              <span>Khung giờ rải bài:</span>
                             </div>
-                            <div className="flex flex-wrap gap-1 max-h-[85px] overflow-y-auto pr-0.5">
+                            <div className="flex flex-wrap gap-1 overflow-y-auto pr-0.5" style={{ maxHeight: 68 }}>
                               {stat.hourlySlots.map((slot, sIdx) => (
                                 <span
                                   key={sIdx}
-                                  className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-900/90 text-slate-300 border border-slate-700/60 flex items-center gap-1"
+                                  className="px-1.5 py-0.5 rounded text-[11px] font-mono bg-slate-900/90 text-slate-200 border border-slate-700/60 inline-flex items-center gap-1"
                                 >
                                   <span className="text-blue-400 font-semibold">{slot.hour}:</span>
-                                  <span className="text-amber-300 font-bold">{slot.count} bài</span>
+                                  <span className="text-amber-300 font-bold">{slot.count}</span>
                                 </span>
                               ))}
                             </div>
@@ -607,21 +732,25 @@ export default function HistoryPanel({
 
                     {stat.pendingPagesList && stat.pendingPagesList.length > 0 ? (
                       <div className="space-y-1 pt-1 border-t border-slate-700/40">
-                        <div className="text-[11px] font-semibold text-slate-300 flex items-center justify-between">
-                          <span>📄 Phân bổ Page chờ đăng:</span>
-                          <span className="text-amber-300 font-mono font-bold">{stat.pendingCount} bài</span>
+                        <div className="text-xs font-semibold text-slate-200 flex items-center justify-between">
+                          <span className="inline-flex items-center gap-1.5">
+                            <FileTextOutlined className="text-slate-400" />
+                            <span>Phân bổ Page chờ đăng</span>
+                          </span>
+                          <span className="text-amber-300 font-mono font-bold text-[11px]">{stat.pendingCount} bài</span>
                         </div>
-                        <div className="space-y-1 max-h-[110px] overflow-y-auto pr-0.5">
+                        <div className="space-y-1 overflow-y-auto pr-0.5" style={{ maxHeight: 96 }}>
                           {stat.pendingPagesList.map((p, idx) => {
                             const pal = PAGE_PALETTE[idx % PAGE_PALETTE.length];
                             return (
                               <div key={idx} className="flex items-center justify-between text-[11px] bg-slate-800/70 px-2 py-1 rounded-md border border-slate-700/50">
-                                <span className="truncate max-w-[170px] text-slate-200 flex items-center gap-1.5">
+                                <span className="truncate text-slate-200 inline-flex items-center gap-1.5" style={{ maxWidth: 180 }}>
                                   <span className={`w-2 h-2 rounded-full ${pal.bg} shrink-0`} />
-                                  {p.isAnon ? '👤 ' : ''}{p.pageName}
+                                  {p.isAnon && <UserOutlined className="text-slate-400 shrink-0" />}
+                                  <span className="truncate">{p.pageName}</span>
                                 </span>
                                 <span className="font-mono font-bold text-amber-300 shrink-0 ml-1">
-                                  {p.count} bài ({p.percent}%)
+                                  {p.count} ({p.percent}%)
                                 </span>
                               </div>
                             );
@@ -629,8 +758,9 @@ export default function HistoryPanel({
                         </div>
                       </div>
                     ) : (
-                      <div className="text-[11px] text-slate-400 italic text-center py-1">
-                        ✓ Hiện không có bài nào chờ đăng
+                      <div className="text-xs text-slate-300 text-center py-1 inline-flex items-center justify-center gap-1.5 w-full">
+                        <CheckCircleOutlined className="text-emerald-400" />
+                        <span>Hiện không có bài nào chờ đăng</span>
                       </div>
                     )}
                   </div>
@@ -653,17 +783,17 @@ export default function HistoryPanel({
                       className={`group relative text-left w-full p-2.5 rounded-xl border transition-all duration-200 cursor-pointer backdrop-blur-md flex flex-col justify-between min-h-[58px] gap-1.5 ${
                         isSelected
                           ? 'border-blue-500 bg-gradient-to-br from-blue-950/70 via-slate-900/90 to-blue-900/40 text-white shadow-lg shadow-blue-950/50 ring-1 ring-blue-500/50'
-                          : 'border-slate-800/80 bg-slate-900/70 hover:border-slate-700 hover:bg-slate-850 text-slate-300 hover:text-white shadow-2xs'
+                          : 'border-slate-800/80 bg-slate-900/70 hover:border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white shadow-2xs'
                       }`}
                     >
                       {/* Dòng 1: Tên nhóm, ID và các Badge số lượng */}
                       <div className="flex items-center justify-between gap-2 min-w-0 w-full">
                         <div className="flex items-center gap-1.5 min-w-0 flex-1">
                           <span className={`w-2 h-2 rounded-full shrink-0 ${dotBg}`} />
-                          <span className="truncate text-xs font-semibold group-hover:text-blue-200 transition-colors" title={groupName}>
+                          <span className="truncate text-[13px] font-semibold group-hover:text-blue-200 transition-colors" title={groupName}>
                             {groupName}
                           </span>
-                          <span className="text-slate-400 font-mono text-[10px] px-1 py-0.2 rounded bg-slate-800/80 border border-slate-700/50 shrink-0">
+                          <span className="text-slate-300 font-mono text-xs px-1.5 py-0.5 rounded bg-slate-800/80 border border-slate-700/50 shrink-0">
                             #{g.id}
                           </span>
                         </div>
@@ -672,33 +802,33 @@ export default function HistoryPanel({
                         <div className="flex items-center gap-1 shrink-0">
                           {stat.publishedToday > 0 && (
                             <span
-                              className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 flex items-center gap-1"
+                              className="px-1.5 py-0.5 rounded-md text-xs font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 flex items-center gap-1"
                               title={`Hôm nay đã đăng ${stat.publishedToday} bài`}
                             >
-                              <CheckCircleFilled className="text-[9px]" /> {stat.publishedToday}
+                              <CheckCircleFilled className="text-[11px]" /> {stat.publishedToday}
                             </span>
                           )}
 
                           {stat.pendingCount > 0 && (
                             <span
-                              className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/25 flex items-center gap-1"
+                              className="px-1.5 py-0.5 rounded-md text-xs font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/25 flex items-center gap-1"
                               title={`Đang chờ đăng: ${stat.pendingCount} bài (Bài cuối: ${stat.todayFinishTimeText || '—'})`}
                             >
-                              <ClockCircleFilled className="text-[9px]" /> {stat.pendingCount}
+                              <ClockCircleFilled className="text-[11px]" /> {stat.pendingCount}
                             </span>
                           )}
 
                           {stat.failedCount > 0 && (
                             <span
-                              className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/35 flex items-center gap-1"
+                              className="px-1.5 py-0.5 rounded-md text-xs font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/35 flex items-center gap-1"
                               title={`Bài bị lỗi: ${stat.failedCount} bài`}
                             >
-                              <CloseCircleFilled className="text-[9px]" /> {stat.failedCount}
+                              <CloseCircleFilled className="text-[11px]" /> {stat.failedCount}
                             </span>
                           )}
 
                           {stat.publishedToday === 0 && stat.pendingCount === 0 && stat.failedCount === 0 && (
-                            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-mono text-slate-500 bg-slate-800/40 border border-slate-700/30">
+                            <span className="px-1.5 py-0.5 rounded-md text-xs font-mono text-slate-300 bg-slate-800/40 border border-slate-700/30">
                               0
                             </span>
                           )}
@@ -706,25 +836,25 @@ export default function HistoryPanel({
                       </div>
 
                       {/* Dòng 2: Mốc thời gian & Tốc độ rải bài */}
-                      <div className="flex items-center justify-between gap-1 w-full text-[11px] pt-1.5 border-t border-slate-800/60">
+                      <div className="flex items-center justify-between gap-1 w-full text-xs pt-1.5 border-t border-slate-800/60">
                         {stat.pendingCount > 0 && stat.todayFinishTimeText ? (
                           <>
-                            <span className="text-amber-300/95 font-mono text-[10.5px] font-medium flex items-center gap-1 truncate">
-                              <ClockCircleOutlined className="text-[10px] text-amber-400 shrink-0" />
+                            <span className="text-amber-300 font-mono text-xs font-medium flex items-center gap-1 truncate">
+                              <ClockCircleOutlined className="text-xs text-amber-400 shrink-0" />
                               <span>Xong {stat.todayFinishTimeText}</span>
                             </span>
                             {stat.avgGapMinutes ? (
-                              <span className="text-[10px] font-mono text-slate-400 bg-slate-800/80 px-1.5 py-0.2 rounded border border-slate-700/40 shrink-0">
+                              <span className="text-xs font-mono text-slate-300 bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700/40 shrink-0">
                                 ~{stat.avgGapMinutes}p/bài
                               </span>
                             ) : null}
                           </>
                         ) : stat.publishedToday > 0 ? (
-                          <span className="text-emerald-400/90 text-[10.5px] font-medium flex items-center gap-1">
-                            <CheckOutlined className="text-[10px]" /> Hoàn tất hôm nay
+                          <span className="text-emerald-400 text-xs font-medium flex items-center gap-1">
+                            <CheckOutlined className="text-xs" /> Hoàn tất hôm nay
                           </span>
                         ) : (
-                          <span className="text-slate-400 text-[10.5px]">Chưa lên lịch</span>
+                          <span className="text-slate-300 text-xs">Chưa lên lịch</span>
                         )}
                       </div>
                     </button>
@@ -732,6 +862,103 @@ export default function HistoryPanel({
                 );
               })}
             </div>
+            ) : (
+            /* LƯỚI THẺ CÁC FANPAGE / NICK HIỂN THỊ RÕ RÀNG SỐ BÀI CHỜ ĐĂNG */
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
+              {currentPendingDistribution.pagesList.map((p, idx) => {
+                const isSelected = historyPageFilter === p.pageName;
+                const pal = PAGE_PALETTE[idx % PAGE_PALETTE.length];
+                const publishedToday = p.publishedToday || 0;
+                const failedCount = p.failedCount || 0;
+
+                let dotBg = 'bg-slate-600';
+                if (failedCount > 0) dotBg = 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.7)] animate-pulse';
+                else if (p.count > 0) dotBg = 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]';
+                else if (publishedToday > 0) dotBg = 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]';
+
+                return (
+                  <button
+                    type="button"
+                    key={p.pageName}
+                    onClick={() => {
+                      setHistoryPageFilter(historyPageFilter === p.pageName ? 'ALL' : p.pageName);
+                    }}
+                    className={`group relative p-3 rounded-2xl border transition-all duration-200 text-left select-none cursor-pointer flex flex-col justify-between gap-2.5 backdrop-blur-sm ${
+                      isSelected
+                        ? 'border-indigo-400/90 bg-indigo-950/40 shadow-md shadow-indigo-950/60 ring-2 ring-indigo-500/40 -translate-y-0.5'
+                        : 'border-slate-800/80 bg-slate-900/60 hover:border-slate-700/90 hover:bg-slate-800/60 hover:-translate-y-0.5 shadow-xs'
+                    }`}
+                  >
+                    {/* Dòng 1: Tên Fanpage / Nick + Icon + % tỷ lệ tải */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${dotBg}`} />
+                        <div className="w-5 h-5 rounded-md bg-slate-800 flex items-center justify-center shrink-0 text-slate-300">
+                          {p.isAnon ? <UserOutlined className="text-purple-400 text-xs" /> : <FacebookFilled className="text-blue-400 text-xs" />}
+                        </div>
+                        <Tooltip title={p.pageName}>
+                          <span
+                            className={`text-xs font-bold truncate transition-colors ${
+                              isSelected ? 'text-indigo-200' : 'text-slate-200 group-hover:text-white'
+                            }`}
+                          >
+                            {p.pageName}
+                          </span>
+                        </Tooltip>
+                      </div>
+
+                      <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold border shrink-0 ${pal.text} ${pal.border} bg-slate-800/80`}>
+                        {p.percent}% tải
+                      </span>
+                    </div>
+
+                    {/* Dòng 2: Badges thống kê: Chờ đăng, Đã đăng, Lỗi */}
+                    <div className="flex items-center justify-between gap-1.5 pt-1 border-t border-slate-800/60 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {/* Badge Chờ đăng */}
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-mono font-bold border ${
+                            p.count > 0
+                              ? 'bg-amber-500/15 text-amber-300 border-amber-500/30 shadow-xs'
+                              : 'bg-slate-800/50 text-slate-500 border-slate-700/30 font-normal'
+                          }`}
+                        >
+                          <ClockCircleOutlined className="text-[10px]" />
+                          <span>{p.count} chờ</span>
+                        </span>
+
+                        {/* Badge Đã đăng hôm nay */}
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-mono font-bold border ${
+                            publishedToday > 0
+                              ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                              : 'bg-slate-800/50 text-slate-500 border-slate-700/30 font-normal'
+                          }`}
+                        >
+                          <CheckCircleOutlined className="text-[10px]" />
+                          <span>{publishedToday} đã đăng</span>
+                        </span>
+
+                        {/* Badge Lỗi nếu có */}
+                        {failedCount > 0 && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse">
+                            <CloseCircleOutlined className="text-[10px]" />
+                            <span>{failedCount} lỗi</span>
+                          </span>
+                        )}
+                      </div>
+
+                      {isSelected && (
+                        <span className="text-[10px] font-bold text-indigo-400 bg-indigo-500/15 px-1.5 py-0.5 rounded border border-indigo-400/30 shrink-0">
+                          Đang lọc
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            )}
           </div>
         );
       })()}
@@ -747,15 +974,15 @@ export default function HistoryPanel({
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-bold text-slate-100 tracking-wide uppercase">Phân bổ Page chờ đăng:</span>
-                <span className="text-xs font-semibold text-sky-300 bg-sky-500/15 px-2.5 py-0.5 rounded-lg border border-sky-400/30 truncate max-w-[260px] flex items-center gap-1.5 shadow-2xs">
+                <span className="text-xs font-semibold text-sky-300 bg-sky-500/15 px-2.5 py-0.5 rounded-lg border border-sky-400/30 truncate max-w-[260px] flex items-center gap-1.5 shadow-sm">
                   <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
                   {currentPendingDistribution.scopeTitle}
                 </span>
-                <span className="text-[11px] font-mono font-bold text-amber-300 bg-amber-500/15 px-2.5 py-0.5 rounded-lg border border-amber-400/30 shadow-2xs">
+                <span className="text-xs font-mono font-bold text-amber-300 bg-amber-500/15 px-2.5 py-0.5 rounded-lg border border-amber-400/30 shadow-sm">
                   {currentPendingDistribution.totalPending.toLocaleString()} bài chờ
                 </span>
                 {historyPageFilter !== 'ALL' && (
-                  <span className="text-[11px] font-semibold text-purple-200 bg-purple-500/20 px-2.5 py-0.5 rounded-lg border border-purple-400/30 flex items-center gap-1.5 shadow-2xs">
+                  <span className="text-xs font-semibold text-purple-200 bg-purple-500/20 px-2.5 py-0.5 rounded-lg border border-purple-400/30 flex items-center gap-1.5 shadow-sm">
                     <span>Đang lọc:</span>
                     <strong className="text-white">{historyPageFilter}</strong>
                   </span>
@@ -783,19 +1010,11 @@ export default function HistoryPanel({
                   const targetIds = filteredHistoryPosts
                     .filter((p) => p.status === 'PENDING' || p.status === 'PROCESSING')
                     .map((p) => p.id);
-                  if (targetIds.length > 0) {
-                    setSelectedRowKeys(targetIds);
-                    setBulkRescheduleTargetScope('SELECTED');
-                    setBulkRescheduleModalVisible(true);
-                    message.info(`Đã chọn ${targetIds.length} bài chờ đăng đang lọc để chia lại giờ.`);
-                  } else {
-                    setBulkRescheduleTargetScope('ALL');
-                    setBulkRescheduleModalVisible(true);
-                  }
+                  onRepack(targetIds.length > 0 ? targetIds : undefined);
                 }}
                 className="text-xs h-8 px-3"
               >
-                Chia lại giờ các bài đang lọc
+                Xếp lại lịch các bài đang lọc
               </Button>
               )}
             </div>
@@ -828,10 +1047,10 @@ export default function HistoryPanel({
           <div className="flex items-center justify-between gap-2 pt-1 pb-2">
             <div className="flex items-center gap-2">
               <AimOutlined className="text-sky-400 text-xs" />
-              <span className="text-xs font-bold text-slate-200 tracking-wide">
+              <span className="text-[13px] font-bold text-slate-100 tracking-wide">
                 Lọc bài theo Page:
               </span>
-              <span className="text-[11px] text-slate-500 font-medium">
+              <span className="text-xs text-slate-300 font-medium">
                 ({currentPendingDistribution.pagesList.length} Page/Nick)
               </span>
             </div>
@@ -848,15 +1067,25 @@ export default function HistoryPanel({
               </button>
 
               {currentPendingDistribution.totalPending > 0 && (
-                <Button
-                  type="primary"
-                  size="small"
-                  icon={<ThunderboltFilled />}
-                  onClick={() => setAutoFixQueueModalVisible(true)}
-                  className="bg-gradient-to-r from-emerald-600 via-teal-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 font-bold text-xs rounded-lg shadow-md border-0"
-                >
-                  ⚡ Tự động xếp lại lịch ({currentPendingDistribution.totalPending} bài)
-                </Button>
+                <>
+                  <Button
+                    size="small"
+                    icon={<ApartmentOutlined />}
+                    onClick={() => onSpreadGroups?.()}
+                    className="font-bold text-xs rounded-lg bg-indigo-600/30 hover:bg-blue-600/30 text-indigo-200 border-indigo-500/40"
+                  >
+                    Rải đều các nhóm cả ngày
+                  </Button>
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<ScheduleOutlined />}
+                    onClick={() => onRepack()}
+                    className="font-bold text-xs rounded-lg"
+                  >
+                    Xếp lại cả hàng đợi ({currentPendingDistribution.totalPending} bài)
+                  </Button>
+                </>
               )}
             </div>
           </div>
@@ -879,14 +1108,16 @@ export default function HistoryPanel({
                 >
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     <span className={`w-2 h-2 rounded-full shrink-0 ${palette.bg} ${isActive ? 'ring-2 ring-white/60' : ''}`} />
-                    <span className="text-xs shrink-0 text-slate-400">{p.isAnon ? '👤' : '📄'}</span>
+                    <span className="text-xs shrink-0 text-slate-400 inline-flex items-center">
+                      {p.isAnon ? <UserOutlined /> : <FileTextOutlined />}
+                    </span>
                     <span className="truncate font-medium text-slate-200 group-hover:text-white">
                       {p.pageName}
                     </span>
                   </div>
-                  <div className="flex items-center gap-1 shrink-0 font-mono text-[11px]">
-                    <span className={`font-bold ${isActive ? 'text-blue-200' : 'text-slate-200'}`}>{p.count}</span>
-                    <span className="text-[10px] text-slate-500">({p.percent}%)</span>
+                  <div className="flex items-center gap-1 shrink-0 font-mono text-xs">
+                    <span className={`font-bold ${isActive ? 'text-blue-200' : 'text-slate-100'}`}>{p.count}</span>
+                    <span className="text-xs text-slate-300">({p.percent}%)</span>
                   </div>
                 </button>
               );
@@ -918,14 +1149,13 @@ export default function HistoryPanel({
                       .map((p) => p.id);
                     if (targetIds.length > 0) {
                       setSelectedRowKeys(targetIds);
-                      setBulkRescheduleTargetScope('SELECTED');
-                      setBulkRescheduleModalVisible(true);
-                      message.info(`🎯 Đã chọn ${targetIds.length} bài của "${heavyPageName}". Hãy chọn thêm Page/Nick khác để chia đều!`);
+                      setReassignModalVisible(true);
+                      message.info(`Đã chọn ${targetIds.length} bài của "${heavyPageName}". Chọn thêm Page/Nick khác để chia đều.`);
                     }
                   }}
-                  className="text-[11px] font-bold text-amber-300 hover:text-white underline cursor-pointer shrink-0 transition-colors"
+                  className="text-xs font-bold text-amber-300 hover:text-white underline cursor-pointer shrink-0 transition-colors inline-flex items-center gap-1"
                 >
-                  ⚡ Chọn {currentPendingDistribution.pagesList[0].count} bài này để chia lại
+                  <ThunderboltOutlined /> Chọn {currentPendingDistribution.pagesList[0].count} bài này để chia lại
                 </button>
               </div>
             )}

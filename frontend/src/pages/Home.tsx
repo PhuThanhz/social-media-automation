@@ -91,11 +91,11 @@ const HomeContent: React.FC = () => {
             {/* Bold, Clean Headline */}
             <h1 className="text-4xl sm:text-6xl lg:text-[64px] font-bold tracking-[-0.03em] leading-[1.1] text-white">
               Đăng bài đều đặn. <br />
-              <span className="text-slate-400 font-light">Phát triển nhẹ nhàng.</span>
+              <span className="text-slate-300 font-light">Phát triển nhẹ nhàng.</span>
             </h1>
 
             {/* Restrained Subtitle */}
-            <p className="text-base sm:text-lg text-slate-400 max-w-xl mx-auto lg:mx-0 font-normal leading-relaxed">
+            <p className="text-base sm:text-lg text-slate-300 max-w-xl mx-auto lg:mx-0 font-normal leading-relaxed">
               Giải pháp tự động đăng bài, săn nội dung viral và quản lý đa kênh trực tiếp trên máy tính của bạn — không cần máy chủ, vận hành mượt mà với chi phí 0đ.
             </p>
 
@@ -105,7 +105,7 @@ const HomeContent: React.FC = () => {
                 <Button
                   type="primary"
                   size="large"
-                  iconPosition="end"
+                  iconPlacement="end"
                   icon={<ArrowRightOutlined />}
                   className="w-full sm:w-auto !h-12 !px-7 !rounded-xl !font-semibold !text-[14px] !bg-white !text-slate-950 !border-none shadow-[0_0_30px_rgba(255,255,255,0.2)] hover:!opacity-95 cursor-pointer"
                 >
@@ -124,15 +124,15 @@ const HomeContent: React.FC = () => {
             </div>
 
             {/* Minimalist Micro Badges */}
-            <div className="pt-2 flex flex-wrap items-center justify-center lg:justify-start gap-5 text-[12px] text-slate-500">
+            <div className="pt-2 flex flex-wrap items-center justify-center lg:justify-start gap-5 text-[13.5px] text-slate-300">
               <span className="flex items-center gap-1.5">
-                <span className="w-1 h-1 rounded-full bg-slate-400" /> Chạy trực tiếp trên máy (Native)
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-300" /> Chạy trực tiếp trên máy (Native)
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-1 h-1 rounded-full bg-slate-400" /> 0đ chi phí máy chủ
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-300" /> 0đ chi phí máy chủ
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-1 h-1 rounded-full bg-slate-400" /> Bản quyền bảo mật HWID
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-300" /> Bản quyền bảo mật HWID
               </span>
             </div>
           </div>
@@ -148,7 +148,7 @@ const HomeContent: React.FC = () => {
                   <span className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]/70" />
                   <span className="w-2.5 h-2.5 rounded-full bg-[#27c93f]/70" />
                 </div>
-                <span className="text-[11px] font-medium text-slate-400 tracking-wide">
+                <span className="text-[13px] font-medium text-slate-300 tracking-wide">
                   PhuSocial Workspace
                 </span>
                 <span className="w-8" />
@@ -160,22 +160,22 @@ const HomeContent: React.FC = () => {
                 {/* Stats Summary Strip */}
                 <div className="grid grid-cols-3 gap-2 pb-3 border-b border-white/[0.06]">
                   <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.04]">
-                    <div className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Tài khoản</div>
-                    <div className="text-sm font-semibold text-slate-200 mt-0.5">3 Kết nối</div>
+                    <div className="text-xs text-slate-400 uppercase tracking-wider font-medium">Tài khoản</div>
+                    <div className="text-sm font-semibold text-slate-100 mt-0.5">3 Kết nối</div>
                   </div>
                   <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.04]">
-                    <div className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Lên lịch</div>
-                    <div className="text-sm font-semibold text-slate-200 mt-0.5">12 Bài</div>
+                    <div className="text-xs text-slate-400 uppercase tracking-wider font-medium">Lên lịch</div>
+                    <div className="text-sm font-semibold text-slate-100 mt-0.5">12 Bài</div>
                   </div>
                   <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.04]">
-                    <div className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Tỷ lệ đăng</div>
+                    <div className="text-xs text-slate-400 uppercase tracking-wider font-medium">Tỷ lệ đăng</div>
                     <div className="text-sm font-semibold text-emerald-400 mt-0.5">99.8%</div>
                   </div>
                 </div>
 
                 {/* Queue Card: Active Item */}
                 <div className="space-y-2">
-                  <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+                  <div className="text-xs font-medium text-slate-300 uppercase tracking-wider">
                     Hàng đợi xuất bản hôm nay
                   </div>
 
@@ -191,14 +191,14 @@ const HomeContent: React.FC = () => {
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3 min-w-0">
-                            <span className="text-xs font-mono text-slate-400 w-10">
+                            <span className="text-[13px] font-mono text-slate-300 w-12">
                               {item.time}
                             </span>
                             <div className="min-w-0">
-                              <div className="text-xs font-medium text-slate-200 truncate">
+                              <div className="text-[13.5px] font-medium text-slate-100 truncate">
                                 {item.title}
                               </div>
-                              <div className="text-[11px] text-slate-500">
+                              <div className="text-xs text-slate-400">
                                 {item.channel}
                               </div>
                             </div>
@@ -206,17 +206,17 @@ const HomeContent: React.FC = () => {
 
                           <div className="shrink-0 ml-3">
                             {item.type === 'done' && (
-                              <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md font-medium">
-                                <CheckOutlined className="text-[9px]" /> Đã đăng
+                              <span className="inline-flex items-center gap-1 text-xs text-emerald-300 bg-emerald-500/10 px-2.5 py-0.5 rounded-md font-medium whitespace-nowrap">
+                                <CheckOutlined className="text-xs" /> Đã đăng
                               </span>
                             )}
                             {item.type === 'active' && (
-                              <span className="inline-flex items-center gap-1 text-[11px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-md font-medium">
+                              <span className="inline-flex items-center gap-1 text-xs text-blue-300 bg-blue-500/10 px-2.5 py-0.5 rounded-md font-medium whitespace-nowrap">
                                 <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" /> Đang chạy
                               </span>
                             )}
                             {item.type === 'pending' && (
-                              <span className="text-[11px] text-slate-500 bg-white/[0.03] px-2 py-0.5 rounded-md font-medium">
+                              <span className="text-xs text-slate-300 bg-white/[0.05] px-2.5 py-0.5 rounded-md font-medium whitespace-nowrap">
                                 Chờ
                               </span>
                             )}
@@ -226,10 +226,10 @@ const HomeContent: React.FC = () => {
                         {/* Progress line for active job */}
                         {item.type === 'active' && (
                           <div className="mt-2.5 pt-2 border-t border-blue-500/10 flex items-center gap-2">
-                            <div className="flex-1 bg-white/[0.06] h-1 rounded-full overflow-hidden">
+                            <div className="flex-1 bg-white/[0.06] h-1.5 rounded-full overflow-hidden">
                               <div className="bg-gradient-to-r from-blue-500 to-indigo-400 h-full w-[75%] rounded-full" />
                             </div>
-                            <span className="text-[10px] font-mono text-blue-400 font-medium">75%</span>
+                            <span className="text-xs font-mono text-blue-300 font-medium">75%</span>
                           </div>
                         )}
                       </div>
@@ -238,11 +238,11 @@ const HomeContent: React.FC = () => {
                 </div>
 
                 {/* Footer Status Bar */}
-                <div className="pt-2 flex items-center justify-between text-[11px] text-slate-400 border-t border-white/[0.06]">
+                <div className="pt-2 flex items-center justify-between text-xs text-slate-300 border-t border-white/[0.06]">
                   <span className="flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Playwright Worker Sẵn sàng
                   </span>
-                  <span className="font-mono text-slate-500">v1.0.0</span>
+                  <span className="font-mono text-slate-400">v1.0.0</span>
                 </div>
 
               </div>
@@ -255,13 +255,13 @@ const HomeContent: React.FC = () => {
       {/* FEATURES SECTION */}
       <section id="features" className="py-24 px-6 max-w-7xl mx-auto relative z-10 border-t border-white/[0.06]">
         <div className="text-center max-w-2xl mx-auto mb-16 space-y-3">
-          <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+          <div className="text-xs font-semibold uppercase tracking-widest text-blue-300">
             Tính Năng Cốt Lõi
           </div>
           <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
             Mọi công cụ bạn cần. Gói gọn trong một ứng dụng.
           </h2>
-          <p className="text-slate-400 text-sm sm:text-base leading-relaxed">
+          <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
             Tất cả tính năng được tối ưu cho hiệu suất làm việc nhanh, ổn định và độc lập trên máy của bạn.
           </p>
         </div>
@@ -276,7 +276,7 @@ const HomeContent: React.FC = () => {
                 <div className="w-10 h-10 rounded-xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center">
                   {tool.icon}
                 </div>
-                <span className="text-[11px] font-mono font-medium text-slate-400 bg-white/[0.03] px-2.5 py-1 rounded-md">
+                <span className="text-xs font-mono font-medium text-slate-300 bg-white/[0.04] px-2.5 py-1 rounded-md">
                   {tool.meta}
                 </span>
               </div>
@@ -285,7 +285,7 @@ const HomeContent: React.FC = () => {
                 <h3 className="text-base font-semibold text-white tracking-tight group-hover:text-blue-300 transition-colors">
                   {tool.title}
                 </h3>
-                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed font-normal">
+                <p className="text-sm text-slate-300 leading-relaxed font-normal">
                   {tool.desc}
                 </p>
               </div>
@@ -295,12 +295,12 @@ const HomeContent: React.FC = () => {
       </section>
 
       {/* FOOTER */}
-      <footer className="py-12 border-t border-white/[0.06] text-center text-xs text-slate-500">
+      <footer className="py-12 border-t border-white/[0.06] text-center text-[13px] text-slate-400">
         <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div>
             © {new Date().getFullYear()} PhuSocial. Tối giản, mạnh mẽ và độc lập.
           </div>
-          <div className="flex items-center gap-6 text-slate-400">
+          <div className="flex items-center gap-6 text-slate-300">
             <Link to="/login" className="hover:text-white transition-colors">Đăng nhập</Link>
             <Link to="/about" className="hover:text-white transition-colors">Giới thiệu</Link>
             <a href="#features" className="hover:text-white transition-colors">Tính năng</a>

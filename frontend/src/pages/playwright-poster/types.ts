@@ -31,6 +31,7 @@ export interface PostLinkItem {
   groupCommentEnabled?: boolean;
   customCaption?: string;
   colorBackground?: boolean | 'RED_PHOTO_TRICK';
+  extraGroupIds?: string[];
 }
 
 export type PostMode = 'FANPAGE_ONLY' | 'FANPAGE_AND_GROUP' | 'GROUP_ONLY';
@@ -77,6 +78,8 @@ export interface PendingPageBreakdownItem {
   count: number;
   percent: number;
   isAnon?: boolean;
+  publishedToday?: number;
+  failedCount?: number;
 }
 
 export interface GroupStatItem {

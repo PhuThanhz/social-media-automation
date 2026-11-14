@@ -48,24 +48,27 @@ function isOwnedByPage(href, target) {
 // Link bài trong Group (đã kèm ID nhóm dạng số hoặc slug)
 const GROUP_POST_HREF = /\/groups\/[^/]+\/(?:posts|permalink)\/[A-Za-z0-9_]+|multi_permalinks=/i;
 
-// Hàm tự động tìm và click toàn bộ các nút "Xem thêm" / "See more" trên trang để Facebook bung 100% nội dung bài viết
+// Hàm tự động tìm và click các nút "Xem thêm" / "See more" trên bài viết để Facebook bung 100% nội dung caption
 async function expandAllSeeMore(page) {
   const count = await page.evaluate(() => {
-    const seeMoreRegex = /(?:…|\.{2,})?\s*(?:Xem\s+thêm|See\s+more|Hiển\s+thị\s+thêm)\b/i;
-    const candidates = Array.from(document.querySelectorAll(
-      'div[data-ad-preview="message"] [role="button"], div[data-ad-comet-preview="message"] [role="button"], [role="article"] [role="button"], [role="main"] div[dir="auto"] [role="button"], [role="feed"] div[dir="auto"] [role="button"], span[role="button"]'
-    ));
+    const seeMoreRegex = /^(?:…|\.{2,})?\s*(?:Xem\s+thêm|See\s+more|Hiển\s+thị\s+thêm)\s*$/i;
+    // CHỈ tìm bên trong các bài viết feed, TUYỆT ĐỐI KHÔNG tìm ở sidebar, navigation hay liên kết ngoài
+    const articles = document.querySelectorAll('[role="article"], div[data-pagelet*="FeedUnit"], div[data-virtualized]');
     let c = 0;
-    for (const btn of candidates) {
-      if (btn.dataset.ztrExpanded) continue;
-      if (btn.closest('[aria-label*="Bình luận" i], [aria-label*="Comment" i], [aria-label*="Thích" i], [aria-label*="Chia sẻ" i], form')) continue;
-      const txt = (btn.innerText || btn.textContent || '').trim();
-      if (txt && txt.length <= 40 && seeMoreRegex.test(txt)) {
-        btn.dataset.ztrExpanded = '1';
-        try {
-          btn.click();
-          c++;
-        } catch (e) {}
+    for (const art of articles) {
+      if (art.closest('[role="navigation"], [role="complementary"]')) continue;
+      const candidates = art.querySelectorAll('div[role="button"], span[role="button"]');
+      for (const btn of candidates) {
+        if (btn.closest('[aria-label*="Bình luận" i], [aria-label*="Comment" i], [aria-label*="Thích" i], [aria-label*="Chia sẻ" i], form, [role="toolbar"]')) continue;
+        if (btn.closest('a[href]:not([href="#"])')) continue;
+        const txt = (btn.innerText || btn.textContent || '').trim();
+        if (/(?:Ẩn\s+bớt|See\s+less|Thu\s+gọn)/i.test(txt)) continue;
+        if (txt && seeMoreRegex.test(txt)) {
+          try {
+            btn.click();
+            c++;
+          } catch (e) {}
+        }
       }
     }
     return c;
@@ -100,8 +103,10 @@ async function revealPagePermalinks(page, target, onUnitDone) {
       el.setAttribute('data-ztr-scanned', '1');
       // Thử mở Xem thêm của bài viết này nếu có
       const sm = Array.from(el.querySelectorAll('div[role="button"], span[role="button"]')).find(b => {
+        if (b.closest('[aria-label*="Bình luận" i], [aria-label*="Comment" i], [aria-label*="Thích" i], [aria-label*="Chia sẻ" i], form, [role="toolbar"]')) return false;
+        if (b.closest('a[href]:not([href="#"])')) return false;
         const t = (b.innerText || b.textContent || '').trim();
-        return t && t.length <= 40 && /(?:…|\.{2,})?\s*(?:Xem\s+thêm|See\s+more|Hiển\s+thị\s+thêm)\b/i.test(t);
+        return t && /^(?:…|\.{2,})?\s*(?:Xem\s+thêm|See\s+more|Hiển\s+thị\s+thêm)\s*$/i.test(t);
       });
       if (sm && !sm.dataset.ztrExpanded) {
         sm.dataset.ztrExpanded = '1';
@@ -207,15 +212,33 @@ function extractFbPostId(url) {
   return '';
 }
 
-function isPostInExcludeList(url, excludeUrls = []) {
-  if (!url || !Array.isArray(excludeUrls) || excludeUrls.length === 0) return false;
+function isPostInExcludeList(url, caption = '', excludeUrls = [], excludeIds = [], excludeSnippets = []) {
   const targetId = extractFbPostId(url);
-  for (const ex of excludeUrls) {
-    if (!ex) continue;
-    if (ex === url || ex.includes(url) || url.includes(ex)) return true;
-    if (targetId) {
-      const exId = extractFbPostId(ex);
-      if (exId && exId === targetId) return true;
+  if (targetId && Array.isArray(excludeIds) && excludeIds.includes(targetId)) {
+    return true;
+  }
+  if (url && Array.isArray(excludeUrls) && excludeUrls.length > 0) {
+    const cleanUrl = url.split('?')[0].replace(/\/+$/, '');
+    for (const ex of excludeUrls) {
+      if (!ex) continue;
+      const cleanEx = String(ex).trim().split('?')[0].replace(/\/+$/, '');
+      if (cleanEx === cleanUrl || cleanEx.includes(cleanUrl) || cleanUrl.includes(cleanEx)) return true;
+      if (targetId) {
+        const exId = extractFbPostId(ex);
+        if (exId && exId === targetId) return true;
+      }
+    }
+  }
+  if (caption && Array.isArray(excludeSnippets) && excludeSnippets.length > 0) {
+    const normCap = caption.replace(/\s+/g, ' ').toLowerCase().trim();
+    if (normCap.length >= 25) {
+      for (const snip of excludeSnippets) {
+        if (!snip) continue;
+        const normSnip = String(snip).replace(/\s+/g, ' ').toLowerCase().trim();
+        if (normSnip.length >= 25 && (normCap.includes(normSnip) || normSnip.includes(normCap.slice(0, 60)))) {
+          return true;
+        }
+      }
     }
   }
   return false;
@@ -223,13 +246,13 @@ function isPostInExcludeList(url, excludeUrls = []) {
 
 /**
  * Quét Group hoặc Fanpage (tự nhận theo link).
- * @param {object} params { groupUrl, limit, cookieString, dateFrom, dateTo, excludeUrls }
+ * @param {object} params { groupUrl, limit, cookieString, dateFrom, dateTo, excludeUrls, excludeIds, excludeSnippets }
  * @param {object} deps { removeFacebookLoginOverlays }
  * @returns {Promise<{status: number, body: object}>}
  */
 async function huntFacebookFeed(params, deps = {}) {
   const removeFacebookLoginOverlays = deps.removeFacebookLoginOverlays || (async () => { });
-  const { groupUrl, limit = 20, cookieString, dateFrom, dateTo, keyword, sortViral, minReactions = 0, excludeUrls = [] } = params || {};
+  const { groupUrl, limit = 20, cookieString, dateFrom, dateTo, keyword, sortViral, minReactions = 0, excludeUrls = [], excludeIds = [], excludeSnippets = [] } = params || {};
   const trimmedKeyword = keyword ? String(keyword).trim() : '';
 
   if (!groupUrl && !trimmedKeyword) {
@@ -264,7 +287,7 @@ async function huntFacebookFeed(params, deps = {}) {
   const dateMode = fromTs !== null && toTs !== null;
 
   const requestedLimit = parseInt(limit, 10) || 20;
-  const maxItems = Math.min(Math.max(requestedLimit, 1), dateMode ? 200 : 60);
+  const maxItems = Math.min(Math.max(requestedLimit, 1), dateMode ? 200 : 100);
   // Backend chờ tối đa 300 giây — dừng cuộn trước đó để còn kịp trả kết quả
   const scanDeadline = Date.now() + (dateMode ? 230 : 280) * 1000;
 
@@ -272,14 +295,31 @@ async function huntFacebookFeed(params, deps = {}) {
   if (isGlobalSearch) {
     navUrl = normalizedGroupUrl;
   } else if (trimmedKeyword) {
-    const cleanUrl = normalizedGroupUrl.split('#')[0].split('?')[0].replace(/\/+$/, '');
-    navUrl = `${cleanUrl}/search/?q=${encodeURIComponent(trimmedKeyword)}`;
-    if (dateMode) {
-      navUrl += '&sorting_setting=CHRONOLOGICAL';
+    try {
+      const parsed = new URL(normalizedGroupUrl);
+      const cleanPath = parsed.pathname.replace(/\/+$/, '');
+      parsed.pathname = `${cleanPath}/search/`;
+      parsed.searchParams.set('q', trimmedKeyword);
+      if (!isPage) {
+        parsed.searchParams.set('sorting_setting', 'CHRONOLOGICAL');
+      }
+      ['mibextid', 'rdid', 'share_url', '__cft__', '__tn__', 'ref'].forEach(k => parsed.searchParams.delete(k));
+      navUrl = parsed.toString();
+    } catch (_) {
+      const cleanUrl = normalizedGroupUrl.split('#')[0].split('?')[0].replace(/\/+$/, '');
+      navUrl = `${cleanUrl}/search/?q=${encodeURIComponent(trimmedKeyword)}`;
+      if (!isPage) navUrl += '&sorting_setting=CHRONOLOGICAL';
     }
-  } else if (dateMode && !isPage) {
-    const u = normalizedGroupUrl.split('#')[0].replace(/\/+$/, '');
-    navUrl = `${u}${u.includes('?') ? '&' : '?'}sorting_setting=CHRONOLOGICAL`;
+  } else if (!isPage) {
+    try {
+      const parsed = new URL(normalizedGroupUrl);
+      parsed.searchParams.set('sorting_setting', 'CHRONOLOGICAL');
+      ['mibextid', 'rdid', 'share_url', '__cft__', '__tn__', 'ref'].forEach(k => parsed.searchParams.delete(k));
+      navUrl = parsed.toString();
+    } catch (_) {
+      const cleanUrl = normalizedGroupUrl.split('#')[0].split('?')[0].replace(/\/+$/, '');
+      navUrl = `${cleanUrl}/?sorting_setting=CHRONOLOGICAL`;
+    }
   }
 
   console.log(`[FB_Hunter] 🔍 Bắt đầu quét ${isGlobalSearch ? 'Toàn bộ bài viết Facebook' : isPage ? 'Fanpage' : 'Group'}: ${navUrl} | Từ khóa: "${trimmedKeyword || 'Tất cả'}" | Mục tiêu: ${maxItems} bài viết${dateMode ? ` | Lọc ngày ${new Date(fromTs).toLocaleString('vi-VN')} → ${new Date(toTs).toLocaleString('vi-VN')}` : ''}`);
@@ -294,14 +334,20 @@ async function huntFacebookFeed(params, deps = {}) {
     releaseContext = acquired.release;
     const context = acquired.context;
 
+    let cUserId = '';
     if (cookieString && String(cookieString).trim().length > 0) {
+      // Bỏ i_user để luôn quét bằng Via cá nhân (c_user), tránh dính danh nghĩa Fanpage khi vào Group kín
       const cookies = String(cookieString).split(';')
         .map(c => {
           const idx = c.indexOf('=');
           if (idx === -1) return null;
+          const name = c.slice(0, idx).trim();
+          const value = c.slice(idx + 1).trim();
+          if (!name || name === 'i_user') return null;
+          if (name === 'c_user' && /^\d+$/.test(value)) cUserId = value;
           return {
-            name: c.slice(0, idx).trim(),
-            value: c.slice(idx + 1).trim(),
+            name,
+            value,
             domain: '.facebook.com',
             path: '/'
           };
@@ -357,13 +403,93 @@ async function huntFacebookFeed(params, deps = {}) {
         status: 400,
         body: {
           success: false,
-          error: 'Cookie Facebook đang dùng (Làm Sen) đã hết hạn hoặc phiên đăng nhập đã đăng xuất. Vui lòng cập nhật lại Cookie mới (c_user + xs) trong mục Kết Nối Tài Khoản để tiếp tục quét bài viết.'
+          error: 'Cookie Facebook đang dùng để quét đã hết hạn hoặc phiên đăng nhập đã đăng xuất. Vui lòng đổi sang Via khác hoặc cập nhật lại Cookie mới (c_user + xs) trong mục Kết Nối Tài Khoản.'
         }
       };
     }
 
     // Tự động tắt popups / overlays
     await removeFacebookLoginOverlays(page);
+
+    // Nếu vào Group kín mà không có bài + dính màn hình Nhóm riêng tư / Không hiển thị:
+    // thử chuyển phiên về Nick Cá Nhân (c_user) 1 lần phòng trường hợp cookie đang kẹt ở Page sau lúc đăng bài.
+    if (!isPage && !isGlobalSearch) {
+      const readGroupAccessState = async () => page.evaluate(() => {
+        const main = document.querySelector('div[role="main"]') || document.body;
+        const text = (main && main.innerText) || '';
+        const hasFeedArticles = document.querySelectorAll('div[role="feed"] [role="article"], div[role="feed"] a[href*="/posts/"], div[role="feed"] a[href*="/permalink/"], [role="article"] a[href*="/posts/"]').length > 0;
+        const isPrivateWall = /nhóm riêng tư|private group|nội dung này hiện không hiển thị|this content isn't available|bạn không thể xem nội dung này|tham gia nhóm để xem bài viết|you must be a member/i.test(text);
+        return { hasFeedArticles, isPrivateWall };
+      }).catch(() => ({ hasFeedArticles: true, isPrivateWall: false }));
+
+      let accessState = await readGroupAccessState();
+      if (!accessState.hasFeedArticles && accessState.isPrivateWall) {
+        if (cUserId) {
+          console.log(`[FB_Hunter] 👤 Gặp tường nhóm riêng tư / hạn chế, thử chuyển danh tính về Via cá nhân (${cUserId}) và tải lại...`);
+          await page.goto(`https://www.facebook.com/profile/switch/?target_id=${cUserId}`, { waitUntil: 'domcontentloaded', timeout: 25000 }).catch(() => { });
+          await page.waitForTimeout(1500);
+          const confirmBtn = page.locator('div[role="button"]:has-text("Chuyển"), div[role="button"]:has-text("Switch"), button:has-text("Chuyển")').first();
+          if (await confirmBtn.isVisible().catch(() => false)) {
+            await confirmBtn.click({ force: true }).catch(() => { });
+            await page.waitForTimeout(2000);
+          }
+          await page.goto(navUrl, { waitUntil: 'domcontentloaded', timeout: 35000 }).catch(() => { });
+          await Promise.race([
+            page.waitForSelector('div[role="feed"] [role="article"], [role="article"], div[role="main"]', { timeout: 3500 }),
+            page.waitForTimeout(1200),
+          ]).catch(() => { });
+          await removeFacebookLoginOverlays(page);
+          accessState = await readGroupAccessState();
+        }
+        if (!accessState.hasFeedArticles && accessState.isPrivateWall) {
+          console.warn(`[FB_Hunter] 🔒 Via (${cUserId || 'unknown'}) chưa tham gia hoặc không có quyền xem nhóm riêng tư: ${navUrl}`);
+          return {
+            status: 400,
+            body: {
+              success: false,
+              code: 'PRIVATE_GROUP_NO_ACCESS',
+              error: 'Via đang chọn chưa tham gia nhóm riêng tư này (hoặc không có quyền xem). Hãy chọn một Via khác đã vào nhóm ở mục "Via quét bài" phía trên rồi quét lại!'
+            }
+          };
+        }
+      }
+    }
+
+    // Kiểm tra bảo đảm an toàn 100%: nếu Facebook vẫn ở chế độ "Phù hợp nhất", tự chuyển sang "Bài viết mới"
+    if (!isPage && !isGlobalSearch) {
+      try {
+        const needsSwitch = await page.evaluate(() => {
+          const btns = Array.from(document.querySelectorAll('div[role="button"], span'));
+          const sortEl = btns.find(b => /sắp xếp bảng feed nhóm theo|phù hợp nhất/i.test(b.innerText || ''));
+          return Boolean(sortEl && /phù hợp nhất/i.test(sortEl.innerText || ''));
+        }).catch(() => false);
+
+        if (needsSwitch) {
+          console.log('[FB_Hunter] 🔄 Phát hiện Feed đang ở Phù hợp nhất, tự động chuyển sang Bài viết mới...');
+          await page.evaluate(() => {
+            const btns = Array.from(document.querySelectorAll('div[role="button"], span'));
+            const sortBtn = btns.find(b => /sắp xếp bảng feed nhóm theo|phù hợp nhất/i.test(b.innerText || ''));
+            const target = sortBtn?.closest('div[role="button"]') || sortBtn;
+            target?.click();
+          }).catch(() => {});
+          await page.waitForTimeout(500);
+
+          const clickedNew = await page.evaluate(() => {
+            const items = Array.from(document.querySelectorAll('div[role="menuitem"], div[role="menuitemradio"], div[role="button"]'));
+            const newPostsOption = items.find(it => /bài viết mới|new posts/i.test(it.innerText || ''));
+            if (newPostsOption) {
+              newPostsOption.click();
+              return true;
+            }
+            return false;
+          }).catch(() => false);
+
+          if (clickedNew) {
+            await page.waitForTimeout(1500);
+          }
+        }
+      } catch (_) {}
+    }
 
     let groupTitle = await page.evaluate(() => {
       const mainH1 = document.querySelector('div[role="main"] h1, h1[dir="auto"], div[role="heading"][aria-level="1"], h1');
@@ -375,7 +501,7 @@ async function huntFacebookFeed(params, deps = {}) {
     }).catch(() => 'Facebook Group');
 
     const collectedItemsMap = new Map();
-    const maxScrollRounds = dateMode ? 150 : Math.min(Math.max(maxItems * 2, 20), 50);
+    const maxScrollRounds = dateMode ? 150 : Math.min(Math.max(maxItems * 4, 60), 160);
     let stagnantCount = 0;
     let stopReason = '';
 
@@ -418,7 +544,7 @@ async function huntFacebookFeed(params, deps = {}) {
       await page.keyboard.press('Escape').catch(() => { });
       await removeFacebookLoginOverlays(page);
       await page.evaluate(() => {
-        const closeBtns = document.querySelectorAll('div[aria-label="Đóng" i], div[aria-label="Close" i], div[role="dialog"] div[role="button"]');
+        const closeBtns = document.querySelectorAll('div[aria-label="Đóng" i], div[aria-label="Close" i], div[role="dialog"] [aria-label="Đóng" i], div[role="dialog"] [aria-label="Close" i]');
         closeBtns.forEach(b => { try { b.click(); } catch (e) { } });
         document.querySelectorAll('div[role="dialog"]').forEach(d => {
           if (!d.querySelector('div[role="article"]')) d.remove();
@@ -468,7 +594,8 @@ async function huntFacebookFeed(params, deps = {}) {
 
           const isCommentOrNoise = (el) => {
             if (!el) return true;
-            if (el.closest('[aria-label*="Bình luận" i], [aria-label*="Comment" i], [aria-label*="Danh sách bình luận" i], form')) return true;
+            if (el.parentElement && el.parentElement.closest('[role="article"]')) return true;
+            if (el.closest('[aria-label*="Bình luận" i], [aria-label*="Comment" i], [aria-label*="Danh sách bình luận" i], form, ul[role="group"]')) return true;
             return false;
           };
 
@@ -490,25 +617,38 @@ async function huntFacebookFeed(params, deps = {}) {
             const groupHeaderEl = art.querySelector('h2 a[href*="/groups/"]:not([href*="/user/"]), a[href*="/groups/"]:not([href*="/user/"]) strong');
             const groupHeaderName = (groupHeaderEl?.innerText || '').trim();
 
-            const authorCandidates = [
-              art.querySelector('a[href*="/user/"] strong, a[href*="/user/"] span, a[href*="/user/"]'),
-              art.querySelector('a[href*="profile.php"] strong, a[href*="profile.php"] span, a[href*="profile.php"]'),
-              art.querySelector('a[href*="/people/"] strong, a[href*="/people/"] span, a[href*="/people/"]'),
-              art.querySelector('h2 a:not([href*="/groups/"]):not([href*="/posts/"]), h3 a:not([href*="/groups/"]):not([href*="/posts/"])'),
-              art.querySelector('h2 strong, h3 strong, [role="article"] h2, [role="article"] h3'),
-            ];
-
-            for (const cand of authorCandidates) {
-              if (!cand) continue;
-              let txt = (cand.innerText || cand.textContent || '').trim();
-              if (!txt) {
-                // Nếu thẻ a là avatar, lấy qua aria-label hoặc alt ảnh
-                txt = (cand.getAttribute('aria-label') || cand.querySelector('img[alt]')?.getAttribute('alt') || '').trim();
+            // Ưu tiên 0: Bóc tách trực tiếp từ h2 bài viết (VD: "Bài viết của Lê Hoàg Thiên" hoặc "Post by John")
+            const allArtH2 = Array.from(art.querySelectorAll('h2'));
+            for (const h of allArtH2) {
+              const hTxt = (h.innerText || '').trim();
+              const m = hTxt.match(/^(?:bài viết của|post by)\s+(.+)$/i);
+              if (m && m[1] && m[1].trim().length >= 2 && m[1].trim().length <= 50) {
+                rawAuthor = m[1].trim();
+                break;
               }
-              if (txt && txt.length >= 2 && !/^(Facebook|Home|Trang chủ|Group|Nhóm|Theo dõi|Follow|Online)$/i.test(txt)) {
-                if (!groupHeaderName || txt.toLowerCase() !== groupHeaderName.toLowerCase()) {
-                  rawAuthor = txt;
-                  break;
+            }
+
+            if (!rawAuthor) {
+              const authorCandidates = [
+                art.querySelector('a[href*="/user/"]:not([href*="/groups/"]) strong, a[href*="/user/"]:not([href*="/groups/"]) span, a[href*="/user/"]:not([href*="/groups/"])'),
+                art.querySelector('a[href*="profile.php"]:not([href*="/groups/"]) strong, a[href*="profile.php"]:not([href*="/groups/"]) span, a[href*="profile.php"]:not([href*="/groups/"])'),
+                art.querySelector('a[href*="/people/"]:not([href*="/groups/"]) strong, a[href*="/people/"]:not([href*="/groups/"]) span, a[href*="/people/"]:not([href*="/groups/"])'),
+                art.querySelector('h2 a:not([href*="/groups/"]):not([href*="/posts/"]), h3 a:not([href*="/groups/"]):not([href*="/posts/"])'),
+                art.querySelector('h2 strong, h3 strong'),
+              ];
+
+              for (const cand of authorCandidates) {
+                if (!cand) continue;
+                let txt = (cand.getAttribute('aria-label') || cand.innerText || cand.textContent || '').trim();
+                if (!txt) {
+                  txt = (cand.querySelector('img[alt]')?.getAttribute('alt') || '').trim();
+                }
+                // Tên tác giả phải là tên ngắn gọn (dưới 50 ký tự), không chứa xuống dòng hoặc dấu câu hoàn chỉnh
+                if (txt && txt.length >= 2 && txt.length <= 50 && !txt.includes('\n') && !/[.!?]/.test(txt) && !/^(Facebook|Home|Trang chủ|Group|Nhóm|Theo dõi|Follow|Online)$/i.test(txt)) {
+                  if (!groupHeaderName || txt.toLowerCase() !== groupHeaderName.toLowerCase()) {
+                    rawAuthor = txt;
+                    break;
+                  }
                 }
               }
             }
@@ -519,6 +659,7 @@ async function huntFacebookFeed(params, deps = {}) {
               let a = raw.split('\n')[0].trim();
               a = a
                 .replace(/Online\s+status\s+in[^\n·•]*/gi, '')
+                .replace(/Chỉ báo trạng thái (?:online|trực tuyến)/gi, '')
                 .replace(/[\s\u00A0]*[·•|–—-][\s\u00A0]*(?:Theo dõi|Follow|Following|Đã theo dõi|Quản trị viên|Admin|Người điều hành|Moderator|Người đóng góp hàng đầu|Top Contributor|Tác giả|Author).*$/i, '')
                 .replace(/\s*\((?:Admin|Quản trị viên|Tác giả|Author|Mod|Người kiểm duyệt)\)\s*/gi, '')
                 .replace(/^bài viết của\s+/i, '')
@@ -527,8 +668,9 @@ async function huntFacebookFeed(params, deps = {}) {
                 .replace(/^profile of\s+/i, '')
                 .trim();
               if (groupHeaderName && a.toLowerCase() === groupHeaderName.toLowerCase()) return '';
-              if (/^(Facebook|Bài viết Facebook|Video Facebook|Group|Nhóm|Trang chủ|Home|Feed|Reels?|Watch)$/i.test(a)) return '';
-              if (a.toLowerCase().includes('online status') || a.length < 2) return '';
+              if (/^(Facebook|Bài viết Facebook|Video Facebook|Group|Nhóm|Trang chủ|Home|Feed|Reels?|Watch|Chỉ báo trạng thái online|Trạng thái online)$/i.test(a)) return '';
+              if (a.toLowerCase().includes('online status') || a.toLowerCase().includes('trạng thái online') || a.toLowerCase().includes('trực tuyến') || a.length < 2 || a.length > 50) return '';
+              if (/[.!?]/.test(a)) return '';
               return a;
             };
 
@@ -549,12 +691,11 @@ async function huntFacebookFeed(params, deps = {}) {
             }
             for (const a of (pageMode ? [] : links)) {
               const h = a.href || '';
-              // Bỏ qua link profile người dùng, link comment, hashtag, quy tắc nhóm
+              // Bỏ qua link profile người dùng, story, hashtag, quy tắc nhóm
               if (
                 h.includes('/user/') ||
                 h.includes('/people/') ||
                 h.includes('/profile.php') ||
-                h.includes('comment_id=') ||
                 h.includes('/stories/') ||
                 h.includes('/hashtag/') ||
                 h.includes('/member-requests/') ||
@@ -564,12 +705,14 @@ async function huntFacebookFeed(params, deps = {}) {
                 continue;
               }
 
-              // Ưu tiên 1: Lấy post_id từ đường dẫn /posts/ID hoặc /permalink/ID (hỗ trợ cả ID số & pfbid)
+              // Ưu tiên 1: Lấy post_id từ đường dẫn /posts/ID hoặc /permalink/ID (kể cả khi URL có kèm ?comment_id=..., vẫn trích xuất đúng post_id gốc)
               const postMatch = h.match(/\/groups\/[^\/]+\/(?:posts|permalink)\/([a-zA-Z0-9_]+)/);
               if (postMatch) {
                 postUrl = gid ? `https://www.facebook.com/groups/${gid}/posts/${postMatch[1]}/` : h.split('?')[0];
                 break;
               }
+
+              if (h.includes('comment_id=')) continue;
 
               // Ưu tiên 2: Lấy post_id từ multi_permalinks=...
               const multiMatch = h.match(/multi_permalinks=([a-zA-Z0-9_]+)/);
@@ -614,17 +757,6 @@ async function huntFacebookFeed(params, deps = {}) {
             if (!postUrl) continue;
 
             // 3. Tìm Caption bài viết (bỏ qua tên tác giả và nút hành động)
-            // Kích hoạt bấm "Xem thêm" của riêng bài này nếu còn nút chưa mở
-            const seeMoreRegex = /(?:…|\.{2,})?\s*(?:Xem\s+thêm|See\s+more|Hiển\s+thị\s+thêm)\b/i;
-            const seeMoreBtn = Array.from(art.querySelectorAll('div[role="button"], span[role="button"], div[dir="auto"] div[role="button"], span[dir="auto"]')).find(b => {
-              if (b.closest('[aria-label*="Bình luận" i], [aria-label*="Comment" i]')) return false;
-              const t = (b.innerText || b.textContent || '').trim();
-              return t && t.length <= 40 && seeMoreRegex.test(t);
-            });
-            if (seeMoreBtn) {
-              try { seeMoreBtn.click(); } catch (e) { }
-            }
-
             const cleanSeeMoreText = (txt) => {
               if (!txt) return '';
               let s = txt
@@ -634,6 +766,7 @@ async function huntFacebookFeed(params, deps = {}) {
                 .replace(/(?:^|\n)[\s\u200B\u00A0]*(?:Xem\s+thêm|See\s+more|Hiển\s+thị\s+thêm|Ẩn\s+bớt|See\s+less|Thu\s+gọn)[\s\u200B\u00A0]*$/gim, '')
                 .replace(/[\s\u200B\u00A0]*(?:…|\.{2,})[\s\u200B\u00A0]*(?:Xem\s+thêm|See\s+more)\b/gi, '')
                 .replace(/\n?(?:Translate|Dịch)\s*$/gi, '')
+                .replace(/(?:^|\n)[\s\u200B\u00A0]*(?:Công khai|Public|Chỉ mình tôi|Bạn bè|Friends|Only me|Chia sẻ với:?\s*Công khai|Shared with:?\s*Public)[\s\u200B\u00A0]*$/gim, '')
                 .trim();
 
               // Nếu còn dấu 3 chấm dở dang ở cuối
@@ -642,37 +775,59 @@ async function huntFacebookFeed(params, deps = {}) {
             };
 
             let caption = '';
-            // Chuỗi bị Facebook xáo (chống cào): token dài lẫn chữ + số, không phải link. Chỉ coi cả đoạn là rác khi
-            // phần lớn từ là token xáo — tránh bỏ nhầm caption thật có mã SP / SĐT ("iPhone15ProMax", "0901234567zalo")
+            // Chuỗi bị Facebook xáo (chống cào): token dài lẫn chữ + số, không phải link.
             const isJunkWord = (w) => w.length >= 12 && /[a-zA-Z]/.test(w) && /\d/.test(w) && !/^https?:\/\//i.test(w);
             const isJunkText = (t) => {
               const ws = t.split(/\s+/).filter(Boolean);
               return ws.length > 0 && ws.filter(isJunkWord).length / ws.length >= 0.5;
             };
+
+            // Ưu tiên 1: Vùng tin nhắn chuẩn của Facebook
             const msgEl = Array.from(art.querySelectorAll('div[data-ad-preview="message"], div[data-ad-comet-preview="message"]'))
               .find((el) => !inNestedArticle(el));
             if (msgEl) {
               caption = cleanSeeMoreText(msgEl.innerText || '');
             } else {
+              // Ưu tiên 2: Định vị chính xác vùng Caption nằm giữa Header bài viết và Media/Toolbar
+              const toolbar = art.querySelector('[role="toolbar"], [aria-label*="Thích" i], [aria-label*="Like" i], [aria-label*="Chia sẻ" i]');
+              const media = art.querySelector('a[href*="/photo"], a[href*="set="], video, [data-visualcompletion="media-vc-image"]');
+              const header = art.querySelector('h2, h3, header');
+
               const candidates = Array.from(art.querySelectorAll('div[dir="auto"], span[dir="auto"]'))
                 .filter(el => {
-                  if (el.closest('h2, h3, h4, header, a[href*="/user/"], [role="button"], button, [aria-label*="Bình luận" i], [aria-label*="Comment" i], [aria-label*="Thích" i], [aria-label*="Chia sẻ" i]')) return false;
-                  // Bỏ text của bình luận / bài chia sẻ lồng bên trong và phần dưới thanh tương tác
-                  if (inNestedArticle(el) || el.closest('[role="toolbar"], form, ul')) return false;
+                  if (inNestedArticle(el)) return false;
+                  // Tuyệt đối không lấy text nằm trong hoặc sau Toolbar (loại bỏ 100% comment, người comment, like/share bar)
+                  if (toolbar) {
+                    if (el === toolbar || toolbar.contains(el)) return false;
+                    if ((el.compareDocumentPosition(toolbar) & Node.DOCUMENT_POSITION_PRECEDING) !== 0) return false;
+                  }
+                  // Tuyệt đối không lấy text nằm trong hoặc sau Media (tránh lấy nhầm thông tin chú thích ảnh con)
+                  if (media) {
+                    if (el === media || media.contains(el)) return false;
+                    if ((el.compareDocumentPosition(media) & Node.DOCUMENT_POSITION_PRECEDING) !== 0) return false;
+                  }
+                  // Bỏ qua header bài viết & profile link của tác giả
+                  if (header && (el === header || header.contains(el))) return false;
+                  if (el.closest('h2, h3, h4, header, a[href*="/user/"], a[href*="profile.php"], a[href*="/people/"]')) return false;
+                  // Bỏ qua các nút bấm, icon, danh sách
+                  if (el.closest('button, [role="button"], form, ul')) return false;
+
                   const t = (el.innerText || '').trim();
                   if (!t || t.length < 3) return false;
-                  if (t === author || t === 'Facebook' || t === 'Thích' || t === 'Bình luận' || t === 'Chia sẻ') return false;
+                  if (t === author || t === 'Facebook' || t === 'Thích' || t === 'Bình luận' || t === 'Chia sẻ' || /^(?:Công khai|Public|Bạn bè|Friends|Chỉ mình tôi|Only me)$/i.test(t)) return false;
+                  if (/^(?:Chia sẻ với:?\s*(?:Công khai|Public|Bạn bè)|Shared with:?\s*(?:Public|Friends))/i.test(t)) return false;
                   if (/^(?:\d{1,2}\s*(?:phút|giờ|ngày|tháng|mins?|hrs?|d|w|m|y)|vừa xong|hôm qua|hôm nay|thứ\s+\d|\d{1,2}\s+tháng\s+\d{1,2})/i.test(t)) return false;
                   // Chuỗi ký tự bị Facebook xáo (mốc thời gian chống cào / anti-scraping obfuscation)
                   if (t.length > 20 && !/\s/.test(t)) return false;
-                  // Kiểm tra từ ngữ rác chứa chuỗi ngẫu nhiên dài lẫn lộn chữ và số (VD: esodnpotrSu5L8hcmg6rhr9Og0...)
+                  // Kiểm tra từ ngữ rác chứa chuỗi ngẫu nhiên dài lẫn lộn chữ và số
                   if (isJunkText(t)) return false;
                   return true;
                 });
+
               if (candidates.length > 0) {
                 // Ghép tất cả các đoạn văn không lồng nhau theo đúng thứ tự hiển thị DOM
                 const topLevelCandidates = candidates.filter((c) => !candidates.some((other) => other !== c && other.contains(c)));
-                const combined = topLevelCandidates.map((c) => (c.innerText || '').trim()).filter(Boolean).join('\n\n');
+                const combined = topLevelCandidates.map((c) => cleanSeeMoreText(c.innerText || '')).filter(Boolean).join('\n\n');
                 caption = cleanSeeMoreText(combined || candidates[0]?.innerText || '');
               }
             }
@@ -754,8 +909,9 @@ async function huntFacebookFeed(params, deps = {}) {
 
             // 5. Tìm thời gian đăng bài (postedTime)
             let postedTime = '';
-            // Mốc thời gian là chuỗi ngắn 1 dòng — link bọc cả nội dung bài cũng khớp regex ("1h" trong chữ xáo) thì bỏ
-            const shortTime = (t) => Boolean(t) && t.length <= 40 && !/\n/.test(t);
+            // Mốc thời gian là chuỗi ngắn 1 dòng — loại link tên trang ("...24h, xem tin") hoặc chuỗi xáo rác
+            const shortTime = (t) => Boolean(t) && t.length <= 36 && !/\n/.test(t) && !/\.com|https?:\/\/|xem\s+tin/i.test(t) && !isJunkText(t);
+            const strictTimeRe = /^(?:vừa xong|vừa đăng|just now|hôm qua|hôm nay|yesterday|today|\d{1,2}\s*(?:phút|giờ|ngày|tuần|tháng|thg|năm|mins?|hrs?|hours?|days?|weeks?|h|d|w|m|y)\b|thứ\s+[a-zA-Z0-9_À-ỹ]+|\d{1,2}\s+(?:tháng|thg)\s+\d{1,2}|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}|[0-9]{1,2}:[0-9]{2})/i;
             const taggedTime = readTag(art, 'data-ztr-time');
             if (taggedTime) postedTime = taggedTime;
 
@@ -767,21 +923,21 @@ async function huntFacebookFeed(params, deps = {}) {
               });
               for (const a of postLinks) {
                 const t = (a.innerText || a.getAttribute('aria-label') || '').trim();
-                if (shortTime(t) && /(?:phút|giờ|ngày|tháng|thg|tuần|năm|vừa xong|hôm nay|hôm qua|thứ|mins?|hrs?|hours?|days?|yesterday|today|[0-9]{1,2}:[0-9]{2})/i.test(t)) {
+                if (shortTime(t) && strictTimeRe.test(t)) {
                   postedTime = t;
                   break;
                 }
               }
             }
 
-            // Ưu tiên 2: Tìm link có text/aria-label chứa thời gian (không dùng dấu ^ cứng nhắc)
+            // Ưu tiên 2: Tìm link có text/aria-label chứa thời gian chuẩn xác
             if (!postedTime) {
               for (const a of links) {
                 const h = a.href || '';
                 if (h.includes('/user/') || h.includes('/people/') || h.includes('/profile.php') || h.includes('comment_id=')) continue;
                 const txt = (a.innerText || a.getAttribute('aria-label') || '').trim();
                 if (!shortTime(txt)) continue;
-                if (/(?:\d{1,2}\s*(?:phút|giờ|ngày|tháng|thg|năm|mins?|hrs?|h|d|w|m|y)|vừa xong|vừa đăng|hôm qua|hôm nay|thứ\s+[a-zA-Z0-9_À-ỹ]+|\d{1,2}\s+(?:tháng|thg)\s+\d{1,2}|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2})/i.test(txt)) {
+                if (strictTimeRe.test(txt)) {
                   postedTime = txt;
                   break;
                 }
@@ -795,7 +951,7 @@ async function huntFacebookFeed(params, deps = {}) {
                 const aria = (el.getAttribute('aria-label') || '').trim();
                 const inner = (el.innerText || '').trim();
                 const cand = aria || inner;
-                if (shortTime(cand) && /(?:\d{1,2}\s*(?:phút|giờ|ngày|tháng|thg|năm|mins?|hrs?|h|d|w)|vừa xong|hôm qua|hôm nay|thứ\s+[a-zA-Z0-9_À-ỹ]+|\d{1,2}\s+(?:tháng|thg)\s+\d{1,2})/i.test(cand)) {
+                if (shortTime(cand) && strictTimeRe.test(cand)) {
                   postedTime = cand;
                   break;
                 }
@@ -938,7 +1094,7 @@ async function huntFacebookFeed(params, deps = {}) {
           if (postedAt === null) postedAt = parseFbPostedTime(it.postedTime, scanNow);
           if (postedAt === null && postedTimeLabel) postedAt = parseFbPostedTime(postedTimeLabel, scanNow);
           const publishedAt = it.publishedAt || (postedAt ? new Date(postedAt).toISOString() : undefined);
-          const isAlreadyImported = isPostInExcludeList(it.url, excludeUrls);
+          const isAlreadyImported = isPostInExcludeList(it.url, it.caption, excludeUrls, excludeIds, excludeSnippets);
           collectedItemsMap.set(it.url, { ...rest, postedAt, publishedAt, isAlreadyImported });
           if (process.env.FEED_HUNTER_DEBUG) console.log('[FB_Group_Hunter][debug] +', it.url, isAlreadyImported ? 'ALREADY-POSTED' : 'NEW');
         }
@@ -973,21 +1129,12 @@ async function huntFacebookFeed(params, deps = {}) {
         break;
       }
 
-      // Kích hoạt cuộn sâu hơn nếu feed tạm thời chưa nạp bài mới (KHÔNG xóa cookie)
-      if (!isPage && round >= 4 && stagnantCount >= 4) {
-        console.log('[FB_Group_Hunter] ℹ️ Đang kích hoạt cuộn sâu thêm để nạp tiếp bài viết cũ từ feed...');
-        await page.evaluate(() => window.scrollBy(0, 1500)).catch(() => {});
-        await page.mouse.wheel(0, 3500).catch(() => {});
-        await page.keyboard.press('PageDown').catch(() => {});
-        await page.waitForTimeout(2000);
-      }
-
       if (collectedItemsMap.size === prevSize) {
         stagnantCount++;
-        const maxStagnant = isPage ? 3 : 4;
+        const maxStagnant = isPage ? 8 : 16;
         if (stagnantCount >= maxStagnant) {
           stopReason = 'NO_MORE_POSTS';
-          console.log(`[FB_Group_Hunter] ℹ️ Dừng cuộn sớm sau ${stagnantCount} vòng không có bài viết mới để trả kết quả ngay.`);
+          console.log(`[FB_Group_Hunter] ℹ️ Dừng cuộn sau ${stagnantCount} vòng không có bài viết mới để trả kết quả ngay.`);
           break;
         }
       } else {
@@ -999,29 +1146,32 @@ async function huntFacebookFeed(params, deps = {}) {
         await page.mouse.move(760, 520).catch(() => { });
         await page.mouse.wheel(0, 1400).catch(() => { });
         await page.evaluate(() => window.scrollBy(0, 200)).catch(() => { });
-        await page.waitForTimeout(stagnantCount > 1 ? 1600 : 1100);
+        await page.waitForTimeout(stagnantCount > 0 ? 2000 : 1200);
         continue;
       }
 
-      await page.mouse.wheel(0, 3500).catch(() => { });
-      await page.evaluate(() => {
-        const feedDivs = document.querySelectorAll('div[role="feed"] > div, div[data-pagelet*="FeedUnit"], div[role="article"]');
-        if (feedDivs.length > 0) {
-          feedDivs[feedDivs.length - 1].scrollIntoView({ behavior: 'smooth', block: 'end' });
-        }
-        window.scrollBy(0, 3500);
-        document.querySelectorAll('*').forEach(el => {
-          if (el.scrollHeight > el.clientHeight + 50 && el.clientHeight > 0) {
-            const style = window.getComputedStyle(el);
-            if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
-              el.scrollTop += 3500;
-              try { el.dispatchEvent(new Event('scroll', { bubbles: true })); } catch(e){}
-            }
-          }
-        });
-      }).catch(() => { });
+      // Nếu bị kẹt ở đầu feed (<= 2 bài sau 6 vòng) → tải lại trang Group mặc định 1 lần để thoát kẹt GraphQL
+      if (stagnantCount === 6 && collectedItemsMap.size <= 2 && !cookieFallbackDone && !trimmedKeyword) {
+        cookieFallbackDone = true;
+        console.log('[FB_Group_Hunter] 🔄 Feed bị chững sớm (<= 2 bài), thử tải lại trang Group để nạp tiếp...');
+        await page.goto(normalizedGroupUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => { });
+        await page.waitForTimeout(2000);
+        continue;
+      }
+
+      // Khi tạm thời chững ở đáy trang, nhích lên rồi kéo xuống lại để kích hoạt IntersectionObserver nạp batch mới
+      if (stagnantCount > 0) {
+        await page.evaluate(() => window.scrollBy(0, -650)).catch(() => { });
+        await page.waitForTimeout(250);
+      }
+
+      // Cuộn nhịp nhàng theo bước để Facebook virtualized list mount đầy đủ từng bài, không bị nhảy cóc
+      await page.mouse.move(640, 480).catch(() => { });
+      await page.mouse.wheel(0, 1400).catch(() => { });
+      await page.evaluate(() => window.scrollBy(0, 500)).catch(() => { });
       await page.keyboard.press('PageDown').catch(() => { });
-      await page.waitForTimeout(stagnantCount > 1 ? 1800 : 1200);
+      // Khi tạm thời chưa nạp bài mới, chờ thêm một chút để Facebook query GraphQL batch tiếp theo
+      await page.waitForTimeout(stagnantCount > 0 ? 2500 : 1600);
     }
 
     if (isPage && (!groupTitle || /^(?:Facebook|Facebook Group|Thông báo)$/i.test(groupTitle))) {

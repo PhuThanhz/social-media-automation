@@ -230,11 +230,11 @@ export default function PostHunterTab({
       key: 'target',
       render: (_, mon) => (
         <div className="min-w-0">
-          <div className="text-[13px] font-semibold text-slate-100 truncate">{mon.targetName}</div>
-          <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-0.5 min-w-0">
+          <div className="text-sm font-semibold text-slate-100 truncate">{mon.targetName}</div>
+          <div className="flex items-center gap-1.5 text-xs text-slate-300 mt-0.5 min-w-0">
             <span className="shrink-0">{TYPE_LABELS[mon.targetType] || 'Fanpage'}</span>
             <span className="shrink-0">·</span>
-            <a href={mon.targetUrl} target="_blank" rel="noopener noreferrer" className="truncate text-slate-400 hover:text-blue-400">
+            <a href={mon.targetUrl} target="_blank" rel="noopener noreferrer" className="truncate text-slate-300 hover:text-blue-400">
               {shortUrl(mon.targetUrl)}
             </a>
           </div>
@@ -244,23 +244,23 @@ export default function PostHunterTab({
     {
       title: 'Trạng thái',
       key: 'status',
-      width: 140,
+      width: 145,
       render: (_, mon) => {
         const health = getMonitorHealth(mon);
-        const badge = <Badge className="whitespace-nowrap" status={health.status} text={<span className="text-xs text-slate-200">{health.text}</span>} />;
+        const badge = <Badge className="whitespace-nowrap" status={health.status} text={<span className="text-[13px] text-slate-200">{health.text}</span>} />;
         return health.hint ? <Tooltip title={health.hint}>{badge}</Tooltip> : badge;
       },
     },
     {
       title: 'Cách buff',
       key: 'buff',
-      width: 170,
+      width: 185,
       render: (_, mon) => (
-        <div className="text-xs whitespace-nowrap">
+        <div className="text-[13px] whitespace-nowrap">
           <div className="text-slate-200">
             {mon.buffConfig?.targetLikes === 'ALL' ? `Xoay vòng ≤${maxPagesPerPost} page` : `${mon.buffConfig?.targetLikes || 30} lượt`}
           </div>
-          <div className="text-[11px] text-slate-400 mt-0.5 truncate">
+          <div className="text-xs text-slate-300 mt-0.5 truncate">
             {REACTION_LABELS[mon.buffConfig?.reactionType] || mon.buffConfig?.reactionType}
             {' · '}
             {mon.buffConfig?.delayMinutes ? `chờ ${mon.buffConfig.delayMinutes} phút` : 'buff ngay'}
@@ -272,11 +272,11 @@ export default function PostHunterTab({
     {
       title: 'Quét gần nhất',
       key: 'lastScan',
-      width: 160,
+      width: 165,
       render: (_, mon) => (
-        <div className="text-xs whitespace-nowrap">
+        <div className="text-[13px] whitespace-nowrap">
           <div className="text-slate-200">{formatAgo(mon.lastCheckedAt, now)}</div>
-          <div className="text-[11px] text-slate-400 mt-0.5 truncate">
+          <div className="text-xs text-slate-300 mt-0.5 truncate">
             {mon.lastCheckedAt
               ? `${mon.lastPostsFound ?? 0} bài${mon.lastScanVia ? ` · ${mon.lastScanVia}` : ''}`
               : `Mỗi ${mon.checkIntervalMinutes} phút`}
@@ -287,9 +287,9 @@ export default function PostHunterTab({
     {
       title: 'Quét tiếp',
       key: 'nextScan',
-      width: 105,
+      width: 110,
       render: (_, mon) => (
-        <span className="text-xs text-slate-300 whitespace-nowrap">
+        <span className="text-[13px] text-slate-200 whitespace-nowrap">
           {mon.status === 'ACTIVE' ? formatUntil(nextScanAt(mon), now) : '—'}
         </span>
       ),
@@ -297,13 +297,13 @@ export default function PostHunterTab({
     {
       title: 'Đã bắt',
       key: 'caught',
-      width: 90,
+      width: 100,
       align: 'right',
       render: (_, mon) => (
-        <div className="text-xs whitespace-nowrap">
+        <div className="text-[13px] whitespace-nowrap">
           <div className="text-slate-100 font-semibold">{mon.totalDetected || 0} bài</div>
           {mon.lastFoundPostUrl && (
-            <a href={mon.lastFoundPostUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] text-blue-400 hover:underline">
+            <a href={mon.lastFoundPostUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline">
               Bài gần nhất
             </a>
           )}
@@ -386,7 +386,7 @@ export default function PostHunterTab({
             <Col xs={12} sm={12} lg={idx === 0 ? 5 : 4} key={item.label}>
               <div className="app-stat-label">{item.label}</div>
               <div className="text-xl font-semibold text-slate-100 mt-1">{item.value}</div>
-              <div className={`text-[11px] mt-0.5 ${item.sub.includes('cần xem lại') ? 'text-amber-400' : 'text-slate-500'}`}>{item.sub}</div>
+              <div className={`text-xs mt-0.5 ${item.sub.includes('cần xem lại') ? 'text-amber-400' : 'text-slate-400'}`}>{item.sub}</div>
             </Col>
           ))}
           <Col xs={24} sm={12} lg={4}>
@@ -394,7 +394,7 @@ export default function PostHunterTab({
             <div className="mt-1.5">
               <Badge status={autoBuffOwnPosts ? 'success' : 'default'} text={<span className="text-sm font-semibold text-slate-100">{autoBuffOwnPosts ? 'Đang bật' : 'Đang tắt'}</span>} />
             </div>
-            <Button type="link" size="small" className="!p-0 !h-auto text-[11px]" onClick={onOpenSettings}>
+            <Button type="link" size="small" className="!p-0 !h-auto text-xs" onClick={onOpenSettings}>
               Cài đặt
             </Button>
           </Col>
@@ -405,7 +405,7 @@ export default function PostHunterTab({
       <Card variant="borderless" styles={{ body: { padding: 0 } }} className="overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 px-4 py-3 border-b border-slate-800/80">
           <Segmented<MonitorFilter>
-            size="small"
+            size="middle"
             value={filter}
             onChange={setFilter}
             options={[
@@ -417,8 +417,8 @@ export default function PostHunterTab({
           />
           <Input
             allowClear
-            size="small"
-            prefix={<SearchOutlined className="text-slate-500" />}
+            size="middle"
+            prefix={<SearchOutlined className="text-slate-400" />}
             placeholder="Tìm theo tên hoặc link"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -438,7 +438,7 @@ export default function PostHunterTab({
                 <div className="py-10">
                   <Empty
                     image={Empty.PRESENTED_IMAGE_SIMPLE}
-                    description={<span className="text-slate-400 text-xs">Chưa theo dõi Fanpage hay Group nào</span>}
+                    description={<span className="text-slate-300 text-sm">Chưa theo dõi Fanpage hay Group nào</span>}
                   >
                     <Button type="primary" icon={<PlusOutlined />} onClick={() => onAdd()}>
                       Thêm mục tiêu
@@ -446,7 +446,7 @@ export default function PostHunterTab({
                   </Empty>
                 </div>
               ) : (
-                <div className="py-8 text-xs text-slate-400">Không có mục tiêu phù hợp bộ lọc</div>
+                <div className="py-8 text-sm text-slate-300">Không có mục tiêu phù hợp bộ lọc</div>
               ),
           }}
         />
@@ -455,19 +455,19 @@ export default function PostHunterTab({
       {/* Bài bắt gần đây */}
       <Card variant="borderless" styles={{ body: { padding: 0 } }} className="overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/80">
-          <div className="text-[13px] font-semibold text-slate-100">Bài bắt gần đây</div>
-          <Button type="link" size="small" className="!p-0" onClick={onOpenQueue}>
+          <div className="text-sm font-semibold text-slate-100">Bài bắt gần đây</div>
+          <Button type="link" size="small" className="!p-0 text-[13px]" onClick={onOpenQueue}>
             Mở hàng đợi
           </Button>
         </div>
         {recentCatches.length === 0 ? (
-          <div className="px-4 py-8 text-center text-xs text-slate-500">
+          <div className="px-4 py-8 text-center text-[13px] text-slate-400">
             Chưa có bài nào. Bài mới từ các mục tiêu và bài app vừa đăng sẽ hiện ở đây.
           </div>
         ) : (
           <div className="divide-y divide-slate-800/70">
             {recentCatches.map((task) => (
-              <div key={task.id} className="px-4 py-2.5 grid grid-cols-12 items-center gap-3 text-xs">
+              <div key={task.id} className="px-4 py-2.5 grid grid-cols-12 items-center gap-3 text-[13px]">
                 <div className="col-span-2 text-slate-400">{formatAgo(task.addedAt, now)}</div>
                 <div className="col-span-3 text-slate-200 truncate">
                   {task.source === 'AUTO_OWN_POST'
@@ -545,20 +545,20 @@ export default function PostHunterTab({
             ) : (
               <div className="rounded-lg border border-slate-800 divide-y divide-slate-800/70 max-h-72 overflow-y-auto">
                 {testResult.posts.map((p: any, idx: number) => (
-                  <div key={p.url || idx} className="px-3 py-2 flex items-center gap-3 text-xs">
+                  <div key={p.url || idx} className="px-3 py-2 flex items-center gap-3 text-[13px]">
                     <div className="min-w-0 flex-1">
-                      <div className="text-slate-200 truncate">{(p.title || 'Bài viết Facebook').split('\n')[0]}</div>
-                      <a href={p.url} target="_blank" rel="noopener noreferrer" className="block truncate text-[11px] text-blue-400 hover:underline">
+                      <div className="text-slate-100 truncate">{(p.title || 'Bài viết Facebook').split('\n')[0]}</div>
+                      <a href={p.url} target="_blank" rel="noopener noreferrer" className="block truncate text-xs text-blue-400 hover:underline">
                         {shortUrl(p.url)}
                       </a>
                     </div>
-                    <div className="shrink-0 w-28">
+                    <div className="shrink-0 w-32">
                       {p.isAlreadyBuffed ? (
-                        <Badge status="success" text={<span className="text-[11px] text-slate-300">Đã buff</span>} />
+                        <Badge status="success" text={<span className="text-xs text-slate-200">Đã buff</span>} />
                       ) : p.isInQueue ? (
-                        <Badge status="warning" text={<span className="text-[11px] text-slate-300">Trong hàng đợi</span>} />
+                        <Badge status="warning" text={<span className="text-xs text-slate-200">Trong hàng đợi</span>} />
                       ) : (
-                        <Badge status="default" text={<span className="text-[11px] text-slate-300">Chưa buff</span>} />
+                        <Badge status="default" text={<span className="text-xs text-slate-200">Chưa buff</span>} />
                       )}
                     </div>
                     <Button

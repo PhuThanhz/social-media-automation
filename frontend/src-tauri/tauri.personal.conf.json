@@ -1,6 +1,6 @@
 {
   "productName": "ToolZutter Personal",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "identifier": "com.phusocial.autopost.personal",
   "build": { "devUrl": "http://localhost:3000" },
   "app": { "windows": [{ "label": "main", "title": "ToolZutter Personal", "width": 1400, "height": 900, "minWidth": 1024, "minHeight": 720, "center": true }] },

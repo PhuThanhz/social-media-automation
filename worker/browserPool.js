@@ -55,6 +55,27 @@ class BrowserPool {
 
   async _reserveEntry() {
     const runReservation = async () => {
+      // 1. Dọn dẹp các browser đã ngắt kết nối hoặc cho nghỉ hưu (retire) các browser đã đạt quota
+      for (const entry of [...this.entries]) {
+        if (!entry.browser.isConnected()) {
+          this.entries = this.entries.filter(e => e !== entry);
+          continue;
+        }
+        if ((entry.totalContextsCreated || 0) >= this.maxTotalContexts) {
+          // Đã đạt quota: bỏ khỏi active pool ngay để nhường slot (maxBrowsers) cho browser mới!
+          this.entries = this.entries.filter(e => e !== entry);
+          if (entry.activeContexts === 0) {
+            entry.browser.close().catch(() => {});
+          } else {
+            entry.retired = true;
+            // Timer an toàn 60s ép đóng nếu context bị giữ quá lâu/leak
+            setTimeout(() => {
+              entry.browser.close().catch(() => {});
+            }, 60000).unref?.();
+          }
+        }
+      }
+
       let entry = this.entries.find(e => e.activeContexts < this.maxContextsPerBrowser && (e.totalContextsCreated || 0) < this.maxTotalContexts);
       if (entry) {
         entry.activeContexts += 1;
@@ -92,7 +113,7 @@ class BrowserPool {
    * Trả về { context, release() }. release() PHẢI được gọi sau khi dùng xong (kể cả khi lỗi).
    * waitTimeoutMs > 0: nếu pool đầy quá thời gian này thì trả về null thay vì chờ vô hạn.
    */
-  async acquireContext(contextOptions, { waitTimeoutMs = 0 } = {}) {
+  async acquireContext(contextOptions, { waitTimeoutMs = 15_000 } = {}) {
     const deadline = waitTimeoutMs > 0 ? Date.now() + waitTimeoutMs : 0;
     let entry = await this._reserveEntry();
     while (!entry) {
@@ -107,7 +128,7 @@ class BrowserPool {
     try {
       context = await entry.browser.newContext(contextOptions);
     } catch (err) {
-      entry.activeContexts -= 1;
+      entry.activeContexts = Math.max(0, entry.activeContexts - 1);
       this._wakeWaiter();
       throw err;
     }
@@ -122,8 +143,10 @@ class BrowserPool {
       entry.activeContexts = Math.max(0, entry.activeContexts - 1);
       entry.lastUsedAt = Date.now();
 
-      // Tự động tái chế (recycle) browser khi đã phục vụ đủ số context để giải phóng triệt để RAM
-      if (entry.activeContexts === 0 && (entry.totalContextsCreated || 0) >= this.maxTotalContexts) {
+      // Nếu browser đã nghỉ hưu và hết active contexts, đóng ngay
+      if (entry.retired && entry.activeContexts === 0) {
+        entry.browser.close().catch(() => {});
+      } else if (entry.activeContexts === 0 && (entry.totalContextsCreated || 0) >= this.maxTotalContexts) {
         this.entries = this.entries.filter(e => e !== entry);
         entry.browser.close().catch(() => {});
         console.log(`[BrowserPool] ♻️ Đã tái chế browser process sau ${entry.totalContextsCreated} contexts để tối ưu RAM.`);
@@ -141,7 +164,7 @@ class BrowserPool {
    * vẫn mở Chromium riêng như trước, để proxy áp ở cấp browser và không dùng chung IP với pool.
    * Trả về { context, release() } — release() PHẢI được gọi trong finally.
    */
-  async acquireScrapeContext(contextOptions = {}, { proxy = null, launchArgs = [], browser = null, waitTimeoutMs = 0 } = {}) {
+  async acquireScrapeContext(contextOptions = {}, { proxy = null, launchArgs = [], browser = null, waitTimeoutMs = 10_000 } = {}) {
     // Caller đã có sẵn 1 browser (VD route đăng bài cần cào nguồn) → mở context mới, sạch cookie trong
     // chính browser đó thay vì bật thêm 1 process Chromium; release() chỉ đóng context, không đóng browser.
     if (browser && !proxy) {
@@ -156,9 +179,9 @@ class BrowserPool {
     }
 
     if (!proxy) {
-      const acquired = await this.acquireContext(contextOptions, { waitTimeoutMs });
+      const acquired = await this.acquireContext(contextOptions, { waitTimeoutMs: waitTimeoutMs || 10_000 });
       if (acquired) return acquired;
-      console.warn(`[BrowserPool] ⏳ Pool đầy quá ${waitTimeoutMs}ms — mở Chromium riêng để không chặn tác vụ.`);
+      console.warn(`[BrowserPool] ⏳ Pool bận quá ${waitTimeoutMs || 10000}ms — mở Chromium riêng để cào ngay không chặn.`);
     }
 
     const mergedArgs = Array.from(new Set([
@@ -271,6 +294,11 @@ class BrowserPool {
       const isOverLimit = (entry.totalContextsCreated || 0) >= this.maxTotalContexts;
       if (entry.activeContexts === 0 && (idleMs > this.idleTimeoutMs || isOverLimit)) {
         console.log(`[BrowserPool] 💤 Đóng browser (${Math.round(idleMs / 1000)}s idle, ${entry.totalContextsCreated || 0} contexts) để giải phóng RAM.`);
+        this.entries = this.entries.filter(e => e !== entry);
+        await entry.browser.close().catch(() => {});
+        this._wakeWaiter();
+      } else if (isOverLimit && idleMs > 120_000) {
+        console.warn(`[BrowserPool] ⚠️ Buộc tái chế browser sau 120s bị giữ context (${entry.activeContexts} active, ${entry.totalContextsCreated} served).`);
         this.entries = this.entries.filter(e => e !== entry);
         await entry.browser.close().catch(() => {});
         this._wakeWaiter();
