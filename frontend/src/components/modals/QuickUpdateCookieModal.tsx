@@ -1,30 +1,49 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Modal, Form, Input, Button, Select, Alert, Tag, Space, Typography, message, Segmented, Flex } from 'antd';
+import {
+  Modal,
+  Button,
+  Input,
+  Select,
+  Tag,
+  Alert,
+  message,
+  Flex,
+  Segmented,
+  Tooltip,
+  Collapse,
+  Badge,
+  Space,
+} from 'antd';
 import {
   KeyOutlined,
   CopyOutlined,
   CheckCircleOutlined,
   WarningOutlined,
   ThunderboltOutlined,
-  GlobalOutlined,
   SafetyCertificateOutlined,
-  EditOutlined,
+  ClearOutlined,
 } from '@ant-design/icons';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../../config/axios';
+import {
+  FacebookCookies,
+  INITIAL_FACEBOOK_COOKIES,
+  parseAllFacebookCookies,
+  buildCookieString,
+  countCookies,
+} from '@/utils/cookieHelper';
 
-const { Text, Paragraph } = Typography;
-const { TextArea } = Input;
 const { Option } = Select;
+const { TextArea } = Input;
 
 export interface QuickCookieAccount {
   id: number;
-  platform?: string;
   platformAccountId: string;
   pageName?: string;
+  platform: string;
   accountType?: string;
-  tokenStatus?: string;
   accessToken?: string;
+  tokenStatus?: string;
   postingIdentityAccountId?: number;
 }
 
@@ -36,69 +55,8 @@ interface QuickUpdateCookieModalProps {
   onSuccess?: () => void;
 }
 
-export function extractCookieFields(rawStr: string, defaultCUser: string = ''): {
-  cUser: string;
-  xs: string;
-  isValid: boolean;
-  normalized: string;
-  fullCookie: string;
-} {
-  if (!rawStr && !defaultCUser) return { cUser: '', xs: '', isValid: false, normalized: '', fullCookie: '' };
-  
-  const text = (rawStr || '').trim();
-  
-  // 1. JSON format từ tiện ích J2Team / Cookie-Editor
-  if (text.startsWith('[') && text.endsWith(']')) {
-    try {
-      const arr = JSON.parse(text);
-      let cUser = '';
-      let xs = '';
-      const pairs: string[] = [];
-      if (Array.isArray(arr)) {
-        for (const item of arr) {
-          const name = String(item?.name || '').trim();
-          const val = String(item?.value || '').trim();
-          if (!name || !val) continue;
-          if (name === 'c_user') cUser = val;
-          if (name === 'xs') xs = val;
-          pairs.push(`${name}=${val}`);
-        }
-      }
-      if (cUser && xs) {
-        const full = pairs.join('; ');
-        return { cUser, xs, isValid: true, normalized: full, fullCookie: full };
-      }
-    } catch {}
-  }
-
-  // 2. Trích xuất c_user từ chuỗi dán vào (nếu có)
-  const cUserMatch = text.match(/(?:c_user=|^c_user:\s*|["']?c_user["']?\s*[:=]\s*["']?)([\d]+)/i);
-  const cUser = (cUserMatch ? cUserMatch[1] : defaultCUser) || '';
-
-  // 3. Trích xuất xs
-  const xsMatch = text.match(/(?:xs=|^xs:\s*|["']?xs["']?\s*[:=]\s*["']?)([^;'"\s\n\r]+)/i);
-  let xs = xsMatch ? xsMatch[1] : '';
-
-  // Nếu người dùng chỉ dán nguyên chuỗi xs (không có dấu =)
-  if (!xs && text && !text.includes('=')) {
-    xs = text;
-  }
-
-  const isValid = Boolean(cUser && xs);
-  if (!isValid) {
-    return { cUser, xs, isValid: false, normalized: '', fullCookie: '' };
-  }
-
-  // Nếu chuỗi dán vào là Full Cookie (chứa nhiều cặp cookie khác như sb, datr, fr...)
-  let fullCookie = text;
-  if (!text.includes('c_user=') && cUser) {
-    fullCookie = `c_user=${cUser}; ${text}`;
-  }
-
-  const minimal = `c_user=${cUser}; xs=${xs}`;
-  const normalized = fullCookie.includes(';') ? fullCookie : minimal;
-
-  return { cUser, xs, isValid, normalized, fullCookie };
+export function extractCookieFields(rawStr: string, defaultCUser: string = '') {
+  return parseAllFacebookCookies(rawStr, defaultCUser);
 }
 
 export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
@@ -109,12 +67,10 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
   onSuccess,
 }) => {
   const queryClient = useQueryClient();
-  const [form] = Form.useForm();
   const [selectedAccountId, setSelectedAccountId] = useState<number | undefined>(targetAccountId);
-  const [inputMode, setInputMode] = useState<'RAW' | 'MANUAL'>('RAW');
+  const [inputMode, setInputMode] = useState<'COLUMNS' | 'RAW'>('COLUMNS');
   const [rawCookieInput, setRawCookieInput] = useState<string>('');
-  const [manualCUser, setManualCUser] = useState<string>('');
-  const [manualXs, setManualXs] = useState<string>('');
+  const [cookies, setCookies] = useState<FacebookCookies>({ ...INITIAL_FACEBOOK_COOKIES, extraPairs: {} });
 
   // Lấy danh sách kết nối nếu không truyền sẵn
   const { data: fetchedAccounts = [] } = useQuery<QuickCookieAccount[]>({
@@ -139,8 +95,6 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
     [cookieAccounts, selectedAccountId]
   );
 
-  // c_user mặc định phải là UID nick cá nhân. Với kết nối Fanpage, platformAccountId là ID Page —
-  // dùng nó làm c_user sẽ tạo cookie lai (xs của Via + ID Page) khiến Page bị báo hết hạn oan.
   const existingCUser = useMemo(() => {
     if (!currentAccount) return '';
     const isProfile = currentAccount.platform === 'FACEBOOK_PROFILE' || currentAccount.accountType === 'PERSONAL_PROFILE_COOKIE';
@@ -157,7 +111,16 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
     return ownCUser && ownCUser !== currentAccount.platformAccountId ? ownCUser : '';
   }, [currentAccount, allAccounts]);
 
-  // Khởi tạo account và c_user được chọn khi mở modal
+  // Load existing cookies of account if available
+  useEffect(() => {
+    if (open && currentAccount?.accessToken) {
+      const parsed = parseAllFacebookCookies(currentAccount.accessToken, existingCUser);
+      setCookies(parsed.cookies);
+      setRawCookieInput(currentAccount.accessToken);
+    }
+  }, [open, currentAccount?.id]);
+
+  // Khởi tạo account khi mở modal
   useEffect(() => {
     if (open) {
       if (targetAccountId) {
@@ -167,42 +130,40 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
       } else if (cookieAccounts.length > 0) {
         setSelectedAccountId(cookieAccounts[0].id);
       }
-      setRawCookieInput('');
-      setManualXs('');
-      form.resetFields();
     }
   }, [open, targetAccountId, expiredAccounts.length, cookieAccounts.length]);
 
-  useEffect(() => {
-    if (existingCUser) {
-      setManualCUser(existingCUser);
-    }
-  }, [existingCUser]);
+  const updateCookieField = (field: keyof FacebookCookies, val: string) => {
+    setCookies((prev) => {
+      const next = { ...prev, [field]: val.trim() };
+      return next;
+    });
+  };
 
-  // Phân tích chuỗi cookie theo thời gian thực (tự dùng existingCUser nếu người dùng chỉ dán xs)
+  // Tính toán chuỗi đầy đủ và tính hợp lệ theo thời gian thực
   const parsedData = useMemo(() => {
     if (inputMode === 'RAW') {
-      return extractCookieFields(rawCookieInput, existingCUser);
+      return parseAllFacebookCookies(rawCookieInput, existingCUser);
     } else {
-      const cUser = manualCUser.trim() || existingCUser;
-      const xs = manualXs.trim();
-      const isValid = Boolean(cUser && xs);
-      const pair = isValid ? `c_user=${cUser}; xs=${xs}` : '';
+      const full = buildCookieString(cookies);
+      const isValid = Boolean(cookies.cUser && cookies.xs);
+      const count = countCookies(cookies);
+      const hasSecuritySuite = Boolean(cookies.cUser && cookies.xs && (cookies.datr || cookies.sb));
       return {
-        cUser,
-        xs,
+        cookies,
         isValid,
-        normalized: pair,
-        fullCookie: pair,
+        fullCookie: full,
+        count,
+        hasSecuritySuite,
       };
     }
-  }, [inputMode, rawCookieInput, manualCUser, manualXs, existingCUser]);
+  }, [inputMode, rawCookieInput, cookies, existingCUser]);
 
-  const targetCUser = parsedData.cUser || existingCUser;
+  const targetCUser = parsedData.cookies.cUser || existingCUser;
   const linkedAccounts = useMemo(() => {
     if (!targetCUser) return [];
     return allAccounts.filter((a) => {
-      const aCUser = extractCookieFields(a.accessToken || '').cUser || (a.platformAccountId?.match(/^\d+$/) ? a.platformAccountId : '');
+      const aCUser = parseAllFacebookCookies(a.accessToken || '').cookies.cUser || (a.platformAccountId?.match(/^\d+$/) ? a.platformAccountId : '');
       return aCUser === targetCUser;
     });
   }, [allAccounts, targetCUser]);
@@ -230,23 +191,30 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
     },
   });
 
-  const handlePasteClipboard = async () => {
+  const handlePasteClipboardToColumns = async () => {
     try {
       const text = await navigator.clipboard.readText();
       if (!text) {
         message.warning('Clipboard rỗng!');
         return;
       }
+      const parsed = parseAllFacebookCookies(text, existingCUser);
+      setCookies(parsed.cookies);
       setRawCookieInput(text);
-      const parsed = extractCookieFields(text);
       if (parsed.isValid) {
-        message.success(`Đã đọc Cookie từ Clipboard: c_user=${parsed.cUser}`);
+        message.success(`Đã tự động phân tách và điền vào các cột: ${parsed.count} cookie (c_user: ${parsed.cookies.cUser})!`);
       } else {
-        message.info('Đã dán chuỗi từ Clipboard. Vui lòng kiểm tra lại c_user và xs.');
+        message.info(`Đã điền ${parsed.count} trường từ Clipboard. Vui lòng kiểm tra lại.`);
       }
     } catch {
-      message.error('Không thể đọc Clipboard (Vui lòng cấp quyền trình duyệt hoặc dán thủ công Ctrl+V)!');
+      message.error('Không thể đọc Clipboard! Vui lòng dán thủ công Ctrl+V.');
     }
+  };
+
+  const handleClearAll = () => {
+    setCookies({ ...INITIAL_FACEBOOK_COOKIES, extraPairs: {} });
+    setRawCookieInput('');
+    message.info('Đã làm trống toàn bộ các cột cookie');
   };
 
   const handleSave = () => {
@@ -255,11 +223,11 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
       return;
     }
     if (!parsedData.isValid) {
-      message.error('Chuỗi Cookie không hợp lệ! Bắt buộc phải có cả c_user và xs.');
+      message.error('Bắt buộc phải có ít nhất c_user (UID) và xs (Mã phiên)!');
       return;
     }
 
-    const finalCookie = parsedData.fullCookie || parsedData.normalized || rawCookieInput.trim();
+    const finalCookie = parsedData.fullCookie;
     updateMutation.mutate({
       id: selectedAccountId,
       accessToken: finalCookie,
@@ -271,7 +239,7 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
       open={open}
       onCancel={onClose}
       footer={null}
-      width={580}
+      width={740}
       centered
       className="quick-cookie-modal qcm-modal"
       destroyOnHidden
@@ -282,8 +250,8 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
               <KeyOutlined className="qcm-ic-base" />
             </div>
             <div>
-              <div className="qcm-title-text">Cập Nhật Cookie Facebook 1-Chạm</div>
-              <div className="qcm-title-sub">Khắc phục nhanh lỗi hết hạn phiên đăng nhập</div>
+              <div className="qcm-title-text">Cập Nhật Toàn Bộ Cookie Facebook (Kháng Checkpoint)</div>
+              <div className="qcm-title-sub">Hỗ trợ đầy đủ từng cột DevTools: c_user, xs, datr, sb, fr, wd, locale...</div>
             </div>
           </Flex>
           {expiredAccounts.length > 0 && (
@@ -345,7 +313,7 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
                   Cookie của &quot;{currentAccount.pageName || currentAccount.platformAccountId}&quot; đã bị hết hạn!
                 </span>
                 <p className="qcm-alert-desc">
-                  Tất cả tác vụ đăng bài bằng Cookie này sẽ bị lỗi. Hãy dán chuỗi Cookie mới từ Chrome / Extension bên dưới để kích hoạt lại ngay.
+                  Tất cả tác vụ đăng bài bằng Cookie này sẽ bị lỗi. Hãy nạp đầy đủ các cột Cookie bên dưới để kích hoạt lại ngay.
                 </p>
               </div>
             }
@@ -377,97 +345,314 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
         <Flex align="center" justify="space-between" className="qcm-mode-row">
           <Segmented
             value={inputMode}
-            onChange={(val) => setInputMode(val as any)}
+            onChange={(val) => {
+              const newMode = val as 'COLUMNS' | 'RAW';
+              if (newMode === 'RAW' && inputMode === 'COLUMNS') {
+                setRawCookieInput(buildCookieString(cookies));
+              } else if (newMode === 'COLUMNS' && inputMode === 'RAW') {
+                const parsed = parseAllFacebookCookies(rawCookieInput, existingCUser);
+                setCookies(parsed.cookies);
+              }
+              setInputMode(newMode);
+            }}
             options={[
-              { label: '🚀 Dán nguyên chuỗi Cookie (Khuyên dùng)', value: 'RAW' },
-              { label: '⚙️ Nhập c_user + xs riêng', value: 'MANUAL' },
+              { label: '📊 Nhập từng cột theo DevTools (Khuyên dùng)', value: 'COLUMNS' },
+              { label: '🚀 Dán nguyên chuỗi Cookie', value: 'RAW' },
             ]}
             className="qcm-mode"
           />
-        </Flex>
-
-        {/* Giao diện nhập Cookie */}
-        {inputMode === 'RAW' ? (
-          <div className="qcm-stack-2">
-            <Flex align="center" justify="space-between">
-              <span className="qcm-field-label">Dán chuỗi Cookie Facebook vào đây:</span>
+          {inputMode === 'COLUMNS' && (
+            <Flex gap={8}>
               <Button
                 type="dashed"
                 size="small"
                 icon={<CopyOutlined />}
-                onClick={handlePasteClipboard}
+                onClick={handlePasteClipboardToColumns}
+                className="qcm-paste-btn"
+              >
+                📋 Dán tự động điền các cột
+              </Button>
+              <Button
+                size="small"
+                icon={<ClearOutlined />}
+                onClick={handleClearAll}
+                danger
+              >
+                Làm trống
+              </Button>
+            </Flex>
+          )}
+        </Flex>
+
+        {/* GIAO DIỆN NHẬP TỪNG CỘT */}
+        {inputMode === 'COLUMNS' ? (
+          <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1">
+            {/* TẦNG 1: BẮT BUỘC */}
+            <div className="p-3 rounded-xl border border-blue-500/30 bg-blue-950/20 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-blue-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Badge status="processing" color="#3b82f6" /> Tầng 1: Tài khoản & Phiên đăng nhập (Bắt buộc)
+                </span>
+                <Tag color="blue" className="text-[11px] m-0 font-semibold">Bắt buộc</Tag>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-300 font-semibold mb-1 block">
+                    <code>c_user</code> <span className="text-slate-400 font-normal">(UID Facebook)</span>:
+                  </label>
+                  <Input
+                    value={cookies.cUser}
+                    onChange={(e) => updateCookieField('cUser', e.target.value)}
+                    placeholder="VD: 100023403136194"
+                    className="font-mono text-xs rounded-lg bg-slate-900/90 border-slate-700"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-300 font-semibold mb-1 block">
+                    <code>xs</code> <span className="text-slate-400 font-normal">(Session Token)</span>:
+                  </label>
+                  <Input.Password
+                    value={cookies.xs}
+                    onChange={(e) => updateCookieField('xs', e.target.value)}
+                    placeholder="VD: 49%3A8J7wSQZ3Key3BA..."
+                    className="font-mono text-xs rounded-lg bg-slate-900/90 border-slate-700"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* TẦNG 2: KHÁNG CHECKPOINT THIẾT BỊ (CỰC KỲ QUAN TRỌNG) */}
+            <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-950/20 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <SafetyCertificateOutlined className="text-emerald-400" /> Tầng 2: Bộ Kháng Checkpoint Thiết Bị (Khuyên Dùng)
+                </span>
+                <Tag color="green" className="text-[11px] m-0 font-semibold">Kháng Checkpoint</Tag>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-300 font-semibold mb-1 flex items-center justify-between">
+                    <span><code>datr</code> <span className="text-slate-400 font-normal">(Thẻ căn cước thiết bị)</span>:</span>
+                    <Tooltip title="Facebook lưu 2 năm để nhận diện thiết bị quen thuộc, bắt buộc để không bị văng phiên khi đổi máy.">
+                      <span className="text-emerald-400 cursor-pointer text-[10px]">ℹ️ Quan trọng</span>
+                    </Tooltip>
+                  </label>
+                  <Input
+                    value={cookies.datr}
+                    onChange={(e) => updateCookieField('datr', e.target.value)}
+                    placeholder="VD: imv2alUXVRr_X1icflr8cOaL"
+                    className="font-mono text-xs rounded-lg bg-slate-900/90 border-slate-700"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-300 font-semibold mb-1 flex items-center justify-between">
+                    <span><code>sb</code> <span className="text-slate-400 font-normal">(Ràng buộc trình duyệt)</span>:</span>
+                    <Tooltip title="Khóa ràng buộc phiên đăng nhập với cấu hình phần cứng trình duyệt.">
+                      <span className="text-emerald-400 cursor-pointer text-[10px]">ℹ️ Cần thiết</span>
+                    </Tooltip>
+                  </label>
+                  <Input
+                    value={cookies.sb}
+                    onChange={(e) => updateCookieField('sb', e.target.value)}
+                    placeholder="VD: f1kNaidyOexVUhTEy37sYHde"
+                    className="font-mono text-xs rounded-lg bg-slate-900/90 border-slate-700"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-300 font-semibold mb-1 block">
+                    <code>fr</code> <span className="text-slate-400 font-normal">(Mã bảo mật phiên)</span>:
+                  </label>
+                  <Input.Password
+                    value={cookies.fr}
+                    onChange={(e) => updateCookieField('fr', e.target.value)}
+                    placeholder="VD: 1MB8n8sM0txfPht2c.AWfb..."
+                    className="font-mono text-xs rounded-lg bg-slate-900/90 border-slate-700"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-300 font-semibold mb-1 block">
+                    <code>wd</code> <span className="text-slate-400 font-normal">(Kích thước màn hình)</span>:
+                  </label>
+                  <Input
+                    value={cookies.wd}
+                    onChange={(e) => updateCookieField('wd', e.target.value)}
+                    placeholder="VD: 440x956 hoặc 1920x1080"
+                    className="font-mono text-xs rounded-lg bg-slate-900/90 border-slate-700"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* TẦNG 3: CÁC THÔNG SỐ BỔ SUNG TRONG DEVTOOLS */}
+            <Collapse
+              ghost
+              size="small"
+              className="border border-slate-800 rounded-xl bg-slate-900/40"
+              items={[
+                {
+                  key: 'extra',
+                  label: (
+                    <span className="text-xs text-slate-300 font-semibold flex items-center gap-2">
+                      <span>⚙️ Thông số bổ sung từ DevTools (dpr, locale, vpd, presence, pas...)</span>
+                      <Tag color="default" className="text-[10px] m-0">Tùy chọn (Điền đủ 100%)</Tag>
+                    </span>
+                  ),
+                  children: (
+                    <div className="grid grid-cols-2 gap-3 pt-1">
+                      <div>
+                        <label className="text-xs text-slate-400 block mb-1">
+                          <code>locale</code> (Ngôn ngữ):
+                        </label>
+                        <Input
+                          value={cookies.locale}
+                          onChange={(e) => updateCookieField('locale', e.target.value)}
+                          placeholder="VD: vi_VN hoặc en_US"
+                          className="font-mono text-xs rounded-lg bg-slate-900 border-slate-700"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-slate-400 block mb-1">
+                          <code>vpd</code> (Viewport dimension):
+                        </label>
+                        <Input
+                          value={cookies.vpd}
+                          onChange={(e) => updateCookieField('vpd', e.target.value)}
+                          placeholder="VD: v1%3B956x440x3"
+                          className="font-mono text-xs rounded-lg bg-slate-900 border-slate-700"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-slate-400 block mb-1">
+                          <code>dpr</code> (Device Pixel Ratio):
+                        </label>
+                        <Input
+                          value={cookies.dpr}
+                          onChange={(e) => updateCookieField('dpr', e.target.value)}
+                          placeholder="VD: 2"
+                          className="font-mono text-xs rounded-lg bg-slate-900 border-slate-700"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-slate-400 block mb-1">
+                          <code>presence</code> (Thời gian online):
+                        </label>
+                        <Input
+                          value={cookies.presence}
+                          onChange={(e) => updateCookieField('presence', e.target.value)}
+                          placeholder="VD: C%7B%22t3%22..."
+                          className="font-mono text-xs rounded-lg bg-slate-900 border-slate-700"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-slate-400 block mb-1">
+                          <code>pas</code> (Account pass):
+                        </label>
+                        <Input
+                          value={cookies.pas}
+                          onChange={(e) => updateCookieField('pas', e.target.value)}
+                          placeholder="VD: 100023403136194%3AaZlr..."
+                          className="font-mono text-xs rounded-lg bg-slate-900 border-slate-700"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-slate-400 block mb-1">
+                          <code>wl_cbv</code> (Client version):
+                        </label>
+                        <Input
+                          value={cookies.wl_cbv}
+                          onChange={(e) => updateCookieField('wl_cbv', e.target.value)}
+                          placeholder="VD: v2%3Bclient_version%3A3..."
+                          className="font-mono text-xs rounded-lg bg-slate-900 border-slate-700"
+                        />
+                      </div>
+                    </div>
+                  ),
+                },
+              ]}
+            />
+          </div>
+        ) : (
+          <div className="qcm-stack-2">
+            <Flex align="center" justify="space-between">
+              <span className="qcm-field-label">Dán toàn bộ chuỗi Cookie Facebook vào đây:</span>
+              <Button
+                type="dashed"
+                size="small"
+                icon={<CopyOutlined />}
+                onClick={handlePasteClipboardToColumns}
                 className="qcm-paste-btn"
               >
                 📋 Dán từ Clipboard
               </Button>
             </Flex>
             <TextArea
-              rows={4}
+              rows={5}
               value={rawCookieInput}
               onChange={(e) => setRawCookieInput(e.target.value)}
-              placeholder="Dán toàn bộ chuỗi cookie lấy từ Extension hoặc DevTools F12 (VD: c_user=1000...; xs=27%3A...; datr=...)"
-              className="qcm-textarea"
+              placeholder="Dán toàn bộ chuỗi cookie từ DevTools hoặc Extension (VD: c_user=1000...; xs=...; datr=...; sb=...; fr=...; wd=...)"
+              className="qcm-textarea font-mono text-xs"
               autoFocus
             />
             <div className="qcm-hint-row">
-              <span>Hệ thống tự động tìm và bóc tách <code>c_user</code> và <code>xs</code>.</span>
-            </div>
-          </div>
-        ) : (
-          <div className="qcm-stack-3">
-            <div>
-              <label className="qcm-label-block">c_user (ID tài khoản):</label>
-              <Input
-                value={manualCUser}
-                onChange={(e) => setManualCUser(e.target.value)}
-                placeholder="VD: 100023403136194"
-                className="qcm-mono-input"
-              />
-            </div>
-            <div>
-              <label className="qcm-label-block">xs (Session Token):</label>
-              <Input.Password
-                value={manualXs}
-                onChange={(e) => setManualXs(e.target.value)}
-                placeholder="VD: 27%3AFjj1d3Y_5KP0JA%3A2%3A1787585254..."
-                className="qcm-mono-input"
-              />
+              <span>Hệ thống tự động nhận diện và bóc tách đầy đủ tất cả các trường: <code>c_user</code>, <code>xs</code>, <code>datr</code>, <code>sb</code>, <code>fr</code>, <code>wd</code>...</span>
             </div>
           </div>
         )}
 
         {/* Kết quả nhận diện Cookie thời gian thực */}
-        <div className="qcm-preview">
-          <Flex align="center" justify="space-between" className="qcm-preview-head">
-            <span className="qcm-preview-title">Kết quả nhận diện:</span>
-            {parsedData.isValid ? (
+        <div className="qcm-preview p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+          <Flex align="center" justify="space-between" className="qcm-preview-head mb-2">
+            <span className="qcm-preview-title text-xs font-semibold text-slate-300">
+              Tổng quan bộ Cookie: <Tag color="blue">{parsedData.count} cookie đã nạp</Tag>
+            </span>
+            {parsedData.hasSecuritySuite ? (
               <Tag icon={<CheckCircleOutlined />} color="success" className="qcm-pill-bold">
-                Hợp lệ
+                🛡️ Kháng Checkpoint Tối Đa (Đủ datr / sb)
+              </Tag>
+            ) : parsedData.isValid ? (
+              <Tag icon={<WarningOutlined />} color="warning" className="qcm-pill-bold">
+                ⚠️ Chỉ có UID & xs (Khuyên điền thêm datr & sb)
               </Tag>
             ) : (
-              <Tag icon={<WarningOutlined />} color="warning" className="qcm-pill-bold">
-                Chưa đủ thông tin
+              <Tag icon={<WarningOutlined />} color="error" className="qcm-pill-bold">
+                Chưa đủ c_user & xs
               </Tag>
             )}
           </Flex>
-          <div className="qcm-preview-grid">
-            <div className="qcm-preview-cell">
-              <span className="qcm-preview-key">c_user: </span>
-              <span className={parsedData.cUser ? 'qcm-val-cuser' : 'qcm-val-empty'}>
-                {parsedData.cUser || '(chưa có)'}
-              </span>
-            </div>
-            <div className="qcm-preview-cell">
-              <span className="qcm-preview-key">xs: </span>
-              <span className={parsedData.xs ? 'qcm-val-xs' : 'qcm-val-empty'}>
-                {parsedData.xs ? `${parsedData.xs.slice(0, 15)}...` : '(chưa có)'}
-              </span>
-            </div>
+
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            <Tag color={parsedData.cookies.cUser ? 'blue' : 'default'} className="font-mono text-xs">
+              c_user: {parsedData.cookies.cUser ? `${parsedData.cookies.cUser}` : 'Chưa có'}
+            </Tag>
+            <Tag color={parsedData.cookies.xs ? 'blue' : 'default'} className="font-mono text-xs">
+              xs: {parsedData.cookies.xs ? 'OK' : 'Chưa có'}
+            </Tag>
+            <Tag color={parsedData.cookies.datr ? 'green' : 'default'} className="font-mono text-xs">
+              datr: {parsedData.cookies.datr ? 'OK' : 'Chưa có'}
+            </Tag>
+            <Tag color={parsedData.cookies.sb ? 'green' : 'default'} className="font-mono text-xs">
+              sb: {parsedData.cookies.sb ? 'OK' : 'Chưa có'}
+            </Tag>
+            <Tag color={parsedData.cookies.fr ? 'cyan' : 'default'} className="font-mono text-xs">
+              fr: {parsedData.cookies.fr ? 'OK' : 'Chưa có'}
+            </Tag>
+            <Tag color={parsedData.cookies.wd ? 'cyan' : 'default'} className="font-mono text-xs">
+              wd: {parsedData.cookies.wd ? `${parsedData.cookies.wd}` : 'Chưa có'}
+            </Tag>
+            {parsedData.cookies.locale && (
+              <Tag color="purple" className="font-mono text-xs">locale: {parsedData.cookies.locale}</Tag>
+            )}
+            {parsedData.cookies.vpd && (
+              <Tag color="purple" className="font-mono text-xs">vpd: OK</Tag>
+            )}
+            {parsedData.cookies.dpr && (
+              <Tag color="purple" className="font-mono text-xs">dpr: {parsedData.cookies.dpr}</Tag>
+            )}
           </div>
         </div>
 
         {/* Nút hành động */}
-        <div className="qcm-footer">
+        <div className="qcm-footer pt-2">
           <Button onClick={onClose} size="large" className="qcm-cancel-btn">
             Đóng
           </Button>

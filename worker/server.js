@@ -1236,13 +1236,53 @@ async function waitUntilEnabled(locator, page, maxWaitMs) {
   return false;
 }
 
-// Hàm tiện ích phân tích chuỗi cookie (dạng c_user=...; xs=...) thành mảng object cho Playwright
+// Hàm tiện ích phân tích chuỗi cookie (dạng c_user=...; xs=... hoặc JSON mảng/object từ Extension) thành mảng object cho Playwright
 function parseCookies(cookieString, targetPageId = null) {
   if (!cookieString) return [];
-  const parts = cookieString.split(';');
-  const cookies = [];
   const domains = ['.facebook.com', 'facebook.com', 'www.facebook.com', 'mbasic.facebook.com', 'm.facebook.com'];
+  const cookies = [];
 
+  const trimmedRaw = String(cookieString).trim();
+  if ((trimmedRaw.startsWith('{') && trimmedRaw.endsWith('}')) || (trimmedRaw.startsWith('[') && trimmedRaw.endsWith(']'))) {
+    try {
+      const parsed = JSON.parse(trimmedRaw);
+      const arr = Array.isArray(parsed) ? parsed : Array.isArray(parsed.cookies) ? parsed.cookies : null;
+      if (Array.isArray(arr)) {
+        for (const item of arr) {
+          const name = String(item?.name || item?.key || '').trim();
+          let val = String(item?.value || item?.val || '').trim();
+          if (name && val) {
+            if (name === 'i_user' && targetPageId) {
+              val = targetPageId.toString().trim();
+            }
+            for (const d of domains) {
+              cookies.push({
+                name,
+                value: val,
+                domain: d,
+                path: item.path || '/',
+              });
+            }
+          }
+        }
+        if (targetPageId && !cookies.some(c => c.name === 'i_user')) {
+          for (const d of domains) {
+            cookies.push({
+              name: 'i_user',
+              value: targetPageId.toString().trim(),
+              domain: d,
+              path: '/',
+            });
+          }
+        }
+        return cookies;
+      }
+    } catch (e) {
+      // fallback sang split bình thường
+    }
+  }
+
+  const parts = cookieString.split(';');
   for (const part of parts) {
     const [name, ...valueParts] = part.trim().split('=');
     if (name && valueParts.length > 0) {
