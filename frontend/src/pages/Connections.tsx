@@ -434,9 +434,17 @@ const Connections = () => {
     [accounts]
   );
 
-  // Danh sách các tài khoản hết hạn cookie
+  // Danh sách các tài khoản hết hạn cookie (chỉ tính Fanpage và Via cá nhân, Group không có cookie)
   const expiredAccounts = useMemo(
-    () => (accounts || []).map(withEffectiveStatus).filter((a) => isPersonalCookieType(a.accountType) && a.tokenStatus === 'EXPIRED'),
+    () =>
+      (accounts || [])
+        .map(withEffectiveStatus)
+        .filter(
+          (a) =>
+            a.platform !== 'FACEBOOK_GROUP' &&
+            isPersonalCookieType(a.accountType) &&
+            a.tokenStatus === 'EXPIRED'
+        ),
     [accounts, withEffectiveStatus]
   );
 

@@ -162,9 +162,9 @@ const Dashboard = () => {
     },
   });
 
-  // Phát hiện tài khoản hết hạn Cookie
+  // Phát hiện tài khoản hết hạn Cookie (chỉ tính Fanpage và Via cá nhân, Group không có cookie)
   const expiredCookieAccounts = useMemo(
-    () => connections.filter((c) => c.accountType === 'PERSONAL_COOKIE' && c.tokenStatus === 'EXPIRED'),
+    () => connections.filter((c) => c.platform !== 'FACEBOOK_GROUP' && c.accountType === 'PERSONAL_COOKIE' && c.tokenStatus === 'EXPIRED'),
     [connections]
   );
 

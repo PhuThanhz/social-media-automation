@@ -265,6 +265,7 @@ const Groups = () => {
             pageName: payload.pageName.trim(),
             platformAccountId: payload.platformAccountId?.trim() || undefined,
             fallbackGroupId: payload.fallbackGroupId || undefined,
+            tokenStatus: 'OK',
           })
         )
       );
