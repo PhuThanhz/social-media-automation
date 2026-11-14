@@ -2,7 +2,7 @@
 cd "$(dirname "$0")"
 export PORT=3003
 export PROFILE_DIR=browser_profiles_w3
-export MAX_PARALLEL_POSTING=3
+export MAX_PARALLEL_POSTING=1
 
 while true; do
   echo "[AutoRestart] 🚀 Khởi động Worker 3 (Port 3003)..."

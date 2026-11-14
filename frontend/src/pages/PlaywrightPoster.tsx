@@ -40,6 +40,11 @@ import {
   EditOutlined,
   UserOutlined,
   DeploymentUnitOutlined,
+  RightOutlined,
+  FileTextOutlined,
+  SafetyCertificateOutlined,
+  SyncOutlined,
+  PlusCircleOutlined,
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
@@ -50,18 +55,18 @@ import { cleanSocialUrl } from '../components/common/PasteLinkInput';
 import NewsCardModal, { type NewsCardSource } from '../components/modals/NewsCardModal';
 import PostDetailModal from '../components/modals/PostDetailModal';
 import QuickUpdateCookieModal from '../components/modals/QuickUpdateCookieModal';
-import PostingWindowPanel, { POSTING_WINDOW_QUERY_KEY } from '../components/common/PostingWindowPanel';
+import { POSTING_WINDOW_QUERY_KEY, schedulePayload, type ScheduleValue } from '../components/common/postingSchedule';
+import ScheduleChoice from '../components/common/ScheduleChoice';
 import HistoryPanel from './playwright-poster/HistoryPanel';
 import ComposeAdvancedOptions from './playwright-poster/ComposeAdvancedOptions';
 import ComposeContentSection from './playwright-poster/ComposeContentSection';
 import ComposeTargetSection from './playwright-poster/ComposeTargetSection';
-import { DEFAULT_SAVED_COMMENT, STORAGE_KEY_COMMENT, stripEmojiPrefix } from './playwright-poster/shared';
+import { DEFAULT_SAVED_COMMENT, STORAGE_KEY_COMMENT, stripEmojiPrefix, resolveItemGroupTargets } from './playwright-poster/shared';
 import { useStableActions } from './playwright-poster/useStableActions';
 import type { DiagnosticEvidence, DiagnosticLogPayload, GroupStatItem, ItemPreview, PendingPageBreakdownItem, PostLinkItem, PostMode, PostQueue, SocialAccount } from './playwright-poster/types';
 import { useOpenedOnce } from './playwright-poster/useOpenedOnce';
 import { usePresetHub } from './playwright-poster/usePresetHub';
 import { useGroupMembership } from './playwright-poster/useGroupMembership';
-import { useBulkReschedule } from './playwright-poster/useBulkReschedule';
 import { useReassignNick } from './playwright-poster/useReassignNick';
 import { useCreditHashtag } from './playwright-poster/useCreditHashtag';
 import { useQueueDispatch } from './playwright-poster/useQueueDispatch';
@@ -70,16 +75,15 @@ import { useFailedPostActions } from './playwright-poster/useFailedPostActions';
 import { useViralHunter } from './playwright-poster/useViralHunter';
 import { useGroupHunter } from './playwright-poster/useGroupHunter';
 import { useNewsScraper } from './playwright-poster/useNewsScraper';
+import { distributeGroupTasks, type GroupScheduleTask } from '../utils/groupScheduleDistribution';
 
 // Modal/drawer lớn: tách chunk riêng, chỉ tải khi mở lần đầu
 const ArticleBatchModal = lazy(() => import('./playwright-poster/ArticleBatchModal'));
 const BulkPasteDrawer = lazy(() => import('./playwright-poster/BulkPasteDrawer'));
-const BulkRescheduleModal = lazy(() => import('./playwright-poster/BulkRescheduleModal'));
 const DistributeModal = lazy(() => import('./playwright-poster/DistributeModal'));
 const GroupHunterDrawer = lazy(() => import('./playwright-poster/GroupHunterDrawer'));
 const SwipeReviewModal = lazy(() => import('./playwright-poster/SwipeReviewModal'));
 const ViralHunterDrawer = lazy(() => import('./playwright-poster/ViralHunterDrawer'));
-const AutoFixQueueModal = lazy(() => import('./playwright-poster/AutoFixQueueModal'));
 const CustomCreModal = lazy(() => import('./playwright-poster/CustomCreModal'));
 const DiagnosticsDrawer = lazy(() => import('./playwright-poster/DiagnosticsDrawer'));
 const GroupCheckModal = lazy(() => import('./playwright-poster/GroupCheckModal'));
@@ -238,21 +242,21 @@ const EstimatedPostProgress: React.FC<{
   const isFinishing = remainingSec <= 0;
 
   return (
-    <div className="flex flex-col gap-1.5 w-full max-w-[160px] bg-gradient-to-b from-slate-900/95 to-slate-950/95 p-2.5 rounded-xl border border-purple-500/30 shadow-md shadow-purple-950/20 mt-1.5 backdrop-blur-sm">
+    <div className="flex flex-col gap-1.5 w-full max-w-[165px] bg-gradient-to-b from-slate-900/95 to-slate-950/95 p-2.5 rounded-xl border border-purple-500/30 shadow-md shadow-purple-950/20 mt-1.5 backdrop-blur-sm">
       <div className="flex items-center justify-between gap-1">
-        <span className="flex items-center gap-1.5 text-[10px] font-bold text-purple-300 uppercase tracking-wider font-mono">
+        <span className="flex items-center gap-1.5 text-xs font-bold text-purple-300 uppercase tracking-wider font-mono">
           <span className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
           </span>
           Đang chạy
         </span>
-        <span className="text-[10px] text-slate-500 font-mono font-medium">~{estimatedTotalSec}s</span>
+        <span className="text-xs text-slate-300 font-mono font-medium">~{estimatedTotalSec}s</span>
       </div>
 
       <div className="flex items-baseline justify-between">
         <span className="text-sm font-extrabold text-white font-mono tracking-tight">{formattedElapsed}</span>
-        <span className="text-[10px] font-mono text-purple-300/90 font-semibold">{percent}%</span>
+        <span className="text-xs font-mono text-purple-300 font-semibold">{percent}%</span>
       </div>
 
       <div className="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden border border-slate-800 p-[0.5px]">
@@ -262,8 +266,8 @@ const EstimatedPostProgress: React.FC<{
         />
       </div>
 
-      <div className="pt-0.5 flex items-center justify-between text-[10px]">
-        <span className="text-slate-400 text-[10px]">Ước tính:</span>
+      <div className="pt-0.5 flex items-center justify-between text-xs">
+        <span className="text-slate-300 text-xs">Ước tính:</span>
         {isFinishing ? (
           <span className="font-bold text-emerald-300 flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -280,7 +284,7 @@ const EstimatedPostProgress: React.FC<{
 // --- TIỆN ÍCH LÀM SẠCH DẤU SAO / HOA THỊ MARKDOWN (**) VÌ FACEBOOK KHÔNG HỖ TRỢ ---
 
 const PlaywrightPoster = () => {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -334,6 +338,9 @@ const PlaywrightPoster = () => {
   const [forceRefresh, setForceRefresh] = useState(false);
   // Khoảng cách thời gian giãn cách giữa các nhóm khi đăng bài vào nhiều nhóm cùng lúc (phút)
   const [groupStaggerInterval, setGroupStaggerInterval] = useState<number>(2);
+  const [groupTimingMode, setGroupTimingMode] = useState<'SPREAD_DAY' | 'STAGGER'>('SPREAD_DAY');
+  const [groupSpreadStart, setGroupSpreadStart] = useState<Dayjs>(() => dayjs().startOf('day').add(8, 'hour').add(30, 'minute'));
+  const [groupSpreadEnd, setGroupSpreadEnd] = useState<Dayjs>(() => dayjs().startOf('day').add(22, 'hour').add(30, 'minute'));
 
   // Xem trước ảnh/video cào được TRƯỚC khi đăng — key theo id của từng dòng link trong danh sách.
   const [previews, setPreviews] = useState<Record<string, ItemPreview>>({});
@@ -762,8 +769,13 @@ const PlaywrightPoster = () => {
       rejectedIds.forEach((id) => delete next[id]);
       return next;
     });
+    const keptWithExtraCount = keptItems.filter((item) => (item.extraGroupIds?.length || 0) > 0).length;
     setSwipeReviewOpen(false);
-    message.success(`Đã giữ ${swipeReviewItems.length - rejectedIds.size} bài và bỏ ${rejectedIds.size} bài khỏi danh sách.`);
+    message.success(
+      keptWithExtraCount > 0
+        ? `Đã giữ ${swipeReviewItems.length - rejectedIds.size} bài (${keptWithExtraCount} bài có đăng thêm nhóm khác) và bỏ ${rejectedIds.size} bài khỏi danh sách.`
+        : `Đã giữ ${swipeReviewItems.length - rejectedIds.size} bài và bỏ ${rejectedIds.size} bài khỏi danh sách.`
+    );
   };
 
   useEffect(() => {
@@ -793,33 +805,22 @@ const PlaywrightPoster = () => {
   }, [swipeReviewOpen, activeSwipeItem?.id]);
 
 
-  // Bộ cấu hình chia giờ tự động khi thêm link
-  const [batchScheduleMode, setBatchScheduleMode] = useState<'WINDOW' | 'INTERVAL' | 'NOW'>('WINDOW');
-  // "Nối đuôi liên tục": backend tự xếp bài mới ngay sau bài đang chờ của đúng nick, nghỉ N phút/bài.
-  const [queueAppendMode, setQueueAppendModeState] = useState<boolean>(() => localStorage.getItem('poster_queue_append') !== '0');
-  const [queueGapMinutes, setQueueGapMinutesState] = useState<number>(() => {
-    const saved = Number(localStorage.getItem('poster_queue_gap_minutes'));
-    return Number.isFinite(saved) && saved >= 0 && localStorage.getItem('poster_queue_gap_minutes') !== null ? saved : 2;
-  });
-  const setQueueAppendMode = (on: boolean) => {
-    setQueueAppendModeState(on);
-    localStorage.setItem('poster_queue_append', on ? '1' : '0');
+  // Thời gian đăng: chỉ 3 cách (Đăng ngay / Xếp vào lịch / Hẹn giờ). Giờ cụ thể do server xếp theo
+  // "Lịch đăng" chung (bấm badge hàng đợi trên header để cài khung giờ, giãn cách, giới hạn mỗi nick).
+  const [scheduleChoice, setScheduleChoiceState] = useState<ScheduleValue>(() => (
+    { mode: localStorage.getItem('poster_schedule_mode') === 'NOW' ? 'NOW' : 'QUEUE' }
+  ));
+  const setScheduleChoice = (v: ScheduleValue) => {
+    setScheduleChoiceState(v);
+    if (v.mode !== 'AT') localStorage.setItem('poster_schedule_mode', v.mode);
   };
-  const setQueueGapMinutes = (minutes: number) => {
-    setQueueGapMinutesState(minutes);
-    localStorage.setItem('poster_queue_gap_minutes', String(minutes));
+  // "Hẹn giờ" nhiều bài = bắt đầu từ mốc đã chọn, server tự nối đuôi theo nick → không gửi giờ riêng từng bài
+  const scheduleBody = {
+    ...schedulePayload(scheduleChoice),
+    ...(scheduleChoice.mode === 'AT' ? { scheduledTimes: undefined } : {}),
   };
-  const queueAppendPayload = queueAppendMode
-    ? { publishNow: false, appendToQueue: true, gapSeconds: Math.round(queueGapMinutes * 60) }
-    : {};
-  const [packingQueue, setPackingQueue] = useState(false);
-  const [batchWindowDate, setBatchWindowDate] = useState<Dayjs>(dayjs());
-  const [batchWindowStartTime, setBatchWindowStartTime] = useState<Dayjs>(dayjs().hour(9).minute(0).second(0));
-  const [batchWindowEndTime, setBatchWindowEndTime] = useState<Dayjs>(dayjs().hour(17).minute(30).second(0));
-  const [batchWindowMaxPerDay, setBatchWindowMaxPerDay] = useState<number>(-1);
-  const [desiredMinInterval, setDesiredMinInterval] = useState<number>(30);
-  const [batchStartTime, setBatchStartTime] = useState<Dayjs>(dayjs().add(60, 'minute'));
-  const [batchInterval, setBatchInterval] = useState<number>(60);
+  // Chỉ dùng để hiển thị giờ dự kiến tạm trên form, server mới là nơi quyết giờ thật
+  const batchInterval = 15;
   const [batchToolsOpen, setBatchToolsOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
@@ -831,15 +832,6 @@ const PlaywrightPoster = () => {
   const [bulkModalVisible, setBulkModalVisible] = useState(false);
   const [bulkAutoDistributeTwoVias, setBulkAutoDistributeTwoVias] = useState(false);
   const [bulkText, setBulkText] = useState('');
-  const [bulkScheduleMode, setBulkScheduleMode] = useState<'WINDOW' | 'INTERVAL' | 'NOW'>('WINDOW');
-  const [bulkWindowDate, setBulkWindowDate] = useState<Dayjs>(dayjs());
-  const [bulkWindowStartTime, setBulkWindowStartTime] = useState<Dayjs>(dayjs().hour(9).minute(0).second(0));
-  const [bulkWindowEndTime, setBulkWindowEndTime] = useState<Dayjs>(dayjs().hour(18).minute(0).second(0));
-  const [bulkWindowMaxPerDay, setBulkWindowMaxPerDay] = useState<number>(-1);
-  const [bulkStartMode, setBulkStartMode] = useState<'NOW' | 'TIME'>('NOW');
-  const [bulkStartTime, setBulkStartTime] = useState<Dayjs>(dayjs().add(60, 'minute'));
-  const [bulkInterval, setBulkInterval] = useState<number>(60);
-
   const {
     hunterDrawerVisible, setHunterDrawerVisible, hunterTarget, setHunterTarget, setHunterLimit, hunterLimit,
     hunterMinViews, setHunterMinViews, hunterDurationFilter, setHunterDurationFilter, hunterSortBy,
@@ -848,10 +840,17 @@ const PlaywrightPoster = () => {
     setHunterSelectedIds, handleHuntChannel, filteredAndSortedHunterVideos, handleImportHunterVideos,
   } = useViralHunter({
     setBulkText,
-    setBulkStartMode,
-    setBulkStartTime,
-    setBulkInterval,
+    setScheduleChoice,
     setBulkModalVisible,
+  });
+
+  // Fetch danh sách kết nối Fanpage / Group Playwright (đặt trước useGroupHunter để dùng an toàn khi render)
+  const { data: socialAccounts } = useQuery({
+    queryKey: ['socialAccounts'],
+    queryFn: async () => {
+      const response = await api.get('/connections');
+      return response.data as SocialAccount[];
+    }
   });
 
   const {
@@ -870,15 +869,12 @@ const PlaywrightPoster = () => {
     handleRemoveFavoriteGroup, handleRenameFavoriteGroup, handleHuntFacebookGroup,
     handleGeminiCurateGroupPosts, handleApplyGroupHunterHook, handleCleanSpamFromSelectedPosts,
     handleExecuteGroupHunterBatchAi, filteredGroupHunterPosts, handleImportGroupHunterPosts,
-    handleImportAndSwipeGroupHunterPosts,
+    handleImportAndSwipeGroupHunterPosts, scrapeAccountOptions, activeScrapeAccount, setGroupHunterScrapeAccountId,
   } = useGroupHunter({
     setBulkText,
     setBulkDrawerPreviews,
     formatMultiLineCaption,
-    setCustomDrawerScheduledTimes,
-    setBulkStartMode,
-    setBulkStartTime,
-    setBulkInterval,
+    setScheduleChoice,
     form,
     setBulkModalVisible,
     setPreviews,
@@ -888,6 +884,7 @@ const PlaywrightPoster = () => {
     setSwipeDecisions,
     setSwipeReviewOpen,
     linkItems,
+    socialAccounts,
     late: () => ({ socialAccounts, setSmartGroupId }),
   });
 
@@ -938,15 +935,6 @@ const PlaywrightPoster = () => {
   // Modal cập nhật cookie nhanh
   const [quickCookieModalOpen, setQuickCookieModalOpen] = useState(false);
   const [quickCookieTargetId, setQuickCookieTargetId] = useState<number | undefined>(undefined);
-
-  // Fetch danh sách kết nối Fanpage / Group Playwright
-  const { data: socialAccounts } = useQuery({
-    queryKey: ['socialAccounts'],
-    queryFn: async () => {
-      const response = await api.get('/connections');
-      return response.data as SocialAccount[];
-    }
-  });
 
   // Danh sách các nhóm nguồn Facebook lưu thủ công + lấy từ DB (CRAWL_SOURCE) để quét bài viết
   // TUYỆT ĐỐI KHÔNG lấy các nhóm FACEBOOK_GROUP thuộc socialAccounts vì đó là KÊNH XUẤT BẢN ĐÍCH của người dùng!
@@ -1286,12 +1274,6 @@ const PlaywrightPoster = () => {
   );
   const groupAccountsWithId = groupAccounts.filter((g) => g.platformAccountId && g.platformAccountId.trim().length > 0);
 
-  const activeScrapeAccount = useMemo(() => {
-    return (socialAccounts || []).find((a) => a.pageName?.toLowerCase().includes('làm sen') && a.accessToken)
-      || (socialAccounts || []).find((a) => a.accessToken && a.accessToken.trim().length > 0 && a.tokenStatus === 'OK')
-      || (socialAccounts || []).find((a) => a.accessToken && a.accessToken.trim().length > 0);
-  }, [socialAccounts]);
-
   // targetGroupNames lưu ID Nhóm (đôi khi là tên cũ cho bản ghi cũ) cách nhau bởi dấu phẩy — quy đổi
   // ngược lại thành tên Nhóm dễ đọc dựa trên danh sách kết nối, để lịch sử biết đăng vào Nhóm nào.
   const resolveGroupNames = (rawGroupNames?: string | string[]) => {
@@ -1321,21 +1303,21 @@ const PlaywrightPoster = () => {
           (a) => String(a.id) === dbId || a.platformAccountId === platformId
         );
         if (matched?.pageName) {
-          return isAnon ? `👤 ${matched.pageName} (Ẩn danh)` : matched.pageName;
+          return isAnon ? `${matched.pageName} (Ẩn danh)` : matched.pageName;
         }
       }
 
       if (parts.length === 2) {
         const part1 = parts[1].trim();
         if (part1 && part1 !== 'PERSONAL_COOKIE' && part1 !== 'PAGE_TOKEN') {
-          return isAnon ? `👤 ${part1} (Ẩn danh)` : part1;
+          return isAnon ? `${part1} (Ẩn danh)` : part1;
         }
         const platformId = parts[0].trim();
         const matched = (socialAccounts || []).find(
           (a) => a.platformAccountId === platformId || String(a.id) === platformId
         );
         if (matched?.pageName) {
-          return isAnon ? `👤 ${matched.pageName} (Ẩn danh)` : matched.pageName;
+          return isAnon ? `${matched.pageName} (Ẩn danh)` : matched.pageName;
         }
       }
 
@@ -1343,12 +1325,12 @@ const PlaywrightPoster = () => {
         (a) => String(a.id) === raw || a.platformAccountId === raw || a.platformAccountId === parts[0]
       );
       if (matched?.pageName) {
-        return isAnon ? `👤 ${matched.pageName} (Ẩn danh)` : matched.pageName;
+        return isAnon ? `${matched.pageName} (Ẩn danh)` : matched.pageName;
       }
     }
 
     if (isAnon) {
-      return '👤 Nick cá nhân (Ẩn danh)';
+      return 'Nick cá nhân (Ẩn danh)';
     }
 
     if (record.targetGroupNames && (socialAccounts || []).length > 0) {
@@ -1399,10 +1381,9 @@ const PlaywrightPoster = () => {
 
   const isCurrentTargetExpired = selectedTargetAccount?.tokenStatus === 'EXPIRED';
 
-  // Bình luận mặc định dùng cho khung xem trước Status nền đỏ — cùng thứ tự ưu tiên với lúc gửi bài (effectiveDefaultComment).
+  // Bình luận mặc định dùng cho khung xem trước Status nền đỏ — chỉ hiển thị khi người dùng nhập ô affiliateLink
   const watchedDefaultComment = Form.useWatch('affiliateLink', form);
-  const defaultCommentPreview = (watchedDefaultComment || '').trim()
-    || (localStorage.getItem(STORAGE_KEY_COMMENT) || DEFAULT_SAVED_COMMENT).trim();
+  const defaultCommentPreview = (watchedDefaultComment || '').trim();
   const previewAuthorName = String(selectedTargetAccountNames[0] || 'Fanpage');
 
   const selectedGroupDisplayNames = postMode === 'GROUP_ONLY'
@@ -1668,18 +1649,18 @@ const PlaywrightPoster = () => {
             <span className={isExp ? 'text-red-500 font-bold' : 'text-emerald-300 font-semibold flex items-center gap-1.5'}>
               <span>📄 {acc.pageName || acc.platformAccountId}</span>
               {isCoAdmin && (
-                <span className="px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                <span className="px-1.5 py-0.5 rounded text-xs font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
                   ⚡ 2 Via
                 </span>
               )}
-              {viaName && <span className="text-[11px] font-normal text-slate-400">· {viaName}</span>}
+              {viaName && <span className="text-xs font-normal text-slate-300">· {viaName}</span>}
             </span>
             <div className="flex items-center gap-1.5 shrink-0 ml-2">
-              <Tag color={needed > 0 ? 'orange' : 'success'} className="!rounded-full text-[10px] !mr-0">
+              <Tag color={needed > 0 ? 'orange' : 'success'} className="!rounded-full !text-xs !mr-0">
                 KPI: {currentCount}/{targetCount} {needed > 0 ? `(thiếu ${needed})` : '(đủ)'}
               </Tag>
               {isExp && (
-                <Tag color="error" className="!rounded-full text-[10px] !mr-0 font-bold">Hết Cookie</Tag>
+                <Tag color="error" className="!rounded-full !text-xs !mr-0 font-bold">Hết Cookie</Tag>
               )}
             </div>
           </div>
@@ -1705,19 +1686,19 @@ const PlaywrightPoster = () => {
             <span className={isExp ? 'text-red-600 font-bold flex items-center gap-1.5' : 'text-indigo-400 font-semibold flex items-center gap-1.5'}>
               <span>👤 {acc.pageName || acc.platformAccountId}</span>
               {managedPageCount > 0 && (
-                <span className="text-[10px] font-normal text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/20">
+                <span className="text-xs font-normal text-sky-300 bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/20">
                   {managedPageCount} Page quản trị
                 </span>
               )}
             </span>
             <div className="flex items-center gap-1.5 shrink-0 ml-2">
-              <Tag color={needed > 0 ? 'orange' : 'success'} className="!rounded-full text-[10px] !mr-0">
+              <Tag color={needed > 0 ? 'orange' : 'success'} className="!rounded-full !text-xs !mr-0">
                 KPI: {currentCount}/{targetCount} {needed > 0 ? `(thiếu ${needed})` : '(đủ)'}
               </Tag>
               {isExp ? (
-                <Tag color="error" className="!rounded-full text-[10px] !mr-0 font-bold">Hết Cookie</Tag>
+                <Tag color="error" className="!rounded-full !text-xs !mr-0 font-bold">Hết Cookie</Tag>
               ) : (
-                <Tag color="purple" className="!rounded-full text-[10px] !mr-0 font-bold">Cá nhân</Tag>
+                <Tag color="purple" className="!rounded-full !text-xs !mr-0 font-bold">Cá nhân</Tag>
               )}
             </div>
           </div>
@@ -1757,9 +1738,9 @@ const PlaywrightPoster = () => {
               {cleanName} {index + 1} · ID {group.platformAccountId}
             </span>
             <div className="shrink-0">
-              {isJoined && <Tag color="success" className="!rounded-full text-[10px] !mr-0">Đã vào</Tag>}
-              {isPending && <Tag color="warning" className="!rounded-full text-[10px] !mr-0">Chờ duyệt</Tag>}
-              {isNotJoined && <Tag color="error" className="!rounded-full text-[10px] !mr-0">Chưa vào</Tag>}
+              {isJoined && <Tag color="success" className="!rounded-full !text-xs !mr-0">Đã vào</Tag>}
+              {isPending && <Tag color="warning" className="!rounded-full !text-xs !mr-0">Chờ duyệt</Tag>}
+              {isNotJoined && <Tag color="error" className="!rounded-full !text-xs !mr-0">Chưa vào</Tag>}
             </div>
           </div>
         ),
@@ -1768,16 +1749,16 @@ const PlaywrightPoster = () => {
   }, [groupAccountsWithId]);
 
   const calculatedTotalQueueCount = useMemo(() => {
-    const validCount = linkItems.filter((i) => {
+    const validItems = linkItems.filter((i) => {
       const hasUrl = !!i.url && i.url.trim().length > 0;
       const hasContent = (!!i.manualContent && i.manualContent.trim().length > 0) || (!!i.customCaption && i.customCaption.trim().length > 0);
       const hasMedia = (i.manualMediaUrls?.length || 0) > 0;
       return hasUrl || hasContent || hasMedia;
-    }).length;
-    if (validCount === 0) return 0;
+    });
+    if (validItems.length === 0) return 0;
 
     if (postMode === 'FANPAGE_ONLY') {
-      return isMultiDistributeActive ? validCount : validCount * Math.max(1, activeSelectedFanpageIds.length);
+      return isMultiDistributeActive ? validItems.length : validItems.length * Math.max(1, activeSelectedFanpageIds.length);
     }
 
     const gCount = activeSelectedGroupIds.length;
@@ -1785,13 +1766,11 @@ const PlaywrightPoster = () => {
 
     if (gCount === 0) return 0;
 
-    if (groupDistributionMode === 'PAGE_PER_GROUP') {
-      return validCount * gCount;
-    } else if (groupDistributionMode === 'ROUND_ROBIN_POSTS') {
-      return validCount;
-    } else {
-      return validCount * gCount * Math.max(1, pCount);
-    }
+    const fanpageMultiplier = groupDistributionMode === 'CROSS_ALL' ? Math.max(1, pCount) : 1;
+    return validItems.reduce((sum, item, idx) => {
+      const itemGroups = resolveItemGroupTargets(activeSelectedGroupIds, item.extraGroupIds, groupDistributionMode, idx);
+      return sum + itemGroups.length * fanpageMultiplier;
+    }, 0);
   }, [linkItems, postMode, isMultiDistributeActive, activeSelectedGroupIds, activeSelectedFanpageIds, groupDistributionMode]);
 
 
@@ -1825,14 +1804,15 @@ const PlaywrightPoster = () => {
     }
   }, [form, postingIdentities, playwrightAccounts, postMode]);
 
-  // Khởi tạo bình luận mặc định từ LocalStorage hoặc mẫu có sẵn
+  // Khởi tạo bình luận: Mặc định ĐỂ TRỐNG (TẮT), chỉ điền nếu người dùng từng chủ động lưu mẫu riêng của mình
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY_COMMENT);
-    if (!saved || saved.trim() === '' || !saved.includes('9fLALT7wfw')) {
-      localStorage.setItem(STORAGE_KEY_COMMENT, DEFAULT_SAVED_COMMENT);
-      form.setFieldValue('affiliateLink', DEFAULT_SAVED_COMMENT);
-    } else {
+    if (saved && saved.trim() !== '' && !saved.includes('9fLALT7wfw')) {
       form.setFieldValue('affiliateLink', saved);
+    } else {
+      // Xoá mẫu mặc định cũ để tránh tự ý bình luận
+      localStorage.removeItem(STORAGE_KEY_COMMENT);
+      form.setFieldValue('affiliateLink', '');
     }
   }, [form]);
 
@@ -1946,28 +1926,8 @@ const PlaywrightPoster = () => {
 
   const [filterHistoryDuplicates, setFilterHistoryDuplicates] = useState(false);
 
-  // Smart Schedule: lên lịch thông minh theo khung giờ nhóm
-  const [smartScheduleEnabled, setSmartScheduleEnabled] = useState(false);
+  // Nhóm đang lên bài bù KPI (mở từ Floating KPI Popover) — chỉ để hiện chỉ tiêu, không xếp giờ
   const [smartGroupId, setSmartGroupId] = useState<string>('');
-  const [smartDailyLimit, setSmartDailyLimit] = useState<number>(10);
-  const STORAGE_KEY_GROUP_LIMITS = 'autopost_group_daily_limits';
-
-  // Lấy daily limit đã lưu cho nhóm cụ thể
-  const getGroupDailyLimit = useCallback((groupId: string): number => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY_GROUP_LIMITS) || '{}');
-      return saved[groupId] ?? 10;
-    } catch { return 10; }
-  }, []);
-
-  // Lưu daily limit cho nhóm
-  const saveGroupDailyLimit = useCallback((groupId: string, limit: number) => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY_GROUP_LIMITS) || '{}');
-      saved[groupId] = limit;
-      localStorage.setItem(STORAGE_KEY_GROUP_LIMITS, JSON.stringify(saved));
-    } catch { /* ignore */ }
-  }, []);
 
   const {
     groupCheckModalVisible, setGroupCheckModalVisible, groupCheckingMap, groupJoiningMap,
@@ -2086,9 +2046,7 @@ const PlaywrightPoster = () => {
       if (mode) setPostMode(mode);
       else setPostMode('GROUP_ONLY');
       form.setFieldValue('targetGroupId', targetGroupId);
-      setSmartScheduleEnabled(true);
       setSmartGroupId(targetGroupId);
-      setSmartDailyLimit(getGroupDailyLimit(targetGroupId));
       if (openBulk === '1') {
         setBulkModalVisible(true);
       }
@@ -2109,110 +2067,8 @@ const PlaywrightPoster = () => {
       message.info(`🎯 Đang lên bài bù KPI cho Fanpage "${groupName || targetFanpageId}"${missing ? ` (còn thiếu ${missing} bài hôm nay)` : ''}`, 6);
       setSearchParams({}, { replace: true });
     }
-  }, [searchParams, form, playwrightAccounts, getGroupDailyLimit, setSearchParams, message]);
+  }, [searchParams, form, playwrightAccounts, setSearchParams, message]);
 
-  /**
-   * Tính toán lịch thông minh cho N bài mới vào một nhóm cụ thể.
-   * Nguyên lý:
-   *   - Lấy tất cả bài PENDING/PROCESSING của nhóm đó.
-   *   - Nhóm theo từng ngày, đếm xem mỗi ngày còn slot nào chưa đầy (< dailyLimit).
-   *   - Bài mới được ghép vào slot trống tiếp theo, cách nhau (24h / dailyLimit).
-   *   - Nếu hôm nay đầy → chuyển sang ngày mai, cứ vậy tiếp.
-   */
-  const computeSmartSchedule = useCallback((
-    targetGroupId: string,
-    newCount: number,
-    dailyLimit: number,
-  ): Dayjs[] => {
-    if (!targetGroupId || newCount === 0) return [];
-    const now = dayjs();
-    const minSafeInterval = 60; // Tối thiểu cách nhau 60 phút giữa 2 bài của cùng 1 nhóm
-    const limit = Math.max(1, dailyLimit || 4);
-    // Khung giờ vàng ban ngày từ 07:30 đến 22:30 (15 tiếng = 900 phút)
-    const idealInterval = Math.max(minSafeInterval, Math.floor(900 / limit));
-
-    // Lọc pending/processing posts thuộc nhóm này
-    const pendingForGroup = (posts || []).filter((p) => {
-      if (p.status !== 'PENDING' && p.status !== 'PROCESSING') return false;
-      const raw = (p.targetGroupNames || '').replace(/^GROUP_ONLY_ANON:|^GROUP_ONLY:/, '');
-      return raw.split(',').map((v) => v.trim()).includes(targetGroupId);
-    });
-
-    // Build map: dateStr → list of scheduledAt (sorted asc)
-    const occupiedByDate = new Map<string, Dayjs[]>();
-    pendingForGroup.forEach((p) => {
-      const dt = dayjs(p.scheduledAt);
-      const key = dt.format('YYYY-MM-DD');
-      if (!occupiedByDate.has(key)) occupiedByDate.set(key, []);
-      occupiedByDate.get(key)!.push(dt);
-    });
-    occupiedByDate.forEach((slots) => slots.sort((a, b) => a.valueOf() - b.valueOf()));
-
-    const result: Dayjs[] = [];
-    let currentDate = now.startOf('day');
-
-    // Duyệt qua tối đa 30 ngày để tìm slot an toàn, không trùng
-    for (let d = 0; d < 30 && result.length < newCount; d++) {
-      const isToday = currentDate.isSame(now, 'day');
-      const dateStr = currentDate.format('YYYY-MM-DD');
-      const occupied = occupiedByDate.get(dateStr) || [];
-      const scheduledThisDay = result.filter((r) => r.isSame(currentDate, 'day'));
-      const totalPlannedToday = occupied.length + scheduledThisDay.length;
-      const availableCount = Math.max(0, limit - totalPlannedToday);
-
-      if (availableCount > 0) {
-        let cursor: Dayjs;
-        if (isToday) {
-          cursor = now.add(10, 'minute');
-        } else {
-          cursor = currentDate.hour(7).minute(30).second(0);
-        }
-
-        const maxEndTimeToday = currentDate.hour(22).minute(30).second(0);
-
-        // Gom toàn bộ mốc đã có (cả bài pending cũ và các bài vừa xếp trong result)
-        const allOccupiedToday = [...occupied, ...scheduledThisDay].sort((a, b) => a.valueOf() - b.valueOf());
-
-        while (result.filter((r) => r.isSame(currentDate, 'day')).length < availableCount && result.length < newCount) {
-          if (cursor.isBefore(now.add(5, 'minute'))) {
-            cursor = now.add(5, 'minute');
-          }
-
-          // Kiểm tra xem cursor có bị trùng gần (< minSafeInterval) với bất kỳ mốc đã có nào không
-          let hasConflict = false;
-          for (const occ of allOccupiedToday) {
-            const diffMins = Math.abs(cursor.diff(occ, 'minute'));
-            if (diffMins < minSafeInterval) {
-              // Xung đột -> đẩy cursor ra sau mốc này ít nhất minSafeInterval
-              cursor = occ.add(minSafeInterval, 'minute');
-              hasConflict = true;
-              break;
-            }
-          }
-
-          if (hasConflict) {
-            continue;
-          }
-
-          // Nếu vượt quá 22:30 hôm nay -> dừng hôm nay, chuyển sang ngày mai
-          if (cursor.isAfter(maxEndTimeToday)) {
-            break;
-          }
-
-          // Slot hợp lệ
-          result.push(cursor);
-          allOccupiedToday.push(cursor);
-          allOccupiedToday.sort((a, b) => a.valueOf() - b.valueOf());
-
-          // Tiến cursor lên cho slot tiếp theo
-          cursor = cursor.add(idealInterval, 'minute');
-        }
-      }
-      currentDate = currentDate.add(1, 'day');
-    }
-
-    return result;
-  }, [posts]);
 
 
 
@@ -2240,12 +2096,6 @@ const PlaywrightPoster = () => {
       duplicateInHistoryCount: historyMatchedUrls.length,
     };
   }, [bulkText, posts, filterHistoryDuplicates]);
-
-  // Kết quả tính toán smart schedule (live preview) — phải đặt sau bulkPasteSummary
-  const smartScheduleTimes = useMemo(() => {
-    if (!smartScheduleEnabled || !smartGroupId || bulkPasteSummary.finalUrls.length === 0) return [];
-    return computeSmartSchedule(smartGroupId, bulkPasteSummary.finalUrls.length, smartDailyLimit);
-  }, [smartScheduleEnabled, smartGroupId, smartDailyLimit, bulkPasteSummary.finalUrls.length, computeSmartSchedule]);
 
   // Mục tiêu KPI hôm nay của nhóm đang chọn (tính cả bài đã đăng và bài đang chờ đăng hôm nay)
   const currentKpiTarget = useMemo(() => {
@@ -2755,17 +2605,24 @@ const PlaywrightPoster = () => {
     }
 
     // 2. Nếu đang chọn "Tất cả nhóm" (ALL)
-    const allMap = new Map<string, { count: number; isAnon?: boolean }>();
+    const today = dayjs();
+    const allMap = new Map<string, { count: number; isAnon?: boolean; publishedToday: number; failedCount: number }>();
     let totalPending = 0;
     (posts || []).forEach((post) => {
+      const posterName = resolvePosterIdentityName(post) || 'Chưa gán Page';
+      const isAnon = !!(post.targetGroupNames?.startsWith('GROUP_ONLY_ANON:') || post.targetFanpageId === 'PERSONAL_PROFILE');
+      const cur = allMap.get(posterName) || { count: 0, isAnon, publishedToday: 0, failedCount: 0 };
       if (post.status === 'PENDING' || post.status === 'PROCESSING') {
         totalPending += 1;
-        const posterName = resolvePosterIdentityName(post) || 'Chưa gán Page';
-        const isAnon = !!(post.targetGroupNames?.startsWith('GROUP_ONLY_ANON:') || post.targetFanpageId === 'PERSONAL_PROFILE');
-        const cur = allMap.get(posterName) || { count: 0, isAnon };
         cur.count += 1;
-        allMap.set(posterName, cur);
+      } else if (post.status === 'PUBLISHED') {
+        if (post.publishedAt && dayjs(post.publishedAt).isSame(today, 'day')) {
+          cur.publishedToday += 1;
+        }
+      } else if (post.status === 'FAILED' || post.status === 'CANCELLED') {
+        cur.failedCount += 1;
       }
+      allMap.set(posterName, cur);
     });
 
     const pagesList: PendingPageBreakdownItem[] = [];
@@ -2776,6 +2633,8 @@ const PlaywrightPoster = () => {
         count: val.count,
         percent,
         isAnon: val.isAnon,
+        publishedToday: val.publishedToday,
+        failedCount: val.failedCount,
       });
     });
     pagesList.sort((a, b) => b.count - a.count);
@@ -2809,28 +2668,69 @@ const PlaywrightPoster = () => {
     queryClient.invalidateQueries({ queryKey: ['postQueuePlaywright'] });
   };
 
-  const {
-    computeTimeWindowSchedule, bulkRescheduleModalVisible, setBulkRescheduleModalVisible,
-    bulkRescheduleTargetScope, setBulkRescheduleTargetScope, bulkRescheduleMode, setBulkRescheduleMode,
-    setBulkRescheduleDate, bulkRescheduleDate, setBulkRescheduleStartTime, bulkRescheduleStartTime,
-    setBulkRescheduleEndTime, bulkRescheduleEndTime, bulkRescheduleInterval, setBulkRescheduleInterval,
-    bulkRescheduleInterleave, setBulkRescheduleInterleave, bulkRescheduleSpreadPerGroup, setBulkRescheduleSpreadPerGroup, bulkRescheduleMaxPerDay,
-    setBulkRescheduleMaxPerDay, bulkRescheduleSameDayGap, setBulkRescheduleSameDayGap,
-    setBulkRescheduleDistributeNicks, bulkRescheduleDistributeNicks, setBulkRescheduleSelectedNicks,
-    bulkRescheduleSelectedNicks, viralMaxPerTargetPerDay, setViralMaxPerTargetPerDay, viralMinGapPerTarget,
-    setViralMinGapPerTarget, viralMinGapGlobal, setViralMinGapGlobal, viralJitter, setViralJitter,
-    setViralSeed, rescheduleTargetPosts, reschedulePreviewList, reschedulePreviewStats,
-    handleApplyBulkReschedule,
-  } = useBulkReschedule({
-    desiredMinInterval,
-    posts,
-    selectedRowKeys,
-    postingIdentities,
-    accountTargetValue,
-    setIsBulkProcessing,
-    setSelectedRowKeys,
-    queryClient,
-  });
+  // Xếp lại lịch theo cài đặt chung (khung giờ + giãn cách + làn theo nick). ids trống = cả hàng đợi.
+  const handleRepackQueue = (ids?: React.Key[]) => {
+    const run = async () => {
+      setIsBulkProcessing(true);
+      try {
+        const body = ids && ids.length > 0 ? { ids: ids.map((k) => Number(k)) } : {};
+        const res = await api.post('/queue/pack-continuous', body);
+        const finish = res.data?.estimatedFinishAt ? dayjs(res.data.estimatedFinishAt).format('HH:mm DD/MM') : '';
+        const deferred = Number(res.data?.deferredCount) || 0;
+        message.success(`Đã xếp lại ${res.data?.updated ?? 0} bài${finish ? `, dự kiến xong lúc ${finish}` : ''}`
+          + (deferred > 0 ? `. ${deferred} bài sang ngày sau.` : '.'), 5);
+        setSelectedRowKeys([]);
+        queryClient.invalidateQueries({ queryKey: ['postQueuePlaywright'] });
+        queryClient.invalidateQueries({ queryKey: POSTING_WINDOW_QUERY_KEY });
+      } catch (err: any) {
+        message.error(err?.response?.data?.message || 'Không xếp lại được lịch');
+      } finally {
+        setIsBulkProcessing(false);
+      }
+    };
+    if (ids && ids.length > 0) {
+      run();
+      return;
+    }
+    modal.confirm({
+      title: 'Xếp lại toàn bộ hàng đợi?',
+      content: 'Mọi bài đang chờ sẽ được xếp nối đuôi theo Lịch đăng chung, kể cả bài đã hẹn giờ riêng.',
+      okText: 'Xếp lại',
+      cancelText: 'Hủy',
+      onOk: run,
+    });
+  };
+
+  // Xếp lại lịch rải đều toàn bộ các nhóm suốt cả ngày (xen kẽ nhóm, không dồn cục)
+  const handleSpreadGroupsQueue = (ids?: React.Key[]) => {
+    const run = async () => {
+      setIsBulkProcessing(true);
+      try {
+        const body = ids && ids.length > 0 ? { ids: ids.map((k) => Number(k)) } : {};
+        const res = await api.post('/queue/spread-groups', body);
+        const finish = res.data?.estimatedFinishAt ? dayjs(res.data.estimatedFinishAt).format('HH:mm DD/MM') : '';
+        message.success(`🎯 Đã rải đều ${res.data?.updated ?? 0} bài cho ${res.data?.groupCount ?? 0} nhóm${finish ? `, dự kiến xong lúc ${finish}` : ''}.`, 5);
+        setSelectedRowKeys([]);
+        queryClient.invalidateQueries({ queryKey: ['postQueuePlaywright'] });
+        queryClient.invalidateQueries({ queryKey: POSTING_WINDOW_QUERY_KEY });
+      } catch (err: any) {
+        message.error(err?.response?.data?.message || 'Không thể rải đều lịch nhóm');
+      } finally {
+        setIsBulkProcessing(false);
+      }
+    };
+    if (ids && ids.length > 0) {
+      run();
+      return;
+    }
+    modal.confirm({
+      title: '🎯 Rải đều bài của toàn bộ các nhóm cả ngày?',
+      content: 'Hệ thống sẽ gom các bài theo từng nhóm, tự động xếp xen kẽ so le xoay vòng và giãn cách đều đặn suốt cả ngày, không bị dồn cục vào 1 khung giờ.',
+      okText: 'Rải đều',
+      cancelText: 'Hủy',
+      onOk: run,
+    });
+  };
 
   // Xử lý Xóa hàng loạt các bài được chọn
   const handleBulkDelete = async () => {
@@ -2904,6 +2804,10 @@ const PlaywrightPoster = () => {
 
   const updateLinkCustomCaption = (id: string, customCaption: string) => {
     setLinkItems((prev) => prev.map((item) => (item.id === id ? { ...item, customCaption } : item)));
+  };
+
+  const updateLinkExtraGroupIds = (id: string, extraGroupIds: string[]) => {
+    setLinkItems((prev) => prev.map((item) => (item.id === id ? { ...item, extraGroupIds } : item)));
   };
 
   const updateLinkInputType = (id: string, inputType: 'LINK' | 'MANUAL') => {
@@ -3210,10 +3114,7 @@ const PlaywrightPoster = () => {
   });
 
   const {
-    autoFixQueueModalVisible, smartDispatchInterval, setSmartDispatchInterval, smartDispatchStartMode,
-    setSmartDispatchStartMode, smartDispatchSummary, resetEqualDistribution, handleSmartDispatch,
-    setAutoFixQueueModalVisible, autoFixInterval, setAutoFixInterval, autoFixStartMode, setAutoFixStartMode,
-    autoFixDistributeVias, setAutoFixDistributeVias, handleAutoFixQueue, applyEqualDistributionToPosts,
+    smartDispatchSummary, resetEqualDistribution, handleSmartDispatch, applyEqualDistributionToPosts,
   } = useQueueDispatch({
     selectedDistributePages,
     linkItems,
@@ -3283,54 +3184,6 @@ const PlaywrightPoster = () => {
     setLinkItems((prev) => prev.filter((item) => item.id !== id));
   };
 
-  // Chia đều thời gian cho tất cả các dòng hiện có trên form
-  const handleApplyBatchSchedule = () => {
-    const now = dayjs();
-    if (linkItems.length === 0) return;
-    setQueueAppendMode(false);
-
-    if (batchScheduleMode === 'WINDOW') {
-      const dateObj = dayjs.isDayjs(batchWindowDate) ? batchWindowDate : dayjs(batchWindowDate || new Date());
-      const startObj = dayjs.isDayjs(batchWindowStartTime) ? batchWindowStartTime : dayjs().hour(9).minute(0).second(0);
-      const endObj = dayjs.isDayjs(batchWindowEndTime) ? batchWindowEndTime : dayjs().hour(17).minute(30).second(0);
-
-      const times = computeTimeWindowSchedule(
-        dateObj,
-        startObj,
-        endObj,
-        linkItems.length,
-        batchWindowMaxPerDay,
-        desiredMinInterval
-      );
-      setLinkItems((prev) =>
-        prev.map((item, idx) => ({
-          ...item,
-          isNow: false,
-          scheduledAt: times[idx] || now.add(idx * 15, 'minute'),
-        }))
-      );
-      message.success(`⚡ Đã chia đều ${linkItems.length} bài từ ${startObj.format('HH:mm')} đến ${endObj.format('HH:mm')} ngày ${dateObj.format('DD/MM/YYYY')}!`);
-    } else {
-      const base = batchScheduleMode === 'NOW'
-        ? now
-        : (dayjs.isDayjs(batchStartTime) ? batchStartTime : dayjs(batchStartTime || new Date()));
-      const intervalMinutes = batchInterval || 15;
-      setLinkItems((prev) =>
-        prev.map((item, idx) => {
-          if (batchScheduleMode === 'NOW' && idx === 0) {
-            return { ...item, isNow: true, scheduledAt: now };
-          }
-          return {
-            ...item,
-            isNow: false,
-            scheduledAt: base.add(idx * intervalMinutes, 'minute'),
-          };
-        })
-      );
-      message.success(`⚡ Đã chia đều giờ cho ${linkItems.length} bài viết (khoảng cách ${batchInterval || 15} phút)!`);
-    }
-  };
-
   // Bật/tắt "Không cmt" hàng loạt cho TOÀN BỘ danh sách hiện tại, thay vì phải tick từng dòng một
   const applyDisableAllComments = () => {
     setLinkItems((prev) => prev.map((item) => ({ ...item, skipComment: true })));
@@ -3376,76 +3229,20 @@ const PlaywrightPoster = () => {
 
     let newItems: PostLinkItem[] = [];
 
-    // ── Smart Schedule mode ──────────────────────────────────
-    if (smartScheduleEnabled && smartGroupId && smartScheduleTimes.length > 0) {
-      if (smartScheduleTimes.length < filteredUrls.length) {
-        message.warning(
-          `⚠️ Chỉ tìm được ${smartScheduleTimes.length} slot trống trong 30 ngày tới (cần ${filteredUrls.length}). Hãy tăng giới hạn bài/ngày hoặc giảm số link.`,
-          7
-        );
-      }
-      newItems = filteredUrls.map((url, idx) => {
-        const cached = bulkDrawerPreviews[url];
-        const customTime = customDrawerScheduledTimes[url];
-        return {
-          id: Math.random().toString(36).substring(2, 9),
-          url,
-          isNow: false,
-          scheduledAt: customTime || smartScheduleTimes[idx] || now.add((idx + 1) * 10, 'minute'),
-          includeCredit: cached?.includeCredit !== false,
-          skipComment: !!cached?.skipComment,
-          affiliateLink: cached?.affiliateComment,
-          customCaption: cached?.caption,
-        };
-      });
-    } else {
-      // ── Manual / Standard mode ───────────────────────────────
-      let computedTimes: Dayjs[] = [];
-      if (bulkScheduleMode === 'WINDOW') {
-        computedTimes = computeTimeWindowSchedule(
-          bulkWindowDate,
-          bulkWindowStartTime,
-          bulkWindowEndTime,
-          filteredUrls.length,
-          bulkWindowMaxPerDay,
-          desiredMinInterval
-        );
-      }
-
-      newItems = filteredUrls.map((url, idx) => {
-        const cached = bulkDrawerPreviews[url];
-        const customTime = customDrawerScheduledTimes[url];
-        const isAlreadyPosted = bulkPasteSummary.historyMatchedUrls.includes(url);
-
-        let assignedTime: Dayjs;
-        let isNow = false;
-
-        if (bulkScheduleMode === 'WINDOW') {
-          assignedTime = customTime || computedTimes[idx] || now;
-        } else if (bulkScheduleMode === 'NOW') {
-          if (!customTime && idx === 0 && !isAlreadyPosted) {
-            isNow = true;
-            assignedTime = now;
-          } else {
-            assignedTime = customTime || now.add(idx * bulkInterval, 'minute');
-          }
-        } else {
-          // INTERVAL mode
-          assignedTime = customTime || bulkStartTime.add(idx * bulkInterval, 'minute');
-        }
-
-        return {
-          id: Math.random().toString(36).substring(2, 9),
-          url,
-          isNow,
-          scheduledAt: assignedTime,
-          includeCredit: cached?.includeCredit !== false,
-          skipComment: !!cached?.skipComment,
-          affiliateLink: cached?.affiliateComment,
-          customCaption: cached?.caption,
-        };
-      });
-    }
+    // Giờ đăng không chọn ở đây: nút Đăng gửi kèm cách chọn giờ chung (Đăng ngay / Xếp vào lịch / Hẹn giờ)
+    newItems = filteredUrls.map((url) => {
+      const cached = bulkDrawerPreviews[url];
+      return {
+        id: Math.random().toString(36).substring(2, 9),
+        url,
+        isNow: true,
+        scheduledAt: now,
+        includeCredit: cached?.includeCredit !== false,
+        skipComment: !!cached?.skipComment,
+        affiliateLink: cached?.affiliateComment,
+        customCaption: cached?.caption,
+      };
+    });
 
     // Tự động chuyển toàn bộ preview ảnh/video đã cào trong Drawer sang previews chính
     const initialPreviews: typeof previews = {};
@@ -3590,8 +3387,8 @@ const PlaywrightPoster = () => {
         const isRealEstateFanpage = checkIsVietnamRealEstate(values.targetFanpageId) ||
           validItems.some(i => checkIsVietnamRealEstate(customItemTargets[i.id]));
 
-        const savedComment = localStorage.getItem(STORAGE_KEY_COMMENT) || DEFAULT_SAVED_COMMENT;
-        let effectiveDefaultComment = values.affiliateLink?.trim() || form.getFieldValue('affiliateLink')?.trim() || (savedComment && savedComment.trim()) || undefined;
+        // CHỈ dùng bình luận khi người dùng chủ động điền vào ô affiliateLink
+        let effectiveDefaultComment = values.affiliateLink?.trim() || form.getFieldValue('affiliateLink')?.trim() || undefined;
         if ((isSapGiau || isRealEstateFanpage) && effectiveDefaultComment && /shopee|shp\.ee|shope\.ee|affiliate/i.test(effectiveDefaultComment)) {
           effectiveDefaultComment = undefined;
         }
@@ -3628,17 +3425,7 @@ const PlaywrightPoster = () => {
           : (effectiveGroupNames ? [String(effectiveGroupNames)] : []);
 
         if (postMode === 'FANPAGE_AND_GROUP' && (selectedGroupIds.length > 0 || selectedFanpageIds.length > 0)) {
-          const expandedUrls: string[] = [];
-          const expandedScheduledTimes: string[] = [];
-          const expandedCustomCaptions: string[] = [];
-          const expandedCustomMediaUrls: string[] = [];
-          const expandedAffiliateLinks: string[] = [];
-          const expandedTargetGroupNamesList: string[] = [];
-          const expandedTargetFanpageIdsList: string[] = [];
-          const expandedCommentDisabled: boolean[] = [];
-          const expandedGroupCommentEnabled: boolean[] = [];
-          const expandedIncludeCredits: boolean[] = [];
-          const expandedColorBackgrounds: (boolean | string)[] = [];
+          const rawTasks: GroupScheduleTask[] = [];
 
           validItems.forEach((i, itemIdx) => {
             const itemUrl = i.inputType === 'MANUAL' ? `manual://post_${i.id}` : i.url.trim();
@@ -3652,92 +3439,65 @@ const PlaywrightPoster = () => {
               itemMedia = itemMedia.split(',')[0].trim();
             }
             const baseAffLink = (i.affiliateLink && i.affiliateLink.trim().length > 0) ? i.affiliateLink.trim() : (effectiveDefaultComment || '');
-            const baseTime = i.isNow ? dayjs() : i.scheduledAt;
 
             const groupsToLoop = selectedGroupIds.length > 0 ? selectedGroupIds : [''];
             const fanpagesToLoop = selectedFanpageIds.length > 0 ? selectedFanpageIds : [values.targetFanpageId || ''];
             const rawItemTarget = customItemTargets[i.id];
             const itemTarget = (rawItemTarget && fanpagesToLoop.includes(rawItemTarget)) ? rawItemTarget : undefined;
+            const resolvedGroups = resolveItemGroupTargets(groupsToLoop, i.extraGroupIds, groupDistributionMode, itemIdx);
+
+            const pushFanpageGroupTask = (gId: string, fId: string) => {
+              const finalAffLink = resolveAffiliateLinkForGroup(gId, baseAffLink);
+              rawTasks.push({
+                itemUrl,
+                itemCaption,
+                itemMedia,
+                finalAffLink,
+                targetGroupId: gId,
+                targetFanpageId: fId,
+                commentDisabled: Boolean(i.skipComment),
+                groupCommentEnabled: Boolean(i.groupCommentEnabled) && isGroupCommentAllowedForGroup(gId),
+                includeCredit: i.includeCredit !== false,
+                colorBackground: resolveColorBgValue(i.colorBackground),
+              });
+            };
 
             if (itemTarget) {
-              groupsToLoop.forEach((gId, gIdx) => {
-                const finalAffLink = resolveAffiliateLinkForGroup(gId, baseAffLink);
-                const offsetMinutes = gIdx * groupStaggerInterval;
-                const groupScheduledAt = baseTime.add(offsetMinutes, 'minute');
-
-                expandedUrls.push(itemUrl);
-                expandedScheduledTimes.push(groupScheduledAt.format('YYYY-MM-DDTHH:mm:ss'));
-                expandedCustomCaptions.push(itemCaption);
-                expandedCustomMediaUrls.push(itemMedia);
-                expandedAffiliateLinks.push(finalAffLink);
-                expandedTargetGroupNamesList.push(gId);
-                expandedTargetFanpageIdsList.push(itemTarget);
-                expandedCommentDisabled.push(Boolean(i.skipComment));
-                expandedGroupCommentEnabled.push(Boolean(i.groupCommentEnabled) && isGroupCommentAllowedForGroup(gId));
-                expandedIncludeCredits.push(i.includeCredit !== false);
-                expandedColorBackgrounds.push(resolveColorBgValue(i.colorBackground));
-              });
+              resolvedGroups.forEach((gId) => pushFanpageGroupTask(gId, itemTarget));
             } else if (groupDistributionMode === 'PAGE_PER_GROUP') {
-              groupsToLoop.forEach((gId, gIdx) => {
-                const fId = fanpagesToLoop[(gIdx + itemIdx) % fanpagesToLoop.length];
-                const finalAffLink = resolveAffiliateLinkForGroup(gId, baseAffLink);
-                const offsetMinutes = gIdx * groupStaggerInterval;
-                const groupScheduledAt = baseTime.add(offsetMinutes, 'minute');
-
-                expandedUrls.push(itemUrl);
-                expandedScheduledTimes.push(groupScheduledAt.format('YYYY-MM-DDTHH:mm:ss'));
-                expandedCustomCaptions.push(itemCaption);
-                expandedCustomMediaUrls.push(itemMedia);
-                expandedAffiliateLinks.push(finalAffLink);
-                expandedTargetGroupNamesList.push(gId);
-                expandedTargetFanpageIdsList.push(fId);
-                expandedCommentDisabled.push(Boolean(i.skipComment));
-                expandedGroupCommentEnabled.push(Boolean(i.groupCommentEnabled) && isGroupCommentAllowedForGroup(gId));
-                expandedIncludeCredits.push(i.includeCredit !== false);
-                expandedColorBackgrounds.push(resolveColorBgValue(i.colorBackground));
+              resolvedGroups.forEach((gId, gIdx) => {
+                pushFanpageGroupTask(gId, fanpagesToLoop[(gIdx + itemIdx) % fanpagesToLoop.length]);
               });
             } else if (groupDistributionMode === 'ROUND_ROBIN_POSTS') {
-              const gIdx = itemIdx % groupsToLoop.length;
-              const gId = groupsToLoop[gIdx];
               const fId = fanpagesToLoop[itemIdx % fanpagesToLoop.length];
-              const finalAffLink = resolveAffiliateLinkForGroup(gId, baseAffLink);
-              const offsetMinutes = itemIdx * groupStaggerInterval;
-              const groupScheduledAt = baseTime.add(offsetMinutes, 'minute');
-
-              expandedUrls.push(itemUrl);
-              expandedScheduledTimes.push(groupScheduledAt.format('YYYY-MM-DDTHH:mm:ss'));
-              expandedCustomCaptions.push(itemCaption);
-              expandedCustomMediaUrls.push(itemMedia);
-              expandedAffiliateLinks.push(finalAffLink);
-              expandedTargetGroupNamesList.push(gId);
-              expandedTargetFanpageIdsList.push(fId);
-              expandedCommentDisabled.push(Boolean(i.skipComment));
-              expandedGroupCommentEnabled.push(Boolean(i.groupCommentEnabled) && isGroupCommentAllowedForGroup(gId));
-              expandedIncludeCredits.push(i.includeCredit !== false);
-              expandedColorBackgrounds.push(resolveColorBgValue(i.colorBackground));
+              resolvedGroups.forEach((gId) => pushFanpageGroupTask(gId, fId));
             } else {
-              groupsToLoop.forEach((gId, gIdx) => {
-                fanpagesToLoop.forEach((fId, fIdx) => {
-                  const finalAffLink = resolveAffiliateLinkForGroup(gId, baseAffLink);
-                  const taskIndex = gIdx * fanpagesToLoop.length + fIdx;
-                  const offsetMinutes = taskIndex * groupStaggerInterval;
-                  const groupScheduledAt = baseTime.add(offsetMinutes, 'minute');
-
-                  expandedUrls.push(itemUrl);
-                  expandedScheduledTimes.push(groupScheduledAt.format('YYYY-MM-DDTHH:mm:ss'));
-                  expandedCustomCaptions.push(itemCaption);
-                  expandedCustomMediaUrls.push(itemMedia);
-                  expandedAffiliateLinks.push(finalAffLink);
-                  expandedTargetGroupNamesList.push(gId);
-                  expandedTargetFanpageIdsList.push(fId);
-                  expandedCommentDisabled.push(Boolean(i.skipComment));
-                  expandedGroupCommentEnabled.push(Boolean(i.groupCommentEnabled) && isGroupCommentAllowedForGroup(gId));
-                  expandedIncludeCredits.push(i.includeCredit !== false);
-                  expandedColorBackgrounds.push(resolveColorBgValue(i.colorBackground));
-                });
+              resolvedGroups.forEach((gId) => {
+                fanpagesToLoop.forEach((fId) => pushFanpageGroupTask(gId, fId));
               });
             }
           });
+
+          const baseTime = validItems[0]?.isNow ? dayjs() : (validItems[0]?.scheduledAt || dayjs());
+          const scheduledTasks = distributeGroupTasks(rawTasks, {
+            timingMode: groupTimingMode,
+            staggerIntervalMinutes: groupStaggerInterval,
+            spreadStart: groupSpreadStart,
+            spreadEnd: groupSpreadEnd,
+            baseTime,
+          });
+
+          const expandedUrls = scheduledTasks.map((t) => t.itemUrl);
+          const expandedScheduledTimes = scheduledTasks.map((t) => t.scheduledIso);
+          const expandedCustomCaptions = scheduledTasks.map((t) => t.itemCaption);
+          const expandedCustomMediaUrls = scheduledTasks.map((t) => t.itemMedia);
+          const expandedAffiliateLinks = scheduledTasks.map((t) => t.finalAffLink);
+          const expandedTargetGroupNamesList = scheduledTasks.map((t) => t.targetGroupId);
+          const expandedTargetFanpageIdsList = scheduledTasks.map((t) => t.targetFanpageId);
+          const expandedCommentDisabled = scheduledTasks.map((t) => t.commentDisabled);
+          const expandedGroupCommentEnabled = scheduledTasks.map((t) => t.groupCommentEnabled);
+          const expandedIncludeCredits = scheduledTasks.map((t) => t.includeCredit);
+          const expandedColorBackgrounds = scheduledTasks.map((t) => t.colorBackground);
 
           const isFirstImmediate = validItems[0].isNow;
 
@@ -3746,7 +3506,10 @@ const PlaywrightPoster = () => {
             scheduledTimes: expandedScheduledTimes,
             intervalMinutes: batchInterval,
             publishNow: isFirstImmediate,
-            ...queueAppendPayload,
+            ...scheduleBody,
+            groupTimingMode,
+            groupSpreadStart: groupSpreadStart.format('YYYY-MM-DDTHH:mm:ss'),
+            groupSpreadEnd: groupSpreadEnd.format('YYYY-MM-DDTHH:mm:ss'),
             targetFanpageId: expandedTargetFanpageIdsList[0] || selectedFanpageIds[0] || values.targetFanpageId,
             targetFanpageIds: expandedTargetFanpageIdsList,
             targetGroupNamesList: expandedTargetGroupNamesList,
@@ -3776,12 +3539,17 @@ const PlaywrightPoster = () => {
         });
         const colorBackgrounds = validItems.map((i) => resolveColorBgValue(i.colorBackground));
 
+        const hasPerItemExtraGroups = validItems.some((i) => (i.extraGroupIds?.length || 0) > 0);
+        const targetGroupNamesList = hasPerItemExtraGroups
+          ? validItems.map((i) => (i.extraGroupIds && i.extraGroupIds.length > 0 ? i.extraGroupIds.join(',') : null))
+          : undefined;
+
         const payload = {
           urls,
           scheduledTimes: effectiveScheduledTimes,
           intervalMinutes: batchInterval,
           publishNow: isFirstImmediate,
-          ...queueAppendPayload,
+          ...scheduleBody,
           targetFanpageId: (effectiveTargetFanpageIds && effectiveTargetFanpageIds.length > 0) ? effectiveTargetFanpageIds[0] : (Array.isArray(values.targetFanpageId) ? values.targetFanpageId[0] : values.targetFanpageId),
           targetFanpageIds: effectiveTargetFanpageIds,
           affiliateLink: effectiveDefaultComment,
@@ -3793,6 +3561,7 @@ const PlaywrightPoster = () => {
           customCaptions,
           customMediaUrls,
           groupNames: effectiveGroupNames,
+          ...(targetGroupNamesList ? { targetGroupNamesList } : {}),
           isAnonymous,
           forceRefresh,
         };
@@ -3880,20 +3649,10 @@ const PlaywrightPoster = () => {
       try {
         const primaryTarget = selectedFanpageIds[0];
         const pageId = primaryTarget ? String(primaryTarget).split(':')[0] : undefined;
-        const savedComment = localStorage.getItem(STORAGE_KEY_COMMENT) || DEFAULT_SAVED_COMMENT;
-        const effectiveDefaultComment = values.affiliateLink?.trim() || form.getFieldValue('affiliateLink')?.trim() || (savedComment && savedComment.trim()) || undefined;
+        // CHỈ dùng bình luận khi người dùng chủ động điền vào ô affiliateLink
+        const effectiveDefaultComment = values.affiliateLink?.trim() || form.getFieldValue('affiliateLink')?.trim() || undefined;
 
-        const expandedUrls: string[] = [];
-        const expandedScheduledTimes: string[] = [];
-        const expandedCustomCaptions: string[] = [];
-        const expandedCustomMediaUrls: string[] = [];
-        const expandedAffiliateLinks: string[] = [];
-        const expandedTargetGroupNamesList: string[] = [];
-        const expandedTargetFanpageIdsList: string[] = [];
-        const expandedCommentDisabled: boolean[] = [];
-        const expandedGroupCommentEnabled: boolean[] = [];
-        const expandedIncludeCredits: boolean[] = [];
-        const expandedColorBackgrounds: (boolean | string)[] = [];
+        const rawGroupTasks: GroupScheduleTask[] = [];
 
         validItems.forEach((i, itemIdx) => {
           const itemUrl = (!i.url || !i.url.trim()) ? `manual://post_${i.id}` : i.url.trim();
@@ -3907,102 +3666,78 @@ const PlaywrightPoster = () => {
             itemMedia = itemMedia.split(',')[0].trim();
           }
           const baseAffLink = (i.affiliateLink && i.affiliateLink.trim().length > 0) ? i.affiliateLink.trim() : (effectiveDefaultComment || '');
-          const baseTime = i.isNow ? dayjs() : i.scheduledAt;
 
           const rawItemTarget = customItemTargets[i.id];
           const itemTarget = (rawItemTarget && selectedFanpageIds.includes(rawItemTarget)) ? rawItemTarget : undefined;
+          const resolvedGroups = resolveItemGroupTargets(selectedGroupIds, i.extraGroupIds, groupDistributionMode, itemIdx);
+
+          const pushGroupOnlyTask = (gId: string, fId: string) => {
+            const finalAffLink = resolveAffiliateLinkForGroup(gId, baseAffLink);
+            rawGroupTasks.push({
+              itemUrl,
+              itemCaption,
+              itemMedia,
+              finalAffLink,
+              targetGroupId: isAnonymous ? `GROUP_ONLY_ANON:${gId}` : `GROUP_ONLY:${gId}`,
+              targetFanpageId: fId,
+              commentDisabled: Boolean(i.skipComment),
+              groupCommentEnabled: Boolean(i.groupCommentEnabled) && isGroupCommentAllowedForGroup(gId),
+              includeCredit: i.includeCredit !== false,
+              colorBackground: Boolean(i.colorBackground),
+            });
+          };
 
           if (itemTarget) {
-            selectedGroupIds.forEach((gId, gIdx) => {
-              const finalAffLink = resolveAffiliateLinkForGroup(gId, baseAffLink);
-              const offsetMinutes = gIdx * groupStaggerInterval;
-              const groupScheduledAt = baseTime.add(offsetMinutes, 'minute');
-
-              expandedUrls.push(itemUrl);
-              expandedScheduledTimes.push(groupScheduledAt.format('YYYY-MM-DDTHH:mm:ss'));
-              expandedCustomCaptions.push(itemCaption);
-              expandedCustomMediaUrls.push(itemMedia);
-              expandedAffiliateLinks.push(finalAffLink);
-              expandedTargetGroupNamesList.push(isAnonymous ? `GROUP_ONLY_ANON:${gId}` : `GROUP_ONLY:${gId}`);
-              expandedTargetFanpageIdsList.push(itemTarget);
-              expandedCommentDisabled.push(Boolean(i.skipComment));
-              expandedGroupCommentEnabled.push(Boolean(i.groupCommentEnabled) && isGroupCommentAllowedForGroup(gId));
-              expandedIncludeCredits.push(i.includeCredit !== false);
-              expandedColorBackgrounds.push(Boolean(i.colorBackground));
-            });
+            resolvedGroups.forEach((gId) => pushGroupOnlyTask(gId, itemTarget));
           } else if (groupDistributionMode === 'PAGE_PER_GROUP') {
-            selectedGroupIds.forEach((gId, gIdx) => {
-              const fId = selectedFanpageIds[(gIdx + itemIdx) % selectedFanpageIds.length];
-              const finalAffLink = resolveAffiliateLinkForGroup(gId, baseAffLink);
-              const offsetMinutes = gIdx * groupStaggerInterval;
-              const groupScheduledAt = baseTime.add(offsetMinutes, 'minute');
-
-              expandedUrls.push(itemUrl);
-              expandedScheduledTimes.push(groupScheduledAt.format('YYYY-MM-DDTHH:mm:ss'));
-              expandedCustomCaptions.push(itemCaption);
-              expandedCustomMediaUrls.push(itemMedia);
-              expandedAffiliateLinks.push(finalAffLink);
-              expandedTargetGroupNamesList.push(isAnonymous ? `GROUP_ONLY_ANON:${gId}` : `GROUP_ONLY:${gId}`);
-              expandedTargetFanpageIdsList.push(fId);
-              expandedCommentDisabled.push(Boolean(i.skipComment));
-              expandedGroupCommentEnabled.push(Boolean(i.groupCommentEnabled) && isGroupCommentAllowedForGroup(gId));
-              expandedIncludeCredits.push(i.includeCredit !== false);
-              expandedColorBackgrounds.push(Boolean(i.colorBackground));
+            resolvedGroups.forEach((gId, gIdx) => {
+              pushGroupOnlyTask(gId, selectedFanpageIds[(gIdx + itemIdx) % selectedFanpageIds.length]);
             });
           } else if (groupDistributionMode === 'ROUND_ROBIN_POSTS') {
-            const gIdx = itemIdx % selectedGroupIds.length;
-            const gId = selectedGroupIds[gIdx];
             const fId = selectedFanpageIds[itemIdx % selectedFanpageIds.length];
-            const finalAffLink = resolveAffiliateLinkForGroup(gId, baseAffLink);
-            const offsetMinutes = itemIdx * groupStaggerInterval;
-            const groupScheduledAt = baseTime.add(offsetMinutes, 'minute');
-
-            expandedUrls.push(itemUrl);
-            expandedScheduledTimes.push(groupScheduledAt.format('YYYY-MM-DDTHH:mm:ss'));
-            expandedCustomCaptions.push(itemCaption);
-            expandedCustomMediaUrls.push(itemMedia);
-            expandedAffiliateLinks.push(finalAffLink);
-            expandedTargetGroupNamesList.push(isAnonymous ? `GROUP_ONLY_ANON:${gId}` : `GROUP_ONLY:${gId}`);
-            expandedTargetFanpageIdsList.push(fId);
-            expandedCommentDisabled.push(Boolean(i.skipComment));
-            expandedGroupCommentEnabled.push(Boolean(i.groupCommentEnabled) && isGroupCommentAllowedForGroup(gId));
-            expandedIncludeCredits.push(i.includeCredit !== false);
-            expandedColorBackgrounds.push(Boolean(i.colorBackground));
+            resolvedGroups.forEach((gId) => pushGroupOnlyTask(gId, fId));
           } else {
-            selectedGroupIds.forEach((gId, gIdx) => {
-              selectedFanpageIds.forEach((fId, fIdx) => {
-                const finalAffLink = resolveAffiliateLinkForGroup(gId, baseAffLink);
-                const taskIndex = gIdx * selectedFanpageIds.length + fIdx;
-                const offsetMinutes = taskIndex * groupStaggerInterval;
-                const groupScheduledAt = baseTime.add(offsetMinutes, 'minute');
-
-                expandedUrls.push(itemUrl);
-                expandedScheduledTimes.push(groupScheduledAt.format('YYYY-MM-DDTHH:mm:ss'));
-                expandedCustomCaptions.push(itemCaption);
-                expandedCustomMediaUrls.push(itemMedia);
-                expandedAffiliateLinks.push(finalAffLink);
-                expandedTargetGroupNamesList.push(isAnonymous ? `GROUP_ONLY_ANON:${gId}` : `GROUP_ONLY:${gId}`);
-                expandedTargetFanpageIdsList.push(fId);
-                expandedCommentDisabled.push(Boolean(i.skipComment));
-                expandedGroupCommentEnabled.push(Boolean(i.groupCommentEnabled) && isGroupCommentAllowedForGroup(gId));
-                expandedIncludeCredits.push(i.includeCredit !== false);
-                expandedColorBackgrounds.push(Boolean(i.colorBackground));
-              });
+            resolvedGroups.forEach((gId) => {
+              selectedFanpageIds.forEach((fId) => pushGroupOnlyTask(gId, fId));
             });
           }
         });
+
+        const baseTime = validItems[0]?.isNow ? dayjs() : (validItems[0]?.scheduledAt || dayjs());
+        const scheduledGroupTasks = distributeGroupTasks(rawGroupTasks, {
+          timingMode: groupTimingMode,
+          staggerIntervalMinutes: groupStaggerInterval,
+          spreadStart: groupSpreadStart,
+          spreadEnd: groupSpreadEnd,
+          baseTime,
+        });
+
+        const expandedUrls = scheduledGroupTasks.map((t) => t.itemUrl);
+        const expandedScheduledTimes = scheduledGroupTasks.map((t) => t.scheduledIso);
+        const expandedCustomCaptions = scheduledGroupTasks.map((t) => t.itemCaption);
+        const expandedCustomMediaUrls = scheduledGroupTasks.map((t) => t.itemMedia);
+        const expandedAffiliateLinks = scheduledGroupTasks.map((t) => t.finalAffLink);
+        const expandedTargetGroupNamesList = scheduledGroupTasks.map((t) => t.targetGroupId);
+        const expandedTargetFanpageIdsList = scheduledGroupTasks.map((t) => t.targetFanpageId);
+        const expandedCommentDisabled = scheduledGroupTasks.map((t) => t.commentDisabled);
+        const expandedGroupCommentEnabled = scheduledGroupTasks.map((t) => t.groupCommentEnabled);
+        const expandedIncludeCredits = scheduledGroupTasks.map((t) => t.includeCredit);
+        const expandedColorBackgrounds = scheduledGroupTasks.map((t) => t.colorBackground);
 
         const isFirstImmediate = validItems[0].isNow;
 
         const payload = {
           urls: expandedUrls,
           scheduledTimes: expandedScheduledTimes,
+          groupTimingMode,
+          groupSpreadStart: groupSpreadStart.format('YYYY-MM-DDTHH:mm:ss'),
+          groupSpreadEnd: groupSpreadEnd.format('YYYY-MM-DDTHH:mm:ss'),
           pageId: expandedTargetFanpageIdsList[0] ? expandedTargetFanpageIdsList[0].split(':')[0] : pageId,
           targetFanpageId: expandedTargetFanpageIdsList[0] || selectedFanpageIds[0],
           targetFanpageIds: expandedTargetFanpageIdsList,
           targetGroupNamesList: expandedTargetGroupNamesList,
           publishNow: isFirstImmediate,
-          ...queueAppendPayload,
+          ...scheduleBody,
           intervalMinutes: batchInterval,
           affiliateLink: effectiveDefaultComment,
           affiliateLinks: expandedAffiliateLinks,
@@ -4181,24 +3916,8 @@ const PlaywrightPoster = () => {
     },
   });
 
-  const isFirstItemImmediate = linkItems.length > 0 && linkItems[0].isNow;
+  const isFirstItemImmediate = scheduleChoice.mode === 'NOW';
 
-  const handlePackQueueContinuous = async () => {
-    setPackingQueue(true);
-    try {
-      const res = await api.post('/queue/pack-continuous', { gapSeconds: Math.round(queueGapMinutes * 60) });
-      const finish = res.data?.estimatedFinishAt ? dayjs(res.data.estimatedFinishAt).format('HH:mm DD/MM') : '';
-      const deferred = Number(res.data?.deferredCount) || 0;
-      message.success(`Đã dồn ${res.data?.updated ?? 0} bài chạy liên tục${finish ? `, dự kiến xong lúc ${finish}` : ''}`
-        + (deferred > 0 ? `. ${deferred} bài không kịp trong khung giờ hôm nay, xem đề xuất ở mục Khung giờ đăng.` : ''), deferred > 0 ? 6 : 3);
-      queryClient.invalidateQueries({ queryKey: ['postQueuePlaywright'] });
-      queryClient.invalidateQueries({ queryKey: POSTING_WINDOW_QUERY_KEY });
-    } catch (err: any) {
-      message.error(err?.response?.data?.message || 'Không dồn được hàng đợi');
-    } finally {
-      setPackingQueue(false);
-    }
-  };
 
   const handleSubmit = (values: any) => {
     if (postMode === 'GROUP_ONLY') {
@@ -4232,11 +3951,11 @@ const PlaywrightPoster = () => {
               {content || record.title || 'Bài viết không tiêu đề'}
             </Paragraph>
             <Space size={8} wrap>
-              <span className="text-[10px] font-mono text-slate-400">#{record.id}</span>
+              <span className="text-xs font-mono text-slate-300">#{record.id}</span>
               {resolvePosterIdentityName(record) && (
                 <Tooltip title={`Đăng bài với danh nghĩa: ${resolvePosterIdentityName(record)} · Nhấn để ${historyPageFilter === resolvePosterIdentityName(record) ? 'bỏ lọc' : 'lọc xem chỉ bài của Page này'}`}>
                   <Tag
-                    className="!m-0 !text-[10px] font-bold cursor-pointer hover:opacity-85 transition-all"
+                    className="!m-0 !text-xs font-bold cursor-pointer hover:opacity-85 transition-all"
                     color={historyPageFilter === resolvePosterIdentityName(record) ? "gold" : (isAnon ? "purple" : "geekblue")}
                     icon={isAnon ? <UserOutlined /> : <FacebookFilled />}
                     onClick={(e) => {
@@ -4254,7 +3973,7 @@ const PlaywrightPoster = () => {
               )}
               {isGroupOnly ? (
                 <Tooltip title={resolvedGroupNames.length > 1 ? `Đăng vào các Nhóm: ${resolvedGroupNames.join(', ')}` : undefined}>
-                  <Tag className="!m-0 !text-[10px]" color={isAnon ? "green" : "purple"} icon={<TeamOutlined />}>
+                  <Tag className="!m-0 !text-xs" color={isAnon ? "green" : "purple"} icon={<TeamOutlined />}>
                     {isAnon
                       ? `Nhóm Ẩn danh (${resolvedGroupNames.length === 1 ? resolvedGroupNames[0] : groupCount})`
                       : (resolvedGroupNames.length === 1 ? resolvedGroupNames[0] : `Chỉ Nhóm (${groupCount})`)}
@@ -4262,7 +3981,7 @@ const PlaywrightPoster = () => {
                 </Tooltip>
               ) : (
                 <Tooltip title={groupCount > 0 ? `Đã chia sẻ thêm vào Nhóm: ${resolvedGroupNames.join(', ')}` : undefined}>
-                  <Tag className="!m-0 !text-[10px]" color={groupCount > 0 ? 'cyan' : 'blue'}>
+                  <Tag className="!m-0 !text-xs" color={groupCount > 0 ? 'cyan' : 'blue'}>
                     {groupCount === 0 ? 'Chỉ Fanpage' : groupCount === 1 ? `Page + Nhóm: ${resolvedGroupNames[0]}` : `Page + ${groupCount} nhóm`}
                   </Tag>
                 </Tooltip>
@@ -4272,14 +3991,14 @@ const PlaywrightPoster = () => {
                   href={record.originalUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-[11px] text-blue-600 font-medium hover:underline inline-flex items-center gap-1"
+                  className="text-xs text-blue-400 font-medium hover:underline inline-flex items-center gap-1"
                 >
                   <LinkOutlined /> Bài gốc
                 </a>
               )}
               {record.affiliateLink && (record.targetGroupNames ? !!record.enableGroupComment : true) && (
                 <Tooltip title={`Bình luận tự động: ${record.affiliateLink}`}>
-                  <Tag className="!m-0 !text-[10px]" color="gold" icon={<MessageOutlined />}>
+                  <Tag className="!m-0 !text-xs" color="gold" icon={<MessageOutlined />}>
                     Kèm cmt
                   </Tag>
                 </Tooltip>
@@ -4321,14 +4040,14 @@ const PlaywrightPoster = () => {
               )}
 
               {record.affiliateLink && commentActuallyEnabled && !isCommentError && (
-                <Tag icon={<CheckCircleOutlined />} color="cyan" className="!text-[10px] !m-0 font-semibold">
+                <Tag icon={<CheckCircleOutlined />} color="cyan" className="!text-xs !m-0 font-semibold">
                   💬 Đã bình luận
                 </Tag>
               )}
 
               {activeRetryProgress && activeRetryProgress.status === 'RUNNING' && (
                 <div className="w-full min-w-[145px] rounded-lg border border-blue-500/30 bg-blue-950/40 px-2.5 py-1.5 backdrop-blur-xs">
-                  <div className="mb-1 text-[10px] font-semibold text-blue-300 truncate">
+                  <div className="mb-1 text-xs font-semibold text-blue-300 truncate">
                     {activeRetryProgress.currentGroupName
                       ? `Đang thử: ${activeRetryProgress.currentGroupName}`
                       : 'Đang chuẩn bị thử lại nhóm lỗi…'}
@@ -4351,7 +4070,7 @@ const PlaywrightPoster = () => {
               <Tag icon={<LoadingOutlined spin />} color="purple" className="!font-mono !font-bold">
                 Đang đăng (<LiveElapsedTimer startTime={record.updatedAt || record.createdAt} />)
               </Tag>
-              <div className="text-[10px] text-purple-300 font-mono flex items-center gap-1 animate-pulse">
+              <div className="text-xs text-purple-300 font-mono flex items-center gap-1 animate-pulse">
                 <span className="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
                 <span>Playwright cào & đăng...</span>
               </div>
@@ -4362,7 +4081,7 @@ const PlaywrightPoster = () => {
             <div className="flex flex-col gap-1 items-start">
               <Tag icon={<ClockCircleOutlined />} color="processing">Chờ đăng</Tag>
               {record.affiliateLink && (record.targetGroupNames ? !!record.enableGroupComment : true) && (
-                <Tag color="default" className="!text-[10px] !m-0 text-slate-500">
+                <Tag color="default" className="!text-xs !m-0 text-slate-300">
                   + Sẽ cmt tự động
                 </Tag>
               )}
@@ -4380,14 +4099,14 @@ const PlaywrightPoster = () => {
     {
       title: 'Link đã đăng',
       key: 'publishedLinks',
-      width: 150,
+      width: 155,
       render: (_: any, record: PostQueue) => {
         const groupUrls = (record.publishedGroupPostUrls || '').split(',').map((u) => u.trim()).filter(Boolean);
         const links: { url: string; label: string }[] = [];
         if (record.publishedPostUrl) links.push({ url: record.publishedPostUrl, label: 'Bài đã đăng' });
         groupUrls.forEach((url, idx) => links.push({ url, label: groupUrls.length > 1 ? `Nhóm ${idx + 1}` : 'Bài trong Nhóm' }));
         if (links.length === 0) {
-          return <span className="text-[11px] text-slate-400">—</span>;
+          return <span className="text-xs text-slate-300">—</span>;
         }
         return (
           <div className="flex flex-col gap-0.5">
@@ -4397,7 +4116,7 @@ const PlaywrightPoster = () => {
                 href={l.url}
                 target="_blank"
                 rel="noreferrer"
-                className="text-[11px] text-blue-600 font-medium hover:underline inline-flex items-center gap-1"
+                className="text-xs text-blue-400 font-medium hover:underline inline-flex items-center gap-1"
               >
                 <LinkOutlined /> {l.label}
               </a>
@@ -4410,7 +4129,7 @@ const PlaywrightPoster = () => {
       title: 'Thời gian',
       dataIndex: 'publishedAt',
       key: 'publishedAt',
-      width: 175,
+      width: 185,
       render: (date: string, record: PostQueue) => {
         if (record.status === 'PROCESSING') {
           const startedAt = record.updatedAt || record.createdAt;
@@ -4428,9 +4147,9 @@ const PlaywrightPoster = () => {
                 hasAffiliate={!!record.affiliateLink}
               />
               {record.scheduledAt && (
-                <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1 mt-1">
+                <div className="text-xs text-slate-300 font-mono flex items-center gap-1 mt-1">
                   <span>📅 Hẹn:</span>
-                  <span className="text-slate-300">{dayjs(record.scheduledAt).format('HH:mm · DD/MM')}</span>
+                  <span className="text-slate-200">{dayjs(record.scheduledAt).format('HH:mm · DD/MM')}</span>
                 </div>
               )}
             </div>
@@ -4445,7 +4164,7 @@ const PlaywrightPoster = () => {
             const durationStr = execSec < 60 ? `${execSec}s` : `${Math.floor(execSec / 60)}m ${execSec % 60}s`;
             durationBadge = (
               <div
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/25 text-[10px] font-mono font-bold mt-1 shadow-2xs"
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/25 text-xs font-mono font-bold mt-1 shadow-2xs"
                 title={`Thời gian Playwright chạy thực tế: ${durationStr}`}
               >
                 <span>⏱</span>
@@ -4459,12 +4178,12 @@ const PlaywrightPoster = () => {
               <div className="font-bold text-emerald-300 font-mono text-sm leading-tight">
                 {pubTime ? dayjs(pubTime).format('HH:mm') : '-'}
               </div>
-              <div className="text-[11px] text-slate-400 font-mono">
+              <div className="text-xs text-slate-300 font-mono">
                 {pubTime ? dayjs(pubTime).format('DD/MM/YYYY') : ''}
               </div>
               <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-[10px] font-medium">
-                  <CheckCircleOutlined className="text-[9px]" /> Đã đăng
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-xs font-medium">
+                  <CheckCircleOutlined className="text-xs" /> Đã đăng
                 </span>
                 {durationBadge}
               </div>
@@ -4479,12 +4198,12 @@ const PlaywrightPoster = () => {
               <div className="font-bold text-amber-300 font-mono text-sm leading-tight">
                 {schedTime ? dayjs(schedTime).format('HH:mm') : '-'}
               </div>
-              <div className="text-[11px] text-slate-400 font-mono">
+              <div className="text-xs text-slate-300 font-mono">
                 {schedTime ? dayjs(schedTime).format('DD/MM/YYYY') : ''}
               </div>
               <div className="mt-0.5">
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/25 text-[10px] font-medium shadow-2xs">
-                  <ClockCircleOutlined className="text-[9px]" /> Hẹn đăng
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/25 text-xs font-medium shadow-2xs">
+                  <ClockCircleOutlined className="text-xs" /> Hẹn đăng
                 </span>
               </div>
             </div>
@@ -4498,12 +4217,12 @@ const PlaywrightPoster = () => {
             <div className="font-bold text-rose-300 font-mono text-sm leading-tight">
               {failTime ? dayjs(failTime).format('HH:mm') : '-'}
             </div>
-            <div className="text-[11px] text-slate-400 font-mono">
+            <div className="text-xs text-slate-300 font-mono">
               {failTime ? dayjs(failTime).format('DD/MM/YYYY') : ''}
             </div>
             <div className="mt-0.5">
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-rose-500/10 text-rose-300 border border-rose-500/25 text-[10px] font-medium shadow-2xs">
-                <CloseCircleOutlined className="text-[9px]" /> Lỗi đăng
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-rose-500/10 text-rose-300 border border-rose-500/25 text-xs font-medium shadow-2xs">
+                <CloseCircleOutlined className="text-xs" /> Lỗi đăng
               </span>
             </div>
           </div>
@@ -4645,30 +4364,7 @@ const PlaywrightPoster = () => {
   ];
 
   const queueModeControl = (
-    <div className="poster-queue-mode">
-      <Segmented
-        size="small"
-        value={queueAppendMode ? 'QUEUE' : 'MANUAL'}
-        onChange={(v) => setQueueAppendMode(v === 'QUEUE')}
-        options={[
-          { label: 'Nối đuôi liên tục', value: 'QUEUE' },
-          { label: 'Theo giờ đã hẹn', value: 'MANUAL' },
-        ]}
-      />
-      {queueAppendMode && (
-        <Tooltip title="Thời gian nghỉ giữa 2 bài của cùng một nick">
-          <InputNumber
-            size="small"
-            min={0}
-            max={60}
-            value={queueGapMinutes}
-            onChange={(v) => setQueueGapMinutes(typeof v === 'number' ? v : 2)}
-            suffix="phút"
-            style={{ width: 92 }}
-          />
-        </Tooltip>
-      )}
-    </div>
+    <ScheduleChoice value={scheduleChoice} onChange={setScheduleChoice} size="small" />
   );
 
   // Options chọn nơi đăng cho từng bài; viaNameOf đọc socialAccounts + viaNameByCUser nên dùng chúng làm deps
@@ -4682,14 +4378,12 @@ const PlaywrightPoster = () => {
 
   const swipeReviewModalOpened = useOpenedOnce(swipeReviewOpen);
   const bulkPasteDrawerOpened = useOpenedOnce(bulkModalVisible);
-  const bulkRescheduleModalOpened = useOpenedOnce(bulkRescheduleModalVisible);
   const viralHunterDrawerOpened = useOpenedOnce(hunterDrawerVisible);
   const groupHunterDrawerOpened = useOpenedOnce(groupHunterDrawerVisible);
   const distributeModalOpened = useOpenedOnce(distributeModalOpen);
   const articleBatchModalOpened = useOpenedOnce(showArticleBatchModal);
   const savePresetModalOpened = useOpenedOnce(savePresetModalOpen);
   const managePresetsModalOpened = useOpenedOnce(managePresetsModalOpen);
-  const autoFixQueueModalOpened = useOpenedOnce(autoFixQueueModalVisible);
   const resetFailedModalOpened = useOpenedOnce(resetFailedModalVisible);
   const reassignNickModalOpened = useOpenedOnce(reassignModalVisible);
   const kpiTargetsModalOpened = useOpenedOnce(kpiModalOpen);
@@ -4746,6 +4440,7 @@ const PlaywrightPoster = () => {
     updateLinkMode,
     updateLinkTime,
     removeLinkItem,
+    updateLinkExtraGroupIds,
   });
 
   return (
@@ -4804,33 +4499,58 @@ const PlaywrightPoster = () => {
 
       <div className="poster-compose-layout" style={workspaceTab === 'compose' ? undefined : { display: 'none' }}>
         <Card className="poster-composer border border-slate-200 bg-white shadow-sm rounded-2xl">
-          {/* Thanh Tiến Trình 4 Bước — Trực quan, Gọn gàng & Tuyệt Đối Ổn Định */}
-          <div className="mb-6 px-4 py-3 rounded-xl bg-slate-900/50 border border-slate-800/80 flex flex-wrap items-center justify-between gap-2.5 text-xs select-none">
-            <div className="flex items-center gap-2">
-              <span className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 font-bold text-[11px] flex items-center justify-center border border-blue-400/30">1</span>
-              <span className="font-semibold text-slate-200">1. Cách xuất bản</span>
-              <span className="text-slate-400 text-[11px] hidden sm:inline">(Page / Nhóm)</span>
-            </div>
-            <span className="text-slate-600 hidden sm:inline font-bold">➔</span>
-            <div className="flex items-center gap-2">
-              <span className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 font-bold text-[11px] flex items-center justify-center border border-blue-400/30">2</span>
-              <span className="font-semibold text-slate-200">2. Nơi đăng & Via</span>
-              <span className="text-slate-400 text-[11px] hidden sm:inline">(Chọn tài khoản)</span>
-            </div>
-            <span className="text-slate-600 hidden sm:inline font-bold">➔</span>
-            <div className="flex items-center gap-2">
-              <span className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 font-bold text-[11px] flex items-center justify-center border border-blue-400/30">3</span>
-              <span className="font-semibold text-slate-200">3. Soạn nội dung</span>
-              <span className="text-slate-400 text-[11px] hidden sm:inline">(Dán link / Báo AI)</span>
-            </div>
-            <span className="text-slate-600 hidden sm:inline font-bold">➔</span>
-            <div className="flex items-center gap-2">
-              <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-[11px] flex items-center justify-center border border-emerald-400/30">✓</span>
-              <span className="font-semibold text-emerald-300">4. Bấm Đăng</span>
-            </div>
-          </div>
+          {/* Thanh Tiến Trình 4 Bước — 1 hàng 4 cột, click chuyển tới từng bước, hiển thị trạng thái hoàn thành */}
+          {(() => {
+            const hasTarget = activeSelectedFanpageIds.length > 0 && (postMode === 'FANPAGE_ONLY' || activeSelectedGroupIds.length > 0);
+            const hasContent = validLinkCount > 0;
+            const readyToPublish = hasTarget && hasContent;
+            const modeShort = postMode === 'FANPAGE_ONLY' ? 'Chỉ Fanpage' : postMode === 'GROUP_ONLY' ? 'Chỉ vào Nhóm' : 'Page + Nhóm';
+            const targetSub = hasTarget
+              ? (postMode === 'FANPAGE_ONLY'
+                  ? `${activeSelectedFanpageIds.length} Page/Via`
+                  : `${activeSelectedGroupIds.length} nhóm · ${activeSelectedFanpageIds.length} nick`)
+              : 'Chọn Page & Nhóm';
+            const contentSub = hasContent ? `${validLinkCount} bài sẵn sàng` : 'Dán link / Cào bài';
+            const submitSub = readyToPublish
+              ? (scheduleChoice.mode === 'QUEUE' ? 'Xếp vào lịch chung' : scheduleChoice.mode === 'NOW' ? 'Sẵn sàng đăng ngay' : 'Sẵn sàng hẹn giờ')
+              : 'Chờ bước 2 & 3';
 
-          <div className="poster-section-heading">
+            const steps = [
+              { id: 'poster-step-1', num: 1, title: 'Cách xuất bản', sub: modeShort, done: true, active: false, cta: false },
+              { id: 'poster-step-2', num: 2, title: 'Nơi đăng & Via', sub: targetSub, done: hasTarget, active: !hasTarget, cta: false },
+              { id: 'poster-step-3', num: 3, title: 'Soạn nội dung', sub: contentSub, done: hasContent, active: hasTarget && !hasContent, cta: false },
+              { id: 'poster-step-4', num: 4, title: 'Xuất bản', sub: submitSub, done: false, active: false, cta: readyToPublish },
+            ];
+
+            return (
+              <nav className="poster-flow-bar select-none" aria-label="Quy trình 4 bước đăng bài">
+                {steps.map((s, idx) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => document.getElementById(s.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                    className={`poster-flow-step ${s.cta ? 'is-ready-cta' : s.active ? 'is-active' : s.done ? 'is-done' : ''}`}
+                    title={`Chuyển tới Bước ${s.num}: ${s.title}`}
+                  >
+                    <span className="poster-flow-step-num">
+                      {s.cta ? <RocketOutlined /> : s.done ? <CheckCircleOutlined /> : s.num}
+                    </span>
+                    <span className="poster-flow-step-body">
+                      <span className="poster-flow-step-title">{s.title}</span>
+                      <span className="poster-flow-step-sub">{s.sub}</span>
+                    </span>
+                    {idx < steps.length - 1 && (
+                      <span className="poster-flow-step-arrow" aria-hidden="true">
+                        <RightOutlined />
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </nav>
+            );
+          })()}
+
+          <div id="poster-step-1" className="poster-section-heading">
             <span className="poster-step-number">1</span>
             <div>
               <h2>Chọn cách xuất bản</h2>
@@ -4895,7 +4615,7 @@ const PlaywrightPoster = () => {
                   className={`relative flex items-start gap-3.5 p-4 rounded-2xl text-left transition-all duration-200 cursor-pointer select-none border group ${
                     active
                       ? `bg-gradient-to-br ${mode.activeCard} translate-y-[-1px]`
-                      : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:bg-slate-850/80 hover:translate-y-[-1px]'
+                      : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:bg-slate-800/80 hover:translate-y-[-1px]'
                   }`}
                 >
                   <div
@@ -4937,6 +4657,12 @@ const PlaywrightPoster = () => {
               postMode={postMode}
               groupStaggerInterval={groupStaggerInterval}
               setGroupStaggerInterval={setGroupStaggerInterval}
+              groupTimingMode={groupTimingMode}
+              setGroupTimingMode={setGroupTimingMode}
+              groupSpreadStart={groupSpreadStart}
+              setGroupSpreadStart={setGroupSpreadStart}
+              groupSpreadEnd={groupSpreadEnd}
+              setGroupSpreadEnd={setGroupSpreadEnd}
               validLinkCount={validLinkCount}
               setQuickCookieModalOpen={setQuickCookieModalOpen}
               setQuickCookieTargetId={setQuickCookieTargetId}
@@ -5005,31 +4731,11 @@ const PlaywrightPoster = () => {
               setShowArticleBatchModal={setShowArticleBatchModal}
               swipeReviewItems={swipeReviewItems}
               openSwipeReview={openSwipeReview}
-              batchScheduleMode={batchScheduleMode}
-              setBatchScheduleMode={setBatchScheduleMode}
-              setBatchWindowDate={setBatchWindowDate}
-              batchWindowDate={batchWindowDate}
-              batchWindowStartTime={batchWindowStartTime}
-              setBatchWindowStartTime={setBatchWindowStartTime}
-              batchWindowEndTime={batchWindowEndTime}
-              setBatchWindowEndTime={setBatchWindowEndTime}
-              batchWindowMaxPerDay={batchWindowMaxPerDay}
-              setBatchWindowMaxPerDay={setBatchWindowMaxPerDay}
-              desiredMinInterval={desiredMinInterval}
-              setDesiredMinInterval={setDesiredMinInterval}
-              batchStartTime={batchStartTime}
-              setBatchStartTime={setBatchStartTime}
-              batchInterval={batchInterval}
-              setBatchInterval={setBatchInterval}
               setBatchToolsOpen={setBatchToolsOpen}
               batchToolsOpen={batchToolsOpen}
               setBulkModalVisible={setBulkModalVisible}
               setBulkText={setBulkText}
               bulkText={bulkText}
-              smartDispatchInterval={smartDispatchInterval}
-              setSmartDispatchInterval={setSmartDispatchInterval}
-              smartDispatchStartMode={smartDispatchStartMode}
-              setSmartDispatchStartMode={setSmartDispatchStartMode}
               smartDispatchSummary={smartDispatchSummary}
               setHunterDrawerVisible={setHunterDrawerVisible}
               setGroupHunterDrawerVisible={setGroupHunterDrawerVisible}
@@ -5063,17 +4769,17 @@ const PlaywrightPoster = () => {
               resetEqualDistribution={resetEqualDistribution}
               handleSmartDispatch={handleSmartDispatch}
               dragOverDropzone={dragOverDropzone}
-              handleApplyBatchSchedule={handleApplyBatchSchedule}
               applyDisableAllComments={applyDisableAllComments}
               applyEnableAllComments={applyEnableAllComments}
               applyEnableAllGroupComments={applyEnableAllGroupComments}
               applyDisableAllGroupComments={applyDisableAllGroupComments}
               handleApplyBulkPaste={handleApplyBulkPaste}
               postItemTargetOptions={postItemTargetOptions}
+              groupAccountsWithId={groupAccountsWithId}
+              primaryGroupIds={activeSelectedGroupIds}
               postItemActions={postItemActions}
             />
 
-            {/* Tùy chọn nâng cao được mở theo nhu cầu, không chen vào luồng chính. */}
             {/* Tùy chọn nâng cao được mở theo nhu cầu, không chen vào luồng chính. */}
             <ComposeAdvancedOptions
               form={form}
@@ -5091,8 +4797,9 @@ const PlaywrightPoster = () => {
               applyEnableAllGroupComments={applyEnableAllGroupComments}
             />
 
+            <div id="poster-step-4">
             {isPosting && (
-              <div className="relative overflow-hidden rounded-2xl border border-blue-500/40 bg-gradient-to-r from-blue-950/80 via-indigo-950/70 to-slate-900/90 p-4.5 mb-4 shadow-xl shadow-blue-950/50 backdrop-blur-md">
+              <div className="relative overflow-hidden rounded-2xl border border-blue-500/40 bg-gradient-to-r from-blue-950/80 via-indigo-950/70 to-slate-900/90 p-4 mb-4 shadow-xl shadow-blue-950/50 backdrop-blur-md">
                 <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-500 animate-pulse" />
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div className="flex items-center gap-2.5 min-w-0">
@@ -5123,12 +4830,12 @@ const PlaywrightPoster = () => {
                   strokeWidth={8}
                   className="!m-0"
                 />
-                <div className="flex justify-between items-center mt-2.5 text-[11px] text-slate-400">
-                  <span className="flex items-center gap-1.5 text-blue-300/80">
+                <div className="flex justify-between items-center mt-2.5 text-xs text-slate-300">
+                  <span className="flex items-center gap-1.5 text-blue-300">
                     <LoadingOutlined spin className="text-blue-400 text-xs" />
                     Tiến trình Playwright Browser
                   </span>
-                  <span className="text-slate-400/90">Vui lòng không tắt hoặc tải lại trang</span>
+                  <span className="text-slate-300">Vui lòng không tắt hoặc tải lại trang</span>
                 </div>
               </div>
             )}
@@ -5143,29 +4850,44 @@ const PlaywrightPoster = () => {
                       </div>
                       <div>
                         <span className="font-extrabold text-sm text-indigo-100">Kế hoạch xuất bản tự động</span>
-                        <span className="ml-2 px-2 py-0.5 rounded-full text-[11px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                        <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                           {calculatedTotalQueueCount} bài queue
                         </span>
                       </div>
                     </div>
-                    <div className="text-xs font-semibold text-purple-200">
-                      Chế độ: <span className="text-amber-300 font-bold">{groupDistributionMode === 'PAGE_PER_GROUP' ? '🛡️ Nhân bản đủ tất cả Nhóm (Xoay vòng Page)' : groupDistributionMode === 'ROUND_ROBIN_POSTS' ? '🔄 Chia lẻ bài (Không nhân bản)' : '⚡ Tất cả Page x Tất cả Nhóm'}</span>
+                    <div className="text-xs font-semibold text-purple-200 flex items-center gap-1.5 flex-wrap">
+                      <span>Chế độ:</span>
+                      <span className="text-amber-300 font-bold inline-flex items-center gap-1">
+                        {groupDistributionMode === 'PAGE_PER_GROUP' ? (
+                          <><SafetyCertificateOutlined /> Nhân bản đủ tất cả Nhóm (Xoay vòng Page)</>
+                        ) : groupDistributionMode === 'ROUND_ROBIN_POSTS' ? (
+                          <><SyncOutlined /> Chia lẻ bài (Không nhân bản)</>
+                        ) : (
+                          <><ThunderboltOutlined /> Tất cả Page x Tất cả Nhóm</>
+                        )}
+                      </span>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
                     <div className="bg-slate-900/70 p-2.5 rounded-xl border border-slate-800/80">
-                      <div className="text-slate-400 text-[11px] font-medium mb-1">📝 Nội dung đưa vào</div>
+                      <div className="text-slate-300 text-xs font-medium mb-1 flex items-center gap-1.5">
+                        <FileTextOutlined className="text-blue-400" /> Nội dung đưa vào
+                      </div>
                       <div className="font-bold text-slate-100">{validLinkCount} bài viết</div>
                     </div>
                     <div className="bg-slate-900/70 p-2.5 rounded-xl border border-slate-800/80">
-                      <div className="text-slate-400 text-[11px] font-medium mb-1">🎯 Nhóm nhận bài ({selectedGroupDisplayNames.length} nhóm)</div>
+                      <div className="text-slate-300 text-xs font-medium mb-1 flex items-center gap-1.5">
+                        <TeamOutlined className="text-amber-400" /> Nhóm nhận bài ({selectedGroupDisplayNames.length} nhóm)
+                      </div>
                       <div className="font-bold text-amber-300 truncate" title={selectedGroupDisplayNames.join(', ')}>
                         {selectedGroupDisplayNames.join(', ') || 'Chưa chọn'}
                       </div>
                     </div>
                     <div className="bg-slate-900/70 p-2.5 rounded-xl border border-slate-800/80">
-                      <div className="text-slate-400 text-[11px] font-medium mb-1">🎭 Page/Nick đăng ({selectedTargetAccountNames.length} tài khoản)</div>
+                      <div className="text-slate-300 text-xs font-medium mb-1 flex items-center gap-1.5">
+                        <UserOutlined className="text-sky-400" /> Page/Nick đăng ({selectedTargetAccountNames.length} tài khoản)
+                      </div>
                       <div className="font-bold text-sky-300 truncate" title={selectedTargetAccountNames.join(', ')}>
                         {selectedTargetAccountNames.join(', ') || 'Mặc định'}
                       </div>
@@ -5194,7 +4916,7 @@ const PlaywrightPoster = () => {
                     </span>
                     {postMode !== 'FANPAGE_ONLY' && <span>{selectedGroupDisplayNames.length} nhóm</span>}
                     <span>{validLinkCount} bài</span>
-                    <span>{queueAppendMode ? `Nối đuôi · nghỉ ${queueGapMinutes}'` : isFirstItemImmediate ? 'Đăng ngay' : 'Theo lịch hẹn'}</span>
+                    <span>{scheduleChoice.mode === 'QUEUE' ? 'Xếp vào lịch' : scheduleChoice.mode === 'NOW' ? 'Đăng ngay' : `Hẹn ${scheduleChoice.at ? scheduleChoice.at.format('HH:mm DD/MM') : ''}`}</span>
                   </>
                 ) : (
                   <em>Thêm nội dung hoặc dán link ở bước 3 để bắt đầu.</em>
@@ -5223,15 +4945,16 @@ const PlaywrightPoster = () => {
                   className={`poster-submit-primary rounded-xl font-extrabold h-12 px-6 text-sm sm:text-base shadow-md w-full sm:w-auto ${isFirstItemImmediate ? '!bg-blue-600 hover:!bg-blue-700' : '!bg-indigo-600 hover:!bg-indigo-700'
                     }`}
                 >
-                  {queueAppendMode
-                    ? 'Đăng nối đuôi hàng đợi'
+                  {scheduleChoice.mode === 'QUEUE'
+                    ? 'Xếp vào lịch đăng'
                     : postMode === 'GROUP_ONLY'
-                      ? (isFirstItemImmediate ? '🚀 Đăng ngay vào nhóm' : '⏰ Lên lịch đăng vào nhóm')
+                      ? (isFirstItemImmediate ? 'Đăng ngay vào nhóm' : 'Lên lịch đăng vào nhóm')
                       : postMode === 'FANPAGE_ONLY'
-                        ? (isFirstItemImmediate ? '🚀 Đăng ngay lên Fanpage' : '⏰ Lên lịch lên Fanpage')
-                        : (isFirstItemImmediate ? '🚀 Đăng ngay Page + Nhóm' : '⏰ Lên lịch Page + Nhóm')}
+                        ? (isFirstItemImmediate ? 'Đăng ngay lên Fanpage' : 'Lên lịch lên Fanpage')
+                        : (isFirstItemImmediate ? 'Đăng ngay Page + Nhóm' : 'Lên lịch Page + Nhóm')}
                 </Button>
               </div>
+            </div>
             </div>
           </Form>
         </Card>
@@ -5276,11 +4999,11 @@ const PlaywrightPoster = () => {
                 <dd>
                   {validLinkCount === 0
                     ? '—'
-                    : queueAppendMode
-                      ? `Nối đuôi hàng đợi, nghỉ ${queueGapMinutes} phút/bài`
-                      : isFirstItemImmediate
-                        ? (validLinkCount > 1 ? `Bài 1 đăng ngay, ${validLinkCount - 1} bài theo lịch` : 'Đăng ngay')
-                        : 'Theo lịch hẹn'}
+                    : scheduleChoice.mode === 'QUEUE'
+                      ? 'Xếp vào lịch đăng chung'
+                      : scheduleChoice.mode === 'NOW'
+                        ? 'Đăng ngay'
+                        : `Bắt đầu từ ${scheduleChoice.at ? scheduleChoice.at.format('HH:mm DD/MM') : '—'}`}
                 </dd>
               </div>
             </dl>
@@ -5294,10 +5017,10 @@ const PlaywrightPoster = () => {
               block
               loading={isPosting}
               disabled={validLinkCount === 0}
-              icon={queueAppendMode || isFirstItemImmediate ? <RocketOutlined /> : <ScheduleOutlined />}
+              icon={isFirstItemImmediate ? <RocketOutlined /> : <ScheduleOutlined />}
               onClick={() => form.submit()}
             >
-              {queueAppendMode ? 'Đăng nối đuôi' : isFirstItemImmediate ? 'Đăng ngay' : 'Lên lịch đăng'}
+              {scheduleChoice.mode === 'QUEUE' ? 'Xếp vào lịch' : isFirstItemImmediate ? 'Đăng ngay' : 'Lên lịch đăng'}
             </Button>
             <Button
               block
@@ -5330,7 +5053,7 @@ const PlaywrightPoster = () => {
                 className="text-xs text-cyan-300 hover:text-cyan-200 font-bold flex items-center gap-1.5 bg-slate-800/90 hover:bg-slate-700 px-3 py-1 rounded-lg border border-slate-700 transition-colors"
               >
                 <span>🔗 Mở ảnh gốc trong tab mới</span>
-                <LinkOutlined className="text-[11px]" />
+                <LinkOutlined className="text-xs" />
               </a>
             )}
           </div>
@@ -5446,6 +5169,9 @@ const PlaywrightPoster = () => {
             replaceOrAppendCreditText={replaceOrAppendCreditText}
             openCustomCreModal={openCustomCreModal}
             openHashtagModal={openHashtagModal}
+            groupAccountsWithId={groupAccountsWithId}
+            primaryGroupIds={activeSelectedGroupIds}
+            onExtraGroupIdsChange={updateLinkExtraGroupIds}
           />
         </Suspense>
       )}
@@ -5454,48 +5180,23 @@ const PlaywrightPoster = () => {
       {bulkPasteDrawerOpened && (
         <Suspense fallback={null}>
           <BulkPasteDrawer
+            scheduleChoice={scheduleChoice}
+            setScheduleChoice={setScheduleChoice}
             bulkDrawerPreviews={bulkDrawerPreviews}
             setBulkDrawerPreviews={setBulkDrawerPreviews}
-            customDrawerScheduledTimes={customDrawerScheduledTimes}
-            setCustomDrawerScheduledTimes={setCustomDrawerScheduledTimes}
             isMediaVideo={isMediaVideo}
-            desiredMinInterval={desiredMinInterval}
-            setDesiredMinInterval={setDesiredMinInterval}
             bulkModalVisible={bulkModalVisible}
             setBulkModalVisible={setBulkModalVisible}
             bulkAutoDistributeTwoVias={bulkAutoDistributeTwoVias}
             setBulkAutoDistributeTwoVias={setBulkAutoDistributeTwoVias}
             setBulkText={setBulkText}
             bulkText={bulkText}
-            bulkScheduleMode={bulkScheduleMode}
-            setBulkScheduleMode={setBulkScheduleMode}
-            setBulkWindowDate={setBulkWindowDate}
-            bulkWindowDate={bulkWindowDate}
-            bulkWindowStartTime={bulkWindowStartTime}
-            setBulkWindowStartTime={setBulkWindowStartTime}
-            bulkWindowEndTime={bulkWindowEndTime}
-            setBulkWindowEndTime={setBulkWindowEndTime}
-            bulkWindowMaxPerDay={bulkWindowMaxPerDay}
-            setBulkWindowMaxPerDay={setBulkWindowMaxPerDay}
-            bulkStartTime={bulkStartTime}
-            setBulkStartTime={setBulkStartTime}
-            bulkInterval={bulkInterval}
-            setBulkInterval={setBulkInterval}
             groupAccountsWithId={groupAccountsWithId}
             twoMainViasDisplayNames={twoMainViasDisplayNames}
             posts={posts}
             filterHistoryDuplicates={filterHistoryDuplicates}
             setFilterHistoryDuplicates={setFilterHistoryDuplicates}
-            setSmartScheduleEnabled={setSmartScheduleEnabled}
-            smartScheduleEnabled={smartScheduleEnabled}
-            smartGroupId={smartGroupId}
-            setSmartGroupId={setSmartGroupId}
-            setSmartDailyLimit={setSmartDailyLimit}
-            smartDailyLimit={smartDailyLimit}
-            getGroupDailyLimit={getGroupDailyLimit}
-            saveGroupDailyLimit={saveGroupDailyLimit}
             bulkPasteSummary={bulkPasteSummary}
-            smartScheduleTimes={smartScheduleTimes}
             currentKpiTarget={currentKpiTarget}
             bulkScrapeStats={bulkScrapeStats}
             fetchOneDrawerPreview={fetchOneDrawerPreview}
@@ -5508,7 +5209,6 @@ const PlaywrightPoster = () => {
             toggleDrawerCredit={toggleDrawerCredit}
             removeUrlFromBulkText={removeUrlFromBulkText}
             fetchAllDrawerPreviews={fetchAllDrawerPreviews}
-            computeTimeWindowSchedule={computeTimeWindowSchedule}
             handleApplyBulkPaste={handleApplyBulkPaste}
             handleApplyAndOpenSwipeReview={handleApplyAndOpenSwipeReview}
           />
@@ -5558,85 +5258,7 @@ const PlaywrightPoster = () => {
         onApply={(url) => applyNewsCardToItem(url)}
       />
 
-      {/* Modal Tự Động Phân Bổ & Chia Lại Giờ Hàng Đợi */}
-      {bulkRescheduleModalOpened && (
-        <Suspense fallback={null}>
-          <BulkRescheduleModal
-            desiredMinInterval={desiredMinInterval}
-            setDesiredMinInterval={setDesiredMinInterval}
-            selectedRowKeys={selectedRowKeys}
-            bulkRescheduleModalVisible={bulkRescheduleModalVisible}
-            setBulkRescheduleModalVisible={setBulkRescheduleModalVisible}
-            bulkRescheduleTargetScope={bulkRescheduleTargetScope}
-            setBulkRescheduleTargetScope={setBulkRescheduleTargetScope}
-            bulkRescheduleMode={bulkRescheduleMode}
-            setBulkRescheduleMode={setBulkRescheduleMode}
-            setBulkRescheduleDate={setBulkRescheduleDate}
-            bulkRescheduleDate={bulkRescheduleDate}
-            setBulkRescheduleStartTime={setBulkRescheduleStartTime}
-            bulkRescheduleStartTime={bulkRescheduleStartTime}
-            setBulkRescheduleEndTime={setBulkRescheduleEndTime}
-            bulkRescheduleEndTime={bulkRescheduleEndTime}
-            bulkRescheduleInterval={bulkRescheduleInterval}
-            setBulkRescheduleInterval={setBulkRescheduleInterval}
-            bulkRescheduleInterleave={bulkRescheduleInterleave}
-            setBulkRescheduleInterleave={setBulkRescheduleInterleave}
-            bulkRescheduleSpreadPerGroup={bulkRescheduleSpreadPerGroup}
-            setBulkRescheduleSpreadPerGroup={setBulkRescheduleSpreadPerGroup}
-            bulkRescheduleMaxPerDay={bulkRescheduleMaxPerDay}
-            setBulkRescheduleMaxPerDay={setBulkRescheduleMaxPerDay}
-            bulkRescheduleSameDayGap={bulkRescheduleSameDayGap}
-            setBulkRescheduleSameDayGap={setBulkRescheduleSameDayGap}
-            setBulkRescheduleDistributeNicks={setBulkRescheduleDistributeNicks}
-            bulkRescheduleDistributeNicks={bulkRescheduleDistributeNicks}
-            setBulkRescheduleSelectedNicks={setBulkRescheduleSelectedNicks}
-            bulkRescheduleSelectedNicks={bulkRescheduleSelectedNicks}
-            viralMaxPerTargetPerDay={viralMaxPerTargetPerDay}
-            setViralMaxPerTargetPerDay={setViralMaxPerTargetPerDay}
-            viralMinGapPerTarget={viralMinGapPerTarget}
-            setViralMinGapPerTarget={setViralMinGapPerTarget}
-            viralMinGapGlobal={viralMinGapGlobal}
-            setViralMinGapGlobal={setViralMinGapGlobal}
-            viralJitter={viralJitter}
-            setViralJitter={setViralJitter}
-            setViralSeed={setViralSeed}
-            isBulkProcessing={isBulkProcessing}
-            postingIdentities={postingIdentities}
-            accountTargetValue={accountTargetValue}
-            validPersonalVias={validPersonalVias}
-            twoMainViasTargetValues={twoMainViasTargetValues}
-            twoMainViasDisplayNames={twoMainViasDisplayNames}
-            posts={posts}
-            rescheduleTargetPosts={rescheduleTargetPosts}
-            reschedulePreviewList={reschedulePreviewList}
-            reschedulePreviewStats={reschedulePreviewStats}
-            handleApplyBulkReschedule={handleApplyBulkReschedule}
-            queueGapMinutes={queueGapMinutes}
-            setQueueGapMinutes={setQueueGapMinutes}
-            packingQueue={packingQueue}
-            handlePackQueueContinuous={handlePackQueueContinuous}
-          />
-        </Suspense>
-      )}
 
-      {/* Modal Tự động xếp lại lịch hàng đợi chống trùng giờ & chia đều 2 Via */}
-      {autoFixQueueModalOpened && (
-        <Suspense fallback={null}>
-          <AutoFixQueueModal
-            isBulkProcessing={isBulkProcessing}
-            autoFixQueueModalVisible={autoFixQueueModalVisible}
-            setAutoFixQueueModalVisible={setAutoFixQueueModalVisible}
-            autoFixInterval={autoFixInterval}
-            setAutoFixInterval={setAutoFixInterval}
-            autoFixStartMode={autoFixStartMode}
-            setAutoFixStartMode={setAutoFixStartMode}
-            autoFixDistributeVias={autoFixDistributeVias}
-            setAutoFixDistributeVias={setAutoFixDistributeVias}
-            currentPendingDistribution={currentPendingDistribution}
-            handleAutoFixQueue={handleAutoFixQueue}
-          />
-        </Suspense>
-      )}
 
       {/* Modal Chuyển toàn bộ bài lỗi về Chờ đăng (Reset Failed to Pending) */}
       {resetFailedModalOpened && (
@@ -5700,28 +5322,18 @@ const PlaywrightPoster = () => {
         </Suspense>
       )}
 
-      {workspaceTab === 'history' && (
-        <PostingWindowPanel
-          onReschedule={() => {
-            setBulkRescheduleTargetScope(selectedRowKeys.length > 0 ? 'SELECTED' : 'ALL');
-            setBulkRescheduleModalVisible(true);
-          }}
-        />
-      )}
-
       {/* BẢNG LỊCH SỬ ĐĂNG BÀI VỚI BỘ LỌC THÔNG MINH */}
       {workspaceTab === 'history' && (
         <HistoryPanel
           selectedRowKeys={selectedRowKeys}
           setSelectedRowKeys={setSelectedRowKeys}
-          setBulkRescheduleModalVisible={setBulkRescheduleModalVisible}
-          setBulkRescheduleTargetScope={setBulkRescheduleTargetScope}
+          onRepack={handleRepackQueue}
+          onSpreadGroups={handleSpreadGroupsQueue}
           isBulkProcessing={isBulkProcessing}
           setReassignModalVisible={setReassignModalVisible}
           setReassignSelectedNicks={setReassignSelectedNicks}
           isReassigning={isReassigning}
           setResetFailedModalVisible={setResetFailedModalVisible}
-          setAutoFixQueueModalVisible={setAutoFixQueueModalVisible}
           historyGroupFilter={historyGroupFilter}
           setHistoryGroupFilter={setHistoryGroupFilter}
           setHistoryPageFilter={setHistoryPageFilter}
@@ -5875,6 +5487,8 @@ const PlaywrightPoster = () => {
             filteredFavoriteGroups={filteredFavoriteGroups}
             visibleFavoriteGroups={visibleFavoriteGroups}
             activeScrapeAccount={activeScrapeAccount}
+            scrapeAccountOptions={scrapeAccountOptions}
+            setGroupHunterScrapeAccountId={setGroupHunterScrapeAccountId}
           />
         </Suspense>
       )}
@@ -6002,7 +5616,7 @@ const PlaywrightPoster = () => {
       <Modal
         title={
           <div className="flex items-center gap-2 text-base font-bold text-slate-100">
-            <span className="text-xl">➕</span>
+            <PlusCircleOutlined className="text-blue-400 text-lg" />
             <span>Khai Báo Kênh Báo / Luồng RSS Tùy Chỉnh Mới</span>
           </div>
         }

@@ -29,6 +29,8 @@ import {
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
 import { stripEmojiPrefix } from './shared';
+import ScheduleChoice from '../../components/common/ScheduleChoice';
+import type { ScheduleValue } from '../../components/common/postingSchedule';
 import type { SocialAccount, PostQueue } from './types';
 
 const { TextArea } = Input;
@@ -36,46 +38,19 @@ const { TextArea } = Input;
 interface BulkPasteDrawerProps {
   bulkDrawerPreviews: Record<string, { loading: boolean; error?: string; caption?: string; author?: string; mediaUrls?: string[]; mediaKinds?: ("video" | "image")[]; originalMediaUrls?: string[]; originalMediaKinds?: ("video" | "image")[]; videoCount?: number; imageCount?: number; affiliateComment?: string; skipComment?: boolean; includeCredit?: boolean; watermarkRemoved?: boolean; }>;
   setBulkDrawerPreviews: React.Dispatch<React.SetStateAction<Record<string, { loading: boolean; error?: string; caption?: string; author?: string; mediaUrls?: string[]; mediaKinds?: ("video" | "image")[]; originalMediaUrls?: string[]; originalMediaKinds?: ("video" | "image")[]; videoCount?: number; imageCount?: number; affiliateComment?: string; skipComment?: boolean; includeCredit?: boolean; watermarkRemoved?: boolean; }>>>;
-  customDrawerScheduledTimes: Record<string, Dayjs>;
-  setCustomDrawerScheduledTimes: React.Dispatch<React.SetStateAction<Record<string, Dayjs>>>;
   isMediaVideo: (url: string, kind?: string) => boolean;
-  desiredMinInterval: number;
-  setDesiredMinInterval: React.Dispatch<React.SetStateAction<number>>;
   bulkModalVisible: boolean;
   setBulkModalVisible: React.Dispatch<React.SetStateAction<boolean>>;
   bulkAutoDistributeTwoVias: boolean;
   setBulkAutoDistributeTwoVias: React.Dispatch<React.SetStateAction<boolean>>;
   setBulkText: React.Dispatch<React.SetStateAction<string>>;
   bulkText: string;
-  bulkScheduleMode: "WINDOW" | "INTERVAL" | "NOW";
-  setBulkScheduleMode: React.Dispatch<React.SetStateAction<"WINDOW" | "INTERVAL" | "NOW">>;
-  setBulkWindowDate: React.Dispatch<React.SetStateAction<Dayjs>>;
-  bulkWindowDate: Dayjs;
-  bulkWindowStartTime: Dayjs;
-  setBulkWindowStartTime: React.Dispatch<React.SetStateAction<Dayjs>>;
-  bulkWindowEndTime: Dayjs;
-  setBulkWindowEndTime: React.Dispatch<React.SetStateAction<Dayjs>>;
-  bulkWindowMaxPerDay: number;
-  setBulkWindowMaxPerDay: React.Dispatch<React.SetStateAction<number>>;
-  bulkStartTime: Dayjs;
-  setBulkStartTime: React.Dispatch<React.SetStateAction<Dayjs>>;
-  bulkInterval: number;
-  setBulkInterval: React.Dispatch<React.SetStateAction<number>>;
   groupAccountsWithId: SocialAccount[];
   twoMainViasDisplayNames: string;
   posts: PostQueue[];
   filterHistoryDuplicates: boolean;
   setFilterHistoryDuplicates: React.Dispatch<React.SetStateAction<boolean>>;
-  setSmartScheduleEnabled: React.Dispatch<React.SetStateAction<boolean>>;
-  smartScheduleEnabled: boolean;
-  smartGroupId: string;
-  setSmartGroupId: React.Dispatch<React.SetStateAction<string>>;
-  setSmartDailyLimit: React.Dispatch<React.SetStateAction<number>>;
-  smartDailyLimit: number;
-  getGroupDailyLimit: (groupId: string) => number;
-  saveGroupDailyLimit: (groupId: string, limit: number) => void;
   bulkPasteSummary: { detectedUrls: string[]; uniqueUrls: string[]; finalUrls: string[]; historyMatchedUrls: string[]; invalidLineCount: number; duplicateInInputCount: number; duplicateInHistoryCount: number; };
-  smartScheduleTimes: Dayjs[];
   currentKpiTarget: { socialAccountId: number; name: any; targetCount: number; actualCount: number; pendingCount: number; totalPending: number; totalPlanned: number; isFullyPublished: boolean; isFullyScheduled: boolean; remainingToSchedule: number; };
   bulkScrapeStats: { total: number; completed: number; loading: number; error: number; isDone: boolean; percent: number; };
   fetchOneDrawerPreview: (url: string) => Promise<void>;
@@ -88,55 +63,29 @@ interface BulkPasteDrawerProps {
   toggleDrawerCredit: (url: string) => void;
   removeUrlFromBulkText: (urlToRemove: string) => void;
   fetchAllDrawerPreviews: () => void;
-  computeTimeWindowSchedule: (targetDate: any, start: any, end: any, count: number, maxPerDay?: number, minIntervalMinutes?: number, sameDayMinGap?: number) => Dayjs[];
   handleApplyBulkPaste: () => void;
   handleApplyAndOpenSwipeReview: () => void;
+  scheduleChoice: ScheduleValue;
+  setScheduleChoice: (v: ScheduleValue) => void;
 }
 
 // Drawer "Dán link hàng loạt" — tách từ PlaywrightPoster, state vẫn nằm ở trang cha
 function BulkPasteDrawer({
   bulkDrawerPreviews,
   setBulkDrawerPreviews,
-  customDrawerScheduledTimes,
-  setCustomDrawerScheduledTimes,
   isMediaVideo,
-  desiredMinInterval,
-  setDesiredMinInterval,
   bulkModalVisible,
   setBulkModalVisible,
   bulkAutoDistributeTwoVias,
   setBulkAutoDistributeTwoVias,
   setBulkText,
   bulkText,
-  bulkScheduleMode,
-  setBulkScheduleMode,
-  setBulkWindowDate,
-  bulkWindowDate,
-  bulkWindowStartTime,
-  setBulkWindowStartTime,
-  bulkWindowEndTime,
-  setBulkWindowEndTime,
-  bulkWindowMaxPerDay,
-  setBulkWindowMaxPerDay,
-  bulkStartTime,
-  setBulkStartTime,
-  bulkInterval,
-  setBulkInterval,
   groupAccountsWithId,
   twoMainViasDisplayNames,
   posts,
   filterHistoryDuplicates,
   setFilterHistoryDuplicates,
-  setSmartScheduleEnabled,
-  smartScheduleEnabled,
-  smartGroupId,
-  setSmartGroupId,
-  setSmartDailyLimit,
-  smartDailyLimit,
-  getGroupDailyLimit,
-  saveGroupDailyLimit,
   bulkPasteSummary,
-  smartScheduleTimes,
   currentKpiTarget,
   bulkScrapeStats,
   fetchOneDrawerPreview,
@@ -149,9 +98,10 @@ function BulkPasteDrawer({
   toggleDrawerCredit,
   removeUrlFromBulkText,
   fetchAllDrawerPreviews,
-  computeTimeWindowSchedule,
   handleApplyBulkPaste,
   handleApplyAndOpenSwipeReview,
+  scheduleChoice,
+  setScheduleChoice,
 }: BulkPasteDrawerProps) {
   const { message } = App.useApp();
   return (
@@ -243,19 +193,9 @@ function BulkPasteDrawer({
                     <Tag color="success" className="!m-0 !text-xs !font-bold">ĐÃ SẴN SÀNG</Tag>
                   </div>
                   <div className="text-xs text-emerald-300/80 mt-0.5">
-                    Toàn bộ hình ảnh, video & caption đã được tải trước đầy đủ. Bạn có thể duyệt bài ngay!
+                    Toàn bộ hình ảnh, video & caption đã được tải trước đầy đủ. Bạn có thể duyệt bài ngay ở thanh điều khiển bên dưới.
                   </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="primary"
-                  icon={<ThunderboltOutlined />}
-                  onClick={handleApplyAndOpenSwipeReview}
-                  className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-bold border-none shadow-md rounded-xl"
-                >
-                  ⚡ Duyệt nhanh kiểu Tinder ngay
-                </Button>
               </div>
             </div>
           ) : (
@@ -284,14 +224,6 @@ function BulkPasteDrawer({
                   size="small"
                   style={{ width: 140 }}
                 />
-                <Button
-                  size="small"
-                  icon={<ThunderboltOutlined />}
-                  onClick={handleApplyAndOpenSwipeReview}
-                  className="bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 font-bold border border-sky-500/40 rounded-lg text-xs"
-                >
-                  Duyệt ngay bài đã cào
-                </Button>
               </div>
             </div>
           )
@@ -417,19 +349,19 @@ function BulkPasteDrawer({
             <div className="grid grid-cols-4 gap-2.5">
               <div className="flex flex-col items-center bg-blue-500/15 border border-blue-500/30 rounded-xl p-2.5 text-center shadow-inner">
                 <span className="text-xl font-black text-blue-400">{bulkPasteSummary.finalUrls.length}</span>
-                <span className="text-[11px] font-semibold text-slate-300 leading-tight mt-0.5">Bài sẽ tạo</span>
+                <span className="text-xs font-semibold text-slate-200 leading-tight mt-0.5">Bài sẽ tạo</span>
               </div>
               <div className="flex flex-col items-center bg-slate-800/70 border border-slate-700/70 rounded-xl p-2.5 text-center">
                 <span className="text-xl font-black text-slate-200">{bulkPasteSummary.uniqueUrls.length}</span>
-                <span className="text-[11px] text-slate-400 leading-tight mt-0.5">Link unique</span>
+                <span className="text-xs text-slate-300 leading-tight mt-0.5">Link unique</span>
               </div>
               <div className={`flex flex-col items-center rounded-xl p-2.5 text-center border ${bulkPasteSummary.duplicateInHistoryCount > 0 ? 'bg-amber-500/15 border-amber-500/40 shadow-inner' : 'bg-slate-800/70 border-slate-700/70'}`}>
                 <span className={`text-xl font-black ${bulkPasteSummary.duplicateInHistoryCount > 0 ? 'text-amber-300' : 'text-slate-200'}`}>{bulkPasteSummary.duplicateInHistoryCount}</span>
-                <span className="text-[11px] text-slate-400 leading-tight mt-0.5">Đã có LS</span>
+                <span className="text-xs text-slate-300 leading-tight mt-0.5">Đã có LS</span>
               </div>
               <div className={`flex flex-col items-center rounded-xl p-2.5 text-center border ${bulkPasteSummary.invalidLineCount > 0 ? 'bg-red-500/15 border-red-500/40 shadow-inner' : 'bg-slate-800/70 border-slate-700/70'}`}>
                 <span className={`text-xl font-black ${bulkPasteSummary.invalidLineCount > 0 ? 'text-red-400' : 'text-slate-200'}`}>{bulkPasteSummary.invalidLineCount}</span>
-                <span className="text-[11px] text-slate-400 leading-tight mt-0.5">Dòng vô hiệu</span>
+                <span className="text-xs text-slate-300 leading-tight mt-0.5">Dòng vô hiệu</span>
               </div>
             </div>
 
@@ -455,373 +387,10 @@ function BulkPasteDrawer({
             )}
           </div>
 
-          {/* CỘT PHẢI (xl:col-span-5): CÀI ĐẶT THỜI GIAN & SMART SCHEDULE */}
-          <div className="bulk-paste-schedule-panel xl:col-span-5 bg-slate-900/80 rounded-2xl border border-slate-800/90 overflow-hidden shadow-xl">
-            {/* Header toggle Smart Schedule */}
-            <div
-              className="bulk-paste-schedule-head flex items-center justify-between px-4 py-3.5 cursor-pointer select-none bg-slate-850 border-b border-slate-800"
-              onClick={() => setSmartScheduleEnabled(!smartScheduleEnabled)}
-            >
-              <div className="flex items-center gap-2.5">
-                <span className={`w-8 h-8 rounded-xl grid place-items-center text-base transition-colors ${smartScheduleEnabled ? 'bg-violet-500/30 text-violet-300' : 'bg-slate-700 text-slate-400'}`}>
-                  📅
-                </span>
-                <div>
-                  <div className="text-sm font-bold text-slate-100">Smart Schedule (Phân bổ giờ)</div>
-                  <div className="text-[11px] text-slate-400 leading-tight">
-                    {smartScheduleEnabled
-                      ? 'Tự động tìm slot trống theo giới hạn bài/ngày của nhóm'
-                      : 'Tắt — đang dùng cài đặt thủ công'}
-                  </div>
-                </div>
-              </div>
-              <div className={`w-10 h-6 rounded-full relative transition-colors shrink-0 ${smartScheduleEnabled ? 'bg-violet-500' : 'bg-slate-700'}`}>
-                <div className={`w-5 h-5 rounded-full bg-white absolute top-0.5 transition-all shadow ${smartScheduleEnabled ? 'right-0.5' : 'left-0.5'}`} />
-              </div>
-            </div>
-
-            {/* Smart Schedule body */}
-            {smartScheduleEnabled ? (
-              <div className="p-4 space-y-3.5">
-                {/* Chọn nhóm & Giới hạn */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <div className="text-xs font-bold text-slate-300 mb-1.5">Nhóm target:</div>
-                    <Select
-                      showSearch
-                      optionFilterProp="label"
-                      placeholder="Chọn nhóm..."
-                      value={smartGroupId || undefined}
-                      onChange={(val) => {
-                        setSmartGroupId(val);
-                        setSmartDailyLimit(getGroupDailyLimit(val));
-                      }}
-                      className="w-full rounded-xl font-medium"
-                      options={groupAccountsWithId.map((g) => ({
-                        value: g.platformAccountId,
-                        label: `${stripEmojiPrefix(g.pageName)} (${g.platformAccountId})`,
-                      }))}
-                    />
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-slate-300 mb-1.5">Giới hạn bài/ngày:</div>
-                    <Select
-                      value={smartDailyLimit}
-                      onChange={(val) => {
-                        setSmartDailyLimit(val);
-                        if (smartGroupId) saveGroupDailyLimit(smartGroupId, val);
-                      }}
-                      className="w-full rounded-xl font-medium"
-                      options={[
-                        { value: 5, label: '5 bài/ngày' },
-                        { value: 8, label: '8 bài/ngày' },
-                        { value: 10, label: '10 bài/ngày (mặc định)' },
-                        { value: 12, label: '12 bài/ngày' },
-                        { value: 15, label: '15 bài/ngày' },
-                        { value: 20, label: '20 bài/ngày' },
-                        { value: 30, label: '30 bài/ngày' },
-                      ]}
-                    />
-                  </div>
-                </div>
-
-                {/* Live preview slot analysis */}
-                {smartGroupId && bulkPasteSummary.finalUrls.length > 0 && (() => {
-                  const intervalMins = Math.floor((24 * 60) / smartDailyLimit);
-                  const pendingForGroup = (posts || []).filter((p) => {
-                    if (p.status !== 'PENDING' && p.status !== 'PROCESSING') return false;
-                    const raw = (p.targetGroupNames || '').replace(/^GROUP_ONLY_ANON:|^GROUP_ONLY:/, '');
-                    return raw.split(',').map((v) => v.trim()).includes(smartGroupId);
-                  });
-                  const byDay = new Map<string, number>();
-                  pendingForGroup.forEach((p) => {
-                    const d = dayjs(p.scheduledAt).format('DD/MM (ddd)');
-                    byDay.set(d, (byDay.get(d) || 0) + 1);
-                  });
-                  const byDayNew = new Map<string, number>();
-                  smartScheduleTimes.forEach((t) => {
-                    const d = t.format('DD/MM (ddd)');
-                    byDayNew.set(d, (byDayNew.get(d) || 0) + 1);
-                  });
-
-                  return (
-                    <div className="space-y-2.5">
-                      {smartScheduleTimes.length > 0 ? (
-                        <div className="bg-violet-950/40 rounded-xl p-3.5 border border-violet-500/30 space-y-2.5">
-                          <div className="text-xs font-extrabold text-violet-300 uppercase tracking-wider flex items-center justify-between">
-                            <span>✨ {bulkPasteSummary.finalUrls.length} bài sẽ được xếp vào:</span>
-                            <span className="text-[10px] text-slate-400 font-normal">Cách ~{intervalMins}p</span>
-                          </div>
-
-                          <div className="flex flex-wrap gap-1.5">
-                            {Array.from(byDayNew.entries()).map(([day, count]) => (
-                              <span key={day} className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-bold bg-violet-500/25 text-violet-200 border border-violet-500/40 shadow-sm">
-                                📅 {day} <span className="font-black text-amber-300">+{count} bài</span>
-                              </span>
-                            ))}
-                          </div>
-
-                          {/* Chi tiết từng slot giờ có thể chỉnh sửa trực tiếp */}
-                          <div className="pt-2 border-t border-violet-500/25">
-                            <div className="flex items-center justify-between text-[11px] font-bold text-slate-300 mb-2">
-                              <span>⏰ Danh sách giờ hẹn (Click để tự đổi giờ):</span>
-                              <span className="text-[10px] text-violet-400 font-normal">Tự động lưu khi đổi</span>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1">
-                              {bulkPasteSummary.finalUrls.map((url, idx) => {
-                                const defaultTime = smartScheduleTimes[idx] || dayjs().add((idx + 1) * 15, 'minute');
-                                const effectiveTime = customDrawerScheduledTimes[url] || defaultTime;
-                                return (
-                                  <div
-                                    key={url}
-                                    className="bg-[#0b1222] border border-violet-500/40 hover:border-violet-400 rounded-xl px-2.5 py-1.5 flex items-center justify-between gap-2 text-xs shadow-sm transition-all"
-                                  >
-                                    <span className="font-black text-violet-300 shrink-0">Bài #{idx + 1}</span>
-                                    <DatePicker
-                                      showTime
-                                      size="small"
-                                      format="HH:mm DD/MM/YYYY"
-                                      allowClear={false}
-                                      value={effectiveTime}
-                                      onChange={(val) => {
-                                        if (val) {
-                                          setCustomDrawerScheduledTimes((prev) => ({ ...prev, [url]: val }));
-                                        }
-                                      }}
-                                      className="bg-slate-900 border-violet-500/50 text-amber-300 font-mono font-bold text-xs rounded-lg !w-44 !py-0.5"
-                                    />
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="bg-red-950/30 border border-red-500/30 rounded-lg p-3 text-xs text-red-300">
-                          ⚠️ Không tìm thấy slot trống trong 30 ngày tới với giới hạn {smartDailyLimit} bài/ngày.
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-
-                {!smartGroupId && (
-                  <div className="text-xs text-slate-500 text-center py-3 bg-slate-950/40 rounded-xl border border-slate-800">
-                    ← Chọn nhóm ở trên để tự động phân tích lịch
-                  </div>
-                )}
-              </div>
-            ) : (
-              /* Manual / Distribution mode */
-              <div className="p-4 space-y-3.5">
-                <div>
-                  <div className="text-xs font-bold text-slate-300 mb-2 flex items-center justify-between">
-                    <span>⚙️ Chế độ chia lịch đăng:</span>
-                    {bulkScheduleMode === 'WINDOW' && bulkPasteSummary.finalUrls.length > 1 && (
-                      <Tag color="cyan" className="!m-0 text-xs font-semibold">
-                        ⚡ Tự động chia đều ~{Math.round(
-                          (bulkWindowEndTime.hour() * 60 + bulkWindowEndTime.minute() - (bulkWindowStartTime.hour() * 60 + bulkWindowStartTime.minute()) + (bulkWindowEndTime.isBefore(bulkWindowStartTime) ? 1440 : 0)) / Math.max(1, bulkPasteSummary.finalUrls.length - 1)
-                        )} phút / bài
-                      </Tag>
-                    )}
-                  </div>
-                  <Segmented
-                    block
-                    value={bulkScheduleMode}
-                    onChange={(val) => setBulkScheduleMode(val as 'WINDOW' | 'INTERVAL' | 'NOW')}
-                    options={[
-                      { label: '🎯 Chia đều khung giờ (Từ - Đến)', value: 'WINDOW' },
-                      { label: '⏱️ Giãn cách cố định', value: 'INTERVAL' },
-                      { label: '⚡ Đăng ngay', value: 'NOW' },
-                    ]}
-                    className="mb-3 bg-slate-950/80 p-1 border border-slate-700/80 text-xs"
-                  />
-                </div>
-
-                {bulkScheduleMode === 'WINDOW' && (
-                  <div className="bg-slate-950/50 p-3.5 rounded-xl border border-slate-800 space-y-3">
-                    {/* Nút bấm chọn nhanh Khung Giờ Vàng */}
-                    <div className="flex items-center gap-1.5 flex-wrap pb-2 border-b border-slate-800/80">
-                      <span className="text-[11px] text-slate-400 font-semibold">🌟 Khung giờ chuẩn:</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setBulkWindowStartTime(dayjs().hour(9).minute(0).second(0));
-                          setBulkWindowEndTime(dayjs().hour(18).minute(0).second(0));
-                        }}
-                        className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-800 hover:bg-slate-700 text-blue-300 border border-slate-700 cursor-pointer transition-all"
-                      >
-                        💼 Hành chính (09:00 - 18:00)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setBulkWindowStartTime(dayjs().hour(8).minute(30).second(0));
-                          setBulkWindowEndTime(dayjs().hour(22).minute(0).second(0));
-                        }}
-                        className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 cursor-pointer transition-all"
-                      >
-                        🌟 Giờ vàng cả ngày (08:30 - 22:00)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setBulkWindowStartTime(dayjs().hour(11).minute(30).second(0));
-                          setBulkWindowEndTime(dayjs().hour(23).minute(0).second(0));
-                        }}
-                        className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 cursor-pointer transition-all"
-                      >
-                        🌙 Trưa & Tối (11:30 - 23:00)
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div>
-                        <div className="text-[11px] font-bold text-slate-400 mb-1 flex items-center justify-between">
-                          <span>📅 Ngày bắt đầu:</span>
-                          <div className="flex gap-1">
-                            <button
-                              type="button"
-                              onClick={() => setBulkWindowDate(dayjs())}
-                              className="text-[10px] text-blue-400 hover:underline cursor-pointer"
-                            >Hôm nay</button>
-                            <span className="text-slate-600">|</span>
-                            <button
-                              type="button"
-                              onClick={() => setBulkWindowDate(dayjs().add(1, 'day'))}
-                              className="text-[10px] text-blue-400 hover:underline cursor-pointer"
-                            >Ngày mai</button>
-                          </div>
-                        </div>
-                        <DatePicker
-                          value={bulkWindowDate}
-                          onChange={(val) => val && setBulkWindowDate(val)}
-                          format="DD/MM/YYYY"
-                          allowClear={false}
-                          className="w-full rounded-xl"
-                        />
-                      </div>
-                      <div>
-                        <div className="text-[11px] font-bold text-slate-400 mb-1">
-                          ⏰ Giờ bắt đầu (Start):
-                        </div>
-                        <TimePicker
-                          value={bulkWindowStartTime}
-                          onChange={(val) => val && setBulkWindowStartTime(val)}
-                          format="HH:mm"
-                          minuteStep={5}
-                          allowClear={false}
-                          className="w-full rounded-xl"
-                        />
-                      </div>
-                      <div>
-                        <div className="text-[11px] font-bold text-slate-400 mb-1">
-                          🏁 Giờ kết thúc (Hạn chót):
-                        </div>
-                        <TimePicker
-                          value={bulkWindowEndTime}
-                          onChange={(val) => val && setBulkWindowEndTime(val)}
-                          format="HH:mm"
-                          minuteStep={5}
-                          allowClear={false}
-                          className="w-full rounded-xl"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Tùy chọn chia nhiều ngày nếu danh sách bài lớn */}
-                    <div className="flex items-center justify-between gap-3 bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 text-xs flex-wrap">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-slate-300">📅 Rải sang nhiều ngày:</span>
-                        <Select
-                          size="small"
-                          value={bulkWindowMaxPerDay}
-                          onChange={(val) => setBulkWindowMaxPerDay(val)}
-                          className="w-56 font-bold"
-                          options={[
-                            { value: -1, label: '✨ Tự động chống dồn (Khuyên dùng)' },
-                            { value: 0, label: 'Đăng hết trong 1 ngày' },
-                            { value: 3, label: 'Tối đa 3 bài / ngày' },
-                            { value: 5, label: 'Tối đa 5 bài / ngày' },
-                            { value: 8, label: 'Tối đa 8 bài / ngày' },
-                            { value: 10, label: 'Tối đa 10 bài / ngày' },
-                            { value: 15, label: 'Tối đa 15 bài / ngày' },
-                            { value: 20, label: 'Tối đa 20 bài / ngày' },
-                          ]}
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-slate-300">⏱️ Giãn cách tối thiểu:</span>
-                        <Select
-                          size="small"
-                          value={desiredMinInterval}
-                          onChange={(val) => setDesiredMinInterval(val)}
-                          className="w-32 font-bold"
-                          options={[
-                            { value: 15, label: '≥ 15 phút' },
-                            { value: 20, label: '≥ 20 phút' },
-                            { value: 30, label: '≥ 30 phút (Chuẩn)' },
-                            { value: 45, label: '≥ 45 phút' },
-                            { value: 60, label: '≥ 1 giờ' },
-                            { value: 120, label: '≥ 2 giờ' },
-                          ]}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="text-[11px] text-slate-300 bg-blue-500/10 border border-blue-500/20 rounded-lg p-2.5 flex items-center justify-between">
-                      <span>
-                        💡 Rải <b>{bulkPasteSummary.finalUrls.length} bài</b> từ <b>{bulkWindowStartTime.format('HH:mm')}</b> đến <b>{bulkWindowEndTime.format('HH:mm')}</b>
-                        {bulkWindowMaxPerDay === -1
-                          ? ` (Tự động chống dồn: giãn cách an toàn ≥ ${desiredMinInterval} phút/bài, tự tràn ngày tiếp theo nếu dày)`
-                          : bulkWindowMaxPerDay > 0
-                            ? ` (Tối đa ${bulkWindowMaxPerDay} bài/ngày → ${Math.ceil(bulkPasteSummary.finalUrls.length / bulkWindowMaxPerDay)} ngày)`
-                            : ` ngày ${bulkWindowDate.format('DD/MM/YYYY')} (giãn cách an toàn ≥ ${desiredMinInterval} phút)`}.
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {bulkScheduleMode === 'INTERVAL' && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-950/50 p-3.5 rounded-xl border border-slate-800">
-                    <div>
-                      <div className="text-[11px] font-bold text-slate-400 mb-1">Thời điểm bắt đầu:</div>
-                      <DatePicker
-                        showTime
-                        format="HH:mm DD/MM/YYYY"
-                        value={bulkStartTime}
-                        onChange={(val) => val && setBulkStartTime(val)}
-                        className="w-full rounded-xl"
-                      />
-                    </div>
-                    <div>
-                      <div className="text-[11px] font-bold text-slate-400 mb-1">Mỗi bài sau cách nhau:</div>
-                      <Select
-                        value={bulkInterval}
-                        onChange={(val) => setBulkInterval(val)}
-                        className="w-full rounded-xl font-medium"
-                        options={[
-                          { value: 5, label: '5 phút' },
-                          { value: 10, label: '10 phút' },
-                          { value: 15, label: '15 phút' },
-                          { value: 20, label: '20 phút' },
-                          { value: 30, label: '30 phút' },
-                          { value: 45, label: '45 phút' },
-                          { value: 60, label: '1 giờ' },
-                          { value: 120, label: '2 giờ' },
-                        ]}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {bulkScheduleMode === 'NOW' && (
-                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-xs text-amber-300">
-                    ⚡ Bài viết đầu tiên sẽ được đưa vào xuất bản ngay lập tức, các bài tiếp theo giãn cách mỗi {bulkInterval} phút.
-                  </div>
-                )}
-              </div>
-            )}
+          {/* CỘT PHẢI: THỜI GIAN ĐĂNG — dùng chung bộ chọn giờ với trang, giờ cụ thể do Lịch đăng chung xếp */}
+          <div className="bulk-paste-schedule-panel xl:col-span-5 bg-slate-900/80 rounded-2xl border border-slate-800/90 p-4 space-y-2">
+            <div className="text-sm font-bold text-slate-200">Thời gian đăng</div>
+            <ScheduleChoice value={scheduleChoice} onChange={setScheduleChoice} />
           </div>
         </div>
 
@@ -842,14 +411,6 @@ function BulkPasteDrawer({
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <Button
-                  size="middle"
-                  icon={<ThunderboltOutlined />}
-                  onClick={handleApplyAndOpenSwipeReview}
-                  className="!text-xs !h-9 !px-3.5 border-emerald-500/50 text-emerald-300 bg-emerald-500/20 hover:bg-emerald-500/30 rounded-xl font-bold"
-                >
-                  ⚡ Duyệt Tinder
-                </Button>
                 <Button
                   size="middle"
                   icon={<EyeOutlined />}
@@ -877,32 +438,6 @@ function BulkPasteDrawer({
                 const isSkipComment = !!preview?.skipComment;
                 const isCredit = preview?.includeCredit !== false;
 
-                // Tính toán thời gian dự kiến đăng bài này
-                const calculatedDefaultTime = (() => {
-                  if (posInFinal < 0 || isFiltered) return null;
-                  if (smartScheduleEnabled && smartGroupId && smartScheduleTimes.length > posInFinal) {
-                    return smartScheduleTimes[posInFinal];
-                  }
-                  if (bulkScheduleMode === 'WINDOW') {
-                    const times = computeTimeWindowSchedule(
-                      bulkWindowDate,
-                      bulkWindowStartTime,
-                      bulkWindowEndTime,
-                      bulkPasteSummary.finalUrls.length,
-                      bulkWindowMaxPerDay,
-                      desiredMinInterval
-                    );
-                    return times[posInFinal] || null;
-                  }
-                  if (bulkScheduleMode === 'NOW') {
-                    const isFirstImmediate = posInFinal === 0 && !isInHistory;
-                    if (isFirstImmediate) return dayjs();
-                    return dayjs().add(posInFinal * bulkInterval, 'minute');
-                  }
-                  return bulkStartTime.add(posInFinal * bulkInterval, 'minute');
-                })();
-
-                const effectiveScheduledTime = customDrawerScheduledTimes[url] || calculatedDefaultTime;
 
                 return (
                   <div
@@ -926,25 +461,6 @@ function BulkPasteDrawer({
                             <span className="text-base font-bold text-slate-100 truncate max-w-md">
                               {preview?.caption ? preview.caption.slice(0, 100) : `Bài viết #${posInFinal >= 0 ? posInFinal + 1 : index + 1}`}
                             </span>
-                            {effectiveScheduledTime && (
-                              <div className="flex items-center gap-1.5 bg-indigo-950/70 border border-indigo-500/40 hover:border-indigo-400 rounded-xl px-2.5 py-1 shadow-sm transition-colors">
-                                <ClockCircleOutlined className="text-indigo-400 text-xs" />
-                                <span className="text-[11px] font-bold text-indigo-300">Hẹn giờ:</span>
-                                <DatePicker
-                                  showTime
-                                  size="small"
-                                  format="HH:mm DD/MM/YYYY"
-                                  allowClear={false}
-                                  value={effectiveScheduledTime}
-                                  onChange={(val) => {
-                                    if (val) {
-                                      setCustomDrawerScheduledTimes((prev) => ({ ...prev, [url]: val }));
-                                    }
-                                  }}
-                                  className="bg-slate-900 border-indigo-500/50 text-amber-300 font-mono font-bold text-xs rounded-lg !w-44 !py-0.5"
-                                />
-                              </div>
-                            )}
                           </div>
                           <div className="flex items-center gap-3 text-xs text-slate-400 font-mono flex-wrap">
                             <a
@@ -956,7 +472,7 @@ function BulkPasteDrawer({
                             >
                               🔗 {url}
                             </a>
-                            {isInHistory && <Tag color="warning" className="!m-0 !text-[10px] font-bold">⚠️ ĐÃ CÓ TRONG LỊCH SỬ</Tag>}
+                            {isInHistory && <Tag color="warning" className="!m-0 !text-xs font-bold">⚠️ ĐÃ CÓ TRONG LỊCH SỬ</Tag>}
                           </div>
                         </div>
                       </div>
@@ -1099,9 +615,9 @@ function BulkPasteDrawer({
                             {/* Album ảnh */}
                             {photoUrls.length > 0 && (
                               <div className="space-y-3">
-                                <div className="flex items-center justify-between text-xs text-slate-400">
-                                  <span className="font-bold text-slate-300">📄 Album ảnh đính kèm:</span>
-                                  <span className="text-[11px] text-slate-500">(Click vào ảnh để phóng to toàn màn hình)</span>
+                                <div className="flex items-center justify-between text-xs text-slate-300">
+                                  <span className="font-bold text-slate-200">📄 Album ảnh đính kèm:</span>
+                                  <span className="text-xs text-slate-300">(Click vào ảnh để phóng to toàn màn hình)</span>
                                 </div>
 
                                 <Image.PreviewGroup>
@@ -1121,7 +637,7 @@ function BulkPasteDrawer({
 
                                           {/* Tag Ảnh Bìa */}
                                           {imgIdx === 0 && (
-                                            <span className="absolute top-1.5 left-1.5 bg-rose-600/90 text-white text-[10px] font-black px-2 py-0.5 rounded-lg shadow-lg pointer-events-none">
+                                            <span className="absolute top-1.5 left-1.5 bg-rose-600/90 text-white text-xs font-black px-2 py-0.5 rounded-lg shadow-lg pointer-events-none">
                                               #1 Bìa
                                             </span>
                                           )}

@@ -758,8 +758,8 @@ export default function VideoNewsStudio() {
   // Đổi bất kỳ thiết lập nào → bản xuất cũ không còn khớp
   useEffect(() => { setResultUrl(''); }, [frameHtml, settings, voice, music, source?.url]);
 
-  const sectionTitle = 'text-xs font-semibold text-slate-300';
-  const label = 'text-[11px] text-slate-400 mb-1';
+  const sectionTitle = 'text-sm font-semibold text-slate-100';
+  const label = 'text-[13px] text-slate-300 mb-1.5 font-medium';
 
   // Nội dung tab Khung — dùng chung cho trang Studio và cột "Khung" trong Video Editor
   const frameTabContent = (
@@ -810,7 +810,7 @@ export default function VideoNewsStudio() {
                 )}
               </div>
               {shownFrames.length === 0 ? (
-                <div className="text-[11px] text-slate-500">Chưa có khung nào trong danh mục này. Chỉnh khung bên dưới rồi bấm "Lưu khung hiện tại".</div>
+                <div className="text-xs text-slate-400">Chưa có khung nào trong danh mục này. Chỉnh khung bên dưới rồi bấm "Lưu khung hiện tại".</div>
               ) : (
                 <div className="grid grid-cols-2 gap-1.5">
                   {shownFrames.map((f) => (
@@ -819,8 +819,8 @@ export default function VideoNewsStudio() {
                         <SwatchFill bandBg={f.frame.bandBg} accent={f.frame.accent} />
                       </span>
                       <span className="flex-1 min-w-0">
-                        <span className="block text-[11px] text-slate-200 truncate">{f.name}</span>
-                        {category === ALL && <span className="block text-[10px] text-slate-500 truncate">{f.category}</span>}
+                        <span className="block text-xs text-slate-200 truncate">{f.name}</span>
+                        {category === ALL && <span className="block text-xs text-slate-400 truncate">{f.category}</span>}
                       </span>
                       <Dropdown
                         trigger={['click']}
@@ -853,10 +853,10 @@ export default function VideoNewsStudio() {
               <div className={label}>Kiểu khung</div>
               <Segmented<FrameLayout>
                 block
-                size="small"
+                size="middle"
                 value={frame.layout}
                 onChange={setLayout}
-                options={[{ value: 'news', label: 'Mẫu Ảnh Tin' }, { value: 'card', label: 'Thẻ nổi' }, { value: 'panel', label: 'Dải dưới' }, { value: 'band', label: 'Dải chữ' }]}
+                options={[{ value: 'news', label: 'Ảnh tin' }, { value: 'card', label: 'Thẻ nổi' }, { value: 'panel', label: 'Dải dưới' }, { value: 'band', label: 'Dải chữ' }]}
               />
               {frame.layout !== 'band' && (
                 <Segmented<'cover' | 'contain'>
@@ -906,7 +906,7 @@ export default function VideoNewsStudio() {
                       ...(newsSources.frames.length ? [{ label: 'Khung kênh', options: newsSources.frames.map((f) => ({ value: `frame:${f.id}`, label: f.name })) }] : []),
                     ]}
                   />
-                  <div className="text-[11px] text-slate-500 mt-1">Muốn đổi màu, logo, khung… thì chỉnh và lưu mẫu bên Studio Ảnh Tin rồi chọn lại ở đây.</div>
+                  <div className="text-xs text-slate-400 mt-1">Muốn đổi màu, logo, khung… thì chỉnh và lưu mẫu bên Studio Ảnh Tin rồi chọn lại ở đây.</div>
                 </div>
               )}
             </div>
@@ -929,7 +929,7 @@ export default function VideoNewsStudio() {
                 autoSize={{ minRows: 3, maxRows: 6 }}
                 placeholder="VD: CỤ ÔNG 80 TUỔI [[CỨU 3 CHÁU NHỎ]] KHỎI ĐÁM CHÁY"
               />
-              <div className="flex items-center justify-between text-[11px] text-slate-500">
+              <div className="flex items-center justify-between text-xs text-slate-300">
                 <span>Bọc cụm cần tô màu trong [[ ]]</span>
                 <span className="flex items-center gap-1.5">In hoa <Switch size="small" checked={frame.uppercase} onChange={(v) => setFrame({ uppercase: v })} /></span>
               </div>
@@ -1011,8 +1011,8 @@ export default function VideoNewsStudio() {
 
             <div>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[11px] text-slate-400">Logo góc{category !== ALL ? ` · ${category}` : ''}</span>
-                {frame.logoUrl && <Button size="small" type="link" className="!p-0 !h-auto text-[11px]" onClick={() => setFrame({ logoUrl: '' })}>Bỏ logo</Button>}
+                <span className="text-xs text-slate-300">Logo góc{category !== ALL ? ` · ${category}` : ''}</span>
+                {frame.logoUrl && <Button size="small" type="link" className="!p-0 !h-auto text-xs" onClick={() => setFrame({ logoUrl: '' })}>Bỏ logo</Button>}
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {shownLogos.map((lg) => (
@@ -1064,9 +1064,9 @@ export default function VideoNewsStudio() {
             {frame.layout === 'card' && (
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[11px] text-slate-400">Ảnh trang trí đáy{category !== ALL ? ` · ${category}` : ''}</span>
+                  <span className="text-xs text-slate-300">Ảnh trang trí đáy{category !== ALL ? ` · ${category}` : ''}</span>
                   {frame.decorUrl && (
-                    <span className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                    <span className="flex items-center gap-1.5 text-xs text-slate-400">
                       Nền màu chuyển <Switch size="small" checked={frame.decorGradient} onChange={(v) => setFrame({ decorGradient: v })} />
                     </span>
                   )}
@@ -1074,7 +1074,7 @@ export default function VideoNewsStudio() {
                 <div className="grid grid-cols-3 gap-1.5">
                   <Tooltip title="Chỉ dải màu chuyển, không họa tiết">
                     <div
-                      className={`h-12 rounded border-2 cursor-pointer flex items-center justify-center text-[10px] text-white ${!frame.decorUrl ? 'border-blue-500' : 'border-slate-700 hover:border-slate-500'}`}
+                      className={`h-12 rounded border-2 cursor-pointer flex items-center justify-center text-xs text-white ${!frame.decorUrl ? 'border-blue-500' : 'border-slate-700 hover:border-slate-500'}`}
                       style={{ background: frame.decorColor }}
                       onClick={() => setFrame({ decorUrl: '' })}
                     >
@@ -1131,7 +1131,7 @@ export default function VideoNewsStudio() {
 
   return (
     <>
-    <div className="grid grid-cols-1 lg:grid-cols-[290px_minmax(0,1fr)_340px] xl:grid-cols-[300px_minmax(0,1fr)_360px] gap-4 items-start">
+    <div className="grid grid-cols-1 lg:grid-cols-[290px_minmax(0,1fr)_360px] xl:grid-cols-[310px_minmax(0,1fr)_400px] gap-4 items-start">
       {/* ── TRÁI: nguồn video ── */}
       <div
         className="app-surface p-3 space-y-3"
@@ -1185,13 +1185,13 @@ export default function VideoNewsStudio() {
         </div>
 
         {source && (
-          <div className="text-[11px] text-slate-400 space-y-1 border-t border-slate-800 pt-2">
+          <div className="text-xs text-slate-300 space-y-1 border-t border-slate-800 pt-2">
             <div className="flex flex-wrap gap-1">
               <Tag className="!m-0">{fmtSec(source.duration)}</Tag>
               <Tag className="!m-0">{source.width}×{source.height}</Tag>
               <Tag className="!m-0" color={source.hasAudio ? 'blue' : 'default'}>{source.hasAudio ? 'Có tiếng gốc' : 'Không có tiếng'}</Tag>
             </div>
-            {source.title && <div className="line-clamp-3 text-slate-300">{source.title}</div>}
+            {source.title && <div className="line-clamp-3 text-slate-200">{source.title}</div>}
           </div>
         )}
 
@@ -1199,14 +1199,14 @@ export default function VideoNewsStudio() {
           <div className="flex items-center justify-between">
             <span className={sectionTitle}>Caption khi đăng</span>
             {sourceCaption && caption !== sourceCaption && (
-              <Button size="small" type="link" className="!p-0 !h-auto text-[11px]" onClick={() => setCaption(sourceCaption)}>
+              <Button size="small" type="link" className="!p-0 !h-auto text-xs" onClick={() => setCaption(sourceCaption)}>
                 Dùng lại caption gốc
               </Button>
             )}
           </div>
           <TextArea value={caption} onChange={(e) => setCaption(e.target.value)} autoSize={{ minRows: 3, maxRows: 8 }} placeholder="Nội dung bài đăng kèm video" />
           {sourceCaption && (
-            <div className="text-[10px] text-slate-500">
+            <div className="text-xs text-slate-400">
               💡 Mặc định lấy nguyên văn caption từ clip gốc. Bạn có thể sửa trực tiếp ở đây.
             </div>
           )}
@@ -1220,11 +1220,13 @@ export default function VideoNewsStudio() {
       </div>
 
       {/* ── GIỮA: preview ── */}
-      <div className="app-surface p-3 space-y-3">
-        <div className="flex items-center justify-between">
-          <span className={sectionTitle}>Xem trước</span>
-          <div className="flex items-center gap-2 text-[11px] text-slate-400">
-            {rawView ? 'Clip gốc — nhập tiêu đề (hoặc AI viết) để thêm khung' : alwaysOn ? 'Khung hiện suốt video' : `Khung hiện ${effectiveIntro}s đầu`}
+      <div className="app-surface p-3.5 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className={`${sectionTitle} whitespace-nowrap`}>Xem trước</span>
+          <div className="flex flex-wrap items-center gap-2 text-[13px] text-slate-300">
+            <span className="whitespace-nowrap">
+              {rawView ? 'Clip gốc — nhập tiêu đề (hoặc AI viết) để thêm khung' : alwaysOn ? 'Khung hiện suốt video' : `Khung hiện ${effectiveIntro}s đầu`}
+            </span>
             <Button size="small" icon={<PlayCircleOutlined />} disabled={!source} loading={voiceBusy} onClick={playPreview}>Xem từ đầu</Button>
             <Button
               size="small"
@@ -1274,14 +1276,14 @@ export default function VideoNewsStudio() {
                   className="!w-20 !my-0 !ml-1"
                   tooltip={{ formatter: (v) => v! < 0 ? `Dời lên ${Math.abs(v!)}%` : v! > 0 ? `Hạ xuống ${v}%` : 'Ở giữa (0%)' }}
                 />
-                <span className="text-[10px] text-slate-400 w-8 text-right font-mono">
+                <span className="text-xs text-slate-300 w-10 text-right font-mono">
                   {(frame.videoOffsetY ?? 0) > 0 ? `+${frame.videoOffsetY}%` : `${frame.videoOffsetY ?? 0}%`}
                 </span>
               </div>
             </div>
 
             <div className="flex items-center justify-between border-t border-slate-800/80 pt-1">
-              <span className="flex items-center gap-1 text-[11px] text-slate-300 font-medium">
+              <span className="flex items-center gap-1 text-xs text-slate-200 font-medium">
                 🔍 Phóng to/nhỏ:
               </span>
               <div className="flex items-center gap-1.5 flex-wrap justify-end">
@@ -1319,7 +1321,7 @@ export default function VideoNewsStudio() {
                   className="!w-24 !my-0 !ml-1"
                   tooltip={{ formatter: (v) => `${Math.round((v || 1) * 100)}%` }}
                 />
-                <span className="text-[10px] text-slate-400 w-10 text-right font-mono">
+                <span className="text-xs text-slate-300 w-11 text-right font-mono">
                   {Math.round((frame.videoScale ?? 1) * 100)}%
                 </span>
               </div>
@@ -1344,12 +1346,12 @@ export default function VideoNewsStudio() {
               <div className="absolute inset-0 z-50 bg-blue-950/80 backdrop-blur-sm border-2 border-dashed border-sky-400 flex flex-col items-center justify-center text-sky-200 pointer-events-none rounded transition-all">
                 <UploadOutlined className="text-4xl mb-2 animate-bounce text-sky-300" />
                 <span className="font-bold text-sm text-white">Thả file video vào đây để bắt đầu ngay!</span>
-                <span className="text-[11px] text-sky-300/80 mt-1">Hỗ trợ MP4, MOV, WebM</span>
+                <span className="text-xs text-sky-300/90 mt-1">Hỗ trợ MP4, MOV, WebM</span>
               </div>
             )}
             {source ? (
               <>
-                <div className="absolute top-2 left-2 z-10 bg-black/60 backdrop-blur text-[10px] text-slate-300 px-2 py-0.5 rounded pointer-events-none opacity-80 flex items-center gap-1">
+                <div className="absolute top-2 left-2 z-10 bg-black/60 backdrop-blur text-xs text-slate-200 px-2 py-0.5 rounded pointer-events-none opacity-85 flex items-center gap-1">
                   👆 Kéo để dời clip (CapCut) · Cuộn chuột để phóng to/thu nhỏ
                 </div>
                 <video
@@ -1440,7 +1442,7 @@ export default function VideoNewsStudio() {
                   >
                     {isPlaying ? <PauseOutlined /> : <CaretRightOutlined />}
                   </button>
-                  <span className="font-mono text-[11px] text-slate-300 min-w-[75px] text-center">
+                  <span className="font-mono text-xs text-slate-200 min-w-[82px] text-center">
                     {formatTime(t)} / {formatTime(duration)}
                   </span>
                   <input
@@ -1463,12 +1465,12 @@ export default function VideoNewsStudio() {
                 </div>
               </>
             ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 text-xs px-6 text-center space-y-2 pointer-events-none select-none">
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-300 text-[13px] px-6 text-center space-y-2 pointer-events-none select-none">
                 <div className="w-12 h-12 rounded-full bg-slate-800/90 border border-slate-700/80 flex items-center justify-center text-slate-300 mb-1 shadow-lg">
                   <UploadOutlined className="text-xl text-sky-400" />
                 </div>
-                <div className="font-semibold text-slate-200 text-sm">Kéo & thả file video vào đây</div>
-                <div className="text-[11px] text-slate-500 max-w-[260px]">hoặc dán link TikTok, Douyin, Facebook ở cột bên trái</div>
+                <div className="font-semibold text-slate-100 text-sm">Kéo & thả file video vào đây</div>
+                <div className="text-xs text-slate-400 max-w-[260px]">hoặc dán link TikTok, Douyin, Facebook ở cột bên trái</div>
               </div>
             )}
             <iframe
@@ -1520,7 +1522,7 @@ export default function VideoNewsStudio() {
         <audio ref={voiceRef} hidden />
         {music && <audio ref={musicRef} src={music.url} loop hidden />}
 
-        <div className="flex items-center justify-between gap-2 rounded border border-slate-700/70 bg-slate-900/60 px-3 py-2 text-[11px] text-slate-400">
+        <div className="flex items-center justify-between gap-2 rounded border border-slate-700/70 bg-slate-900/60 px-3 py-2.5 text-[13px] text-slate-300">
           <span>Lồng tiếng, phụ đề, chữ, nhạc nền, cắt clip và timeline kéo thả nằm trong Video Editor.</span>
           <Button
             size="small"
@@ -1572,7 +1574,7 @@ export default function VideoNewsStudio() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className={label}>Vị trí dời clip lên / xuống (như CapCut)</span>
-                <span className="text-[11px] font-mono text-blue-400">
+                <span className="text-xs font-mono text-blue-300">
                   {(frame.videoOffsetY ?? 0) < 0 ? `Lên ${Math.abs(frame.videoOffsetY ?? 0)}%` : (frame.videoOffsetY ?? 0) > 0 ? `Xuống +${frame.videoOffsetY}%` : '0% (giữa)'}
                 </span>
               </div>
@@ -1600,7 +1602,7 @@ export default function VideoNewsStudio() {
                 onChange={(v) => setFrame({ videoOffsetY: v })}
                 tooltip={{ formatter: (v) => v! < 0 ? `Kéo lên ${Math.abs(v!)}%` : v! > 0 ? `Hạ xuống ${v}%` : 'Ở giữa (0%)' }}
               />
-              <div className="text-[11px] text-slate-500">
+              <div className="text-xs text-slate-300">
                 👉 Nhấn giữ chuột và kéo lên/xuống trực tiếp trên video để dời vị trí tức thì như CapCut.
               </div>
             </div>
@@ -1608,7 +1610,7 @@ export default function VideoNewsStudio() {
             <div className="space-y-2 border-t border-slate-800 pt-3">
               <div className="flex items-center justify-between">
                 <span className={label}>Thu phóng video (Zoom in/out)</span>
-                <span className="text-[11px] font-mono text-blue-400">{Math.round((frame.videoScale ?? 1) * 100)}%</span>
+                <span className="text-xs font-mono text-blue-300">{Math.round((frame.videoScale ?? 1) * 100)}%</span>
               </div>
               <Segmented<string>
                 block
@@ -1640,7 +1642,7 @@ export default function VideoNewsStudio() {
             <div className="space-y-2 border-t border-slate-800 pt-3">
               <div className="flex items-center justify-between">
                 <span className={label}>Góc hiển thị khi cắt viền (Cover Focus)</span>
-                <span className="text-[11px] font-mono text-slate-400">{frame.videoFocusY ?? 50}%</span>
+                <span className="text-xs font-mono text-slate-300">{frame.videoFocusY ?? 50}%</span>
               </div>
               <Slider
                 min={0}
@@ -1667,7 +1669,7 @@ export default function VideoNewsStudio() {
             <div className="space-y-2 border-t border-slate-800 pt-3">
               <div className="flex items-center justify-between mb-1">
                 <span className={label}>Thời gian hiện khung (tự kéo dài nếu voice dài hơn)</span>
-                <span className="text-[10px] text-blue-400 font-medium">✨ Chuyển cảnh mềm mại</span>
+                <span className="text-xs text-blue-400 font-medium">✨ Chuyển cảnh mềm mại</span>
               </div>
               <div className="flex gap-1.5 flex-wrap">
                 {[0, 3, 5, 7, 10].map((v) => (
@@ -1681,7 +1683,7 @@ export default function VideoNewsStudio() {
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <span className={label}>Kiểu chuyển cảnh khi hết {settings.introSeconds}s</span>
-                      <span className="text-[10px] text-slate-500">FFmpeg + Preview</span>
+                      <span className="text-xs text-slate-400">FFmpeg + Preview</span>
                     </div>
                     <Select<TransitionEffect>
                       size="small"
@@ -1691,7 +1693,7 @@ export default function VideoNewsStudio() {
                       options={TRANSITION_OPTIONS}
                     />
                   </div>
-                  <div className="flex items-center justify-between text-[11px] text-slate-400">
+                  <div className="flex items-center justify-between text-xs text-slate-300">
                     <span>Giữ "Nguồn" + logo góc trên sau khi khung ẩn</span>
                     <Switch size="small" checked={settings.keepBrand !== false} onChange={(v) => setSettings((p) => ({ ...p, keepBrand: v }))} />
                   </div>
@@ -1707,7 +1709,7 @@ export default function VideoNewsStudio() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className={sectionTitle}>Giọng đọc AI</span>
-                {voice && voiceUpToDate && <span className="text-[11px] text-slate-400">{voice.duration.toFixed(1)}s · {ENGINE_LABEL[voice.engine] || voice.engine}</span>}
+                {voice && voiceUpToDate && <span className="text-xs text-slate-300">{voice.duration.toFixed(1)}s · {ENGINE_LABEL[voice.engine] || voice.engine}</span>}
               </div>
               <TextArea
                 value={voiceText}
@@ -1716,7 +1718,7 @@ export default function VideoNewsStudio() {
                 placeholder="Nội dung giọng đọc (mặc định là tiêu đề). Để trống nếu không cần voice"
               />
               {voiceEdited && (
-                <Button size="small" type="link" className="!p-0 !h-auto text-[11px]" onClick={() => setVoiceEdited(false)}>Dùng lại tiêu đề</Button>
+                <Button size="small" type="link" className="!p-0 !h-auto text-xs" onClick={() => setVoiceEdited(false)}>Dùng lại tiêu đề</Button>
               )}
               <div className="flex gap-2">
                 <Select size="small" className="flex-1" value={settings.voiceName} options={VOICES} onChange={(v) => setSettings((p) => ({ ...p, voiceName: v }))} />
@@ -1770,10 +1772,10 @@ export default function VideoNewsStudio() {
                 { key: 'duckVolume' as const, text: 'Tiếng gốc lúc đọc', disabled: source ? !source.hasAudio : false },
               ].map((row) => (
                 <div key={row.key} className="flex items-center gap-2">
-                  <span className="text-[11px] text-slate-400 w-28 shrink-0">{row.text}</span>
+                  <span className="text-xs text-slate-300 w-32 shrink-0">{row.text}</span>
                   <Slider className="flex-1 !my-1" min={0} max={100} disabled={row.disabled} value={settings[row.key]}
                     onChange={(v) => setSettings((p) => ({ ...p, [row.key]: v }))} />
-                  <span className="text-[11px] text-slate-500 w-8 text-right">{settings[row.key]}%</span>
+                  <span className="text-xs text-slate-400 w-9 text-right">{settings[row.key]}%</span>
                 </div>
               ))}
             </div>
@@ -1792,7 +1794,7 @@ export default function VideoNewsStudio() {
                   <div className={label}>Danh mục</div>
                   <Select className="w-full" value={saveCategory} onChange={setSaveCategory} options={library.categories.map((c) => ({ value: c, label: c }))} />
                 </div>
-                <div className="text-[11px] text-slate-500">Lưu tỉ lệ, vị trí, màu, nhãn, cỡ chữ, logo và thời gian hiện khung.</div>
+                <div className="text-xs text-slate-400">Lưu tỉ lệ, vị trí, màu, nhãn, cỡ chữ, logo và thời gian hiện khung.</div>
               </div>
             </Modal>
     {source && (

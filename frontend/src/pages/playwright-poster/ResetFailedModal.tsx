@@ -79,8 +79,8 @@ function ResetFailedModal({
         {resetFailedMode === 'STAGGER' && (
           <div className="p-3.5 bg-slate-900/60 rounded-xl border border-slate-800 flex items-center justify-between gap-3">
             <div>
-              <div className="text-xs font-bold text-slate-200">Khoảng cách giữa các bài:</div>
-              <div className="text-[11px] text-slate-400">Rải đều thời gian giữa các bài đăng lại để chống dồn dập, bảo vệ an toàn cho Page/Group.</div>
+              <div className="text-[13px] font-bold text-slate-100">Khoảng cách giữa các bài:</div>
+              <div className="text-xs text-slate-300">Rải đều thời gian giữa các bài đăng lại để chống dồn dập, bảo vệ an toàn cho Page/Group.</div>
             </div>
             <Select
               value={resetFailedSpacing}

@@ -680,11 +680,11 @@ const Groups = () => {
               {/* Tầng 1: Tên hiển thị */}
               <div className="p-3.5 rounded-2xl border border-blue-500/30 bg-blue-950/20 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-blue-300 flex items-center gap-1.5">
-                    <span className="w-5 h-5 rounded-full bg-blue-500/30 text-blue-300 flex items-center justify-center text-[11px] font-bold">1</span>
+                  <span className="text-[13px] font-bold text-blue-300 flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-blue-500/30 text-blue-200 flex items-center justify-center text-xs font-bold">1</span>
                     Tên Group Facebook
                   </span>
-                  <Tag color="blue" className="text-[10px] m-0 font-semibold">Bắt buộc</Tag>
+                  <Tag color="blue" className="!text-xs m-0 font-semibold">Bắt buộc</Tag>
                 </div>
                 <Form.Item
                   name="pageName"
@@ -696,7 +696,7 @@ const Groups = () => {
                     className="rounded-xl bg-slate-900/90 border-slate-700/80"
                   />
                 </Form.Item>
-                <div className="text-[11px] text-slate-400">
+                <div className="text-xs text-slate-300">
                   💡 Tên hiển thị để bạn dễ dàng nhận biết khi chọn nơi đăng bài và xem báo cáo.
                 </div>
               </div>
@@ -704,11 +704,11 @@ const Groups = () => {
               {/* Tầng 2: Link hoặc ID Group */}
               <div className="p-3.5 rounded-2xl border border-emerald-500/30 bg-emerald-950/20 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
-                    <span className="w-5 h-5 rounded-full bg-emerald-500/30 text-emerald-300 flex items-center justify-center text-[11px] font-bold">2</span>
+                  <span className="text-[13px] font-bold text-emerald-300 flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-emerald-500/30 text-emerald-200 flex items-center justify-center text-xs font-bold">2</span>
                     Đường Link hoặc ID số của Group
                   </span>
-                  <Tag color="green" className="text-[10px] m-0 font-semibold">Khuyên dùng (Để đạt 100% ĐỦ)</Tag>
+                  <Tag color="green" className="!text-xs m-0 font-semibold">Khuyên dùng (Để đạt 100% ĐỦ)</Tag>
                 </div>
                 <Form.Item name="platformAccountId" className="!mb-0">
                   <Input
@@ -716,7 +716,7 @@ const Groups = () => {
                     className="rounded-xl font-mono text-xs bg-slate-900/90 border-slate-700/80"
                   />
                 </Form.Item>
-                <div className="text-[11px] text-slate-400">
+                <div className="text-xs text-slate-300">
                   🎯 Giúp bot Playwright điều hướng trực tiếp vào đúng nhóm 100%, không bị nhầm lẫn giữa các nhóm trùng tên.
                 </div>
               </div>
@@ -724,11 +724,11 @@ const Groups = () => {
               {/* Tầng 3: Nhóm dự phòng */}
               <div className="p-3.5 rounded-2xl border border-slate-700/80 bg-slate-900/60 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                    <span className="w-5 h-5 rounded-full bg-slate-700 text-slate-300 flex items-center justify-center text-[11px] font-bold">3</span>
+                  <span className="text-[13px] font-bold text-slate-200 flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-slate-700 text-slate-200 flex items-center justify-center text-xs font-bold">3</span>
                     Nhóm Facebook dự phòng (Fallback)
                   </span>
-                  <Tag className="text-[10px] m-0">Tùy chọn</Tag>
+                  <Tag className="!text-xs m-0">Tùy chọn</Tag>
                 </div>
                 <Form.Item name="fallbackGroupId" className="!mb-0">
                   <Select
@@ -738,7 +738,7 @@ const Groups = () => {
                     className="w-full rounded-xl"
                   />
                 </Form.Item>
-                <div className="text-[11px] text-slate-400">
+                <div className="text-xs text-slate-300">
                   🛡️ Khi đăng bài vào nhóm này mà bị kiểm duyệt hoặc bị kick, hệ thống sẽ tự động đổi bài sang nhóm dự phòng này.
                 </div>
               </div>
@@ -752,7 +752,7 @@ const Groups = () => {
                   : 'border-slate-800 bg-slate-900/40'
               }`}>
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-bold text-slate-300">KIỂM TRA ĐỘ ĐẦY ĐỦ THÔNG SỐ:</span>
+                  <span className="text-xs font-bold text-slate-200">KIỂM TRA ĐỘ ĐẦY ĐỦ THÔNG SỐ:</span>
                   {structuredPageName.trim() && structuredPlatformAccountId.trim() ? (
                     <Tag color="success" className="font-semibold m-0">🟢 100% HOÀN HẢO (ĐÃ ĐỦ)</Tag>
                   ) : structuredPageName.trim() ? (
@@ -761,7 +761,7 @@ const Groups = () => {
                     <Tag color="default" className="m-0">⚪ CHƯA NHẬP THÔNG TIN</Tag>
                   )}
                 </div>
-                <div className="text-[11px] text-slate-300 leading-relaxed">
+                <div className="text-xs text-slate-200 leading-relaxed">
                   {structuredPageName.trim() && structuredPlatformAccountId.trim()
                     ? '🎉 Tuyệt vời! Bạn đã điền đủ cả Tên hiển thị và Link/ID nhóm. Bot Playwright sẽ vào thẳng nhóm chính xác 100%.'
                     : structuredPageName.trim()
@@ -790,8 +790,8 @@ const Groups = () => {
           {groupAddMode === 'bulk' && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-slate-400">
-                  Mỗi dòng 1 group. Hỗ trợ dạng: <b className="text-slate-200">Tên | Link hoặc ID</b>
+                <span className="text-[13px] text-slate-300">
+                  Mỗi dòng 1 group. Hỗ trợ dạng: <b className="text-slate-100">Tên | Link hoặc ID</b>
                 </span>
                 <Space size="small">
                   <Button
@@ -800,7 +800,7 @@ const Groups = () => {
                       const sample = `Cinema Sài Gòn | https://www.facebook.com/groups/247792223017151\nKiến Thức Kỳ Quái Đã Được Tiếp Thu | 352102219461769\nhttps://www.facebook.com/groups/964362037266166\nĐảo Mèo 1`;
                       setBulkInputText(sample);
                     }}
-                    className="text-[11px] h-6 px-2 text-slate-400"
+                    className="!text-xs !h-7 px-2.5 text-slate-300"
                   >
                     Mẫu
                   </Button>
@@ -813,7 +813,7 @@ const Groups = () => {
                         if (text) setBulkInputText(text);
                       } catch {}
                     }}
-                    className="text-[11px] h-6 px-2 text-blue-300 bg-blue-600/20 border-blue-500/40"
+                    className="!text-xs !h-7 px-2.5 text-blue-200 bg-blue-600/20 border-blue-500/40"
                   >
                     Dán từ Clipboard
                   </Button>
@@ -825,34 +825,34 @@ const Groups = () => {
                 value={bulkInputText}
                 onChange={(e) => setBulkInputText(e.target.value)}
                 placeholder={`Cinema Sài Gòn | https://www.facebook.com/groups/247792223017151\nKiến Thức Kỳ Quái | 352102219461769\nhttps://www.facebook.com/groups/964362037266166\nĐảo Mèo 1`}
-                className="rounded-xl font-mono text-xs bg-slate-900/90 border-slate-700/80"
+                className="rounded-xl font-mono text-[13px] bg-slate-900/90 border-slate-700/80"
               />
 
               {/* Realtime Bảng Preview Bóc Tách */}
               {parsedBulkList.length > 0 && (
                 <div className="rounded-xl border border-slate-700/80 bg-slate-900/80 overflow-hidden">
-                  <div className="px-3 py-2 bg-slate-800/60 border-b border-slate-700/80 flex items-center justify-between text-xs">
-                    <span className="font-semibold text-slate-200">
+                  <div className="px-3 py-2 bg-slate-800/60 border-b border-slate-700/80 flex items-center justify-between text-[13px]">
+                    <span className="font-semibold text-slate-100">
                       👀 Xem trước kết quả bóc tách ({parsedBulkList.length} nhóm):
                     </span>
-                    <Tag color="cyan" className="m-0 text-[10px]">Tự động phân tầng</Tag>
+                    <Tag color="cyan" className="m-0 !text-xs">Tự động phân tầng</Tag>
                   </div>
                   <div className="max-h-48 overflow-y-auto p-2 space-y-1.5">
                     {parsedBulkList.map((item, idx) => (
-                      <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-slate-950/60 border border-slate-800 text-xs">
+                      <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-slate-950/60 border border-slate-800 text-[13px]">
                         <div className="flex-1 min-w-0 pr-2">
-                          <div className="font-medium text-slate-200 truncate">{item.pageName}</div>
-                          <div className="text-[11px] font-mono text-slate-400 truncate">
+                          <div className="font-medium text-slate-100 truncate">{item.pageName}</div>
+                          <div className="text-xs font-mono text-slate-300 truncate">
                             {item.platformAccountId ? `ID/Link: ${item.platformAccountId}` : 'Chưa có ID (chỉ tìm theo tên)'}
                           </div>
                         </div>
                         <div>
                           {item.isFull ? (
-                            <Tag color="success" className="m-0 text-[10px]">✅ Đủ Tên & ID</Tag>
+                            <Tag color="success" className="m-0 !text-xs">✅ Đủ Tên & ID</Tag>
                           ) : item.hasIdOnly ? (
-                            <Tag color="processing" className="m-0 text-[10px]">⚠️ Đã có Link/ID</Tag>
+                            <Tag color="processing" className="m-0 !text-xs">⚠️ Đã có Link/ID</Tag>
                           ) : (
-                            <Tag color="warning" className="m-0 text-[10px]">⚠️ Chỉ có tên</Tag>
+                            <Tag color="warning" className="m-0 !text-xs">⚠️ Chỉ có tên</Tag>
                           )}
                         </div>
                       </div>

@@ -49,17 +49,17 @@ const About: React.FC = () => {
 
         {/* HERO SECTION */}
         <section className="relative pt-24 pb-20 md:pt-32 md:pb-28 px-6 max-w-5xl mx-auto text-center z-10">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold mb-6 tracking-wide">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[13px] font-semibold mb-6 tracking-wide">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
             CÂU CHUYỆN PHUSOCIAL
           </div>
 
           <h1 className="text-4xl sm:text-6xl font-bold tracking-tight leading-[1.15] text-white max-w-3xl mx-auto">
             Giúp đội ngũ sáng tạo <br />
-            <span className="text-slate-400 font-light">lấy lại thời gian của mình.</span>
+            <span className="text-slate-300 font-light">lấy lại thời gian của mình.</span>
           </h1>
 
-          <p className="mt-6 text-base sm:text-lg text-slate-400 max-w-2xl mx-auto font-normal leading-relaxed">
+          <p className="mt-6 text-base sm:text-lg text-slate-300 max-w-2xl mx-auto font-normal leading-relaxed">
             Chúng tôi tin rằng quản lý mạng xã hội không nên là chuỗi thao tác lặp đi lặp lại mệt mỏi.
             PhuSocial được tạo ra để biến quy trình phức tạp thành trải nghiệm rõ ràng, êm ái và đáng tin cậy.
           </p>
@@ -79,12 +79,12 @@ const About: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="absolute top-2 right-1 sm:right-2 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0e1625] border border-white/[0.1] text-[11px] font-semibold text-slate-200 shadow-lg">
+                <div className="absolute top-2 right-1 sm:right-2 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0e1625] border border-white/[0.1] text-xs font-semibold text-slate-100 shadow-lg whitespace-nowrap">
                   <CheckCircleFilled className="text-emerald-400 text-xs" />
                   <span>Đúng lịch</span>
                 </div>
 
-                <div className="absolute bottom-4 left-1 sm:left-2 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0e1625] border border-white/[0.1] text-[11px] font-semibold text-slate-200 shadow-lg">
+                <div className="absolute bottom-4 left-1 sm:left-2 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0e1625] border border-white/[0.1] text-xs font-semibold text-slate-100 shadow-lg whitespace-nowrap">
                   <TeamOutlined className="text-indigo-400 text-xs" />
                   <span>Đồng bộ 1 nơi</span>
                 </div>
@@ -93,7 +93,7 @@ const About: React.FC = () => {
 
             {/* Story Text */}
             <div className="lg:col-span-7 space-y-6">
-              <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-blue-400">
+              <div className="inline-flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wider text-blue-300">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
                 Vì sao chúng tôi bắt đầu
               </div>
@@ -103,11 +103,11 @@ const About: React.FC = () => {
                 Việc đăng bài thì không nên.
               </h2>
 
-              <p className="text-sm sm:text-base text-slate-400 leading-relaxed">
+              <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
                 Khi đội ngũ phải chuyển qua quá nhiều công cụ rời rạc, đăng từng bài thủ công và luôn căng thẳng lo lắng checkpoint hay trễ lịch, năng lượng dành cho sáng tạo nội dung sẽ dần cạn kiệt.
               </p>
 
-              <p className="text-sm sm:text-base text-slate-400 leading-relaxed">
+              <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
                 PhuSocial gom tất cả về một nơi duy nhất trên máy tính của bạn: kết nối Fanpage/Nhóm, chuẩn bị hình ảnh video, lên lịch thông minh và theo dõi tiến độ theo thời gian thực.
               </p>
 
@@ -118,7 +118,7 @@ const About: React.FC = () => {
                   'Tối ưu bảo mật trực tiếp trên máy',
                   'Dễ dàng làm quen với thành viên mới',
                 ].map((item, idx) => (
-                  <div key={idx} className="flex items-center gap-2.5 text-xs sm:text-sm font-medium text-slate-300">
+                  <div key={idx} className="flex items-center gap-2.5 text-[13.5px] sm:text-sm font-medium text-slate-200">
                     <CheckCircleFilled className="text-emerald-400 shrink-0" />
                     <span>{item}</span>
                   </div>
@@ -154,7 +154,7 @@ const About: React.FC = () => {
                   <h3 className="text-lg font-semibold text-white mb-3">
                     {val.title}
                   </h3>
-                  <p className="text-sm text-slate-400 leading-relaxed font-normal">
+                  <p className="text-[15px] text-slate-300 leading-relaxed font-normal">
                     {val.text}
                   </p>
                 </div>
@@ -171,7 +171,7 @@ const About: React.FC = () => {
                 <div className="text-4xl sm:text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-300">
                   {s.value}
                 </div>
-                <div className="text-xs sm:text-sm text-slate-400 font-medium mt-2 max-w-[200px] mx-auto">
+                <div className="text-[13.5px] sm:text-sm text-slate-300 font-medium mt-2 max-w-[220px] mx-auto">
                   {s.label}
                 </div>
               </div>
@@ -190,7 +190,7 @@ const About: React.FC = () => {
               Cùng PhuSocial xây dựng quy trình tốt hơn.
             </h2>
 
-            <p className="text-sm sm:text-base text-slate-400 max-w-lg mx-auto mb-8 font-normal leading-relaxed">
+            <p className="text-sm sm:text-base text-slate-300 max-w-lg mx-auto mb-8 font-normal leading-relaxed">
               Thiết lập không gian làm việc đầu tiên của bạn chỉ trong vài phút. Không cần thẻ tín dụng, sẵn sàng sử dụng ngay.
             </p>
 
@@ -199,7 +199,7 @@ const About: React.FC = () => {
                 <Button
                   type="primary"
                   size="large"
-                  iconPosition="end"
+                  iconPlacement="end"
                   icon={<ArrowRightOutlined />}
                   className="w-full sm:w-auto !h-12 !px-8 !rounded-xl !font-bold !text-sm !bg-white !text-slate-950 !border-none shadow-[0_0_30px_rgba(255,255,255,0.2)] hover:!opacity-95 cursor-pointer"
                 >

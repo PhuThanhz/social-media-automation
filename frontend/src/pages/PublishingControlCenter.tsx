@@ -46,6 +46,8 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import api from '../config/axios';
+import ScheduleChoice from '../components/common/ScheduleChoice';
+import type { ScheduleValue } from '../components/common/postingSchedule';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -183,8 +185,7 @@ const PublishingControlCenter: React.FC = () => {
 
   // State Bulk Reschedule Modal
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
-  const [rescheduleStartTime, setRescheduleStartTime] = useState<dayjs.Dayjs>(dayjs().add(5, 'minute'));
-  const [rescheduleGapMinutes, setRescheduleGapMinutes] = useState<number>(15);
+  const [rescheduleChoice, setRescheduleChoice] = useState<ScheduleValue>({ mode: 'QUEUE' });
   const [rescheduling, setRescheduling] = useState(false);
 
   // State Post Detail Modal
@@ -341,8 +342,9 @@ const PublishingControlCenter: React.FC = () => {
     try {
       const res = await api.post('/publishing-control-center/bulk-reschedule', {
         postIds: selectedRowKeys,
-        startAt: rescheduleStartTime.format('YYYY-MM-DDTHH:mm:ss'),
-        gapMinutes: rescheduleGapMinutes,
+        ...(rescheduleChoice.mode === 'AT' && rescheduleChoice.at
+          ? { startAt: rescheduleChoice.at.format('YYYY-MM-DDTHH:mm:ss') }
+          : {}),
       });
       message.success(`Đã dời lịch thành công ${res.data?.rescheduledCount} bài viết`);
       setRescheduleModalOpen(false);
@@ -416,7 +418,7 @@ const PublishingControlCenter: React.FC = () => {
             <Tag color={color} className="font-semibold">{st}</Tag>
             {record.lockedBy && record.status === 'PROCESSING' && (
               <Tooltip title={`Được chiếm lease bởi: ${record.lockedBy} (hết hạn lúc: ${record.leaseExpiresAt ? dayjs(record.leaseExpiresAt).format('HH:mm:ss') : 'N/A'})`}>
-                <Tag color="cyan" className="text-[10px] mt-1 block truncate max-w-[130px]">
+                <Tag color="cyan" className="!text-xs mt-1 block truncate max-w-[140px]">
                   🔒 {record.lockedBy}
                 </Tag>
               </Tooltip>
@@ -539,7 +541,7 @@ const PublishingControlCenter: React.FC = () => {
           <Select
             value={autoRefreshInterval}
             onChange={(val) => setAutoRefreshInterval(val)}
-            style={{ width: 140 }}
+            style={{ width: 175 }}
             size="middle"
           >
             <Option value={10}>Tự làm mới: 10s</Option>
@@ -1026,33 +1028,11 @@ const PublishingControlCenter: React.FC = () => {
         okText="Lưu lịch mới"
         cancelText="Đóng"
       >
-        <div className="space-y-4 py-2">
-          <div>
-            <label className="block text-gray-300 text-xs mb-1 font-medium">Thời điểm bắt đầu bài đầu tiên:</label>
-            <DatePicker
-              showTime
-              value={rescheduleStartTime}
-              onChange={(val) => val && setRescheduleStartTime(val)}
-              format="YYYY-MM-DD HH:mm"
-              className="w-full"
-            />
-          </div>
-
-          <div>
-            <label className="block text-gray-300 text-xs mb-1 font-medium">
-              Khoảng cách an toàn giữa mỗi bài (phút):
-            </label>
-            <InputNumber
-              min={1}
-              max={120}
-              value={rescheduleGapMinutes}
-              onChange={(val) => setRescheduleGapMinutes(val || 15)}
-              className="w-full"
-            />
-            <Text className="text-gray-500 text-xs block mt-1">
-              Khuyến nghị từ 10 - 20 phút để chống spam và tránh checkpoint tài khoản VIA.
-            </Text>
-          </div>
+        <div className="space-y-3 py-2">
+          <Text className="text-gray-400 text-xs block">
+            Các bài được xếp nối đuôi theo từng nick, theo khung giờ và giãn cách của Lịch đăng chung.
+          </Text>
+          <ScheduleChoice value={rescheduleChoice} onChange={setRescheduleChoice} modes={['QUEUE', 'AT']} />
         </div>
       </Modal>
 
@@ -1138,8 +1118,8 @@ const PublishingControlCenter: React.FC = () => {
               width: 130,
               render: (token, record, idx) => (
                 <div>
-                  <Text strong className="text-gray-300 block text-xs">#{attemptsList.length - idx}</Text>
-                  <Text className="text-[10px] text-gray-500 font-mono truncate block max-w-[110px]" title={token}>
+                  <Text strong className="text-slate-200 block text-xs">#{attemptsList.length - idx}</Text>
+                  <Text className="text-xs text-slate-400 font-mono truncate block max-w-[120px]" title={token}>
                     {token ? token.substring(0, 10) + '...' : 'N/A'}
                   </Text>
                 </div>
@@ -1150,7 +1130,7 @@ const PublishingControlCenter: React.FC = () => {
               dataIndex: 'workerInstance',
               width: 150,
               render: (worker) => (
-                <Tag color="geekblue" className="text-xs">
+                <Tag color="geekblue" className="!text-xs">
                   {worker || 'N/A'}
                 </Tag>
               ),
@@ -1160,7 +1140,7 @@ const PublishingControlCenter: React.FC = () => {
               dataIndex: 'startedAt',
               width: 140,
               render: (start, record) => (
-                <div className="text-[11px] text-gray-400">
+                <div className="text-xs text-slate-300">
                   <div>Bắt đầu: {dayjs(start).format('HH:mm:ss')}</div>
                   {record.finishedAt && <div>Kết thúc: {dayjs(record.finishedAt).format('HH:mm:ss')}</div>}
                 </div>

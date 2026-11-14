@@ -72,7 +72,7 @@ function HashtagModal({
         </div>
 
         <div className="space-y-2">
-          <div className="text-[11px] font-bold text-slate-400">Gợi ý chủ đề Hashtag phổ biến (Bấm để chọn thêm):</div>
+          <div className="text-xs font-bold text-slate-300">Gợi ý chủ đề Hashtag phổ biến (Bấm để chọn thêm):</div>
           <div className="flex flex-wrap gap-1.5">
             {[
               '#Trending', '#Viral', '#Review', '#HotTrend', '#ChiaSe',

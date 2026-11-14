@@ -1923,7 +1923,7 @@ export default function NewsCardStudio() {
                   okText="Dọn dẹp"
                   cancelText="Hủy"
                 >
-                  <Button size="small" type="text" className="!p-0 !h-auto text-[11px] text-slate-400 hover:text-amber-400">
+                  <Button size="small" type="text" className="!p-0 !h-auto text-xs text-slate-300 hover:text-amber-400">
                     Dọn đã đăng
                   </Button>
                 </Popconfirm>
@@ -1937,14 +1937,14 @@ export default function NewsCardStudio() {
                   cancelText="Hủy"
                   okButtonProps={{ danger: true }}
                 >
-                  <Button size="small" type="text" danger className="!p-0 !h-auto text-[11px] hover:underline">
+                  <Button size="small" type="text" danger className="!p-0 !h-auto text-xs hover:underline">
                     Xoá tất cả
                   </Button>
                 </Popconfirm>
               )}
               {displayedItems.length > 0 && (
                 <Checkbox
-                  className="text-xs"
+                  className="text-[13px]"
                   checked={displayedItems.length > 0 && displayedItems.every((i) => i.checked)}
                   indeterminate={displayedItems.some((i) => i.checked) && !displayedItems.every((i) => i.checked)}
                   onChange={(e) => {
@@ -1962,12 +1962,12 @@ export default function NewsCardStudio() {
           {/* Lọc theo Kênh */}
           {customFrames.length > 0 && items.length > 0 && (
             <div className="flex items-center gap-1.5 pt-1">
-              <span className="text-[11px] text-slate-400 shrink-0">Lọc kênh:</span>
+              <span className="text-xs text-slate-300 shrink-0">Lọc kênh:</span>
               <Select
                 size="small"
                 value={channelFilter}
                 onChange={setChannelFilter}
-                className="flex-1 text-xs"
+                className="flex-1 text-[13px]"
                 options={[
                   { value: 'ALL', label: `Tất cả kênh (${items.length})` },
                   ...customFrames.map((f) => ({
@@ -1983,7 +1983,7 @@ export default function NewsCardStudio() {
           {/* Thanh gán Kênh, Mẫu, Logo & Xoá hàng loạt khi tick chọn bài */}
           {checkedItems.length > 0 && (
             <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/30 space-y-2 mt-1 shadow-sm">
-              <div className="flex items-center justify-between text-[11px] font-semibold text-blue-300">
+              <div className="flex items-center justify-between text-xs font-semibold text-blue-300">
                 <span>Áp dụng cho {checkedItems.length} bài đã chọn:</span>
                 <Popconfirm
                   title={`Xoá ${checkedItems.length} bài đã chọn?`}
@@ -2047,8 +2047,8 @@ export default function NewsCardStudio() {
 
               {/* Hàng thao tác Logo hàng loạt */}
               <div className="pt-2 border-t border-blue-500/20 space-y-1.5">
-                <div className="text-[11px] text-slate-300 font-medium flex items-center gap-1.5">
-                  <PictureOutlined className="text-sky-400 text-xs" />
+                <div className="text-xs text-slate-200 font-medium flex items-center gap-1.5">
+                  <PictureOutlined className="text-sky-400 text-[13px]" />
                   <span>Logo ({checkedItems.length} bài):</span>
                 </div>
                 <div className="grid grid-cols-2 gap-1.5">
@@ -2056,7 +2056,7 @@ export default function NewsCardStudio() {
                     size="small"
                     icon={<EyeInvisibleOutlined />}
                     onClick={() => toggleLogoForChecked(false)}
-                    className="w-full !text-[11px] !h-7 bg-slate-800/90 border-slate-700 text-rose-300 hover:text-rose-200 hover:border-rose-500 rounded-lg flex items-center justify-center gap-1"
+                    className="w-full !text-xs !h-7 bg-slate-800/90 border-slate-700 text-rose-300 hover:text-rose-200 hover:border-rose-500 rounded-lg flex items-center justify-center gap-1"
                     title="Ẩn / bỏ logo cho toàn bộ các bài đang chọn"
                   >
                     Bỏ logo
@@ -2065,7 +2065,7 @@ export default function NewsCardStudio() {
                     size="small"
                     icon={<PictureOutlined />}
                     onClick={() => toggleLogoForChecked(true)}
-                    className="w-full !text-[11px] !h-7 bg-slate-800/90 border-slate-700 text-sky-300 hover:text-sky-200 hover:border-sky-500 rounded-lg flex items-center justify-center gap-1"
+                    className="w-full !text-xs !h-7 bg-slate-800/90 border-slate-700 text-sky-300 hover:text-sky-200 hover:border-sky-500 rounded-lg flex items-center justify-center gap-1"
                     title="Bật lại logo cho toàn bộ các bài đang chọn"
                   >
                     Bật logo
@@ -2076,7 +2076,7 @@ export default function NewsCardStudio() {
           )}
 
           {displayedItems.length === 0 ? (
-            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={<span className="text-xs">Không có bài nào phù hợp</span>} />
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={<span className="text-sm">Không có bài nào phù hợp</span>} />
           ) : (
             <div className="space-y-1.5 max-h-[60vh] xl:max-h-none overflow-y-auto pr-1">
               {displayedItems.map((it) => (
@@ -2092,17 +2092,17 @@ export default function NewsCardStudio() {
                     ) : (
                       <div className="flex flex-col items-center justify-center text-center p-1">
                         <span className="text-base leading-none">💬</span>
-                        <span className="text-[9px] text-cyan-400 font-bold mt-1 tracking-tight">Thẻ chữ</span>
+                        <span className="text-[11px] text-cyan-400 font-bold mt-1 tracking-tight">Thẻ chữ</span>
                       </div>
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="text-xs text-slate-200 font-medium line-clamp-2 leading-snug">{it.title}</div>
-                    <div className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                    <div className="text-[13px] text-slate-100 font-medium line-clamp-2 leading-snug">{it.title}</div>
+                    <div className="text-xs text-slate-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
                       <span>{sourceName(it.url)}</span>
                       {it.channelName && (
                         <span
-                          className="px-1.5 py-0.2 rounded text-[9px] font-semibold text-white truncate max-w-[120px]"
+                          className="px-1.5 py-0.5 rounded text-[11px] font-semibold text-white truncate max-w-[120px]"
                           style={{
                             backgroundColor:
                               customFrames.find((f) => f.id === it.channelId)?.tagColor || '#2563eb',
@@ -2310,7 +2310,7 @@ export default function NewsCardStudio() {
                   </FacebookPostPreview>
                 );
               })()}
-              <div className="text-[11px] text-slate-500 text-center -mt-2">
+              <div className="text-xs text-slate-400 text-center -mt-2">
                 Kéo trực tiếp trên ảnh để di chuyển ảnh tròn, logo, nhãn, nguồn/watermark{active.style.fit === 'cover' ? ' hoặc chỉnh góc ảnh' : ''}.
               </div>
 
@@ -2323,7 +2323,7 @@ export default function NewsCardStudio() {
                 if (blurry.length === 0) return null;
                 const size = active.imageSizes![blurry[0]];
                 return (
-                  <div className="max-w-[560px] mx-auto text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg p-2.5">
+                  <div className="max-w-[560px] mx-auto text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg p-2.5">
                     Ảnh đang dùng chỉ {size[0]}×{size[1]}px, phải phóng to nhiều nên sẽ bị mờ. Nên chọn ảnh có số to hơn (ảnh có nhãn vàng là ảnh nhỏ), tải ảnh nét hơn lên, chọn "Giữ đủ ảnh", hoặc ghép 2-4 ảnh để mỗi ô nhỏ lại.
                   </div>
                 );
@@ -2368,9 +2368,9 @@ export default function NewsCardStudio() {
                       value={fullCaptionOf(active)}
                       onChange={(e) => patchItem(active.id, { caption: e.target.value })}
                       autoSize={{ minRows: 6, maxRows: 16 }}
-                      className="text-xs"
+                      className="text-[13px]"
                     />
-                    <div className="text-[11px] text-slate-500">
+                    <div className="text-xs text-slate-400">
                       {active.summary ? 'Mặc định là bản tóm tắt AI soạn.' : 'Mặc định là toàn bộ nội dung bài đã cào.'} Khi chuyển đi đăng sẽ tự thêm dòng "Nguồn: {sourceName(active.url)}" nếu chưa có.
                     </div>
                   </>
@@ -2382,7 +2382,7 @@ export default function NewsCardStudio() {
                       onChange={(e) => patchItem(active.id, { hook: e.target.value })}
                       autoSize={{ minRows: 2, maxRows: 5 }}
                       placeholder="2-3 câu gây tò mò. Bấm 'AI soạn bài' ở cột phải để AI viết."
-                      className="text-xs"
+                      className="text-[13px]"
                     />
                     <div className="flex items-center justify-between">
                       <span className={sectionTitle}>Bình luận đầu tiên (nội dung + nguồn)</span>
@@ -2394,9 +2394,9 @@ export default function NewsCardStudio() {
                       value={commentOf(active)}
                       onChange={(e) => patchItem(active.id, { comment: e.target.value })}
                       autoSize={{ minRows: 5, maxRows: 14 }}
-                      className="text-xs"
+                      className="text-[13px]"
                     />
-                    <div className="text-[11px] text-slate-500">Bình luận được thả ngay sau khi đăng bài, tự thêm dòng nguồn nếu chưa có.</div>
+                    <div className="text-xs text-slate-400">Bình luận được thả ngay sau khi đăng bài, tự thêm dòng nguồn nếu chưa có.</div>
                   </>
                 )}
               </div>
@@ -2531,7 +2531,7 @@ export default function NewsCardStudio() {
                             const words = active.headline.replace(/\[\[|\]\]/g, '').trim().split(/\s+/).filter(Boolean).length;
                             return (
                               <div className="flex items-center justify-between mt-1 gap-2">
-                                <span className={`text-[11px] ${words > 40 ? 'text-amber-400' : 'text-slate-500'}`}>
+                                <span className={`text-xs ${words > 40 ? 'text-amber-400' : 'text-slate-400'}`}>
                                   {words} từ{words > 40 ? ' · hơi dài, chữ sẽ nhỏ' : ''} · bôi đen + Cmd/Ctrl+B để tô màu
                                 </span>
                                 <Button size="small" onClick={highlightSelection}>Tô màu</Button>
@@ -2540,7 +2540,7 @@ export default function NewsCardStudio() {
                           })()}
 
                           {/* Chọn nhanh màu chữ chính & màu nhấn ngay tại tab Nội dung */}
-                          <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-800/80 text-[11px] text-slate-400 flex-wrap gap-2">
+                          <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-800/80 text-xs text-slate-300 flex-wrap gap-2">
                             <div className="flex items-center gap-1.5">
                               <span>Màu chữ:</span>
                               <ColorPicker size="small" value={s.textColor} onChange={(c) => setStyle({ textColor: c.toHexString() })} />
@@ -2571,7 +2571,7 @@ export default function NewsCardStudio() {
                             </div>
                           </div>
                           {(active.aiError || active.headlineFromTitle || !active.headline.trim()) && !active.headlineLoading && (
-                            <div className="mt-2 text-[11px] rounded-lg p-2.5 bg-red-500/10 border border-red-500/30 text-red-300 space-y-1.5">
+                            <div className="mt-2 text-xs rounded-lg p-2.5 bg-red-500/10 border border-red-500/30 text-red-300 space-y-1.5">
                               <div>
                                 {!active.headline.trim()
                                   ? 'Chưa có tiêu đề nên dải chữ trên ảnh đang trống.'
@@ -2602,7 +2602,7 @@ export default function NewsCardStudio() {
                                     key={h}
                                     type="button"
                                     onClick={() => patchItem(active.id, { headline: h })}
-                                    className={`w-full text-left text-[11px] leading-snug p-2 rounded-md border cursor-pointer bg-transparent ${h === active.headline ? 'border-blue-500 text-slate-100' : 'border-slate-700 text-slate-300 hover:border-slate-500'}`}
+                                    className={`w-full text-left text-xs leading-snug p-2 rounded-md border cursor-pointer bg-transparent ${h === active.headline ? 'border-blue-500 text-slate-100' : 'border-slate-700 text-slate-300 hover:border-slate-500'}`}
                                   >
                                     {h.split(/(\[\[[\s\S]*?\]\])/g).map((part, i) => {
                                       const m = part.match(/^\[\[([\s\S]*?)\]\]$/);
@@ -2630,7 +2630,7 @@ export default function NewsCardStudio() {
                               <Button size="small" icon={<UploadOutlined />}>Tải thêm</Button>
                             </Upload>
                           </div>
-                          <div className="text-[11px] text-slate-500 mb-2">Bấm để chọn ảnh, chọn 2-4 ảnh để ghép. Số trên ảnh là thứ tự ghép.</div>
+                          <div className="text-xs text-slate-400 mb-2">Bấm để chọn ảnh, chọn 2-4 ảnh để ghép. Số trên ảnh là thứ tự ghép.</div>
                           <div className="grid grid-cols-4 gap-1.5 max-h-56 overflow-y-auto pr-1">
                             {active.images.map((url) => {
                               const idx = active.selectedImages.indexOf(url);
@@ -2649,7 +2649,7 @@ export default function NewsCardStudio() {
                                   title="Bấm để chọn/bỏ chọn, hoặc kéo thả vào khung ảnh"
                                 >
                                   {brokenThumbs.has(url) ? (
-                                    <div className="w-full h-full grid place-items-center bg-slate-900 text-[9px] text-slate-500 text-center p-1 leading-tight">Không xem trước được</div>
+                                    <div className="w-full h-full grid place-items-center bg-slate-900 text-[10px] text-slate-400 text-center p-1 leading-tight">Không xem trước được</div>
                                   ) : (
                                     <img
                                       src={url}
@@ -2660,12 +2660,12 @@ export default function NewsCardStudio() {
                                     />
                                   )}
                                   {size && (
-                                    <span className={`absolute bottom-0.5 left-0.5 text-[9px] px-1 rounded ${blurry ? 'bg-amber-600/90 text-white' : 'bg-black/70 text-slate-200'}`}>
+                                    <span className={`absolute bottom-0.5 left-0.5 text-[10px] px-1 rounded ${blurry ? 'bg-amber-600/90 text-white' : 'bg-black/70 text-slate-200'}`}>
                                       {size[0]}×{size[1]}
                                     </span>
                                   )}
-                                  {isSmall && <span className="absolute top-0.5 right-0.5 text-[9px] px-1 rounded bg-black/70 text-slate-300">nhỏ</span>}
-                                  {idx >= 0 && <span className="absolute top-0.5 left-0.5 w-5 h-5 rounded bg-blue-600 text-white text-[11px] font-bold grid place-items-center">{idx + 1}</span>}
+                                  {isSmall && <span className="absolute top-0.5 right-0.5 text-[10px] px-1 rounded bg-black/70 text-slate-200">nhỏ</span>}
+                                  {idx >= 0 && <span className="absolute top-0.5 left-0.5 w-5 h-5 rounded bg-blue-600 text-white text-xs font-bold grid place-items-center">{idx + 1}</span>}
                                 </div>
                               );
                             })}
@@ -2676,7 +2676,7 @@ export default function NewsCardStudio() {
                           <div>
                             <div className={`${sectionTitle} mb-1.5`}>Bố cục ảnh</div>
                             {active.selectedImages.length === 1 && (
-                              <div className="text-[11px] text-slate-500">Chọn thêm 1-3 ảnh ở trên để có các kiểu ghép ảnh.</div>
+                              <div className="text-xs text-slate-400">Chọn thêm 1-3 ảnh ở trên để có các kiểu ghép ảnh.</div>
                             )}
                             {active.selectedImages.length > 1 && (
                               <>
@@ -2691,7 +2691,7 @@ export default function NewsCardStudio() {
                                         className={`flex flex-col items-center gap-1 p-1.5 rounded-lg border cursor-pointer bg-transparent transition-colors ${on ? 'border-blue-500 bg-blue-500/10' : 'border-slate-700 hover:border-slate-500'}`}
                                       >
                                         <LayoutIcon layout={l.value} active={on} />
-                                        <span className={`text-[10px] leading-tight text-center ${on ? 'text-blue-300' : 'text-slate-400'}`}>{l.label}</span>
+                                        <span className={`text-xs leading-tight text-center ${on ? 'text-blue-300' : 'text-slate-300'}`}>{l.label}</span>
                                       </button>
                                     );
                                   })}
@@ -2702,7 +2702,7 @@ export default function NewsCardStudio() {
                                     <FieldSlider label="Bo góc từng ảnh" value={s.photoRadius ?? 0} unit="px" min={0} max={48} step={2} onChange={(v) => setStyle({ photoRadius: v })} />
                                   )}
                                   <div>
-                                    <div className="text-[11px] text-slate-500 mb-1">Màu đường chia</div>
+                                    <div className="text-xs text-slate-300 mb-1">Màu đường chia</div>
                                     <Segmented
                                       block
                                       size="small"
@@ -2722,9 +2722,9 @@ export default function NewsCardStudio() {
                           <div className="flex items-center justify-between mb-1">
                             <span className={sectionTitle}>Ảnh vừa khung</span>
                             {active.fitManual ? (
-                              <button type="button" className="text-[11px] text-blue-400 bg-transparent border-0 p-0 cursor-pointer" onClick={() => patchItem(active.id, { fitManual: false })}>Để Studio tự chọn</button>
+                              <button type="button" className="text-xs text-blue-400 bg-transparent border-0 p-0 cursor-pointer" onClick={() => patchItem(active.id, { fitManual: false })}>Để Studio tự chọn</button>
                             ) : (
-                              <span className="text-[11px] text-slate-500">Tự chọn theo ảnh</span>
+                              <span className="text-xs text-slate-400">Tự chọn theo ảnh</span>
                             )}
                           </div>
                           <Segmented
@@ -2736,9 +2736,9 @@ export default function NewsCardStudio() {
                           />
                           {s.fit === 'cover' && (
                             <div className="mt-2.5 space-y-2 pt-2 border-t border-slate-800/60">
-                              <div className="flex items-center justify-between text-[11px] text-slate-400">
+                              <div className="flex items-center justify-between text-xs text-slate-300">
                                 <span>Phần ảnh hiển thị (Trên / Dưới)</span>
-                                <span className="text-slate-500 font-mono text-[10px]">{s.focusY}%</span>
+                                <span className="text-slate-300 font-mono text-xs">{s.focusY}%</span>
                               </div>
                               <div className="grid grid-cols-3 gap-1">
                                 <Button
@@ -2771,7 +2771,7 @@ export default function NewsCardStudio() {
                                 onChange={(v) => setStyle({ focusY: v })}
                                 tooltip={{ formatter: (v) => `${v}% (0%: Đỉnh, 100%: Đáy)` }}
                               />
-                              <div className="text-[11px] text-slate-500">
+                              <div className="text-xs text-slate-300">
                                 👉 Mẹo: Bạn cũng có thể dùng chuột kéo trực tiếp ảnh trên khung xem trước lên/xuống để chỉnh góc đẹp nhất.
                               </div>
                             </div>
@@ -2785,12 +2785,12 @@ export default function NewsCardStudio() {
                               🏷️ Nhãn thương hiệu / Chữ ký (Thạnh Phú)
                             </span>
                             {s.videoWatermark ? (
-                              <Tag color="cyan" className="!mr-0 !text-[10px]">Đang bật: {s.videoWatermark}</Tag>
+                              <Tag color="cyan" className="!mr-0 !text-xs">Đang bật: {s.videoWatermark}</Tag>
                             ) : (
-                              <Tag className="!mr-0 !text-[10px] text-slate-500">Tắt</Tag>
+                              <Tag className="!mr-0 !text-xs text-slate-300">Tắt</Tag>
                             )}
                           </div>
-                          <div className="text-[11px] text-slate-400 leading-relaxed">
+                          <div className="text-xs text-slate-300 leading-relaxed">
                             Chèn chữ ký bản quyền thương hiệu lên video/ảnh hoặc di chuyển để che logo watermark cũ.
                           </div>
                           <div className="space-y-1.5">
@@ -2802,7 +2802,7 @@ export default function NewsCardStudio() {
                               allowClear
                             />
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-[10px] text-slate-500 font-medium">Chọn nhanh:</span>
+                              <span className="text-xs text-slate-300 font-medium">Chọn nhanh:</span>
                               {(() => {
                                 const currentUserName = (() => {
                                   try {
@@ -2822,7 +2822,7 @@ export default function NewsCardStudio() {
                                     key={chip}
                                     size="small"
                                     type={s.videoWatermark === chip ? 'primary' : 'dashed'}
-                                    className={`!text-[10px] !h-6 !px-2 font-medium ${
+                                    className={`!text-xs !h-7 !px-2.5 font-medium ${
                                       s.videoWatermark === chip
                                         ? 'bg-blue-600 text-white border-blue-400'
                                         : 'bg-slate-900/60 text-slate-300 hover:!text-cyan-300 hover:!border-cyan-400'
@@ -2841,7 +2841,7 @@ export default function NewsCardStudio() {
                                   size="small"
                                   danger
                                   type="text"
-                                  className="!text-[10px] !h-6 !px-1.5"
+                                  className="!text-xs !h-7 !px-2"
                                   onClick={() => setStyle({ videoWatermark: '' })}
                                 >
                                   ✕ Tắt nhãn
@@ -2852,7 +2852,7 @@ export default function NewsCardStudio() {
 
                           {s.videoWatermark && (
                             <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-2.5 space-y-2.5">
-                              <div className="bg-cyan-950/40 border border-cyan-800/40 rounded p-2 text-[11px] text-cyan-200 flex items-start gap-1.5">
+                              <div className="bg-cyan-950/40 border border-cyan-800/40 rounded p-2.5 text-xs text-cyan-200 flex items-start gap-1.5">
                                 <span className="text-base leading-none">💡</span>
                                 <span>
                                   <b>Kéo thả trực tiếp:</b> Dùng chuột kéo nhãn nguồn trên khung xem trước đến bất kỳ đâu (hoặc đè thẳng lên logo cũ để che). Cuộn chuột trên nhãn để đổi cỡ chữ nhanh!
@@ -2860,7 +2860,7 @@ export default function NewsCardStudio() {
                               </div>
 
                                 <div>
-                                  <div className="text-[10px] text-slate-400 mb-1.5 font-medium">Kiểu hiển thị & Che logo:</div>
+                                  <div className="text-xs text-slate-300 mb-1.5 font-medium">Kiểu hiển thị & Che logo:</div>
                                   <div className="grid grid-cols-3 gap-1.5">
                                     {[
                                       { value: 'clean', label: 'Không viền', desc: 'Chữ đổ bóng' },
@@ -2889,13 +2889,13 @@ export default function NewsCardStudio() {
                                       );
                                     })}
                                   </div>
-                                  <div className="text-[10px] text-slate-500 mt-1.5">
+                                  <div className="text-xs text-slate-300 mt-1.5">
                                     💡 <b>Không viền</b> & <b>Viền đen</b>: Chữ nổi không có khung hộp bọc quanh, đặt ở giữa hoặc kéo ở đâu cũng thoáng mắt, dễ nhìn!
                                   </div>
                                 </div>
 
                                 <div>
-                                  <div className="text-[10px] text-slate-400 mb-1 font-medium">Đặt nhanh vị trí:</div>
+                                  <div className="text-xs text-slate-300 mb-1 font-medium">Đặt nhanh vị trí:</div>
                                   <div className="flex items-center gap-1.5">
                                     <CornerButtons
                                       value={s.videoWatermarkPos === 'center' ? undefined : s.videoWatermarkPos}
@@ -2913,7 +2913,7 @@ export default function NewsCardStudio() {
                                     <Button
                                       size="small"
                                       type={s.videoWatermarkX === 35 && s.videoWatermarkY === 46 ? 'primary' : 'dashed'}
-                                      className="!text-[10px] !h-6 text-cyan-300 border-cyan-700/60"
+                                      className="!text-xs !h-7 text-cyan-300 border-cyan-700/60"
                                       onClick={() => setStyle({ videoWatermarkPos: 'center', videoWatermarkX: 35, videoWatermarkY: 46 })}
                                     >
                                       📍 Ra giữa video
@@ -3030,9 +3030,9 @@ export default function NewsCardStudio() {
                                 🖼️ Khung ảnh & Logo Kênh
                               </span>
                               {s.useCustomFrame && s.customFrameUrl ? (
-                                <Tag color="success" className="!mr-0 !text-[10px]">Đang bật</Tag>
+                                <Tag color="success" className="!mr-0 !text-xs">Đang bật</Tag>
                               ) : (
-                                <Tag className="!mr-0 !text-[10px] text-slate-400">Tắt</Tag>
+                                <Tag className="!mr-0 !text-xs text-slate-300">Tắt</Tag>
                               )}
                             </div>
                             <Switch
@@ -3046,7 +3046,7 @@ export default function NewsCardStudio() {
                             {/* Nút tải Frame & Logo đi kèm */}
                             <div className="grid grid-cols-2 gap-2">
                               <div>
-                                <div className="text-[11px] text-slate-400 mb-1 font-medium">1. Khung bài (PNG)</div>
+                                <div className="text-xs text-slate-300 mb-1 font-medium">1. Khung bài (PNG)</div>
                                 <Upload
                                   accept="image/png,image/webp"
                                   showUploadList={false}
@@ -3066,7 +3066,7 @@ export default function NewsCardStudio() {
                               </div>
 
                               <div>
-                                <div className="text-[11px] text-slate-400 mb-1 font-medium">2. Logo kênh</div>
+                                <div className="text-xs text-slate-300 mb-1 font-medium">2. Logo kênh</div>
                                 <Upload
                                   accept="image/*"
                                   showUploadList={false}
@@ -3113,7 +3113,7 @@ export default function NewsCardStudio() {
                                     <div className="text-xs font-semibold text-slate-200 truncate">
                                       {active.channelName || (s.useCustomFrame ? 'Đang dùng khung tuỳ chỉnh' : 'Khung đã nạp')}
                                     </div>
-                                    <div className="text-[11px] text-slate-400 flex items-center gap-1.5 flex-wrap mt-0.5">
+                                    <div className="text-xs text-slate-300 flex items-center gap-1.5 flex-wrap mt-0.5">
                                       <span className={s.logoUrl && s.showLogo ? 'text-emerald-400 font-medium' : 'text-slate-500'}>
                                         {s.logoUrl && s.showLogo ? '✓ Logo bật' : 'Logo tắt'}
                                       </span>
@@ -3133,7 +3133,7 @@ export default function NewsCardStudio() {
                                     content={
                                       <div className="p-1 space-y-2 w-56">
                                         <div className="text-xs font-semibold text-slate-200">Lưu thành Kênh mẫu:</div>
-                                        <div className="text-[11px] text-slate-400">Lưu trọn bộ: Khung PNG + Logo + Tone màu để sau này chọn Kênh 1 chạm.</div>
+                                        <div className="text-xs text-slate-300">Lưu trọn bộ: Khung PNG + Logo + Tone màu để sau này chọn Kênh 1 chạm.</div>
                                         <Input
                                           size="small"
                                           placeholder="VD: Vietnam Health News"
@@ -3157,14 +3157,14 @@ export default function NewsCardStudio() {
                             {/* Logo Quick Settings khi có logo */}
                             {s.logoUrl && (
                               <div className="pt-2 border-t border-slate-800/80 space-y-2">
-                                <div className="flex items-center justify-between text-[11px]">
-                                  <span className="text-slate-400">Hiển thị logo trên bài</span>
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-slate-300">Hiển thị logo trên bài</span>
                                   <Switch size="small" checked={!!s.showLogo} onChange={(on) => setStyle({ showLogo: on })} />
                                 </div>
                                 {s.showLogo && (
                                   <>
                                     <CornerButtons value={s.logoPos} onPick={placeLogo} />
-                                    <div className="flex justify-between text-[11px] text-slate-500">
+                                    <div className="flex justify-between text-xs text-slate-300">
                                       <span>Cỡ logo</span>
                                       <span>{s.logoSize}px</span>
                                     </div>
@@ -3176,7 +3176,7 @@ export default function NewsCardStudio() {
 
                             {/* Thư viện các kênh đã lưu */}
                             <div className="pt-2 border-t border-slate-800/80">
-                              <div className="text-[11px] font-semibold text-slate-300 mb-2 flex items-center justify-between">
+                              <div className="text-xs font-semibold text-slate-200 mb-2 flex items-center justify-between">
                                 <span>Thư viện Kênh thương hiệu ({customFrames.length})</span>
                                 <Upload
                                   accept="image/png,image/webp"
@@ -3198,8 +3198,8 @@ export default function NewsCardStudio() {
                                 >
                                   <div className="rounded-lg border-2 border-dashed border-slate-700 hover:border-blue-500 bg-slate-900/40 p-2 cursor-pointer flex flex-col items-center justify-center text-center aspect-square transition-all group hover:bg-blue-500/5">
                                     <PlusOutlined className="text-xl text-slate-400 group-hover:text-blue-400 mb-1" />
-                                    <span className="text-[11px] font-semibold text-slate-300 group-hover:text-blue-300">Nạp Khung PNG</span>
-                                    <span className="text-[10px] text-slate-500 mt-0.5">Thêm vào thư viện</span>
+                                    <span className="text-xs font-semibold text-slate-200 group-hover:text-blue-300">Nạp Khung PNG</span>
+                                    <span className="text-xs text-slate-300 mt-0.5">Thêm vào thư viện</span>
                                   </div>
                                 </Upload>
 
@@ -3235,7 +3235,7 @@ export default function NewsCardStudio() {
                                             }}
                                           >
                                             <span className="text-lg mb-0.5">{frame.template === 'gradient' ? '✨' : '📰'}</span>
-                                            <span className="text-[10px] font-bold text-white leading-tight truncate max-w-full px-1">
+                                            <span className="text-[11px] font-bold text-white leading-tight truncate max-w-full px-1">
                                               {frame.template === 'gradient' ? 'Radiant' : frame.name}
                                             </span>
                                           </div>
@@ -3249,7 +3249,7 @@ export default function NewsCardStudio() {
                                         )}
                                       </div>
                                       <div className="flex items-center justify-between gap-1">
-                                        <span className="text-[11px] font-medium text-slate-200 truncate" title={frame.name}>
+                                        <span className="text-xs font-medium text-slate-200 truncate" title={frame.name}>
                                           {frame.name}
                                         </span>
                                         <Popconfirm
@@ -3263,7 +3263,7 @@ export default function NewsCardStudio() {
                                             type="text"
                                             danger
                                             className="!p-0 !h-4 !w-4 opacity-0 group-hover:opacity-100 transition-opacity"
-                                            icon={<DeleteOutlined className="text-[10px]" />}
+                                            icon={<DeleteOutlined className="text-xs" />}
                                             onClick={(e) => e?.stopPropagation()}
                                           />
                                         </Popconfirm>
@@ -3277,9 +3277,9 @@ export default function NewsCardStudio() {
                             {/* Căn chỉnh vị trí & kích thước (Vùng ảnh + Tiêu đề) */}
                             {s.useCustomFrame && s.customFrameUrl && (
                               <div className="space-y-3 pt-2 border-t border-slate-800">
-                                <div className="text-[11px] font-semibold text-slate-300">Căn chỉnh tọa độ khung</div>
-                                <div className="rounded-lg border border-slate-800 p-2 bg-slate-900/30 space-y-2">
-                                  <div className="text-[11px] text-slate-400 font-medium">Vùng ảnh (Photo)</div>
+                                <div className="text-xs font-semibold text-slate-200">Căn chỉnh tọa độ khung</div>
+                                <div className="rounded-lg border border-slate-800 p-2.5 bg-slate-900/30 space-y-2">
+                                  <div className="text-xs text-slate-300 font-medium">Vùng ảnh (Photo)</div>
                                   <FieldSlider
                                     label="Top"
                                     value={s.framePhotoTop ?? 0}
@@ -3301,7 +3301,7 @@ export default function NewsCardStudio() {
                                 </div>
 
                                 <div className="rounded-lg border border-slate-800 p-2 bg-slate-900/30 space-y-2">
-                                  <div className="text-[11px] text-slate-400 font-medium">Hộp tiêu đề (Headline)</div>
+                                  <div className="text-xs text-slate-300 font-medium">Hộp tiêu đề (Headline)</div>
                                   <FieldSlider
                                     label="Cách đáy"
                                     value={s.frameTextBottom ?? 4}
@@ -3341,7 +3341,7 @@ export default function NewsCardStudio() {
                                     />
                                   </div>
                                   <div>
-                                    <div className="text-[10px] text-slate-500 mb-1">Căn lề chữ tiêu đề</div>
+                                    <div className="text-xs text-slate-300 mb-1">Căn lề chữ tiêu đề</div>
                                     <Segmented
                                       block
                                       size="small"
@@ -3361,16 +3361,16 @@ export default function NewsCardStudio() {
                             {/* TỰ ĐỘNG ẨN KHUNG SAU N GIÂY (HOOK VIDEO 5S) */}
                             <div className="pt-3 border-t border-slate-800 space-y-2">
                               <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-semibold text-white flex items-center gap-1.5">
+                                <span className="text-xs font-semibold text-white flex items-center gap-1.5">
                                   ⏱️ Tự động ẩn khung sau vài giây (Hook Video)
                                 </span>
                                 {s.frameDuration ? (
-                                  <Tag color="cyan" className="!mr-0 !text-[10px]">Ẩn sau {s.frameDuration}s</Tag>
+                                  <Tag color="cyan" className="!mr-0 !text-xs">Ẩn sau {s.frameDuration}s</Tag>
                                 ) : (
-                                  <Tag className="!mr-0 !text-[10px] text-slate-500">Luôn hiện khung</Tag>
+                                  <Tag className="!mr-0 !text-xs text-slate-300">Luôn hiện khung</Tag>
                                 )}
                               </div>
-                              <div className="text-[11px] text-slate-400 leading-relaxed">
+                              <div className="text-xs text-slate-300 leading-relaxed">
                                 Hiển thị khung & tiêu đề trong <b>3 - 5 giây đầu</b> để giật tít giữ chân người xem (Hook), sau đó khung sẽ <b>mờ dần và biến mất</b> để lộ trọn vẹn toàn bộ video full màn hình!
                               </div>
                               <div className="flex items-center gap-1.5 flex-wrap">
@@ -3385,7 +3385,7 @@ export default function NewsCardStudio() {
                                     key={opt.val}
                                     size="small"
                                     type={(s.frameDuration ?? 0) === opt.val ? 'primary' : 'dashed'}
-                                    className="!text-[10px] !h-6"
+                                    className="!text-xs !h-7"
                                     onClick={() => setStyle({ frameDuration: opt.val })}
                                   >
                                     {opt.label}
@@ -3439,7 +3439,7 @@ export default function NewsCardStudio() {
                                     className={`p-1 rounded-lg border cursor-pointer bg-transparent text-left transition-colors ${on ? 'border-blue-500 ring-1 ring-blue-500/40' : 'border-slate-700 hover:border-slate-500'}`}
                                   >
                                     <TemplatePreview html={templatePreviews[t.value] || ''} ratio={s.ratio} />
-                                    <div className={`px-1 pt-1.5 pb-0.5 text-[11px] font-semibold ${on ? 'text-blue-300' : 'text-slate-300'}`}>{t.label}</div>
+                                    <div className={`px-1 pt-1.5 pb-0.5 text-xs font-semibold ${on ? 'text-blue-300' : 'text-slate-200'}`}>{t.label}</div>
                                   </button>
                                 </Tooltip>
                               );
@@ -3447,7 +3447,7 @@ export default function NewsCardStudio() {
                           </div>
                           {normalizeTemplate(s.template) === 'quote' && (
                             <div className="mt-2.5">
-                              <div className="text-[11px] text-slate-500 mb-1">Tên người nói (để trống là ẩn)</div>
+                              <div className="text-xs text-slate-300 mb-1">Tên người nói (để trống là ẩn)</div>
                               <Input
                                 size="small"
                                 value={s.quoteBy || ''}
@@ -3481,7 +3481,7 @@ export default function NewsCardStudio() {
                               );
                             })}
                           </div>
-                          <div className="grid grid-cols-3 gap-2 mt-2.5 text-[11px] text-slate-400">
+                          <div className="grid grid-cols-3 gap-2 mt-2.5 text-xs text-slate-300">
                             <div className="flex items-center gap-1.5"><ColorPicker size="small" value={s.bandBg} onChange={(c) => setStyle({ bandBg: c.toHexString() })} />Nền</div>
                             <div className="flex items-center gap-1.5"><ColorPicker size="small" value={s.textColor} onChange={(c) => setStyle({ textColor: c.toHexString() })} />Chữ</div>
                             <div className="flex items-center gap-1.5"><ColorPicker size="small" value={s.accent} onChange={(c) => setStyle({ accent: c.toHexString() })} />Nhấn</div>
@@ -3508,7 +3508,7 @@ export default function NewsCardStudio() {
                                 placeholder="Tên page (dùng chung mọi bài)"
                               />
                               <div className="flex items-center justify-between">
-                                <span className="text-[11px] text-slate-400">Ghi ngày hôm nay</span>
+                                <span className="text-xs text-slate-300">Ghi ngày hôm nay</span>
                                 <Switch size="small" checked={s.showDate} onChange={(on) => setStyle({ showDate: on })} />
                               </div>
                             </>
@@ -3559,7 +3559,7 @@ export default function NewsCardStudio() {
                     label: 'Chèn thêm',
                     children: (
                       <div className="space-y-3 pb-2">
-                        <div className="text-[11px] text-slate-500">Kéo trực tiếp trên khung xem trước để di chuyển, lăn chuột trên phần đó để phóng to / thu nhỏ.</div>
+                        <div className="text-xs text-slate-300">Kéo trực tiếp trên khung xem trước để di chuyển, lăn chuột trên phần đó để phóng to / thu nhỏ.</div>
 
                         {/* Nhãn góc */}
                         <ToolCard
@@ -3573,7 +3573,7 @@ export default function NewsCardStudio() {
                               <button
                                 type="button"
                                 onClick={() => enableBadge({ text: active.badgeSuggestion!, bg: s.accent, color: '#ffffff' })}
-                                className="px-2 py-0.5 rounded text-[11px] font-black cursor-pointer border border-dashed border-blue-500 bg-transparent text-blue-300"
+                                className="px-2.5 py-1 rounded text-xs font-black cursor-pointer border border-dashed border-blue-500 bg-transparent text-blue-300"
                                 title="AI gợi ý từ nội dung bài"
                               >
                                 AI: {active.badgeSuggestion}
@@ -3584,7 +3584,7 @@ export default function NewsCardStudio() {
                                 key={b.text}
                                 type="button"
                                 onClick={() => enableBadge(b)}
-                                className={`px-2 py-0.5 rounded text-[11px] font-black cursor-pointer border ${active.badge?.text === b.text ? 'border-blue-500' : 'border-transparent'}`}
+                                className={`px-2.5 py-1 rounded text-xs font-black cursor-pointer border ${active.badge?.text === b.text ? 'border-blue-500' : 'border-transparent'}`}
                                 style={{ background: b.bg, color: b.color }}
                               >
                                 {b.text}
@@ -3600,7 +3600,7 @@ export default function NewsCardStudio() {
                                 onChange={(e) => setBadge({ text: e.target.value.toUpperCase() })}
                                 placeholder="Chữ trên nhãn"
                               />
-                              <div className="grid grid-cols-3 gap-2 text-[11px] text-slate-400 items-center">
+                              <div className="grid grid-cols-3 gap-2 text-xs text-slate-300 items-center">
                                 <div className="flex items-center gap-1.5">Nền <ColorPicker size="small" value={active.badge.bg} onChange={(c) => setBadge({ bg: c.toHexString() })} /></div>
                                 <div className="flex items-center gap-1.5">Chữ <ColorPicker size="small" value={active.badge.color} onChange={(c) => setBadge({ color: c.toHexString() })} /></div>
                                 <Segmented
@@ -3629,7 +3629,7 @@ export default function NewsCardStudio() {
                             return (
                               <>
                                 <div>
-                                  <div className="text-[11px] text-slate-500 mb-1">Chọn ảnh</div>
+                                  <div className="text-xs text-slate-300 mb-1">Chọn ảnh</div>
                                   <div className="flex gap-1.5 flex-wrap max-h-28 overflow-y-auto">
                                     {active.images.map((u) => (
                                       <button
@@ -3649,7 +3649,7 @@ export default function NewsCardStudio() {
                                   </div>
                                 </div>
                                 <div>
-                                  <div className="text-[11px] text-slate-500 mb-1">Hình dạng</div>
+                                  <div className="text-xs text-slate-300 mb-1">Hình dạng</div>
                                   <Segmented
                                     block
                                     size="small"
@@ -3659,7 +3659,7 @@ export default function NewsCardStudio() {
                                   />
                                 </div>
                                 <div>
-                                  <div className="text-[11px] text-slate-500 mb-1">Màu viền</div>
+                                  <div className="text-xs text-slate-300 mb-1">Màu viền</div>
                                   <div className="flex items-center gap-1.5">
                                     {[s.accent, '#ffffff', '#111111', '#ffd400'].map((c, i) => (
                                       <button
@@ -3672,7 +3672,7 @@ export default function NewsCardStudio() {
                                       />
                                     ))}
                                     <ColorPicker size="small" value={borderColor} onChange={(c) => setInset({ borderColor: c.toHexString() })} />
-                                    <span className="ml-auto flex items-center gap-1.5 text-[11px] text-slate-400">
+                                    <span className="ml-auto flex items-center gap-1.5 text-xs text-slate-300">
                                       Đổ bóng <Switch size="small" checked={ins.shadow !== false} onChange={(on) => setInset({ shadow: on })} />
                                     </span>
                                   </div>
@@ -3714,12 +3714,12 @@ export default function NewsCardStudio() {
                             <Upload accept="image/*" showUploadList={false} beforeUpload={uploadLogo}>
                               <Button size="small" icon={<UploadOutlined />} loading={logoBusy}>{s.logoUrl ? 'Đổi logo' : 'Tải logo lên'}</Button>
                             </Upload>
-                            <span className="text-[11px] text-slate-500">{s.logoUrl ? 'Bật/tắt riêng từng bài' : 'PNG nền trong suốt là đẹp nhất'}</span>
+                            <span className="text-xs text-slate-300">{s.logoUrl ? 'Bật/tắt riêng từng bài' : 'PNG nền trong suốt là đẹp nhất'}</span>
                           </div>
                           {s.showLogo && s.logoUrl && (
                             <div className="mt-2 space-y-2">
                               <div className="flex items-center justify-between">
-                                <span className="text-[11px] text-slate-400">Tách nền (xoá nền trắng quanh logo)</span>
+                                <span className="text-xs text-slate-300">Tách nền (xoá nền trắng quanh logo)</span>
                                 {s.logoNoBgUrl ? (
                                   <Switch size="small" checked={s.logoBgRemoved} onChange={(on) => updateLogoEverywhere({ logoBgRemoved: on })} />
                                 ) : (
@@ -3727,7 +3727,7 @@ export default function NewsCardStudio() {
                                 )}
                               </div>
                               <div>
-                                <div className="text-[11px] text-slate-500 mb-1">Kiểu khung</div>
+                                <div className="text-xs text-slate-300 mb-1">Kiểu khung</div>
                                 <Segmented
                                   block
                                   size="small"
@@ -3744,7 +3744,7 @@ export default function NewsCardStudio() {
                               </div>
                               {s.logoFrame !== 'none' && (
                                 <div className="flex items-center gap-1.5">
-                                  <span className="text-[11px] text-slate-500 mr-1">Màu khung</span>
+                                  <span className="text-xs text-slate-300 mr-1">Màu khung</span>
                                   {LOGO_FRAME_BG_PRESETS.map((c) => (
                                     <button
                                       key={c}
@@ -3759,7 +3759,7 @@ export default function NewsCardStudio() {
                                 </div>
                               )}
                               <div>
-                                <div className="text-[11px] text-slate-500 mb-1">Màu logo</div>
+                                <div className="text-xs text-slate-300 mb-1">Màu logo</div>
                                 <Segmented
                                   block
                                   size="small"
@@ -3772,17 +3772,17 @@ export default function NewsCardStudio() {
                                   ]}
                                 />
                                 {s.logoTint !== 'original' && !s.logoBgRemoved && s.logoFrame === 'none' && (
-                                  <div className="text-[11px] text-amber-400 mt-1">Nên bật Tách nền, nếu không cả ô nền cũng bị đổi màu.</div>
+                                  <div className="text-xs text-amber-400 mt-1">Nên bật Tách nền, nếu không cả ô nền cũng bị đổi màu.</div>
                                 )}
                               </div>
                               <div className="flex items-center justify-between">
-                                <span className="text-[11px] text-slate-400">Đổ bóng</span>
+                                <span className="text-xs text-slate-300">Đổ bóng</span>
                                 <Switch size="small" checked={s.logoShadow} onChange={(on) => setStyle({ logoShadow: on })} />
                               </div>
-                              <div className="flex justify-between text-[11px] text-slate-500"><span>Độ đậm</span><span>{Math.round(s.logoOpacity * 100)}%</span></div>
+                              <div className="flex justify-between text-xs text-slate-300"><span>Độ đậm</span><span>{Math.round(s.logoOpacity * 100)}%</span></div>
                               <Slider min={0.3} max={1} step={0.05} value={s.logoOpacity} onChange={(v) => setStyle({ logoOpacity: v })} tooltip={{ open: false }} />
                               <CornerButtons value={s.logoPos} onPick={placeLogo} />
-                              <div className="flex justify-between text-[11px] text-slate-500"><span>Cỡ logo</span><span>{s.logoSize}px</span></div>
+                              <div className="flex justify-between text-xs text-slate-300"><span>Cỡ logo</span><span>{s.logoSize}px</span></div>
                               <Slider min={100} max={480} step={10} value={s.logoSize} onChange={(v) => setStyle({ logoSize: v })} tooltip={{ open: false }} />
                             </div>
                           )}
@@ -3846,7 +3846,7 @@ export default function NewsCardStudio() {
                 <TemplatePreview html={galleryOpen ? templatePreviews[t.value] || '' : ''} ratio={s.ratio} />
                 <div className="px-1 pt-2 pb-1">
                   <div className={`text-sm font-semibold ${on ? 'text-blue-300' : 'text-slate-200'}`}>{t.label}{on ? ' · đang dùng' : ''}</div>
-                  <div className="text-[11px] text-slate-500 leading-snug">{t.hint}</div>
+                  <div className="text-xs text-slate-300 leading-snug">{t.hint}</div>
                 </div>
               </button>
             );
@@ -3883,12 +3883,12 @@ export default function NewsCardStudio() {
               {r.url ? (
                 <img src={r.url} alt="" className="w-full aspect-square object-contain bg-slate-900" />
               ) : (
-                <div className="w-full aspect-square grid place-items-center bg-slate-900 text-[11px] text-amber-400 p-3 text-center">
+                <div className="w-full aspect-square grid place-items-center bg-slate-900 text-xs text-amber-400 p-3 text-center">
                   Bỏ qua: {r.error}
                 </div>
               )}
               <div className="p-2">
-                <div className="text-[11px] text-slate-300 line-clamp-2 leading-snug min-h-[2.6em]">{r.title}</div>
+                <div className="text-xs text-slate-200 line-clamp-2 leading-snug min-h-[2.6em]">{r.title}</div>
                 {r.url ? (
                   <div className="flex gap-1.5 mt-1.5">
                     <Button size="small" onClick={() => window.open(r.url, '_blank')}>Mở</Button>
@@ -3954,7 +3954,7 @@ export default function NewsCardStudio() {
               className="font-mono text-xs"
             />
           </div>
-          <div className="text-[11px] text-slate-400 bg-slate-800/60 p-2.5 rounded-lg border border-slate-700 space-y-1">
+          <div className="text-xs text-slate-300 bg-slate-800/60 p-3 rounded-lg border border-slate-700 space-y-1">
             <div>
               🔗 Lấy key hoàn toàn miễn phí tại:{' '}
               <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-blue-400 underline font-medium">
@@ -3985,7 +3985,7 @@ export default function NewsCardStudio() {
             placeholder='Ví dụ: "Tài chính - trắng đỏ có logo"'
             maxLength={60}
           />
-          <div className="text-[11px] text-slate-500">Lưu màu, cỡ chữ, khung, cách vừa khung, logo và vị trí logo. Trùng tên sẽ ghi đè.</div>
+          <div className="text-xs text-slate-300">Lưu màu, cỡ chữ, khung, cách vừa khung, logo và vị trí logo. Trùng tên sẽ ghi đè.</div>
         </div>
       </Modal>
     </div>
@@ -4052,7 +4052,7 @@ function ToolCard({ title, checked, onToggle, disabled, hint, alwaysShow, childr
         <span className="text-xs font-semibold text-slate-200">{title}</span>
         <Switch size="small" checked={checked} disabled={disabled} onChange={onToggle} />
       </div>
-      {hint && !checked && <div className="text-[11px] text-slate-500 mt-1">{hint}</div>}
+      {hint && !checked && <div className="text-xs text-slate-300 mt-1">{hint}</div>}
       {(checked || alwaysShow) && children && <div className="mt-2.5 space-y-2.5">{children}</div>}
     </div>
   );
@@ -4070,7 +4070,7 @@ function FieldSlider({ label, value, unit, min, max, step, digits = 0, onChange 
 }) {
   return (
     <div>
-      <div className="flex justify-between text-[11px] text-slate-500"><span>{label}</span><span>{value.toFixed(digits)}{unit}</span></div>
+      <div className="flex justify-between text-xs text-slate-300"><span>{label}</span><span>{value.toFixed(digits)}{unit}</span></div>
       <Slider min={min} max={max} step={step} value={value} onChange={onChange} tooltip={{ open: false }} className="!my-1" />
     </div>
   );

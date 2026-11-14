@@ -393,15 +393,15 @@ export default function Timeline({ hasAudio, seek }: Props) {
       <div className="flex flex-1 min-h-0 overflow-y-auto overflow-x-hidden items-start">
         {/* Nhãn track */}
         <div className="flex-shrink-0 border-r border-slate-800 bg-[#121620]" style={{ width: HEADER_W }}>
-          <div className="h-6 border-b border-slate-800 flex items-center px-2 text-[10px] text-slate-500 gap-2">
+          <div className="h-6 border-b border-slate-800 flex items-center px-2 text-xs text-slate-400 gap-2">
             <Tooltip title="Phóng to timeline (Ctrl + cuộn chuột)">
               <Slider className="!m-0 flex-1" min={1} max={40} step={0.1} value={zoom} onChange={setZoom} tooltip={{ open: false }} />
             </Tooltip>
-            <Tooltip title="Vừa khung nhìn"><button type="button" className="text-slate-400 hover:text-white" onClick={() => setZoom(1)}><FullscreenOutlined /></button></Tooltip>
+            <Tooltip title="Vừa khung nhìn"><button type="button" className="text-slate-300 hover:text-white" onClick={() => setZoom(1)}><FullscreenOutlined /></button></Tooltip>
           </div>
           <div className="overflow-hidden">
             {rows.map((r) => (
-              <div key={r.key} className="flex items-center gap-1.5 px-2 border-b border-slate-800/70 text-[11px] text-slate-300" style={{ height: r.h || ROW_H }}>
+              <div key={r.key} className="flex items-center gap-1.5 px-2 border-b border-slate-800/70 text-xs text-slate-200" style={{ height: r.h || ROW_H }}>
                 <span className="w-0.5 self-stretch my-2.5 rounded" style={{ background: r.color }} />
                 <span className="min-w-0 flex-1 text-slate-300">{r.label}</span>
               </div>
@@ -419,7 +419,7 @@ export default function Timeline({ hasAudio, seek }: Props) {
             <div className="h-6 border-b border-slate-800 relative cursor-pointer bg-[#121620]" onPointerDown={(e) => { e.stopPropagation(); rulerDown(e); }}>
               {ticks.map((t) => (
                 <div key={t} className="absolute top-0 bottom-0 border-l border-slate-700" style={{ left: t * pps }}>
-                  <span className="absolute left-1 top-0.5 text-[9px] text-slate-500 font-mono">{fmtTime(t, false)}</span>
+                  <span className="absolute left-1 top-0.5 text-[11px] text-slate-400 font-mono">{fmtTime(t, false)}</span>
                 </div>
               ))}
             </div>

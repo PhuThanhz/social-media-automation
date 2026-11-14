@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -800,14 +801,39 @@ public class CampaignScheduler {
      */
     @Transactional
     public Map<String, Object> packContinuous(Collection<Long> postIds, int gapSeconds) {
+        return packContinuousFrom(postIds, gapSeconds, null);
+    }
+
+    /**
+     * Như packContinuous nhưng các làn bắt đầu từ mốc "from" (chế độ "Hẹn giờ" cho nhiều bài:
+     * bắt đầu từ giờ đã chọn, các bài cùng nick nối đuôi sau đó). from null/quá khứ = từ bây giờ.
+     */
+    @Transactional
+    public Map<String, Object> packContinuousFrom(Collection<Long> postIds, int gapSeconds, LocalDateTime from) {
+        LocalDateTime start = (from != null && from.isAfter(LocalDateTime.now())) ? from : LocalDateTime.now();
         List<PostQueue> pending = postQueueRepository.findByStatusOrderByIdAsc("PENDING");
         List<PostQueue> processing = postQueueRepository.findByStatusOrderByIdAsc("PROCESSING");
         List<PostQueue> updated = new ArrayList<>();
         Map<String, List<PostQueue>> deferred = new LinkedHashMap<>();
         Set<Long> movingIds = postIds == null ? null : new HashSet<>(postIds);
+
+        // Kiểm tra nếu các bài cần xếp lịch có chứa nhiều nhóm đích Facebook, tự động rải đều theo Nhóm
+        List<PostQueue> targetList = pending.stream()
+                .filter(p -> movingIds == null || movingIds.contains(p.getId()))
+                .toList();
+        long groupCount = targetList.stream()
+                .map(p -> com.autopost.saas.util.FacebookPostIds.targetGroupKeys(p.getTargetGroupNames()))
+                .filter(keys -> !keys.isEmpty())
+                .distinct()
+                .count();
+        if (groupCount > 1) {
+            log.info("🎯 [packContinuous] Phát hiện {} nhóm đích, tự động kích hoạt thuật toán rải đều theo Nhóm", groupCount);
+            return spreadEvenlyByGroups(postIds, from, null, null);
+        }
+
         PostingWindow window = postingWindowService.get();
         LocalDateTime lastFinish = planContinuousLanes(pending, processing, movingIds, this::accountGroupKey,
-                LocalDateTime.now(), Math.max(0, gapSeconds), window, false, updated, deferred);
+                start, Math.max(0, gapSeconds), window, false, updated, deferred);
 
         postQueueRepository.saveAll(updated);
         int deferredCount = deferred.values().stream().mapToInt(List::size).sum();
@@ -848,6 +874,162 @@ public class CampaignScheduler {
         result.put("updated", updated.size());
         result.put("estimatedFinishAt", lastFinish.toString());
         result.put("deferredCount", deferredCount);
+        return result;
+    }
+
+    /**
+     * Rải đều TOÀN BỘ bài của TẤT CẢ CÁC NHÓM suốt cả ngày / khoảng thời gian mong muốn (Group-Interleaved Day Distribution):
+     * - Gom bài theo Facebook Group đích.
+     * - Giãn cách đều đặn các bài của cùng 1 nhóm (không bị dồn cục một buổi).
+     * - Xếp xen kẽ (interleaved) giữa các nhóm: Vòng 1 xếp bài đầu tiên của tất cả các nhóm (cách nhau vài phút),
+     *   sau đó mới đến vòng 2, vòng 3...
+     * - Bảo vệ an toàn: 2 bài của cùng 1 Nick/Page không bao giờ bị xếp sát nhau hơn 2 phút.
+     */
+    @Transactional
+    public Map<String, Object> spreadEvenlyByGroups(Collection<Long> postIds, LocalDateTime startRange, LocalDateTime endRange, Integer minGroupGapMinutes) {
+        List<PostQueue> allPending = postQueueRepository.findByStatusOrderByIdAsc("PENDING");
+        Set<Long> scope = (postIds != null && !postIds.isEmpty()) ? new HashSet<>(postIds) : null;
+        List<PostQueue> targets = allPending.stream()
+                .filter(p -> scope == null || scope.contains(p.getId()))
+                .filter(p -> !isNickResting(p))
+                .toList();
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        if (targets.isEmpty()) {
+            result.put("success", true);
+            result.put("updated", 0);
+            result.put("groupCount", 0);
+            return result;
+        }
+
+        // 1. Phân nhóm bài theo Group đích (nếu không có group thì gom theo target_fanpage_id)
+        Map<String, List<PostQueue>> byGroup = new LinkedHashMap<>();
+        for (PostQueue p : targets) {
+            Set<String> groupKeys = com.autopost.saas.util.FacebookPostIds.targetGroupKeys(p.getTargetGroupNames());
+            String groupKey = groupKeys.isEmpty()
+                    ? ("FANPAGE_" + (p.getTargetFanpageId() != null ? p.getTargetFanpageId() : "DEFAULT"))
+                    : groupKeys.iterator().next();
+            byGroup.computeIfAbsent(groupKey, k -> new ArrayList<>()).add(p);
+        }
+
+        // Sắp xếp các bài trong mỗi nhóm theo ID / giờ hiện tại
+        LocalDateTime now = LocalDateTime.now();
+        for (List<PostQueue> list : byGroup.values()) {
+            list.sort(Comparator.comparing((PostQueue p) -> p.getScheduledAt() != null ? p.getScheduledAt() : now)
+                    .thenComparing(PostQueue::getId));
+        }
+
+        // 2. Xác định mốc thời gian bắt đầu & kết thúc
+        LocalDateTime start = (startRange != null && startRange.isAfter(now)) ? startRange : now.plusMinutes(2);
+        PostingWindow window = postingWindowService.get();
+        if (window.enabled()) {
+            start = window.openAtOrAfter(start);
+        }
+
+        LocalDateTime end = endRange;
+        if (end == null || !end.isAfter(start)) {
+            if (window.enabled()) {
+                end = window.closeOf(start);
+                if (!end.isAfter(start)) {
+                    start = window.openAtOrAfter(start);
+                    end = window.closeOf(start);
+                }
+            } else {
+                end = start.toLocalDate().atTime(22, 0);
+                if (!end.isAfter(start)) {
+                    end = start.plusHours(12);
+                }
+            }
+        }
+
+        long totalSeconds = java.time.Duration.between(start, end).getSeconds();
+        if (totalSeconds < 600) totalSeconds = 3600;
+
+        int groupCount = byGroup.size();
+
+        // 3. Phân bổ đều theo tỷ lệ tiến độ (Fractional Distribution):
+        // Mỗi bài của mỗi nhóm được phân đều từ start đến end, nhóm ít bài hay nhiều bài đều có bài rải suốt ngày
+        record Candidate(PostQueue post, String groupKey, LocalDateTime desiredTime) {}
+        List<Candidate> candidates = new ArrayList<>();
+        int gIdx = 0;
+        for (Map.Entry<String, List<PostQueue>> entry : byGroup.entrySet()) {
+            String gKey = entry.getKey();
+            List<PostQueue> gPosts = entry.getValue();
+            int count = gPosts.size();
+            for (int pIdx = 0; pIdx < count; pIdx++) {
+                double frac = (count <= 1) ? 0.0 : ((double) pIdx / (count - 1));
+                long offsetSec = (long) (frac * totalSeconds) + (gIdx * 20L);
+                LocalDateTime desired = start.plusSeconds(offsetSec);
+                candidates.add(new Candidate(gPosts.get(pIdx), gKey, desired));
+            }
+            gIdx++;
+        }
+
+        candidates.sort(Comparator.comparing(Candidate::desiredTime).thenComparing(c -> c.post().getId()));
+
+        // 4. Giải quyết xung đột (cùng Nick tối thiểu minNickGap, cùng Nhóm tối thiểu minGroupGap, và nhảy qua đêm theo PostingWindow)
+        long minNickGapSeconds = Math.max(120, window.enabled() ? window.minGapSeconds() : 120);
+        long minGroupGapSeconds = (minGroupGapMinutes != null && minGroupGapMinutes > 0)
+                ? (minGroupGapMinutes * 60L)
+                : Math.max(180L, minNickGapSeconds);
+
+        Map<String, LocalDateTime> lastNickAssigned = new HashMap<>();
+        Map<String, LocalDateTime> lastGroupAssigned = new HashMap<>();
+        List<PostQueue> updated = new ArrayList<>();
+        LocalDateTime maxScheduled = start;
+
+        for (Candidate c : candidates) {
+            PostQueue post = c.post();
+            String nickKey = accountGroupKey(post);
+            String gKey = c.groupKey();
+
+            LocalDateTime slot = c.desiredTime();
+            if (slot.isBefore(start)) slot = start;
+
+            // Xung đột trên cùng 1 Nick
+            LocalDateTime lastNick = lastNickAssigned.get(nickKey);
+            if (lastNick != null && slot.isBefore(lastNick.plusSeconds(minNickGapSeconds))) {
+                slot = lastNick.plusSeconds(minNickGapSeconds);
+            }
+
+            // Xung đột trên cùng 1 Nhóm
+            LocalDateTime lastGroup = lastGroupAssigned.get(gKey);
+            if (lastGroup != null && slot.isBefore(lastGroup.plusSeconds(minGroupGapSeconds))) {
+                slot = lastGroup.plusSeconds(minGroupGapSeconds);
+            }
+
+            // Nhảy qua đêm nếu vượt quá giờ đóng khung
+            if (window.enabled()) {
+                LocalDateTime openSlot = window.openAtOrAfter(slot);
+                if (!openSlot.equals(slot)) {
+                    slot = openSlot;
+                    // Sau khi nhảy sang sáng hôm sau, kiểm tra lại nick collision
+                    lastNick = lastNickAssigned.get(nickKey);
+                    if (lastNick != null && slot.isBefore(lastNick.plusSeconds(minNickGapSeconds))) {
+                        slot = lastNick.plusSeconds(minNickGapSeconds);
+                    }
+                }
+            }
+
+            lastNickAssigned.put(nickKey, slot);
+            lastGroupAssigned.put(gKey, slot);
+            post.setScheduledAt(slot);
+            post.setWindowDeferred(null);
+            updated.add(post);
+
+            if (slot.isAfter(maxScheduled)) {
+                maxScheduled = slot;
+            }
+        }
+
+        postQueueRepository.saveAll(updated);
+        log.info("🎯 [Phân bổ đều các nhóm] Đã xếp lại {} bài cho {} nhóm từ {} đến {}, bài cuối dự kiến {}",
+                updated.size(), groupCount, start, end, maxScheduled);
+
+        result.put("success", true);
+        result.put("updated", updated.size());
+        result.put("groupCount", groupCount);
+        result.put("estimatedFinishAt", maxScheduled.toString());
         return result;
     }
 

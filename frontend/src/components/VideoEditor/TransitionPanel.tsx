@@ -39,7 +39,7 @@ function Tile({ value, label, active, onClick }: { value: string; label: string;
         </span>
         {tr.overlay && tr.overlay.opacity > 0 && <span className="absolute inset-0" style={{ background: tr.overlay.color, opacity: tr.overlay.opacity }} />}
       </span>
-      <span className={`text-[10px] leading-tight text-center ${active ? 'text-blue-300' : 'text-slate-400'}`}>{label}</span>
+      <span className={`text-xs leading-tight text-center ${active ? 'text-blue-300' : 'text-slate-300'}`}>{label}</span>
     </button>
   );
 }
@@ -61,19 +61,19 @@ export default function TransitionPanel({ seekAndPlay }: { seekAndPlay: (t: numb
   return (
     <div className="space-y-5">
       {!hasJunction ? (
-        <div className="rounded-md border border-slate-700 p-3 space-y-2 text-[12px] text-slate-300">
+        <div className="rounded-md border border-slate-700 p-3 space-y-2 text-[13px] text-slate-200">
           <div>Khung tiêu đề đang hiện suốt video nên chưa có chỗ chuyển cảnh.</div>
           <Button size="small" type="primary" onClick={() => update((pp) => ({ ...pp, frame: { ...pp.frame, enabled: true, keepLayoutAfter: false, end: Math.min(D - 0.5, 5) } }))}>Cho khung ẩn sau 5 giây</Button>
         </div>
       ) : (
         <>
           <div className="flex items-center justify-between">
-            <span className="text-[11px] text-slate-400">Khi khung ẩn lúc <span className="font-mono text-slate-200">{lu.toFixed(1)}s</span></span>
+            <span className="text-xs text-slate-300">Khi khung ẩn lúc <span className="font-mono text-slate-100">{lu.toFixed(1)}s</span></span>
             <Button size="small" type="text" icon={<PlayCircleOutlined />} onClick={() => seekAndPlay(Math.max(0, lu - dur - 0.8))}>Xem thử</Button>
           </div>
           {groups.map((g) => (
             <section key={g}>
-              <div className="text-[11px] text-slate-400 mb-1.5">{g}</div>
+              <div className="text-xs text-slate-300 mb-1.5">{g}</div>
               <div className="grid grid-cols-4 gap-2">
                 {TRANSITIONS.filter((t) => t.group === g).map((t) => (
                   <Tile key={t.value} value={t.value} label={t.label} active={cur === t.value} onClick={() => apply(t.value)} />
@@ -83,7 +83,7 @@ export default function TransitionPanel({ seekAndPlay }: { seekAndPlay: (t: numb
           ))}
           {cur !== 'none' && (
             <section>
-              <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1"><span>Thời lượng chuyển</span><span className="font-mono text-slate-200">{dur.toFixed(1)}s</span></div>
+              <div className="flex items-center justify-between text-xs text-slate-300 mb-1"><span>Thời lượng chuyển</span><span className="font-mono text-slate-100">{dur.toFixed(1)}s</span></div>
               <Slider className="!my-0" min={0.2} max={2} step={0.1} value={dur} onChange={(v) => apply(cur, v)} tooltip={{ open: false }} />
             </section>
           )}

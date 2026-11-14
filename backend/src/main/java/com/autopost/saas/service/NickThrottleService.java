@@ -26,7 +26,19 @@ import java.util.regex.Pattern;
 @Slf4j
 public class NickThrottleService {
 
-    public static final int MAX_POSTS_PER_HOUR_PER_NICK = 35;
+    /** Mặc định khi chưa có cài đặt; giá trị thật đọc từ bảng cài đặt lịch đăng chung. */
+    public static final int MAX_POSTS_PER_HOUR_PER_NICK = PostingWindowService.DEFAULT_MAX_POSTS_PER_HOUR_PER_NICK;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private PostingWindowService postingWindowService;
+
+    public int maxPostsPerHour() {
+        try {
+            return postingWindowService != null ? postingWindowService.maxPostsPerHourPerNick() : MAX_POSTS_PER_HOUR_PER_NICK;
+        } catch (Exception e) {
+            return MAX_POSTS_PER_HOUR_PER_NICK;
+        }
+    }
     private static final long HOUR_MS = 3_600_000L;
     private static final Pattern C_USER = Pattern.compile("(?:^|;\\s*)c_user=([^;\\s]+)", Pattern.CASE_INSENSITIVE);
 
@@ -84,7 +96,7 @@ public class NickThrottleService {
     }
 
     public boolean isOverHourlyCap(String key, long nowMs) {
-        return startsInLastHour(key, nowMs) >= MAX_POSTS_PER_HOUR_PER_NICK;
+        return startsInLastHour(key, nowMs) >= maxPostsPerHour();
     }
 
     /** Lý do nick chưa được giao bài (null = được đăng). Log tối đa 5 phút/lần cho mỗi nick. */
@@ -94,7 +106,7 @@ public class NickThrottleService {
         if (until != null) {
             reason = "đang nghỉ do Facebook giới hạn tần suất tới " + until.toLocalTime().withNano(0);
         } else if (isOverHourlyCap(key, nowMs)) {
-            reason = "đã đăng " + MAX_POSTS_PER_HOUR_PER_NICK + " bài trong 60 phút qua";
+            reason = "đã đăng " + maxPostsPerHour() + " bài trong 60 phút qua";
         }
         if (reason != null) {
             Long last = lastCapLogAt.get(key);

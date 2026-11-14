@@ -128,7 +128,7 @@ function ReassignNickModal({
                   <div className="flex items-center gap-2 py-0.5">
                     <span>{isPersonal ? '👤' : '🚩'}</span>
                     <span className="font-bold">{rawName}</span>
-                    {pageCount > 0 && <span className="text-slate-400 text-[10px]">({pageCount} Page)</span>}
+                    {pageCount > 0 && <span className="text-slate-300 text-xs">({pageCount} Page)</span>}
                   </div>
                 ),
                 value: val,
@@ -137,7 +137,7 @@ function ReassignNickModal({
           />
 
           {reassignSelectedNicks.length > 0 && (
-            <div className="text-[11px] text-purple-300 bg-purple-500/10 border border-purple-500/20 rounded-xl p-2.5">
+            <div className="text-xs text-purple-200 bg-purple-500/10 border border-purple-500/20 rounded-xl p-3">
               💡 {reassignSelectedNicks.length === 1 ? (
                 <span>Toàn bộ <b>{selectedRowKeys.length} bài</b> sẽ được chuyển sang nick đã chọn.</span>
               ) : (
@@ -151,8 +151,8 @@ function ReassignNickModal({
 
         <div className="bg-slate-900/80 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between gap-3">
           <div>
-            <div className="font-semibold text-slate-200">Tự động xếp lịch vào hôm nay</div>
-            <div className="text-[11px] text-slate-400">
+            <div className="font-semibold text-slate-100">Tự động xếp lịch vào hôm nay</div>
+            <div className="text-xs text-slate-300">
               Xếp lại giờ đăng nối tiếp nhau bắt đầu từ bây giờ trong khung giờ hôm nay của các Nick mới, kéo các bài bị hoãn sang ngày mai về đăng hết hôm nay.
             </div>
           </div>

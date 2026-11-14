@@ -1,3 +1,4 @@
+import type { ScheduleValue } from '../../components/common/postingSchedule';
 import type React from 'react';
 import { useState, useMemo } from 'react';
 import { App } from 'antd';
@@ -6,14 +7,12 @@ import api from '../../config/axios';
 
 interface ViralHunterParams {
   setBulkText: React.Dispatch<React.SetStateAction<string>>;
-  setBulkStartMode: React.Dispatch<React.SetStateAction<"NOW" | "TIME">>;
-  setBulkStartTime: React.Dispatch<React.SetStateAction<Dayjs>>;
-  setBulkInterval: React.Dispatch<React.SetStateAction<number>>;
+  setScheduleChoice: (v: ScheduleValue) => void;
   setBulkModalVisible: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 // Săn video viral từ kênh TikTok, đưa video đã chọn vào danh sách dán hàng loạt — tách từ PlaywrightPoster (state và hàm giữ nguyên, chỉ chuyển chỗ)
-export function useViralHunter({ setBulkText, setBulkStartMode, setBulkStartTime, setBulkInterval, setBulkModalVisible }: ViralHunterParams) {
+export function useViralHunter({ setBulkText, setScheduleChoice, setBulkModalVisible }: ViralHunterParams) {
   const { message } = App.useApp();
   // TikTok Channel & Viral Hunter State
   const [hunterDrawerVisible, setHunterDrawerVisible] = useState(false);
@@ -122,15 +121,13 @@ export function useViralHunter({ setBulkText, setBulkStartMode, setBulkStartTime
     setBulkText((prev) => (prev ? `${prev}\n${linksText}` : linksText));
 
     if (hunterAutoSchedule) {
-      // Bật chế độ rải lịch: Cách nhau 180 phút (3 tiếng 1 bài) bắt đầu từ 11:30 ngày mai
-      setBulkStartMode('TIME');
-      setBulkStartTime(dayjs().add(1, 'day').hour(11).minute(30));
-      setBulkInterval(180);
+      // Tự lên lịch = "Xếp vào lịch" theo Lịch đăng chung
+      setScheduleChoice({ mode: 'QUEUE' });
     }
 
     setHunterDrawerVisible(false);
     setBulkModalVisible(true);
-    message.success(`🚀 Đã chuyển ${selected.length} video viral vào danh sách dán hàng loạt! ${hunterAutoSchedule ? 'Đã kích hoạt rải lịch tự động!' : ''}`);
+    message.success(`🚀 Đã chuyển ${selected.length} video viral vào danh sách dán hàng loạt! ${hunterAutoSchedule ? 'Bài sẽ được xếp vào lịch đăng chung.' : ''}`);
   };
 
   return {

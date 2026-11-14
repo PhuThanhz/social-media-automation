@@ -47,7 +47,7 @@ function DiagnosticsDrawer({
           <span className="diagnostic-title-icon"><BugOutlined /></span>
           <div>
             <div className="text-sm font-extrabold">Kiểm tra log bài #{diagnosingPost?.id}</div>
-            <div className="text-[11px] text-slate-500 font-normal mt-0.5">Đối chiếu lỗi đã lưu với nhật ký Worker</div>
+            <div className="text-xs text-slate-300 font-normal mt-0.5">Đối chiếu lỗi đã lưu với nhật ký Worker</div>
           </div>
         </div>
       }

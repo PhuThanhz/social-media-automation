@@ -59,6 +59,8 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import api from '../config/axios';
+import ScheduleChoice from '../components/common/ScheduleChoice';
+import { schedulePayload, type ScheduleValue } from '../components/common/postingSchedule';
 import AiSettingsModal, { getStoredGeminiKeys } from '../components/modals/AiSettingsModal';
 
 export interface HuntedPost {
@@ -568,7 +570,7 @@ export default function ViralHunter() {
 
   // Batch queue modal
   const [queueModalOpen, setQueueModalOpen] = useState(false);
-  const [queueIntervalMinutes, setQueueIntervalMinutes] = useState(30);
+  const [queueSchedule, setQueueSchedule] = useState<ScheduleValue>({ mode: 'QUEUE' });
   const [queueSubmitting, setQueueSubmitting] = useState(false);
 
   // Gemini AI Rewrite Modal State
@@ -607,7 +609,7 @@ export default function ViralHunter() {
       return timeB - timeA;
     });
     return (
-      sorted.find((a) => a.pageName?.toLowerCase().includes('làm sen') && a.accessToken) ||
+      sorted.find((a) => a.accessToken && a.accessToken.trim().length > 0 && a.tokenStatus === 'OK' && a.pageName?.toLowerCase().includes('làm sen')) ||
       sorted.find((a) => a.accessToken && a.accessToken.trim().length > 0 && a.tokenStatus === 'OK') ||
       sorted.find((a) => a.accessToken && a.accessToken.trim().length > 0)
     );
@@ -1778,13 +1780,13 @@ export default function ViralHunter() {
       const urls = selectedPosts.map((p) => p.url);
       const res = await api.post('/queue/add-from-urls', {
         urls,
-        intervalMinutes: queueIntervalMinutes,
+        ...schedulePayload(queueSchedule),
         customCaptions: selectedPosts.map((p) => getDisplayCaption(p)),
         customMediaUrls: selectedPosts.map((p) => (p.mediaUrls || []).join(',')),
       });
       if (res.data?.success || res.status === 200) {
         markInboxPosts(selectedPosts, 'QUEUED');
-        message.success(`⚡ Đã đưa ${selectedPosts.length} bài vào Hàng Đợi (cách nhau ${queueIntervalMinutes} phút)!`);
+        message.success(res.data?.message || `Đã đưa ${selectedPosts.length} bài vào hàng đợi.`);
         setQueueModalOpen(false);
       } else {
         message.warning('Đã gửi yêu cầu thêm bài, vui lòng kiểm tra danh sách Lịch đăng.');
@@ -1926,10 +1928,10 @@ export default function ViralHunter() {
         <div className="group-hunter-section-head">
           <div>
             <div className="flex items-center gap-2 mb-1.5">
-              <span className="group-hunter-kicker tracking-widest text-[11px] font-black">
+              <span className="group-hunter-kicker tracking-widest text-xs font-black">
                 ✨ AI VIRAL RADAR 2026
               </span>
-              <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-300 font-extrabold border border-amber-500/25 flex items-center gap-1 shadow-sm">
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-300 font-extrabold border border-amber-500/25 flex items-center gap-1 shadow-sm">
                 <FireOutlined className="text-amber-400" /> Toàn Nền Tảng
               </span>
             </div>
@@ -1940,7 +1942,7 @@ export default function ViralHunter() {
                 ? 'Cào Bài Mới Nhất Từ Nguồn Chỉ Định (Group / Fanpage)'
                 : 'Săn Bài Viết Triệu Tương Tác'}
             </h3>
-            <p className="text-slate-400 text-xs sm:text-sm max-w-3xl leading-relaxed mt-1">
+            <p className="text-slate-300 text-xs sm:text-sm max-w-3xl leading-relaxed mt-1">
               {hunterMode === 'DISCOVER_GROUPS'
                 ? 'Tự động xếp hạng các Group Facebook từ 100K đến 700K+ thành viên, bóc tách tỷ lệ hoạt động và loại bỏ nhóm rác/thanh lý.'
                 : hunterMode === 'TARGET_SOURCES'
@@ -1980,10 +1982,10 @@ export default function ViralHunter() {
               </span>
               <span className="font-bold tracking-tight">Khám phá Group chất lượng</span>
               <span
-                className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border transition-all ${
+                className={`text-xs font-extrabold px-2.5 py-0.5 rounded-full border transition-all ${
                   hunterMode === 'DISCOVER_GROUPS'
                     ? 'bg-amber-400/20 text-amber-300 border-amber-400/35 shadow-[0_0_8px_rgba(245,158,11,0.2)]'
-                    : 'bg-white/[0.04] text-slate-400 border-white/10'
+                    : 'bg-white/[0.04] text-slate-300 border-white/10'
                 }`}
               >
                 Khuyên dùng
@@ -2010,10 +2012,10 @@ export default function ViralHunter() {
               </span>
               <span className="font-bold tracking-tight">Săn bài viết theo từ khoá</span>
               <span
-                className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border transition-all ${
+                className={`text-xs font-extrabold px-2.5 py-0.5 rounded-full border transition-all ${
                   hunterMode === 'HUNT_POSTS'
                     ? 'bg-blue-400/20 text-blue-300 border-blue-400/35 shadow-[0_0_8px_rgba(59,130,246,0.2)]'
-                    : 'bg-white/[0.04] text-slate-400 border-white/10'
+                    : 'bg-white/[0.04] text-slate-300 border-white/10'
                 }`}
               >
                 Toàn sàn
@@ -2040,10 +2042,10 @@ export default function ViralHunter() {
               </span>
               <span className="font-bold tracking-tight">Cào theo nguồn chỉ định</span>
               <span
-                className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border transition-all ${
+                className={`text-xs font-extrabold px-2.5 py-0.5 rounded-full border transition-all ${
                   hunterMode === 'TARGET_SOURCES'
                     ? 'bg-purple-400/20 text-purple-300 border-purple-400/35 shadow-[0_0_8px_rgba(168,85,247,0.2)]'
-                    : 'bg-white/[0.04] text-slate-400 border-white/10'
+                    : 'bg-white/[0.04] text-slate-300 border-white/10'
                 }`}
               >
                 Mới nhất
@@ -2059,14 +2061,14 @@ export default function ViralHunter() {
             <div className="p-3.5 sm:p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-2.5">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-slate-300 font-bold text-xs flex items-center gap-1.5 tracking-tight">
+                  <span className="text-slate-200 font-bold text-[13px] flex items-center gap-1.5 tracking-tight">
                     💡 Kho nguồn mẫu theo chủ đề:
                   </span>
-                  <span className="text-[11px] text-slate-500 hidden sm:inline">
+                  <span className="text-xs text-slate-300 hidden sm:inline">
                     (Đã phân loại sẵn nguồn phim & giải trí chất lượng, bấm để tra cứu ngay)
                   </span>
                 </div>
-                <span className="text-[11px] text-slate-400">
+                <span className="text-xs text-slate-300">
                   Bộ lọc: <span className="text-blue-400 font-semibold">{categoryFilter === 'PHIM' ? '🎬 Phim & Điện Ảnh' : categoryFilter === 'PETS' ? '🐱 Thú Cưng' : 'Toàn Bộ Nguồn'}</span>
                 </span>
               </div>
@@ -2086,7 +2088,7 @@ export default function ViralHunter() {
                 >
                   <span>🎬</span>
                   <span>Nhóm Phim & Điện Ảnh</span>
-                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-700 text-slate-300 font-medium">
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-slate-700 text-slate-200 font-medium">
                     11 nguồn
                   </span>
                 </button>
@@ -2105,7 +2107,7 @@ export default function ViralHunter() {
                 >
                   <span>🐱</span>
                   <span>Chó Mèo & Thú Cưng</span>
-                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-700 text-slate-300 font-medium">
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-slate-700 text-slate-200 font-medium">
                     2 nguồn
                   </span>
                 </button>
@@ -2236,10 +2238,10 @@ export default function ViralHunter() {
             {savedGroups.length > 0 && (
               <div className="pt-3 border-t border-slate-800">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                  <span className="text-[13px] font-bold text-amber-400 flex items-center gap-1.5">
                     <StarFilled /> Nhóm bạn đã lưu ({savedGroups.length}):
                   </span>
-                  <span className="text-[11px] text-slate-500">Bấm nút "Quét bài hay" để cào nội dung ngay</span>
+                  <span className="text-xs text-slate-300">Bấm nút "Quét bài hay" để cào nội dung ngay</span>
                 </div>
                 <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin">
                   {savedGroups.map((g) => (
@@ -2249,14 +2251,14 @@ export default function ViralHunter() {
                     >
                       <TeamOutlined className="text-blue-400 text-base" />
                       <div className="max-w-[200px]">
-                        <div className="text-xs font-bold text-slate-200 truncate">{g.name}</div>
-                        <div className="text-[10px] text-slate-400">{g.memberLine}</div>
+                        <div className="text-[13px] font-bold text-slate-100 truncate">{g.name}</div>
+                        <div className="text-xs text-slate-300">{g.memberLine}</div>
                       </div>
                       <Button
-                        size="small"
+                        size="middle"
                         type="primary"
                         onClick={() => handleScanPostsFromGroup(g)}
-                        className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] h-7 px-2.5 border-none"
+                        className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs px-3 border-none"
                       >
                         Quét bài
                       </Button>
@@ -2280,11 +2282,11 @@ export default function ViralHunter() {
                 <div>
                   <h4 className="text-white font-extrabold text-sm sm:text-base flex items-center gap-2">
                     Cào Bài Mới Nhất Theo Nguồn Chỉ Định
-                    <Tag color="purple" className="font-bold text-[10px] !m-0">
+                    <Tag color="purple" className="font-bold !text-xs !m-0">
                       Group & Fanpage
                     </Tag>
                   </h4>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <p className="text-[13px] text-slate-300 mt-0.5">
                     Hệ thống sẽ kết nối trực tiếp vào feed của nguồn chỉ định và bóc tách các bài viết mới nhất (kèm ảnh, video, lượt like).
                   </p>
                 </div>
@@ -2361,7 +2363,7 @@ export default function ViralHunter() {
                       <button
                         type="button"
                         onClick={handleSaveTargetSource}
-                        className="text-[11px] text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1 cursor-pointer"
+                        className="text-xs text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1 cursor-pointer"
                       >
                         <StarOutlined /> Lưu nguồn này
                       </button>
@@ -2381,9 +2383,9 @@ export default function ViralHunter() {
               <div className="pt-3 border-t border-slate-800/80 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {/* 1. Thứ tự cào bài */}
                 <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1.5">
-                  <span className="text-[11px] font-bold text-slate-400 block">Thứ tự lấy bài:</span>
+                  <span className="text-xs font-bold text-slate-300 block">Thứ tự lấy bài:</span>
                   <Segmented
-                    size="small"
+                    size="middle"
                     value={targetSortOrder}
                     onChange={(val) => setTargetSortOrder(val as 'NEWEST' | 'VIRAL')}
                     options={[
@@ -2396,11 +2398,11 @@ export default function ViralHunter() {
 
                 {/* 2. Khoảng thời gian bài đăng */}
                 <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1.5">
-                  <span className="text-[11px] font-bold text-slate-400 block flex items-center gap-1">
+                  <span className="text-xs font-bold text-slate-300 block flex items-center gap-1">
                     <ClockCircleOutlined className="text-purple-400" /> Thời gian đăng:
                   </span>
                   <Select
-                    size="small"
+                    size="middle"
                     value={targetTimeRange}
                     onChange={setTargetTimeRange}
                     className="w-full text-xs"
@@ -2415,9 +2417,9 @@ export default function ViralHunter() {
 
                 {/* 3. Số lượng bài cần cào */}
                 <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1.5">
-                  <span className="text-[11px] font-bold text-slate-400 block">Số lượng bài cần lấy:</span>
+                  <span className="text-xs font-bold text-slate-300 block">Số lượng bài cần lấy:</span>
                   <Select
-                    size="small"
+                    size="middle"
                     value={targetLimit}
                     onChange={setTargetLimit}
                     className="w-full text-xs"
@@ -2432,9 +2434,9 @@ export default function ViralHunter() {
 
                 {/* 4. Tương tác tối thiểu */}
                 <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1.5">
-                  <span className="text-[11px] font-bold text-slate-400 block">Lọc tương tác tối thiểu:</span>
+                  <span className="text-xs font-bold text-slate-300 block">Lọc tương tác tối thiểu:</span>
                   <Select
-                    size="small"
+                    size="middle"
                     value={targetMinReactions}
                     onChange={setTargetMinReactions}
                     className="w-full text-xs"
@@ -2504,7 +2506,7 @@ export default function ViralHunter() {
                     ]}
                   />
 
-                  <span className="text-[11px] text-slate-400">
+                  <span className="text-xs text-slate-300">
                     {autoScan?.running
                       ? `Đang quét: ${autoScan.currentSource || '...'}`
                       : autoScan?.enabled && autoScan?.nextRunAt
@@ -2515,9 +2517,9 @@ export default function ViralHunter() {
                   </span>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Button
-                    size="small"
+                    size="middle"
                     onClick={handleScanAllNow}
                     loading={Boolean(autoScan?.running)}
                     disabled={targetSources.length === 0}
@@ -2528,20 +2530,20 @@ export default function ViralHunter() {
                     <Checkbox
                       checked={redditConfig.includeVideo !== false}
                       onChange={(e) => handleToggleRedditVideo(e.target.checked)}
-                      className="text-[11px] text-slate-300"
+                      className="text-xs text-slate-200"
                     >
                       Lấy bài video Reddit
                     </Checkbox>
                   )}
-                  <Button size="small" onClick={() => openRedditModal()}>
+                  <Button size="middle" onClick={() => openRedditModal()}>
                     {redditConfig?.configured ? 'Reddit: đã kết nối' : 'Kết nối Reddit'}
                   </Button>
-                  <Button size="small" type="primary" onClick={handleOpenInbox} loading={inboxLoading}>
+                  <Button size="middle" type="primary" onClick={handleOpenInbox} loading={inboxLoading}>
                     Bài mới chờ duyệt ({autoScan?.newCount ?? 0})
                   </Button>
                 </div>
               </div>
-              <div className="text-[11px] text-slate-500">
+              <div className="text-xs text-slate-300">
                 Máy chủ tự quét kể cả khi đóng trình duyệt. Bài đã có trong lịch đăng sẽ tự bỏ qua; bài mới chỉ được gom vào "Bài mới chờ duyệt", không tự đăng.
               </div>
             </div>
@@ -2551,16 +2553,16 @@ export default function ViralHunter() {
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2">
                   <StarFilled className="text-amber-400 text-sm" />
-                  <span className="text-xs font-bold text-white uppercase tracking-wider">
+                  <span className="text-[13px] font-bold text-white uppercase tracking-wider">
                     Kho Nguồn Mục Tiêu Của Bạn ({targetSources.length}):
                   </span>
-                  <span className="text-xs text-slate-400 hidden sm:inline">
+                  <span className="text-xs text-slate-300 hidden sm:inline">
                     (Bấm vào bất kỳ nguồn nào để cào bài mới nhất ngay lập tức)
                   </span>
                 </div>
 
                 <div className="flex items-center gap-2 bg-slate-900/90 px-3 py-1.5 rounded-xl border border-slate-800">
-                  <span className="text-[11px] text-slate-400 font-semibold flex items-center gap-1">
+                  <span className="text-xs text-slate-300 font-semibold flex items-center gap-1">
                     <ClockCircleOutlined className="text-amber-400" /> Lấy bài:
                   </span>
                   <Select
@@ -2589,7 +2591,7 @@ export default function ViralHunter() {
                       <div className="flex items-center justify-between gap-2">
                         <Tag
                           color={source.type === 'REDDIT' ? 'orange' : source.type === 'PAGE' ? 'geekblue' : 'purple'}
-                          className="text-[10px] font-bold !m-0"
+                          className="!text-xs font-bold !m-0"
                         >
                           {source.type === 'REDDIT' ? 'Reddit' : source.type === 'PAGE' ? '📘 Fanpage' : '👥 Group'}
                         </Tag>
@@ -2616,28 +2618,28 @@ export default function ViralHunter() {
                           </button>
                         </Popconfirm>
                       </div>
-                      <h5 className="font-bold text-slate-100 text-xs truncate mt-1" title={source.name}>
+                      <h5 className="font-bold text-slate-100 text-[13px] truncate mt-1" title={source.name}>
                         {source.name}
                       </h5>
                       {source.description && (
-                        <p className="text-[11px] text-slate-400 line-clamp-1">
+                        <p className="text-xs text-slate-300 line-clamp-1">
                           {source.description}
                         </p>
                       )}
                     </div>
 
                     {source.dbId && (
-                      <div className="flex items-center justify-between gap-2 text-[10px]">
+                      <div className="flex items-center justify-between gap-2 text-xs">
                         <Checkbox
                           checked={source.autoScan !== false}
                           onChange={(e) => handleToggleSourceAutoScan(source, e.target.checked)}
-                          className="text-[10px] text-slate-400"
+                          className="text-xs text-slate-300"
                         >
                           Tự quét
                         </Checkbox>
                         {source.lastScannedAt && (
                           <Tooltip title={source.lastScanStatus === 'ERROR' ? source.lastScanError : undefined}>
-                            <span className={source.lastScanStatus === 'ERROR' ? 'text-rose-400' : 'text-slate-500'}>
+                            <span className={source.lastScanStatus === 'ERROR' ? 'text-rose-400' : 'text-slate-300'}>
                               {source.lastScanStatus === 'ERROR'
                                 ? `Lỗi lúc ${formatScanTime(source.lastScannedAt)}`
                                 : `${formatScanTime(source.lastScannedAt)} · ${source.lastNewCount ?? 0} bài mới`}
@@ -2652,16 +2654,16 @@ export default function ViralHunter() {
                         href={source.url}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-[10px] text-slate-500 hover:text-slate-300 flex items-center gap-1 truncate max-w-[120px]"
+                        className="text-xs text-slate-300 hover:text-white flex items-center gap-1 truncate max-w-[120px]"
                       >
                         <LinkOutlined /> Mở link
                       </a>
                       <Button
-                        size="small"
+                        size="middle"
                         type="primary"
                         loading={redditScanningUrl === source.url}
                         onClick={() => (source.type === 'REDDIT' ? handleScanRedditSource(source) : handleScanTargetSource(source.url, source.name))}
-                        className="bg-purple-600 hover:bg-purple-500 text-white font-bold text-[11px] h-7 px-2.5 rounded-lg border-none flex items-center gap-1 shadow-sm"
+                        className="bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs px-3 rounded-lg border-none flex items-center gap-1 shadow-sm"
                       >
                         ⚡ Cào ngay
                       </Button>
@@ -2960,21 +2962,21 @@ export default function ViralHunter() {
                               {isSaved && <StarFilled className="text-amber-400 text-xs shrink-0" />}
                             </div>
                             <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                              <span className="text-[10px] font-medium px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 border border-white/10">
+                              <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-slate-800 text-slate-200 border border-white/10">
                                 {record.privacy || 'Công khai'}
                               </span>
                               {record.category === 'PHIM' && (
-                                <span className="text-[10px] font-medium px-1.5 py-0.2 rounded bg-rose-950/60 text-rose-300 border border-rose-800/60">
+                                <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-rose-950/60 text-rose-300 border border-rose-800/60">
                                   🎬 Phim
                                 </span>
                               )}
                               {record.category === 'PETS' && (
-                                <span className="text-[10px] font-medium px-1.5 py-0.2 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-800/60">
+                                <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-800/60">
                                   🐱 Thú Cưng
                                 </span>
                               )}
                               {record.qualityBadge && (
-                                <span className="text-[10px] font-medium px-1.5 py-0.2 rounded bg-amber-950/50 text-amber-300 border border-amber-800/50">
+                                <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-amber-950/50 text-amber-300 border border-amber-800/50">
                                   {record.qualityBadge}
                                 </span>
                               )}
@@ -3023,7 +3025,7 @@ export default function ViralHunter() {
                         <span className="text-sm font-bold text-white tracking-tight">
                           {formatMemberDisplay(record)}
                         </span>
-                        <div className="text-[11px] text-slate-400 font-medium">
+                        <div className="text-xs text-slate-300 font-medium">
                           {record.privacy === 'Riêng tư' ? 'Nhóm kín' : 'Cộng đồng mở'}
                         </div>
                       </div>
@@ -3101,7 +3103,7 @@ export default function ViralHunter() {
                                 <TeamOutlined className="text-slate-400 text-xl" />
                               )}
                             </div>
-                            <span className="absolute -top-1.5 -left-1.5 px-1.5 py-0.2 rounded-md text-[10px] font-mono font-bold bg-slate-950 text-slate-300 border border-slate-700">
+                            <span className="absolute -top-1.5 -left-1.5 px-1.5 py-0.5 rounded-md text-xs font-mono font-bold bg-slate-950 text-slate-200 border border-slate-700">
                               #{index + 1}
                             </span>
                           </div>
@@ -3117,11 +3119,11 @@ export default function ViralHunter() {
                               {group.name}
                             </a>
                             <div className="flex items-center gap-1 mt-1 flex-wrap">
-                              <span className="text-[10px] font-medium px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                              <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-slate-800 text-slate-200 border border-slate-700">
                                 {group.privacy || 'Công khai'}
                               </span>
                               {group.qualityBadge && (
-                                <span className="text-[10px] font-medium px-1.5 py-0.2 rounded bg-amber-950/40 text-amber-300 border border-amber-800/40">
+                                <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-amber-950/40 text-amber-300 border border-amber-800/40">
                                   {group.qualityBadge}
                                 </span>
                               )}
@@ -3340,7 +3342,7 @@ export default function ViralHunter() {
                 </Checkbox>
 
                 <div className="flex items-center gap-1.5 bg-slate-900/80 px-2.5 py-1 rounded-xl border border-slate-700/70">
-                  <span className="text-slate-400 font-medium flex items-center gap-1 text-[11px]">
+                  <span className="text-slate-300 font-medium flex items-center gap-1 text-xs">
                     <ClockCircleOutlined className="text-purple-400" /> Lọc ngày:
                   </span>
                   <Select
@@ -3358,7 +3360,7 @@ export default function ViralHunter() {
                   />
                 </div>
               </div>
-              <span className="text-[11px] text-slate-400">
+              <span className="text-xs text-slate-300">
                 Key Gemini tích hợp:{' '}
                 <button
                   type="button"
@@ -3410,16 +3412,16 @@ export default function ViralHunter() {
                         />
                         <Tag
                           color={post.sourcePlatform === 'REDDIT' ? 'orange' : post.platform === 'THREADS' ? 'purple' : post.platform === 'TIKTOK' ? 'magenta' : 'blue'}
-                          className="!text-[11px] !px-2 !py-0 font-bold border-none"
+                          className="!text-xs !px-2 !py-0.5 font-bold border-none"
                         >
                           {post.sourcePlatform === 'REDDIT' ? `Reddit ${post.subreddit || ''}` : post.platform === 'THREADS' ? '🧵 Threads' : post.platform === 'TIKTOK' ? '🎵 TikTok' : '📘 Facebook'}
                         </Tag>
                         {post.isAlreadyImported ? (
-                          <Tag color="error" className="!text-[10px] !px-2 !py-0 font-bold">
+                          <Tag color="error" className="!text-xs !px-2 !py-0.5 font-bold">
                             {post.postStatus === 'PUBLISHED' ? '⛔ Đã từng đăng' : '📅 Đã có trong lịch'}
                           </Tag>
                         ) : (
-                          <Tag className="!text-[10px] !px-2 !py-0 font-bold !bg-emerald-500/15 !text-emerald-400 !border !border-emerald-500/30">
+                          <Tag className="!text-xs !px-2 !py-0.5 font-bold !bg-emerald-500/15 !text-emerald-400 !border !border-emerald-500/30">
                             ✨ Chưa đăng
                           </Tag>
                         )}
@@ -3434,7 +3436,7 @@ export default function ViralHunter() {
                             setTinderModalOpen(true);
                           }}
                           icon={<EyeOutlined />}
-                          className="!text-[11px] font-semibold bg-slate-800 border-slate-700 text-slate-300 hover:text-white"
+                          className="!text-xs font-semibold bg-slate-800 border-slate-700 text-slate-200 hover:text-white"
                         >
                           Duyệt to
                         </Button>
@@ -3442,7 +3444,7 @@ export default function ViralHunter() {
                           size="small"
                           onClick={() => handleOpenAiModal(post)}
                           icon={<RobotOutlined className="text-amber-400" />}
-                          className="!text-[11px] font-semibold bg-slate-800 border-slate-700 text-slate-300 hover:text-white"
+                          className="!text-xs font-semibold bg-slate-800 border-slate-700 text-slate-200 hover:text-white"
                         >
                           {post.aiRewritten ? 'AI Đã sửa' : 'AI Viết lại'}
                         </Button>
@@ -3451,7 +3453,7 @@ export default function ViralHunter() {
                             href={post.url}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-xs text-slate-400 hover:text-blue-400 px-1"
+                            className="text-xs text-slate-300 hover:text-blue-400 px-1"
                           >
                             Xem ↗
                           </a>
@@ -3463,25 +3465,25 @@ export default function ViralHunter() {
                     {post.aiCurated && (
                       <div className="flex items-center gap-1.5 flex-wrap">
                         {post.aiScore !== undefined && post.aiScore >= 80 ? (
-                          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 to-yellow-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1 shadow-sm">
+                          <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 to-yellow-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1 shadow-sm">
                             💎 Cực Phẩm ({post.aiScore}/100)
                           </span>
                         ) : post.aiScore !== undefined && post.aiScore >= 65 ? (
-                          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
                             ⭐ Chất Lượng ({post.aiScore}/100)
                           </span>
                         ) : (
-                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+                          <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
                             Điểm AI: {post.aiScore}/100
                           </span>
                         )}
                         {post.isSpam && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                          <span className="text-xs font-bold px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40">
                             ⚠️ AI Báo: Rác / Spam
                           </span>
                         )}
                         {post.qualityVerdict && (
-                          <span className="text-[11px] text-amber-200/90 italic truncate max-w-[200px]" title={post.qualityVerdict}>
+                          <span className="text-xs text-amber-200/90 italic truncate max-w-[200px]" title={post.qualityVerdict}>
                             {post.qualityVerdict}
                           </span>
                         )}
@@ -3489,19 +3491,19 @@ export default function ViralHunter() {
                     )}
 
                     {/* Author & Group Source & Time */}
-                    <div className="text-xs text-slate-400 flex items-center justify-between gap-2 flex-wrap">
+                    <div className="text-xs text-slate-300 flex items-center justify-between gap-2 flex-wrap">
                       <div className="flex items-center gap-1.5 truncate max-w-[220px]">
-                        <span className="font-semibold text-slate-300 truncate">👤 {post.author || 'Tác giả'}</span>
+                        <span className="font-semibold text-slate-200 truncate">👤 {post.author || 'Tác giả'}</span>
                         {post.sourceGroup && (
-                          <span className="text-[11px] text-blue-400 truncate">({post.sourceGroup})</span>
+                          <span className="text-xs text-blue-400 truncate">({post.sourceGroup})</span>
                         )}
                       </div>
                       {(post.postedTime || post.dateText || post.publishedAt) && (
                         <span
-                          className="text-[11px] text-slate-300 flex items-center gap-1 shrink-0 bg-slate-800/80 px-2 py-0.5 rounded-md border border-slate-700/60"
+                          className="text-xs text-slate-200 flex items-center gap-1 shrink-0 bg-slate-800/80 px-2 py-0.5 rounded-md border border-slate-700/60"
                           title="Thời gian bài viết được đăng trên nguồn gốc"
                         >
-                          <ClockCircleOutlined className="text-amber-400 text-[10px]" />
+                          <ClockCircleOutlined className="text-amber-400 text-xs" />
                           {post.postedTime || post.dateText || (post.publishedAt ? dayjs(post.publishedAt).format('DD/MM HH:mm') : '')}
                         </span>
                       )}
@@ -3531,7 +3533,7 @@ export default function ViralHunter() {
                           </div>
                         )}
                         {post.mediaUrls && post.mediaUrls.length > 1 && (
-                          <span className="absolute bottom-2 right-2 bg-black/70 backdrop-blur-md text-white text-[10px] font-bold px-2 py-0.5 rounded-md">
+                          <span className="absolute bottom-2 right-2 bg-black/70 backdrop-blur-md text-white text-xs font-bold px-2 py-0.5 rounded-md">
                             +{post.mediaUrls.length} ảnh
                           </span>
                         )}
@@ -3541,7 +3543,7 @@ export default function ViralHunter() {
                     {/* Caption với tính năng Xem thêm / Thu gọn */}
                     <div className="space-y-1">
                       <div
-                        className={`text-xs text-slate-200 leading-relaxed ${
+                        className={`text-[13px] text-slate-200 leading-relaxed ${
                           expandedCardIds.has(post.id) ? 'whitespace-pre-wrap' : 'line-clamp-3'
                         }`}
                       >
@@ -3551,7 +3553,7 @@ export default function ViralHunter() {
                         <button
                           type="button"
                           onClick={(e) => toggleExpandCard(post.id, e)}
-                          className="text-[11px] text-purple-400 hover:text-purple-300 font-semibold p-0 h-auto cursor-pointer flex items-center gap-1"
+                          className="text-xs text-purple-300 hover:text-purple-200 font-semibold p-0 h-auto cursor-pointer flex items-center gap-1"
                         >
                           {expandedCardIds.has(post.id) ? '▲ Thu gọn' : '▼ Xem toàn bộ caption'}
                         </button>
@@ -3560,12 +3562,12 @@ export default function ViralHunter() {
 
                     {/* Gemini Viral Angle & Suggested Hook */}
                     {post.viralAngle && (
-                      <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-200">
+                      <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200">
                         <span className="font-bold text-amber-400">💡 Vì sao Viral:</span> {post.viralAngle}
                       </div>
                     )}
                     {post.suggestedHook && (
-                      <div className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-200 flex items-start justify-between gap-2">
+                      <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-200 flex items-start justify-between gap-2">
                         <div>
                           <span className="font-bold text-blue-400">🎣 Hook gợi ý:</span> "{post.suggestedHook}"
                         </div>
@@ -3576,7 +3578,7 @@ export default function ViralHunter() {
                             e.stopPropagation();
                             applySuggestedHook(post);
                           }}
-                          className="!p-0 !h-auto text-[11px] text-blue-300 hover:text-white shrink-0 font-bold"
+                          className="!p-0 !h-auto text-xs text-blue-300 hover:text-white shrink-0 font-bold"
                         >
                           Áp dụng
                         </Button>
@@ -3585,21 +3587,21 @@ export default function ViralHunter() {
                   </div>
 
                   {/* Metrics Footer */}
-                  <div className="pt-3 mt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
-                    <div className="flex items-center gap-3 font-mono text-[11px]">
-                      <span className="flex items-center gap-1 text-slate-300">
+                  <div className="pt-3 mt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-300">
+                    <div className="flex items-center gap-3 font-mono text-xs">
+                      <span className="flex items-center gap-1 text-slate-200">
                         <LikeOutlined /> {post.reactions || 0}
                       </span>
-                      <span className="flex items-center gap-1 text-slate-300">
+                      <span className="flex items-center gap-1 text-slate-200">
                         <CommentOutlined /> {post.comments || 0}
                       </span>
-                      <span className="flex items-center gap-1 text-slate-300">
+                      <span className="flex items-center gap-1 text-slate-200">
                         <ShareAltOutlined /> {post.shares || 0}
                       </span>
                     </div>
 
                     <div className="flex items-center gap-1">
-                      <span className="text-[11px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                      <span className="text-xs font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
                         🔥 {post.viralScore || 0} pts
                       </span>
                     </div>
@@ -3835,7 +3837,7 @@ export default function ViralHunter() {
             <div className="space-y-1.5 animate-fade-in">
               <label className="text-xs text-amber-300 font-bold block flex items-center justify-between">
                 <span>Kết quả AI tạo ra:</span>
-                <span className="text-[11px] text-slate-400 font-normal">Bạn có thể chỉnh sửa trực tiếp bên dưới</span>
+                <span className="text-xs text-slate-300 font-normal">Bạn có thể chỉnh sửa trực tiếp bên dưới</span>
               </label>
               <Input.TextArea
                 rows={6}
@@ -3941,22 +3943,10 @@ export default function ViralHunter() {
       >
         <div className="space-y-4 pt-3">
           <p className="text-xs text-slate-300">
-            Hệ thống sẽ thêm {selectedPosts.length} bài viết này vào Hàng Đợi (Post Queue) để tự động đăng rải đều theo thời gian.
+            Thêm {selectedPosts.length} bài viết này vào hàng đợi đăng.
           </p>
 
-          <div>
-            <label className="text-xs text-slate-400 font-semibold mb-1 block">
-              Khoảng cách giữa các bài đăng (phút):
-            </label>
-            <InputNumber
-              min={5}
-              max={1440}
-              value={queueIntervalMinutes}
-              onChange={(v) => setQueueIntervalMinutes(v || 30)}
-              className="w-full"
-              addonAfter="phút"
-            />
-          </div>
+          <ScheduleChoice value={queueSchedule} onChange={setQueueSchedule} />
         </div>
       </Modal>
 
@@ -3999,11 +3989,11 @@ export default function ViralHunter() {
                   </span>
                 )}
               </div>
-              <div className="hidden sm:flex items-center gap-2 text-xs text-slate-400">
+              <div className="hidden sm:flex items-center gap-2 text-xs text-slate-300">
                 <span>Phím tắt:</span>
-                <kbd className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300 font-mono text-[11px]">← Bỏ qua</kbd>
-                <kbd className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300 font-mono text-[11px]">→ / Space Chọn</kbd>
-                <kbd className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300 font-mono text-[11px]">Esc Đóng</kbd>
+                <kbd className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-200 font-mono text-xs">← Bỏ qua</kbd>
+                <kbd className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-200 font-mono text-xs">→ / Space Chọn</kbd>
+                <kbd className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-200 font-mono text-xs">Esc Đóng</kbd>
               </div>
             </div>
             {filteredPosts.length > 0 && (
@@ -4083,13 +4073,13 @@ export default function ViralHunter() {
                           {currentTinderPost.author || currentTinderPost.sourceGroup || 'Facebook Page/Group'}
                         </div>
                         {currentTinderPost.sourceGroup && currentTinderPost.author && (
-                          <div className="text-[11px] text-slate-400 truncate">
+                          <div className="text-xs text-slate-300 truncate">
                             Group: {currentTinderPost.sourceGroup}
                           </div>
                         )}
                         {(currentTinderPost.postedTime || currentTinderPost.dateText || currentTinderPost.publishedAt) && (
-                          <div className="text-[11px] text-amber-300 flex items-center gap-1 mt-0.5 font-medium">
-                            <ClockCircleOutlined className="text-[10px]" />
+                          <div className="text-xs text-amber-300 flex items-center gap-1 mt-0.5 font-medium">
+                            <ClockCircleOutlined className="text-xs" />
                             Đăng lúc: {currentTinderPost.postedTime || currentTinderPost.dateText || (currentTinderPost.publishedAt ? dayjs(currentTinderPost.publishedAt).format('DD/MM/YYYY HH:mm') : '')}
                           </div>
                         )}
@@ -4120,29 +4110,29 @@ export default function ViralHunter() {
                   {/* Reaction metrics */}
                   <div className="grid grid-cols-4 gap-2 text-center">
                     <div className="p-2 rounded-xl bg-slate-900/80 border border-slate-800">
-                      <div className="text-[11px] text-slate-400">Like</div>
-                      <div className="text-xs font-bold text-slate-200 flex items-center justify-center gap-1 mt-0.5">
+                      <div className="text-xs text-slate-300">Like</div>
+                      <div className="text-[13px] font-bold text-slate-100 flex items-center justify-center gap-1 mt-0.5">
                         <LikeOutlined className="text-blue-400" />
                         <span>{currentTinderPost.reactions.toLocaleString()}</span>
                       </div>
                     </div>
                     <div className="p-2 rounded-xl bg-slate-900/80 border border-slate-800">
-                      <div className="text-[11px] text-slate-400">Comment</div>
-                      <div className="text-xs font-bold text-slate-200 flex items-center justify-center gap-1 mt-0.5">
+                      <div className="text-xs text-slate-300">Comment</div>
+                      <div className="text-[13px] font-bold text-slate-100 flex items-center justify-center gap-1 mt-0.5">
                         <CommentOutlined className="text-emerald-400" />
                         <span>{currentTinderPost.comments.toLocaleString()}</span>
                       </div>
                     </div>
                     <div className="p-2 rounded-xl bg-slate-900/80 border border-slate-800">
-                      <div className="text-[11px] text-slate-400">Share</div>
-                      <div className="text-xs font-bold text-slate-200 flex items-center justify-center gap-1 mt-0.5">
+                      <div className="text-xs text-slate-300">Share</div>
+                      <div className="text-[13px] font-bold text-slate-100 flex items-center justify-center gap-1 mt-0.5">
                         <ShareAltOutlined className="text-purple-400" />
                         <span>{currentTinderPost.shares.toLocaleString()}</span>
                       </div>
                     </div>
                     <div className="p-2 rounded-xl bg-slate-900/80 border border-slate-800">
-                      <div className="text-[11px] text-slate-400">Điểm viral</div>
-                      <div className="text-xs font-bold text-amber-400 flex items-center justify-center gap-1 mt-0.5">
+                      <div className="text-xs text-slate-300">Điểm viral</div>
+                      <div className="text-[13px] font-bold text-amber-400 flex items-center justify-center gap-1 mt-0.5">
                         <FireOutlined />
                         <span>{currentTinderPost.viralScore} pts</span>
                       </div>
@@ -4222,7 +4212,7 @@ export default function ViralHunter() {
                 >
                   <CloseOutlined className="text-base" />
                   <span>Bỏ qua</span>
-                  <span className="text-[11px] opacity-60 font-mono font-normal">(←)</span>
+                  <span className="text-xs opacity-75 font-mono font-normal">(←)</span>
                 </button>
 
                 {/* Approve Button (Swipe Right / Space) */}
@@ -4233,7 +4223,7 @@ export default function ViralHunter() {
                 >
                   <CheckOutlined className="text-base" />
                   <span>Chọn lấy bài này</span>
-                  <span className="text-[11px] opacity-80 font-mono font-normal">(→ hoặc Space)</span>
+                  <span className="text-xs opacity-90 font-mono font-normal">(→ hoặc Space)</span>
                 </button>
               </div>
 
@@ -4337,7 +4327,7 @@ export default function ViralHunter() {
               .join('\n')}
             className="font-mono text-xs bg-slate-950 text-slate-200 border-slate-800 rounded-xl p-3 focus:border-blue-500 select-all"
           />
-          <div className="text-[11px] text-slate-500 italic">
+          <div className="text-xs text-slate-300 italic">
             * Mẹo: Bạn có thể click vào ô văn bản và nhấn <b>Ctrl+A & Ctrl+C</b> để chép toàn bộ, hoặc nhấn nút <b>"Copy dạng Excel / Google Sheets"</b> ở bên dưới để dán thẳng theo cột vào trang tính.
           </div>
         </div>

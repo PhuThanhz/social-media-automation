@@ -1,133 +1,43 @@
-import { useState } from 'react';
-import { Button, Popover, Table, App } from 'antd';
-import { FieldTimeOutlined, ThunderboltOutlined } from '@ant-design/icons';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
-import dayjs from 'dayjs';
-import api from '../../config/axios';
-import { POSTING_WINDOW_QUERY_KEY, formatWhen, type QueueLane, type WindowPlan } from '../common/PostingWindowPanel';
+import { useEffect, useState } from 'react';
+import { Button, Tooltip } from 'antd';
+import { FieldTimeOutlined } from '@ant-design/icons';
+import ScheduleSettingsDrawer from '../common/ScheduleSettingsDrawer';
+import { formatWhen, onOpenScheduleSettings, usePostingPlan } from '../common/postingSchedule';
 
 /**
- * Ô "Hàng đợi" trên thanh trên cùng: ở trang nào cũng thấy còn bao nhiêu bài chờ và dự kiến đăng xong
- * hết lúc mấy giờ. Bấm vào xem theo từng nick. Dùng chung dữ liệu với mục Khung giờ đăng.
+ * Ô "Hàng đợi" trên thanh trên cùng (mọi trang): còn bao nhiêu bài chờ, xong lúc mấy giờ.
+ * Bấm vào mở "Lịch đăng" — chỗ duy nhất cài khung giờ, giãn cách và giới hạn mỗi nick.
  */
 export default function QueueFinishBadge() {
-  const navigate = useNavigate();
-  const { message } = App.useApp();
-  const queryClient = useQueryClient();
-  const [isPacking, setIsPacking] = useState(false);
+  const [open, setOpen] = useState(false);
+  const { data: plan } = usePostingPlan();
 
-  const { data: plan } = useQuery<WindowPlan>({
-    queryKey: POSTING_WINDOW_QUERY_KEY,
-    queryFn: async () => (await api.get('/queue/window-plan')).data,
-    refetchInterval: 20000,
-  });
+  useEffect(() => onOpenScheduleSettings(() => setOpen(true)), []);
 
-  const handlePackContinuous = async () => {
-    setIsPacking(true);
-    try {
-      const currentGap = plan?.minGapSeconds || 120;
-      const res = await api.post('/queue/pack-continuous', { gapSeconds: currentGap });
-      const finish = res.data?.estimatedFinishAt ? dayjs(res.data.estimatedFinishAt).format('HH:mm DD/MM') : '';
-      const deferred = Number(res.data?.deferredCount) || 0;
-      message.success(
-        `⚡ Đã dồn ${res.data?.updated ?? 0} bài đăng liên tục (nghỉ ${currentGap}s)${finish ? `, dự kiến xong lúc ${finish}` : ''}` +
-        (deferred > 0 ? `. ${deferred} bài không kịp trong hôm nay.` : ' · 100% hoàn thành hôm nay!'),
-        6
-      );
-      queryClient.invalidateQueries({ queryKey: POSTING_WINDOW_QUERY_KEY });
-      queryClient.invalidateQueries({ queryKey: ['postQueue'] });
-      queryClient.invalidateQueries({ queryKey: ['postQueuePlaywright'] });
-    } catch (err: any) {
-      message.error(err?.response?.data?.message || 'Không thể dồn hàng đợi');
-    } finally {
-      setIsPacking(false);
-    }
-  };
   const queue = plan?.queue;
-  if (!queue) return null;
-
-  const late = queue.laterCount > 0;
+  const late = (queue?.laterCount || 0) > 0;
   const deferred = plan?.enabled ? plan.totalDeferred || 0 : 0;
-  const label = queue.totalPending === 0
-    ? (queue.processing > 0 ? `Đang đăng ${queue.processing}` : 'Hàng đợi trống')
-    : `Hàng đợi ${queue.totalPending} · xong ${formatWhen(queue.finishAllAt)}`;
-
-  const content = (
-    <div className="queue-finish-popover">
-      <div className="queue-finish-summary">
-        {queue.totalPending === 0 ? (
-          <span>Không còn bài nào đang chờ{queue.processing > 0 ? ` · ${queue.processing} bài đang đăng` : ''}.</span>
-        ) : (
-          <span>
-            <b>{queue.totalPending}</b> bài đang chờ · đăng xong hết dự kiến <b>{formatWhen(queue.finishAllAt)}</b>
-            {late ? ` · ${queue.laterCount} bài sang ngày sau` : ' · tất cả xong trong hôm nay'}
-          </span>
-        )}
-        {plan?.enabled && (
-          <span className="queue-finish-window">Khung giờ đăng {plan.start}–{plan.end}</span>
-        )}
-        {deferred > 0 && (
-          <span className="queue-finish-warn">{deferred} bài không kịp trong khung giờ hôm nay — có đề xuất chuyển nick</span>
-        )}
-      </div>
-      {queue.lanes.length > 0 && (
-        <Table<QueueLane>
-          size="small"
-          pagination={false}
-          rowKey={(r) => r.name + r.finishAt}
-          dataSource={queue.lanes}
-          scroll={queue.lanes.length > 8 ? { y: 300 } : undefined}
-          columns={[
-            { title: 'Nick đăng', dataIndex: 'name', key: 'name', ellipsis: true },
-            { title: 'Chờ', dataIndex: 'pending', key: 'pending', width: 60, align: 'right' },
-            {
-              title: 'Xong lúc',
-              dataIndex: 'finishAt',
-              key: 'finishAt',
-              width: 130,
-              render: (v: string, r) => (
-                <span className={r.finishTodayCount < r.pending ? 'posting-window-late' : ''}>{formatWhen(v)}</span>
-              ),
-            },
-          ]}
-        />
-      )}
-      {queue.totalPending > 0 && (
-        <Button
-          type="primary"
-          icon={<ThunderboltOutlined />}
-          loading={isPacking}
-          onClick={handlePackContinuous}
-          className="qfb-pack-btn"
-        >
-          ⚡ Dồn đăng hết hôm nay {late ? `(Cứu ${queue.laterCount} bài sang mai)` : ''}
-        </Button>
-      )}
-      <Button
-        type="link"
-        size="small"
-        className="queue-finish-link"
-        onClick={() => {
-          localStorage.setItem('poster_workspace_tab', 'history');
-          navigate('/dashboard/playwright?tab=history');
-        }}
-      >
-        Mở Khung giờ đăng & hàng đợi
-      </Button>
-    </div>
-  );
+  const label = !queue
+    ? 'Lịch đăng'
+    : queue.totalPending === 0
+      ? (queue.processing > 0 ? `Đang đăng ${queue.processing}` : 'Hàng đợi trống')
+      : `Hàng đợi ${queue.totalPending} · xong ${formatWhen(queue.finishAllAt)}`;
+  const windowText = plan?.enabled ? `Khung giờ đăng ${plan.start}–${plan.end}` : 'Khung giờ đăng đang tắt';
 
   return (
-    <Popover content={content} trigger="click" placement="bottomRight" arrow={false}>
-      <Button
-        type="text"
-        className={`queue-finish-badge${late || deferred > 0 ? ' is-late' : ''}`}
-        icon={<FieldTimeOutlined />}
-      >
-        <span className="qfb-label-full">{label}</span>
-        <span className="qfb-label-short">{queue.totalPending}</span>
-      </Button>
-    </Popover>
+    <>
+      <Tooltip title={`${windowText} · bấm để cài đặt lịch đăng`} placement="bottomRight">
+        <Button
+          type="text"
+          className={`queue-finish-badge${late || deferred > 0 ? ' is-late' : ''}`}
+          icon={<FieldTimeOutlined />}
+          onClick={() => setOpen(true)}
+        >
+          <span className="qfb-label-full">{label}</span>
+          <span className="qfb-label-short">{queue?.totalPending ?? ''}</span>
+        </Button>
+      </Tooltip>
+      <ScheduleSettingsDrawer open={open} onClose={() => setOpen(false)} />
+    </>
   );
 }

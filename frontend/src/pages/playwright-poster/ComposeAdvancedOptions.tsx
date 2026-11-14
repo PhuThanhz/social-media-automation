@@ -8,7 +8,7 @@ import {
   Input,
   App,
 } from 'antd';
-import { CheckCircleOutlined, SettingOutlined, CopyOutlined, MessageOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, SettingOutlined, CopyOutlined, MessageOutlined, SaveOutlined, UndoOutlined, BulbOutlined } from '@ant-design/icons';
 import type { FormInstance } from 'antd';
 import { stripEmojiPrefix } from './shared';
 import type { SocialAccount, PostMode } from './types';
@@ -51,7 +51,7 @@ export default function ComposeAdvancedOptions({
 }: ComposeAdvancedOptionsProps) {
   const { message } = App.useApp();
   return (
-    <div className="mb-5 rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden backdrop-blur-sm shadow-xs">
+    <div className="mb-5 rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden backdrop-blur-sm shadow-sm">
       <button
         type="button"
         className="w-full flex items-center gap-2.5 p-3.5 text-left hover:bg-slate-700/30 transition-colors"
@@ -83,7 +83,7 @@ export default function ComposeAdvancedOptions({
                 if (text) {
                   form.setFieldValue('affiliateLink', text);
                   localStorage.setItem(STORAGE_KEY_COMMENT, text);
-                  message.success('📋 Đã dán nội dung từ khay nhớ tạm!');
+                  message.success('Đã dán nội dung từ khay nhớ tạm!');
                 }
               } catch {
                 // Ignore
@@ -91,35 +91,37 @@ export default function ComposeAdvancedOptions({
             }}
             className="bg-blue-600 hover:bg-blue-500 font-bold rounded-lg text-xs"
           >
-            📋 Dán
+            Dán
           </Button>
           <Button
             size="small"
             type="default"
+            icon={<SaveOutlined />}
             onClick={() => {
               const currentVal = form.getFieldValue('affiliateLink');
               if (currentVal && currentVal.trim()) {
                 localStorage.setItem(STORAGE_KEY_COMMENT, currentVal.trim());
-                message.success('💾 Đã lưu nội dung này làm mẫu mặc định!');
+                message.success('Đã lưu nội dung này làm mẫu mặc định!');
               } else {
                 message.warning('Vui lòng nhập nội dung trước khi lưu.');
               }
             }}
             className="font-bold border-slate-700 text-slate-200 hover:bg-slate-800 rounded-lg text-xs"
           >
-            💾 Lưu mẫu
+            Lưu mẫu
           </Button>
           <Button
             size="small"
             type="text"
+            icon={<UndoOutlined />}
             onClick={() => {
               form.setFieldValue('affiliateLink', DEFAULT_SAVED_COMMENT);
               localStorage.setItem(STORAGE_KEY_COMMENT, DEFAULT_SAVED_COMMENT);
-              message.success('↺ Đã khôi phục về mẫu mặc định ban đầu!');
+              message.success('Đã khôi phục về mẫu mặc định ban đầu!');
             }}
             className="text-slate-400 hover:text-slate-200 text-xs rounded-lg"
           >
-            ↺ Khôi phục
+            Khôi phục
           </Button>
         </div>
 
@@ -142,7 +144,7 @@ export default function ComposeAdvancedOptions({
         {postMode !== 'FANPAGE_ONLY' && (
           <div className="mb-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs text-amber-300 shadow-sm">
             <div className="flex items-center gap-2">
-              <span className="text-base">💡</span>
+              <BulbOutlined className="text-base text-amber-300 shrink-0" />
               <span>
                 <strong>Lưu ý về Bình luận Nhóm:</strong> Mặc định bình luận link vào Nhóm ở dạng Opt-in (Tắt). Bấm nút bên phải để bật tự động bình luận link vào Group cho toàn bộ bài viết.
               </span>
@@ -154,7 +156,7 @@ export default function ComposeAdvancedOptions({
               onClick={applyEnableAllGroupComments}
               className="bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-lg border-none shrink-0"
             >
-              💬 Bật cmt Nhóm cho các bài
+              Bật cmt Nhóm cho các bài
             </Button>
           </div>
         )}
@@ -162,7 +164,7 @@ export default function ComposeAdvancedOptions({
         {currentSelectedGroupIdsForAffiliate.length > 0 && (
           <div className="mb-2.5">
             <label className="text-xs font-semibold text-slate-300 block mb-1">
-              🚫 Nhóm KHÔNG gắn link Affiliate (bỏ trống = gắn cho tất cả nhóm đã chọn ở trên):
+              Nhóm KHÔNG gắn link Affiliate (bỏ trống = gắn cho tất cả nhóm đã chọn ở trên):
             </label>
             <Select
               mode="multiple"
@@ -189,7 +191,7 @@ export default function ComposeAdvancedOptions({
         {postMode !== 'FANPAGE_ONLY' && currentSelectedGroupIdsForAffiliate.length > 0 && (
           <div className="mb-2.5">
             <label className="text-xs font-semibold text-slate-300 block mb-1">
-              ✅ Chỉ định Nhóm ĐƯỢC bình luận (bỏ trống = không giới hạn, áp dụng cho mọi Nhóm đã chọn ở trên — vẫn tuỳ checkbox "Bình luận trong Nhóm" của từng bài):
+              Nhóm ĐƯỢC bình luận (bỏ trống = không giới hạn, áp dụng cho mọi Nhóm đã chọn ở trên — vẫn tuỳ checkbox "Bình luận trong Nhóm" của từng bài):
             </label>
             <Select
               mode="multiple"

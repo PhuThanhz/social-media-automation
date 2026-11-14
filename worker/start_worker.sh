@@ -1,7 +1,7 @@
 #!/bin/bash
 # Auto-restart worker server — tự động khởi động lại khi crash (trừ khi port đã bị dùng)
 cd "$(dirname "$0")"
-export MAX_PARALLEL_POSTING=3
+export MAX_PARALLEL_POSTING=1
 
 while true; do
   echo "[AutoRestart] 🚀 Khởi động Worker Server..."

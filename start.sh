@@ -46,11 +46,16 @@ fi
 # 4. Khởi chạy các dịch vụ
 echo "🚀 [3/3] Bắt đầu khởi động các dịch vụ..."
 
-# Chạy Worker (Port 3001)
+# Chạy Worker 1 (Port 3001 - Đăng bài & Cron)
 cd "$PROJECT_DIR/worker" || exit 1
 nohup node server.js > worker.log 2>&1 &
 WORKER_PID=$!
-echo "   ✅ Worker Engine đã bật (PID: $WORKER_PID, Port: 3001)"
+echo "   ✅ Worker Engine 1 đã bật (PID: $WORKER_PID, Port: 3001)"
+
+# Chạy Worker 2 (Port 3002 - Cào bài & Xử lý song song)
+PORT=3002 nohup node server.js > worker_3002.log 2>&1 &
+WORKER2_PID=$!
+echo "   ✅ Worker Engine 2 đã bật (PID: $WORKER2_PID, Port: 3002 - Cào song song)"
 
 # Chạy Backend Spring Boot (Port 8081)
 cd "$PROJECT_DIR/backend" || exit 1

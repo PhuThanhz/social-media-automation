@@ -38,9 +38,9 @@ import {
   UserOutlined,
 } from '@ant-design/icons';
 import PasteLinkInput from '../../components/common/PasteLinkInput';
-import EasyTimePicker from '../../components/common/EasyTimePicker';
 import ColorPostPreview from '../../components/common/ColorPostPreview';
 import type { ItemPreview, PostLinkItem, PostMode, SocialAccount } from './types';
+import { buildExtraGroupOptions, filterSelectByLabel } from './shared';
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -96,6 +96,7 @@ export interface PostItemEditorActions {
   updateLinkMode: AnyFn;
   updateLinkTime: AnyFn;
   removeLinkItem: AnyFn;
+  updateLinkExtraGroupIds: AnyFn;
 }
 
 interface PostItemEditorProps {
@@ -111,6 +112,8 @@ interface PostItemEditorProps {
   dragOverDropzone: string | null;
   postMode: PostMode;
   postingIdentities: SocialAccount[];
+  groupAccountsWithId?: SocialAccount[];
+  primaryGroupIds?: string[];
   targetOptions: { value: string; label: string }[];
   watchedTargetFanpageId: any;
   defaultCommentPreview: string;
@@ -133,6 +136,8 @@ function PostItemEditor({
   dragOverDropzone,
   postMode,
   postingIdentities,
+  groupAccountsWithId = [],
+  primaryGroupIds = [],
   targetOptions,
   watchedTargetFanpageId,
   defaultCommentPreview,
@@ -189,9 +194,12 @@ function PostItemEditor({
     updateLinkMode,
     updateLinkTime,
     removeLinkItem,
+    updateLinkExtraGroupIds,
   } = actions;
   const hasCustomComment = !!item.affiliateLink?.trim();
   const isCommentOpen = !item.skipComment && (item.showCommentBox || hasCustomComment);
+  const extraGroupOptions = buildExtraGroupOptions(groupAccountsWithId, primaryGroupIds);
+  const itemExtraGroupIds = item.extraGroupIds || [];
   return (
     <div
       key={item.id}
@@ -204,7 +212,7 @@ function PostItemEditor({
             <div className="text-sm font-bold text-slate-800 flex items-center gap-2 flex-wrap">
               <span>Bài viết {index + 1}</span>
               {customTarget && (
-                <Tag color="blue" className="!rounded-md text-[11px] font-semibold !m-0 border-blue-300">
+                <Tag color="blue" className="!rounded-md !text-xs font-semibold !m-0 border-blue-300">
                   👤 {(() => {
                     const t = postingIdentities.find(a => accountTargetValue(a) === customTarget);
                     return (t?.pageName || customTarget).replace(/^👤\s*Nick Cá Nhân\s*\((.*)\)$/, '$1');
@@ -212,9 +220,9 @@ function PostItemEditor({
                 </Tag>
               )}
             </div>
-            <div className={`text-[11px] ${item.inputType === 'MANUAL'
-              ? (item.manualContent?.trim() || (item.manualMediaUrls && item.manualMediaUrls.length > 0) ? 'text-emerald-600 font-semibold' : 'text-slate-400')
-              : (item.url.trim() ? 'text-emerald-600 font-semibold' : 'text-slate-400')
+            <div className={`text-xs ${item.inputType === 'MANUAL'
+              ? (item.manualContent?.trim() || (item.manualMediaUrls && item.manualMediaUrls.length > 0) ? 'text-emerald-400 font-semibold' : 'text-slate-300')
+              : (item.url.trim() ? 'text-emerald-400 font-semibold' : 'text-slate-300')
               }`}>
               {item.inputType === 'MANUAL'
                 ? (item.manualContent?.trim() || (item.manualMediaUrls && item.manualMediaUrls.length > 0) ? '✍️ Đã soạn nội dung' : '✍️ Chưa nhập nội dung')
@@ -252,16 +260,6 @@ function PostItemEditor({
             allowClear
             className="w-52 text-xs shrink-0"
             options={targetOptions}
-          />
-          <Segmented
-            size="small"
-            value={item.isNow ? 'NOW' : 'SCHEDULE'}
-            onChange={(val) => updateLinkMode(item.id, val === 'NOW')}
-            options={[
-              { label: 'Đăng ngay', value: 'NOW', icon: <ThunderboltOutlined /> },
-              { label: 'Hẹn giờ', value: 'SCHEDULE', icon: <ClockCircleOutlined /> },
-            ]}
-            className="rounded-lg text-xs shrink-0"
           />
           {item.inputType !== 'MANUAL' && (
             <Tooltip title="Cào thử và xem trước ảnh/video trước khi đăng">
@@ -347,7 +345,7 @@ function PostItemEditor({
                       <span>Nội dung bài viết (Caption):</span>
                     </label>
                     {(item.manualContent || '').length > 0 && (
-                      <span className="text-[11px] font-bold text-blue-400 bg-blue-950 px-2 py-0.5 rounded-md border border-blue-800/60">
+                      <span className="text-xs font-bold text-blue-300 bg-blue-950 px-2 py-0.5 rounded-md border border-blue-800/60">
                         {(item.manualContent || '').length} ký tự · {(item.manualContent || '').trim().split(/\s+/).filter(Boolean).length} từ
                       </span>
                     )}
@@ -374,7 +372,7 @@ function PostItemEditor({
                       <button
                         type="button"
                         onClick={() => applyTransformToSelection(item.id, toUnicodeHeading1, 'Đã áp dụng Tiêu đề Lớn H1!')}
-                        className="px-2 py-0.5 text-[11px] font-black bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-md transition-all active:scale-95 cursor-pointer shadow-xs"
+                        className="px-2.5 py-1 text-xs font-black bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-md transition-all active:scale-95 cursor-pointer shadow-sm"
                       >
                         H1
                       </button>
@@ -384,7 +382,7 @@ function PostItemEditor({
                       <button
                         type="button"
                         onClick={() => applyTransformToSelection(item.id, toUnicodeHeading2, 'Đã áp dụng Tiêu đề Vừa H2!')}
-                        className="px-2 py-0.5 text-[11px] font-bold bg-slate-900 hover:bg-slate-800 text-blue-300 border border-slate-700/80 rounded-md transition-all active:scale-95 cursor-pointer"
+                        className="px-2.5 py-1 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-blue-300 border border-slate-700/80 rounded-md transition-all active:scale-95 cursor-pointer"
                       >
                         H2
                       </button>
@@ -394,7 +392,7 @@ function PostItemEditor({
                       <button
                         type="button"
                         onClick={() => applyTransformToSelection(item.id, toUnicodeBold, 'Đã in đậm (Sans Bold)!')}
-                        className="px-2 py-0.5 text-[11px] font-black bg-slate-900 hover:bg-slate-800 text-slate-100 border border-slate-700/80 rounded-md transition-all active:scale-95 cursor-pointer"
+                        className="px-2.5 py-1 text-xs font-black bg-slate-900 hover:bg-slate-800 text-slate-100 border border-slate-700/80 rounded-md transition-all active:scale-95 cursor-pointer"
                       >
                         𝗕
                       </button>
@@ -404,7 +402,7 @@ function PostItemEditor({
                       <button
                         type="button"
                         onClick={() => applyTransformToSelection(item.id, toUnicodeItalic, 'Đã in nghiêng (Italic)!')}
-                        className="px-2 py-0.5 text-[11px] italic font-bold bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700/80 rounded-md transition-all active:scale-95 cursor-pointer"
+                        className="px-2.5 py-1 text-xs italic font-bold bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700/80 rounded-md transition-all active:scale-95 cursor-pointer"
                       >
                         𝘐
                       </button>
@@ -414,7 +412,7 @@ function PostItemEditor({
                       <button
                         type="button"
                         onClick={() => applyTransformToSelection(item.id, toUnicodeStrikethrough, 'Đã gạch ngang chữ!')}
-                        className="px-2 py-0.5 text-[11px] font-semibold line-through bg-slate-900 hover:bg-rose-950 text-rose-300 border border-slate-700/80 rounded-md transition-all active:scale-95 cursor-pointer"
+                        className="px-2.5 py-1 text-xs font-semibold line-through bg-slate-900 hover:bg-rose-950 text-rose-300 border border-slate-700/80 rounded-md transition-all active:scale-95 cursor-pointer"
                       >
                         S̶
                       </button>
@@ -424,7 +422,7 @@ function PostItemEditor({
                       <button
                         type="button"
                         onClick={() => applyTransformToSelection(item.id, toUnicodeUnderline, 'Đã gạch chân chữ!')}
-                        className="px-2 py-0.5 text-[11px] font-semibold underline bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700/80 rounded-md transition-all active:scale-95 cursor-pointer"
+                        className="px-2.5 py-1 text-xs font-semibold underline bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700/80 rounded-md transition-all active:scale-95 cursor-pointer"
                       >
                         U̲
                       </button>
@@ -434,7 +432,7 @@ function PostItemEditor({
                       <button
                         type="button"
                         onClick={() => applyTransformToSelection(item.id, toUnicodeBoxedTag, 'Đã đóng khung nổi bật!')}
-                        className="px-2 py-0.5 text-[11px] font-bold bg-slate-900 hover:bg-slate-800 text-emerald-300 border border-slate-700/80 rounded-md transition-all active:scale-95 cursor-pointer"
+                        className="px-2.5 py-1 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-emerald-300 border border-slate-700/80 rounded-md transition-all active:scale-95 cursor-pointer"
                       >
                         【Tag】
                       </button>
@@ -465,10 +463,10 @@ function PostItemEditor({
                     >
                       <button
                         type="button"
-                        className="px-1.5 py-0.5 text-[11px] font-medium bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700/80 rounded-md flex items-center gap-0.5 cursor-pointer"
+                        className="px-2 py-1 text-xs font-medium bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 rounded-md flex items-center gap-1 cursor-pointer"
                       >
                         <span>Font...</span>
-                        <DownOutlined className="text-[9px]" />
+                        <DownOutlined className="text-[10px]" />
                       </button>
                     </Popover>
                   </div>
@@ -481,7 +479,7 @@ function PostItemEditor({
                       <button
                         type="button"
                         onClick={() => insertSnippetAtCursor(item.id, '\n✔ ')}
-                        className="h-6 w-6 text-[11px] font-bold bg-slate-900 hover:bg-emerald-950 text-emerald-400 border border-slate-700/80 rounded-md flex items-center justify-center cursor-pointer"
+                        className="h-7 w-7 text-xs font-bold bg-slate-900 hover:bg-emerald-950 text-emerald-400 border border-slate-700/80 rounded-md flex items-center justify-center cursor-pointer"
                       >
                         ✔
                       </button>
@@ -490,7 +488,7 @@ function PostItemEditor({
                       <button
                         type="button"
                         onClick={() => insertSnippetAtCursor(item.id, '\n• ')}
-                        className="h-6 w-6 text-[11px] font-bold bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700/80 rounded-md flex items-center justify-center cursor-pointer"
+                        className="h-7 w-7 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700/80 rounded-md flex items-center justify-center cursor-pointer"
                       >
                         •
                       </button>
@@ -499,7 +497,7 @@ function PostItemEditor({
                       <button
                         type="button"
                         onClick={() => insertSnippetAtCursor(item.id, '\n👉 ')}
-                        className="h-6 w-6 text-[11px] font-bold bg-slate-900 hover:bg-slate-800 text-amber-300 border border-slate-700/80 rounded-md flex items-center justify-center cursor-pointer"
+                        className="h-7 w-7 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-amber-300 border border-slate-700/80 rounded-md flex items-center justify-center cursor-pointer"
                       >
                         👉
                       </button>
@@ -508,7 +506,7 @@ function PostItemEditor({
                       <button
                         type="button"
                         onClick={() => insertSnippetAtCursor(item.id, '\n1️⃣ ')}
-                        className="h-6 w-6 text-[11px] font-bold bg-slate-900 hover:bg-slate-800 text-blue-300 border border-slate-700/80 rounded-md flex items-center justify-center cursor-pointer"
+                        className="h-7 w-7 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-blue-300 border border-slate-700/80 rounded-md flex items-center justify-center cursor-pointer"
                       >
                         1️⃣
                       </button>
@@ -549,11 +547,11 @@ function PostItemEditor({
                   >
                     <button
                       type="button"
-                      className="px-2 py-0.5 text-[11px] font-medium bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700/80 rounded-md flex items-center gap-1 cursor-pointer"
+                      className="px-2 py-1 text-xs font-medium bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700/80 rounded-md flex items-center gap-1 cursor-pointer"
                     >
                       <HolderOutlined className="text-amber-400 text-xs" />
                       <span>Kẻ ngang</span>
-                      <DownOutlined className="text-[9px] text-slate-500" />
+                      <DownOutlined className="text-[10px] text-slate-300" />
                     </button>
                   </Popover>
 
@@ -589,11 +587,11 @@ function PostItemEditor({
                   >
                     <button
                       type="button"
-                      className="px-2 py-0.5 text-[11px] font-medium bg-slate-900 hover:bg-slate-800 text-purple-300 border border-slate-700/80 rounded-md flex items-center gap-1 cursor-pointer"
+                      className="px-2 py-1 text-xs font-medium bg-slate-900 hover:bg-slate-800 text-purple-300 border border-slate-700/80 rounded-md flex items-center gap-1 cursor-pointer"
                     >
                       <RocketOutlined className="text-purple-400 text-xs" />
                       <span>Mẫu CTA</span>
-                      <DownOutlined className="text-[9px] text-slate-500" />
+                      <DownOutlined className="text-[10px] text-slate-300" />
                     </button>
                   </Popover>
 
@@ -622,11 +620,11 @@ function PostItemEditor({
                   >
                     <button
                       type="button"
-                      className="px-2 py-0.5 text-[11px] font-medium bg-slate-900 hover:bg-slate-800 text-blue-300 border border-slate-700/80 rounded-md flex items-center gap-1 cursor-pointer"
+                      className="px-2 py-1 text-xs font-medium bg-slate-900 hover:bg-slate-800 text-blue-300 border border-slate-700/80 rounded-md flex items-center gap-1 cursor-pointer"
                     >
                       <TagOutlined className="text-blue-400 text-xs" />
                       <span>Thẻ Hot</span>
-                      <DownOutlined className="text-[9px] text-slate-500" />
+                      <DownOutlined className="text-[10px] text-slate-300" />
                     </button>
                   </Popover>
 
@@ -652,11 +650,11 @@ function PostItemEditor({
                   >
                     <button
                       type="button"
-                      className="px-2 py-0.5 text-[11px] font-medium bg-slate-900 hover:bg-slate-800 text-amber-300 border border-slate-700/80 rounded-md flex items-center gap-1 cursor-pointer"
+                      className="px-2 py-1 text-xs font-medium bg-slate-900 hover:bg-slate-800 text-amber-300 border border-slate-700/80 rounded-md flex items-center gap-1 cursor-pointer"
                     >
                       <SmileOutlined className="text-amber-400 text-xs" />
                       <span>Icon</span>
-                      <DownOutlined className="text-[9px] text-slate-500" />
+                      <DownOutlined className="text-[10px] text-slate-300" />
                     </button>
                   </Popover>
                 </div>
@@ -673,37 +671,49 @@ function PostItemEditor({
                 />
 
                 <div className="mt-2 px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between flex-wrap gap-2 text-xs">
-                  <div className="flex items-center gap-2 text-slate-400">
+                  <div className="flex items-center gap-2 text-slate-300">
                     <span className="w-5 h-5 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center shrink-0">
                       <PictureOutlined className="text-xs" />
                     </span>
                     <span>
-                      Bấm <kbd className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-200 font-mono text-[11px]">Ctrl+V</kbd> (Cmd+V) vào ô để tự động đính kèm ảnh chụp màn hình
+                      Bấm <kbd className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-100 font-mono text-xs">Ctrl+V</kbd> (Cmd+V) vào ô để tự động đính kèm ảnh chụp màn hình
                     </span>
                   </div>
                   <Button
-                    size="small"
+                    size="middle"
                     type="default"
                     icon={<CopyOutlined className="text-blue-400" />}
                     onClick={() => handlePasteFromClipboardButton(item.id)}
-                    className="text-xs font-semibold bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200"
+                    className="text-xs font-semibold bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-100"
                   >
                     Dán ảnh từ Clipboard
                   </Button>
                 </div>
 
+                {(!item.manualMediaUrls || item.manualMediaUrls.length === 0) && (item.manualContent || "").trim().length > 0 && (item.manualContent || "").trim().length <= 200 && !item.colorBackground && (
+                  <div className="mt-2.5 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-slate-900 via-slate-900 to-slate-900 border border-slate-700/80 flex items-center justify-between flex-wrap gap-2 text-[13px] text-slate-200 shadow-lg">
+                    <div className="flex items-center gap-2.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                      <span><b>Tự động 100%:</b> Bài viết text ngắn (&le; 200 ký tự) sẽ được tự động vẽ <b>ảnh Nền Đen Chữ Trắng (Style BOX Y Khoa)</b> to đậm căn giữa khi đăng.</span>
+                    </div>
+                    <Tag color="cyan" className="!m-0 font-mono font-bold !text-xs px-2 py-0.5">
+                      {(item.manualContent || "").trim().length}/200 ký tự
+                    </Tag>
+                  </div>
+                )}
+
                 {item.colorBackground && (
                   <div className="mt-2.5 p-3 rounded-xl bg-red-950/40 border border-red-800/60 space-y-2.5">
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-bold text-red-300">
+                        <span className="text-[13px] font-bold text-red-300">
                           {item.colorBackground === 'RED_PHOTO_TRICK' ? '🔴 Đang chọn: Nền Đỏ + Kèm Ảnh (Mẹo 3 chấm)' : '🔴 Đang chọn: Status Nền Đỏ (Thuần chữ)'}
                         </span>
-                        <div className="inline-flex rounded-lg bg-black/40 p-0.5 border border-red-800/50 text-[11px]">
+                        <div className="inline-flex rounded-lg bg-black/40 p-0.5 border border-red-800/50 text-xs">
                           <button
                             type="button"
                             onClick={() => toggleColorBackground(item.id, true)}
-                            className={`px-2 py-0.5 rounded-md font-semibold transition-all ${item.colorBackground === true
+                            className={`px-2.5 py-1 rounded-md font-semibold transition-all ${item.colorBackground === true
                               ? 'bg-red-600 text-white shadow-sm'
                               : 'text-red-300 hover:text-white'
                               }`}
@@ -713,7 +723,7 @@ function PostItemEditor({
                           <button
                             type="button"
                             onClick={() => toggleColorBackground(item.id, 'RED_PHOTO_TRICK')}
-                            className={`px-2 py-0.5 rounded-md font-semibold transition-all ${item.colorBackground === 'RED_PHOTO_TRICK'
+                            className={`px-2.5 py-1 rounded-md font-semibold transition-all ${item.colorBackground === 'RED_PHOTO_TRICK'
                               ? 'bg-red-600 text-white shadow-sm'
                               : 'text-red-300 hover:text-white'
                               }`}
@@ -723,7 +733,7 @@ function PostItemEditor({
                         </div>
                         <Tag
                           color={(item.manualContent || "").length <= 130 ? "success" : "error"}
-                          className="!m-0 text-[11px] font-mono font-bold px-2 py-0.5"
+                          className="!m-0 !text-xs font-mono font-bold px-2 py-0.5"
                         >
                           {(item.manualContent || "").length} / 130 ký tự
                         </Tag>
@@ -750,7 +760,7 @@ function PostItemEditor({
                     </div>
 
                     {item.colorBackground === 'RED_PHOTO_TRICK' && (
-                      <div className="text-[11px] text-amber-200/90 bg-amber-950/40 p-2 rounded-lg border border-amber-800/40 flex items-center gap-1.5">
+                      <div className="text-xs text-amber-200 bg-amber-950/40 p-2.5 rounded-lg border border-amber-800/40 flex items-center gap-1.5">
                         <span>💡</span>
                         <span><b>Mẹo Facebook 3 chấm:</b> Bot sẽ đăng kèm ảnh trước, sau đó tự động vào <b>3 chấm &rarr; Sửa bài &rarr; Gỡ ảnh &rarr; Đổi phông nền Đỏ &rarr; Lưu</b> và bình luận bài viết chi tiết bên dưới.</span>
                       </div>
@@ -791,11 +801,11 @@ function PostItemEditor({
                     <div className="text-sm font-bold text-slate-100 flex items-center gap-2">
                       <PictureOutlined className="text-emerald-400 text-base" />
                       <span>Đính kèm Hình ảnh & Video</span>
-                      <Tag color="default" className="!text-[11px] !m-0 !font-normal border-slate-700 text-slate-400 bg-slate-800">
+                      <Tag color="default" className="!text-xs !m-0 !font-normal border-slate-700 text-slate-300 bg-slate-800">
                         Tùy chọn
                       </Tag>
                     </div>
-                    <div className="text-xs text-slate-400 mt-0.5">
+                    <div className="text-xs text-slate-300 mt-0.5">
                       Kéo thả tệp từ máy tính, dán ảnh từ Clipboard (Ctrl+V) hoặc dán link media trực tiếp.
                     </div>
                   </div>
@@ -874,16 +884,16 @@ function PostItemEditor({
                     <div className="text-sm font-bold text-slate-200">
                       Kéo & thả, <span className="text-cyan-400 underline decoration-cyan-400/50 underline-offset-2">Dán (Ctrl+V / Cmd+V)</span> ảnh / video vào đây hoặc <span className="text-emerald-400 underline decoration-emerald-400/50 underline-offset-2">Duyệt từ máy tính</span>
                     </div>
-                    <div className="text-xs text-slate-400 mt-1.5 flex items-center justify-center gap-2 flex-wrap">
+                    <div className="text-xs text-slate-300 mt-1.5 flex items-center justify-center gap-2 flex-wrap">
                       <Tag
                         color="blue"
-                        className="!m-0 !text-[11px] cursor-pointer hover:opacity-85 font-medium flex items-center gap-1"
+                        className="!m-0 !text-xs cursor-pointer hover:opacity-85 font-medium flex items-center gap-1"
                         onClick={(e) => { e.stopPropagation(); handlePasteFromClipboardButton(item.id); }}
                       >
                         <CopyOutlined /> Dán nhanh Ctrl+V / Cmd+V
                       </Tag>
-                      <Tag color="blue" className="!m-0 !text-[10px]">JPG, PNG, WEBP</Tag>
-                      <Tag color="purple" className="!m-0 !text-[10px]">MP4, MOV, WEBM</Tag>
+                      <Tag color="blue" className="!m-0 !text-xs">JPG, PNG, WEBP</Tag>
+                      <Tag color="purple" className="!m-0 !text-xs">MP4, MOV, WEBM</Tag>
                       <span>· Chọn hoặc dán nhiều tệp cùng lúc</span>
                     </div>
                   </div>
@@ -929,7 +939,7 @@ function PostItemEditor({
                         Thư viện media đã chọn ({item.manualMediaUrls.length} tệp):
                         <Button size="small" onClick={() => openNewsCardForItem(item, 'MANUAL')}>Tạo ảnh tin</Button>
                       </span>
-                      <span className="text-[11px] text-amber-400 font-semibold bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800/60">
+                      <span className="text-xs text-amber-300 font-semibold bg-amber-950/60 px-2.5 py-0.5 rounded border border-amber-800/60">
                         👑 Vị trí đầu tiên (#1) sẽ là Ảnh/Video Bìa chính
                       </span>
                     </div>
@@ -953,11 +963,11 @@ function PostItemEditor({
 
                               <div className="absolute top-1.5 left-1.5 z-10">
                                 {isCover ? (
-                                  <Tag color="gold" className="!text-[10px] !font-bold !m-0 !px-1.5 !py-0.5 shadow-md border-0">
+                                  <Tag color="gold" className="!text-xs !font-bold !m-0 !px-1.5 !py-0.5 shadow-md border-0">
                                     👑 Bìa #1
                                   </Tag>
                                 ) : (
-                                  <Tag color={isVid ? 'purple' : 'blue'} className="!text-[10px] !font-bold !m-0 !px-1.5 !py-0.5 shadow-md border-0">
+                                  <Tag color={isVid ? 'purple' : 'blue'} className="!text-xs !font-bold !m-0 !px-1.5 !py-0.5 shadow-md border-0">
                                     {isVid ? '🎥' : '🖼️'} #{mIdx + 1}
                                   </Tag>
                                 )}
@@ -1016,8 +1026,9 @@ function PostItemEditor({
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center py-3 px-3 bg-slate-950/60 rounded-xl border border-slate-800 text-xs text-slate-400 flex items-center justify-center gap-2">
-                    <span>📝 Chưa đính kèm media — Hệ thống sẽ tự động xuất bản dưới dạng</span>
+                  <div className="text-center py-3 px-3 bg-slate-950/60 rounded-xl border border-slate-800 text-xs text-slate-400 flex items-center justify-center gap-2 flex-wrap">
+                    <FileTextOutlined className="text-slate-400" />
+                    <span>Chưa đính kèm media — Hệ thống sẽ tự động xuất bản dưới dạng</span>
                     <span className="text-cyan-400 font-bold bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-800/60">
                       Trạng thái chữ (Pure Text)
                     </span>
@@ -1026,16 +1037,6 @@ function PostItemEditor({
                 )}
               </div>
 
-              {/* PHẦN 3: THỜI GIAN HẸN GIỜ & TÙY CHỌN */}
-              {!item.isNow && (
-                <div className="p-3.5 bg-slate-900/90 border border-slate-700/80 rounded-2xl shadow-md">
-                  <EasyTimePicker
-                    compact
-                    value={item.scheduledAt}
-                    onChange={(val) => updateLinkTime(item.id, val)}
-                  />
-                </div>
-              )}
 
               <div className="poster-post-options !p-2.5 sm:!p-3 bg-slate-950/60 rounded-2xl border border-slate-700/60 flex items-center gap-2 flex-wrap shadow-inner backdrop-blur-sm">
                 <span className="text-xs font-bold text-slate-400 flex items-center gap-1.5 mr-1 select-none">
@@ -1052,7 +1053,7 @@ function PostItemEditor({
                       }`}
                   >
                     <span className="poster-opt-dot" /><span>Status nền đỏ</span>
-                    <span className="text-[10px] opacity-75">(&lt; 130 ký tự)</span>
+                    <span className="text-xs opacity-80">(&lt; 130 ký tự)</span>
                     {item.colorBackground && <CheckOutlined className="text-xs text-rose-400" />}
                   </button>
                 </Tooltip>
@@ -1115,7 +1116,7 @@ function PostItemEditor({
                       <MessageOutlined className="text-blue-400" />
                       <span>Bình luận riêng cho Bài #{index + 1}:</span>
                       {hasCustomComment && (
-                        <Tag color="cyan" className="!text-[10px] !m-0 !py-0.5 !font-bold">
+                        <Tag color="cyan" className="!text-xs !m-0 !py-0.5 !font-bold">
                           Đang dùng cmt riêng
                         </Tag>
                       )}
@@ -1148,15 +1149,15 @@ function PostItemEditor({
                 <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5 uppercase tracking-wider">
                   <FacebookFilled className="text-blue-500 text-sm" /> Mô phỏng Feed Facebook
                 </span>
-                <Tag color="blue" className="!text-[10px] !m-0 !font-bold !px-2 !py-0.5">
+                <Tag color="blue" className="!text-xs !m-0 !font-bold !px-2 !py-0.5">
                   Live Mockup
                 </Tag>
               </div>
 
               {/* FACEBOOK POST MOCKUP CARD */}
-              <div className="bg-[#242526] text-[#e4e6eb] rounded-2xl border border-slate-700/80 overflow-hidden shadow-2xl font-sans">
+              <div className="fb-mockup-card font-sans">
                 {/* Header Facebook Post */}
-                <div className="p-3.5 flex items-center justify-between gap-3 border-b border-[#3a3b3c]/50">
+                <div className="fb-mockup-head">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white font-bold text-base shrink-0 shadow-md">
                       {firstAccountPageName?.charAt(0)?.toUpperCase() || 'F'}
@@ -1165,7 +1166,7 @@ function PostItemEditor({
                       <div className="text-sm font-bold text-white truncate hover:underline cursor-pointer">
                         {firstAccountPageName || 'Trang Fanpage / Nhóm của bạn'}
                       </div>
-                      <div className="text-[11px] text-[#b0b3b8] flex items-center gap-1">
+                      <div className="text-[11px] fb-mockup-muted flex items-center gap-1">
                         <span>Vừa xong</span>
                         <span>·</span>
                         <GlobalOutlined className="text-[10px]" />
@@ -1178,7 +1179,7 @@ function PostItemEditor({
                 </div>
 
                 {/* Caption */}
-                <div className="p-3.5 text-[13.5px] leading-relaxed whitespace-pre-wrap break-words text-[#e4e6eb]">
+                <div className="fb-mockup-caption">
                   {item.manualContent?.trim() ? (
                     item.manualContent
                   ) : (
@@ -1190,7 +1191,7 @@ function PostItemEditor({
 
                 {/* Media Collage Mockup */}
                 {item.manualMediaUrls && item.manualMediaUrls.length > 0 && (
-                  <div className="bg-black relative overflow-hidden border-t border-b border-[#3a3b3c]">
+                  <div className="fb-mockup-media">
                     {(() => {
                       const urls = item.manualMediaUrls || [];
                       const isVid = (u: string, idx: number) => (item.manualMediaKinds?.[idx] === 'video') || isMediaVideo(u);
@@ -1251,7 +1252,7 @@ function PostItemEditor({
                                   <img src={u} alt={`fb-${idx}`} className="w-full h-full object-cover" />
                                 )}
                                 {isLast && (
-                                  <div className="absolute inset-0 bg-black/65 flex items-center justify-center text-white text-2xl font-bold backdrop-blur-xs">
+                                  <div className="absolute inset-0 bg-black/65 flex items-center justify-center text-white text-2xl font-bold backdrop-blur-sm">
                                     +{remaining}
                                   </div>
                                 )}
@@ -1265,7 +1266,7 @@ function PostItemEditor({
                 )}
 
                 {/* Interaction Counts */}
-                <div className="px-3.5 py-2 flex items-center justify-between text-xs text-[#b0b3b8] border-b border-[#3a3b3c]/60">
+                <div className="fb-mockup-counts">
                   <div className="flex items-center gap-1.5">
                     <span className="w-4 h-4 rounded-full bg-blue-600 flex items-center justify-center text-[9px] text-white">👍</span>
                     <span className="w-4 h-4 rounded-full bg-red-500 flex items-center justify-center text-[9px] text-white">❤️</span>
@@ -1278,25 +1279,25 @@ function PostItemEditor({
                 </div>
 
                 {/* Action Buttons */}
-                <div className="px-2 py-1 flex items-center justify-around text-xs font-semibold text-[#b0b3b8]">
-                  <button type="button" className="flex-1 py-2 flex items-center justify-center gap-1.5 hover:bg-[#3a3b3c]/60 rounded-lg transition-colors text-slate-300">
+                <div className="fb-mockup-actions">
+                  <button type="button" className="fb-mockup-action-btn">
                     <LikeOutlined className="text-sm" /> Thích
                   </button>
-                  <button type="button" className="flex-1 py-2 flex items-center justify-center gap-1.5 hover:bg-[#3a3b3c]/60 rounded-lg transition-colors text-slate-300">
+                  <button type="button" className="fb-mockup-action-btn">
                     <CommentOutlined className="text-sm" /> Bình luận
                   </button>
-                  <button type="button" className="flex-1 py-2 flex items-center justify-center gap-1.5 hover:bg-[#3a3b3c]/60 rounded-lg transition-colors text-slate-300">
+                  <button type="button" className="fb-mockup-action-btn">
                     <ShareAltOutlined className="text-sm" /> Chia sẻ
                   </button>
                 </div>
 
                 {/* Simulated First Comment if affiliate/custom comment exists */}
                 {item.affiliateLink?.trim() && !item.skipComment && (
-                  <div className="p-3 bg-[#18191a] border-t border-[#3a3b3c]/80 flex items-start gap-2.5">
+                  <div className="fb-mockup-comment-wrap">
                     <div className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
                       {firstAccountPageName?.charAt(0)?.toUpperCase() || 'F'}
                     </div>
-                    <div className="flex-1 bg-[#242526] p-2.5 rounded-2xl text-xs text-[#e4e6eb] space-y-1">
+                    <div className="fb-mockup-comment-bubble space-y-1">
                       <div className="font-bold text-white text-[11px] flex items-center gap-1.5">
                         <span>{firstAccountPageName || 'Trang của bạn'}</span>
                         <Tag color="blue" className="!text-[9px] !m-0 !px-1 !py-0">Tác giả</Tag>
@@ -1353,7 +1354,7 @@ function PostItemEditor({
                               ✨ Sạch Logo TikTok
                             </Tag>
                           )}
-                          <span className="text-[11px] text-slate-300 font-medium">Sẵn sàng xuất bản</span>
+                          <span className="text-xs text-slate-300 font-medium">Sẵn sàng xuất bản</span>
                         </div>
                         {(preview.imageCount || 0) > 0 && (
                           <Button size="small" onClick={() => openNewsCardForItem(item, 'LINK')} title="Ghép ảnh + tiêu đề in hoa tô đỏ kiểu page tin tức, thay cho ảnh đăng">
@@ -1381,10 +1382,10 @@ function PostItemEditor({
                                 {/* Danh sách Video */}
                                 {videoUrls.length > 0 && (
                                   <div className="bg-slate-950/70 rounded-xl p-2.5 border border-slate-800 space-y-2">
-                                    <div className="flex items-center justify-between text-[11px] text-slate-400 font-semibold">
+                                    <div className="flex items-center justify-between text-xs text-slate-300 font-semibold">
                                       <span>Video đính kèm ({videoUrls.length}):</span>
                                       {hasCustomizedMedia && (
-                                        <span className="text-amber-400 text-[10px]">Đã chỉnh sửa</span>
+                                        <span className="text-amber-400 text-xs">Đã chỉnh sửa</span>
                                       )}
                                     </div>
                                     <div className="space-y-2">
@@ -1410,7 +1411,7 @@ function PostItemEditor({
                                                 <EyeOutlined /> Phóng to
                                               </button>
                                               <div className="absolute top-1.5 left-1.5">
-                                                <Tag color="purple" className="!text-[10px] !font-bold !m-0 !px-1.5 shadow-md">
+                                                <Tag color="purple" className="!text-xs !font-bold !m-0 !px-1.5 shadow-md">
                                                   🎥 Video #{mIdx + 1}
                                                 </Tag>
                                               </div>
@@ -1421,20 +1422,20 @@ function PostItemEditor({
                                                   <Button
                                                     size="small"
                                                     type="text"
-                                                    icon={<ArrowLeftOutlined className="text-[10px]" />}
+                                                    icon={<ArrowLeftOutlined className="text-xs" />}
                                                     disabled={mIdx === 0}
                                                     onClick={() => moveMediaItem(item.id, mIdx, mIdx - 1)}
-                                                    className="h-6 w-6 !p-0 text-slate-400 hover:text-slate-100 disabled:opacity-30"
+                                                    className="h-7 w-7 !p-0 text-slate-300 hover:text-white disabled:opacity-30"
                                                   />
                                                 </Tooltip>
                                                 <Tooltip title="Chuyển xuống sau">
                                                   <Button
                                                     size="small"
                                                     type="text"
-                                                    icon={<ArrowRightOutlined className="text-[10px]" />}
+                                                    icon={<ArrowRightOutlined className="text-xs" />}
                                                     disabled={mIdx === mediaUrls.length - 1}
                                                     onClick={() => moveMediaItem(item.id, mIdx, mIdx + 1)}
-                                                    className="h-6 w-6 !p-0 text-slate-400 hover:text-slate-100 disabled:opacity-30"
+                                                    className="h-7 w-7 !p-0 text-slate-300 hover:text-white disabled:opacity-30"
                                                   />
                                                 </Tooltip>
                                               </div>
@@ -1443,9 +1444,9 @@ function PostItemEditor({
                                                   size="small"
                                                   type="text"
                                                   danger
-                                                  icon={<DeleteOutlined className="text-[10px]" />}
+                                                  icon={<DeleteOutlined className="text-xs" />}
                                                   onClick={() => removeMediaItem(item.id, mIdx)}
-                                                  className="h-6 w-6 !p-0"
+                                                  className="h-7 w-7 !p-0"
                                                 />
                                               </Tooltip>
                                             </div>
@@ -1499,15 +1500,15 @@ function PostItemEditor({
 
                                                 {/* Badge thứ tự và biểu tượng Drag góc trên bên trái */}
                                                 <div className="absolute top-1 left-1 z-10 flex items-center gap-1 pointer-events-auto">
-                                                  <div className="w-4 h-4 rounded bg-black/60 text-slate-300 flex items-center justify-center text-[9px]" title="Kéo thả để đổi thứ tự">
+                                                  <div className="w-5 h-5 rounded bg-black/65 text-slate-200 flex items-center justify-center text-[11px]" title="Kéo thả để đổi thứ tự">
                                                     <HolderOutlined />
                                                   </div>
                                                   {isCover ? (
-                                                    <Tag color="gold" className="!text-[9.5px] !font-bold !m-0 !px-1 shadow-md border-0">
+                                                    <Tag color="gold" className="!text-[11px] !font-bold !m-0 !px-1.5 shadow-md border-0">
                                                       👑 Bìa
                                                     </Tag>
                                                   ) : (
-                                                    <Tag color="blue" className="!text-[9.5px] !font-bold !m-0 !px-1 shadow-md border-0">
+                                                    <Tag color="blue" className="!text-[11px] !font-bold !m-0 !px-1.5 shadow-md border-0">
                                                       #{mIdx + 1}
                                                     </Tag>
                                                   )}
@@ -1522,7 +1523,7 @@ function PostItemEditor({
                                                         e.stopPropagation();
                                                         removeMediaItem(item.id, mIdx);
                                                       }}
-                                                      className="w-5 h-5 rounded-full bg-black/75 hover:bg-red-600 text-white flex items-center justify-center text-[10px] transition-colors shadow"
+                                                      className="w-6 h-6 rounded-full bg-black/75 hover:bg-red-600 text-white flex items-center justify-center text-xs transition-colors shadow"
                                                     >
                                                       <CloseOutlined />
                                                     </button>
@@ -1531,14 +1532,14 @@ function PostItemEditor({
                                               </div>
 
                                               {/* Hàng điều khiển nút bấm nhanh dưới chân ảnh */}
-                                              <div className="p-1 bg-slate-900 flex items-center justify-between border-t border-slate-800">
-                                                <div className="flex items-center gap-0.5">
+                                              <div className="p-1.5 bg-slate-900 flex items-center justify-between border-t border-slate-800">
+                                                <div className="flex items-center gap-1">
                                                   <Tooltip title="Di chuyển ảnh sang trái">
                                                     <button
                                                       type="button"
                                                       disabled={mIdx === 0}
                                                       onClick={() => moveMediaItem(item.id, mIdx, mIdx - 1)}
-                                                      className="w-5 h-5 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-300 flex items-center justify-center text-[9px] transition-colors"
+                                                      className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-200 flex items-center justify-center text-[11px] transition-colors"
                                                     >
                                                       <ArrowLeftOutlined />
                                                     </button>
@@ -1548,7 +1549,7 @@ function PostItemEditor({
                                                       type="button"
                                                       disabled={mIdx === mediaUrls.length - 1}
                                                       onClick={() => moveMediaItem(item.id, mIdx, mIdx + 1)}
-                                                      className="w-5 h-5 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-300 flex items-center justify-center text-[9px] transition-colors"
+                                                      className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-200 flex items-center justify-center text-[11px] transition-colors"
                                                     >
                                                       <ArrowRightOutlined />
                                                     </button>
@@ -1560,7 +1561,7 @@ function PostItemEditor({
                                                     <button
                                                       type="button"
                                                       onClick={() => moveMediaItem(item.id, mIdx, 0)}
-                                                      className="px-1 py-0.5 rounded bg-amber-500/10 hover:bg-amber-500/30 text-amber-400 flex items-center gap-0.5 text-[9px] font-semibold transition-colors border border-amber-500/30"
+                                                      className="px-1.5 py-0.5 rounded bg-amber-500/10 hover:bg-amber-500/30 text-amber-300 flex items-center gap-1 text-[11px] font-semibold transition-colors border border-amber-500/30"
                                                     >
                                                       <StarOutlined /> Bìa
                                                     </button>
@@ -1611,7 +1612,7 @@ function PostItemEditor({
                                 type="text"
                                 icon={<TeamOutlined />}
                                 onClick={applyAnonymousCreditToAll}
-                                className="text-xs text-amber-300 hover:text-amber-100 bg-amber-900/60 border border-amber-600/60 rounded px-1.5 font-bold shadow-xs"
+                                className="text-xs text-amber-300 hover:text-amber-100 bg-amber-900/60 border border-amber-600/60 rounded px-1.5 font-bold shadow-sm"
                               >
                                 ⚡ Ẩn danh (Tất cả bài)
                               </Button>
@@ -1671,11 +1672,11 @@ function PostItemEditor({
                                 <span className="text-xs font-bold text-red-300">
                                   {item.colorBackground === 'RED_PHOTO_TRICK' ? '🔴 Đang chọn: Nền Đỏ + Kèm Ảnh (Mẹo 3 chấm)' : '🔴 Đang chọn: Status Nền Đỏ (Thuần chữ)'}
                                 </span>
-                                <div className="inline-flex rounded-lg bg-black/40 p-0.5 border border-red-800/50 text-[11px]">
+                                <div className="inline-flex rounded-lg bg-black/40 p-0.5 border border-red-800/50 text-xs">
                                   <button
                                     type="button"
                                     onClick={() => toggleColorBackground(item.id, true)}
-                                    className={`px-2 py-0.5 rounded-md font-semibold transition-all ${item.colorBackground === true
+                                    className={`px-2.5 py-1 rounded-md font-semibold transition-all ${item.colorBackground === true
                                       ? 'bg-red-600 text-white shadow-sm'
                                       : 'text-red-300 hover:text-white'
                                       }`}
@@ -1685,7 +1686,7 @@ function PostItemEditor({
                                   <button
                                     type="button"
                                     onClick={() => toggleColorBackground(item.id, 'RED_PHOTO_TRICK')}
-                                    className={`px-2 py-0.5 rounded-md font-semibold transition-all ${item.colorBackground === 'RED_PHOTO_TRICK'
+                                    className={`px-2.5 py-1 rounded-md font-semibold transition-all ${item.colorBackground === 'RED_PHOTO_TRICK'
                                       ? 'bg-red-600 text-white shadow-sm'
                                       : 'text-red-300 hover:text-white'
                                       }`}
@@ -1695,7 +1696,7 @@ function PostItemEditor({
                                 </div>
                                 <Tag
                                   color={(item.customCaption !== undefined ? item.customCaption : (preview?.caption || "")).length <= 130 ? "success" : "error"}
-                                  className="!m-0 text-[11px] font-mono font-bold px-2 py-0.5"
+                                  className="!m-0 !text-xs font-mono font-bold px-2 py-0.5"
                                 >
                                   {(item.customCaption !== undefined ? item.customCaption : (preview?.caption || "")).length} / 130 ký tự
                                 </Tag>
@@ -1722,7 +1723,7 @@ function PostItemEditor({
                             </div>
 
                             {item.colorBackground === 'RED_PHOTO_TRICK' && (
-                              <div className="text-[11px] text-amber-200/90 bg-amber-950/40 p-2 rounded-lg border border-amber-800/40 flex items-center gap-1.5">
+                              <div className="text-xs text-amber-200 bg-amber-950/40 p-2.5 rounded-lg border border-amber-800/40 flex items-center gap-1.5">
                                 <span>💡</span>
                                 <span><b>Mẹo Facebook 3 chấm:</b> Bot sẽ đăng kèm ảnh trước, sau đó tự động vào <b>3 chấm &rarr; Sửa bài &rarr; Gỡ ảnh &rarr; Đổi phông nền Đỏ &rarr; Lưu</b> và bình luận toàn bộ nội dung bài báo bên dưới.</span>
                               </div>
@@ -1756,14 +1757,6 @@ function PostItemEditor({
                         )}
                       </div>
 
-                      {/* Thời gian hẹn giờ */}
-                      {!item.isNow && (
-                        <EasyTimePicker
-                          compact
-                          value={item.scheduledAt}
-                          onChange={(val) => updateLinkTime(item.id, val)}
-                        />
-                      )}
 
                       {/* Tùy chọn bài viết */}
                       <div className="poster-post-options !p-2.5 sm:!p-3 bg-slate-950/60 rounded-2xl border border-slate-700/60 flex items-center gap-2 flex-wrap shadow-inner backdrop-blur-sm">
@@ -1859,7 +1852,7 @@ function PostItemEditor({
                               <MessageOutlined className="text-blue-400" />
                               <span>Bình luận riêng cho Bài #{index + 1}:</span>
                               {hasCustomComment && (
-                                <Tag color="cyan" className="!text-[10px] !m-0 !py-0">
+                                <Tag color="cyan" className="!text-xs !m-0 !py-0">
                                   Đang dùng cmt riêng
                                 </Tag>
                               )}
@@ -1893,14 +1886,6 @@ function PostItemEditor({
             {/* Khi chưa cào xong hoặc không có link preview thì hiển thị Time Picker & Options ở dưới ô URL */}
             {(!item.url.trim() || !preview || preview?.loading || preview?.error) && (
               <>
-                {!item.isNow && (
-                  <EasyTimePicker
-                    compact
-                    value={item.scheduledAt}
-                    onChange={(val) => updateLinkTime(item.id, val)}
-                    className="mt-3"
-                  />
-                )}
 
                 <div className="poster-post-options !p-2.5 sm:!p-3 bg-slate-950/60 rounded-2xl border border-slate-700/60 flex items-center gap-2 flex-wrap shadow-inner backdrop-blur-sm">
                   <span className="text-xs font-bold text-slate-400 flex items-center gap-1.5 mr-1 select-none">
@@ -1917,7 +1902,7 @@ function PostItemEditor({
                         }`}
                     >
                       <span className="poster-opt-dot" /><span>Status nền đỏ</span>
-                      <span className="text-[10px] opacity-75">(&lt; 130 ký tự)</span>
+                      <span className="text-xs opacity-80">(&lt; 130 ký tự)</span>
                       {item.colorBackground && <CheckOutlined className="text-xs text-rose-400" />}
                     </button>
                   </Tooltip>
@@ -2023,6 +2008,35 @@ function PostItemEditor({
               </>
             )}
           </>
+        )}
+
+        {/* Đăng thêm bài này sang các nhóm chỉ định khác (đồng bộ với Tinder Review) */}
+        {extraGroupOptions.length > 0 && (
+          <div className="mt-2 pt-2.5 border-t border-slate-800/70 flex flex-col sm:flex-row sm:items-center gap-2">
+            <span className="text-xs font-bold text-indigo-300 flex items-center gap-1.5 shrink-0">
+              <TeamOutlined className="text-indigo-400" />
+              <span>Đăng thêm sang nhóm khác:</span>
+              {itemExtraGroupIds.length > 0 && (
+                <Tag color="geekblue" className="!m-0 !rounded-md !text-[11px] font-bold">
+                  +{itemExtraGroupIds.length} nhóm
+                </Tag>
+              )}
+            </span>
+            <Select
+              mode="multiple"
+              size="small"
+              allowClear
+              showSearch
+              placeholder="Chọn thêm nhóm đăng chéo riêng bài này (nếu có)..."
+              value={itemExtraGroupIds}
+              onChange={(vals: string[]) => updateLinkExtraGroupIds(item.id, vals)}
+              options={extraGroupOptions}
+              optionLabelProp="name"
+              filterOption={filterSelectByLabel}
+              maxTagCount="responsive"
+              className="flex-1 min-w-0"
+            />
+          </div>
         )}
       </div>
     </div>

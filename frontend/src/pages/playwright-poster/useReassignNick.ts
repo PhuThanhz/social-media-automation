@@ -2,7 +2,7 @@ import type React from 'react';
 import { useState } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
 import { App } from 'antd';
-import { POSTING_WINDOW_QUERY_KEY } from '../../components/common/PostingWindowPanel';
+import { POSTING_WINDOW_QUERY_KEY } from '../../components/common/postingSchedule';
 import api from '../../config/axios';
 
 interface ReassignNickParams {

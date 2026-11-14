@@ -258,13 +258,13 @@ const DashboardLayout = () => {
           <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-[#0b1222]" title="Hệ thống trực tuyến" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <h4 className="font-extrabold text-sm text-white truncate m-0">{profileName}</h4>
-            <span className="inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 text-sky-300 bg-sky-500/15 border border-sky-400/30 rounded-md">
+          <div className="flex items-center gap-2">
+            <h4 className="font-extrabold text-[15px] text-white truncate m-0">{profileName}</h4>
+            <span className="inline-flex items-center text-[11px] font-bold px-2 py-0.5 text-sky-200 bg-sky-500/20 border border-sky-400/35 rounded-md">
               ADMIN
             </span>
           </div>
-          <p className="text-[11px] text-slate-400 truncate mt-0.5 m-0 font-medium">
+          <p className="text-[13px] text-slate-300 truncate mt-0.5 m-0 font-medium">
             {isTauri() ? 'Bản quyền Desktop v2.0' : 'Hệ thống Quản trị Tối cao'}
           </p>
         </div>
@@ -279,9 +279,9 @@ const DashboardLayout = () => {
               setProfileDropdownOpen(false);
               navigate('/');
             }}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/8 transition-all text-left cursor-pointer group"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-semibold text-slate-200 hover:text-white hover:bg-white/8 transition-all text-left cursor-pointer group"
           >
-            <div className="w-7 h-7 rounded-lg bg-sky-500/15 text-sky-400 flex items-center justify-center border border-sky-500/20 group-hover:scale-105 transition-transform shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-sky-500/15 text-sky-400 flex items-center justify-center border border-sky-500/20 group-hover:scale-105 transition-transform shrink-0">
               <DashboardOutlined />
             </div>
             <span className="flex-1">Trang chủ PhuSocial</span>
@@ -294,15 +294,15 @@ const DashboardLayout = () => {
             setProfileDropdownOpen(false);
             setBgPickerOpen(true);
           }}
-          className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/8 transition-all text-left cursor-pointer group"
+          className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-[13.5px] font-semibold text-slate-200 hover:text-white hover:bg-white/8 transition-all text-left cursor-pointer group"
         >
           <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-lg bg-purple-500/15 text-purple-400 flex items-center justify-center border border-purple-500/20 group-hover:scale-105 transition-transform shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-purple-500/15 text-purple-400 flex items-center justify-center border border-purple-500/20 group-hover:scale-105 transition-transform shrink-0">
               <BgColorsOutlined />
             </div>
             <span>Hình nền giao diện</span>
           </div>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-400/30">
+          <span className="text-[11.5px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/30">
             Tùy biến
           </span>
         </button>
@@ -313,9 +313,9 @@ const DashboardLayout = () => {
             setProfileDropdownOpen(false);
             setAiModalOpen(true);
           }}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/8 transition-all text-left cursor-pointer group"
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-semibold text-slate-200 hover:text-white hover:bg-white/8 transition-all text-left cursor-pointer group"
         >
-          <div className="w-7 h-7 rounded-lg bg-cyan-500/15 text-cyan-400 flex items-center justify-center border border-cyan-500/20 group-hover:scale-105 transition-transform shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-cyan-500/15 text-cyan-400 flex items-center justify-center border border-cyan-500/20 group-hover:scale-105 transition-transform shrink-0">
             <RobotOutlined />
           </div>
           <span className="flex-1">Cấu hình AI (Gemini)</span>
@@ -327,9 +327,9 @@ const DashboardLayout = () => {
             setProfileDropdownOpen(false);
             navigate('/dashboard/logs');
           }}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-200 hover:text-white hover:bg-white/8 transition-all text-left cursor-pointer group"
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-semibold text-slate-200 hover:text-white hover:bg-white/8 transition-all text-left cursor-pointer group"
         >
-          <div className="w-7 h-7 rounded-lg bg-amber-500/15 text-amber-400 flex items-center justify-center border border-amber-500/20 group-hover:scale-105 transition-transform shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-amber-500/15 text-amber-400 flex items-center justify-center border border-amber-500/20 group-hover:scale-105 transition-transform shrink-0">
             <CodeOutlined />
           </div>
           <span className="flex-1">Nhật ký hệ thống</span>
@@ -347,9 +347,9 @@ const DashboardLayout = () => {
           logout();
           navigate('/login');
         }}
-        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-rose-300 hover:text-rose-100 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 hover:border-rose-500/35 transition-all text-left cursor-pointer mt-1"
+        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-bold text-rose-200 hover:text-white bg-rose-500/12 hover:bg-rose-500/22 border border-rose-500/25 hover:border-rose-500/40 transition-all text-left cursor-pointer mt-1"
       >
-        <div className="w-7 h-7 rounded-lg bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0">
+        <div className="w-8 h-8 rounded-lg bg-rose-500/20 text-rose-300 flex items-center justify-center shrink-0">
           <LogoutOutlined />
         </div>
         <span>Đăng xuất tài khoản</span>
@@ -358,20 +358,20 @@ const DashboardLayout = () => {
   );
 
   const kpiPanelContent = (
-    <div style={{ width: 440 }}>
+    <div style={{ width: 480, maxWidth: '90vw' }}>
       <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-slate-800/80">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 text-sm shadow-sm">
+          <div className="w-9 h-9 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 text-base shadow-sm">
             <AimOutlined />
           </div>
           <div>
-            <div className="text-sm font-black text-slate-100 tracking-tight">Mục tiêu KPI & Danh sách Nhóm</div>
-            <div className="text-[11px] text-slate-400 font-medium">{dayjs().format('dddd, DD/MM/YYYY')} · {allDisplayTargets.length} kênh/nhóm</div>
+            <div className="text-[15px] font-black text-slate-100 tracking-tight">Mục tiêu KPI & Danh sách Nhóm</div>
+            <div className="text-[13px] text-slate-300 font-medium">{dayjs().format('dddd, DD/MM/YYYY')} · {allDisplayTargets.length} kênh/nhóm</div>
           </div>
         </div>
-        <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${unmetKpiCount === 0 && totalKpiCount > 0
-            ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-            : 'bg-slate-800 text-slate-300 border-slate-700'
+        <span className={`text-[13px] font-bold px-3 py-1 rounded-full border shrink-0 whitespace-nowrap ${unmetKpiCount === 0 && totalKpiCount > 0
+            ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+            : 'bg-slate-800 text-slate-200 border-slate-700'
           }`}>
           {totalKpiCount === 0
             ? `${allDisplayTargets.length} Kênh/Nhóm`
@@ -383,20 +383,20 @@ const DashboardLayout = () => {
 
       <div className="mb-3">
         <Input
-          size="small"
-          prefix={<SearchOutlined className="text-slate-400 text-xs" />}
+          size="middle"
+          prefix={<SearchOutlined className="text-slate-300 text-sm" />}
           placeholder="Tìm tên nhóm hoặc ID..."
           value={kpiSearchText}
           onChange={(e) => setKpiSearchText(e.target.value)}
           allowClear
-          className="rounded-xl bg-slate-900 border-slate-700/80 text-slate-200 text-xs py-1.5"
+          className="rounded-xl bg-slate-900 border-slate-700/80 text-slate-100 text-sm"
         />
       </div>
 
       {filteredDisplayTargets.length === 0 ? (
         <div className="text-center py-8">
           <div className="text-4xl mb-2">🔍</div>
-          <div className="text-xs text-slate-400 font-medium">Không tìm thấy nhóm / kênh nào phù hợp.</div>
+          <div className="text-sm text-slate-300 font-medium">Không tìm thấy nhóm / kênh nào phù hợp.</div>
         </div>
       ) : (
         <div className="space-y-2.5" style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: 2 }}>
@@ -423,16 +423,16 @@ const DashboardLayout = () => {
                 {/* Header: Avatar/Icon + Name + ID + Progress Ratio */}
                 <div className="flex items-center justify-between gap-2.5 mb-2.5">
                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <span className="w-6 h-6 rounded-lg bg-slate-800 border border-slate-700/70 flex items-center justify-center shrink-0">
+                    <span className="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700/70 flex items-center justify-center shrink-0">
                       {t.platform === 'FACEBOOK_GROUP'
-                        ? <TeamOutlined className="text-cyan-400 text-xs" />
-                        : <FacebookFilled className="text-blue-400 text-xs" />}
+                        ? <TeamOutlined className="text-cyan-400 text-sm" />
+                        : <FacebookFilled className="text-blue-400 text-sm" />}
                     </span>
-                    <span className="text-xs font-bold text-slate-200 truncate group-hover:text-white transition-colors" title={t.accountName}>
+                    <span className="text-sm font-bold text-slate-100 truncate group-hover:text-white transition-colors" title={t.accountName}>
                       {t.accountName}
                     </span>
                     {t.platformAccountId && (
-                      <span className="text-[10px] text-slate-400 font-mono px-1.5 py-0.5 rounded bg-slate-800/80 border border-slate-700/60 shrink-0">
+                      <span className="text-xs text-slate-300 font-mono px-1.5 py-0.5 rounded bg-slate-800/80 border border-slate-700/60 shrink-0">
                         {t.platformAccountId.slice(-4)}
                       </span>
                     )}
@@ -440,21 +440,21 @@ const DashboardLayout = () => {
                   <div className="shrink-0">
                     {hasKpi ? (
                       isFullyPublished ? (
-                        <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-2.5 py-1 rounded-lg">
+                        <span className="text-[13px] font-mono font-bold text-emerald-300 bg-emerald-500/10 border border-emerald-500/25 px-2.5 py-1 rounded-lg">
                           {actual}/{t.targetCount} ✓
                         </span>
                       ) : isFullyScheduled ? (
-                        <span className="text-xs font-mono font-bold text-cyan-300 bg-cyan-500/10 border border-cyan-500/25 px-2.5 py-1 rounded-lg">
-                          {actual}/{t.targetCount} <span className="text-[11px] text-cyan-400 font-normal">(+{totalQueue})</span>
+                        <span className="text-[13px] font-mono font-bold text-cyan-200 bg-cyan-500/10 border border-cyan-500/25 px-2.5 py-1 rounded-lg">
+                          {actual}/{t.targetCount} <span className="text-xs text-cyan-300 font-normal">(+{totalQueue})</span>
                         </span>
                       ) : (
-                        <span className="text-xs font-mono font-bold text-slate-300 bg-slate-800 border border-slate-700 px-2.5 py-1 rounded-lg">
-                          {actual}/{t.targetCount} {totalQueue > 0 && <span className="text-cyan-300 text-[11px] font-normal">(+{totalQueue})</span>}
+                        <span className="text-[13px] font-mono font-bold text-slate-200 bg-slate-800 border border-slate-700 px-2.5 py-1 rounded-lg">
+                          {actual}/{t.targetCount} {totalQueue > 0 && <span className="text-cyan-300 text-xs font-normal">(+{totalQueue})</span>}
                         </span>
                       )
                     ) : (
-                      <span className="text-xs font-mono font-bold text-slate-400 bg-slate-800/80 border border-slate-700/60 px-2.5 py-1 rounded-lg">
-                        {actual} đã đăng {totalQueue > 0 && <span className="text-cyan-300 text-[11px] font-normal">(+{totalQueue})</span>}
+                      <span className="text-[13px] font-mono font-bold text-slate-300 bg-slate-800/80 border border-slate-700/60 px-2.5 py-1 rounded-lg">
+                        {actual} đã đăng {totalQueue > 0 && <span className="text-cyan-300 text-xs font-normal">(+{totalQueue})</span>}
                       </span>
                     )}
                   </div>
@@ -463,7 +463,7 @@ const DashboardLayout = () => {
                 {/* Progress bar */}
                 <Progress
                   percent={scheduledPct}
-                  size={[undefined, 4]}
+                  size={[undefined, 5]}
                   strokeColor={
                     !hasKpi
                       ? (totalPlanned > 0 ? '#38bdf8' : '#475569')
@@ -484,13 +484,13 @@ const DashboardLayout = () => {
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {/* Badge đã đăng */}
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md">
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md">
                       ✓ {actual} đã đăng
                     </span>
 
                     {/* Badge chờ đăng */}
                     {totalQueue > 0 && (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded-md">
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-cyan-200 bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded-md">
                         ⏳ {totalQueue} chờ đăng
                       </span>
                     )}
@@ -498,20 +498,20 @@ const DashboardLayout = () => {
                     {/* Badge thiếu bài / Đủ KPI / Chưa đặt KPI */}
                     {hasKpi ? (
                       isFullyPublished ? (
-                        <span className="inline-flex items-center text-[11px] font-semibold text-emerald-300 bg-emerald-500/10 border border-emerald-500/25 px-2 py-0.5 rounded-md">
+                        <span className="inline-flex items-center text-xs font-semibold text-emerald-300 bg-emerald-500/10 border border-emerald-500/25 px-2 py-0.5 rounded-md">
                           Hoàn thành
                         </span>
                       ) : isFullyScheduled ? (
-                        <span className="inline-flex items-center text-[11px] font-semibold text-cyan-200 bg-cyan-500/10 border border-cyan-500/25 px-2 py-0.5 rounded-md">
+                        <span className="inline-flex items-center text-xs font-semibold text-cyan-200 bg-cyan-500/10 border border-cyan-500/25 px-2 py-0.5 rounded-md">
                           Đủ 100% KPI
                         </span>
                       ) : (
-                        <span className="inline-flex items-center text-[11px] font-semibold text-slate-400 bg-slate-800 border border-slate-700 px-2 py-0.5 rounded-md">
+                        <span className="inline-flex items-center text-xs font-semibold text-slate-300 bg-slate-800 border border-slate-700 px-2 py-0.5 rounded-md">
                           Thiếu {remainingToSchedule} bài
                         </span>
                       )
                     ) : (
-                      <span className="inline-flex items-center text-[11px] font-semibold text-slate-400 bg-slate-800/80 border border-slate-700/60 px-2 py-0.5 rounded-md">
+                      <span className="inline-flex items-center text-xs font-semibold text-slate-300 bg-slate-800/80 border border-slate-700/60 px-2 py-0.5 rounded-md">
                         Chưa đặt KPI
                       </span>
                     )}
@@ -523,8 +523,8 @@ const DashboardLayout = () => {
                       e.stopPropagation();
                       handleQuickFillTarget(t);
                     }}
-                    className={`!text-[11px] !h-6 !px-2.5 rounded-lg font-bold shrink-0 transition-all ${hasKpi && isFullyPublished
-                        ? '!border-slate-700 !text-slate-400 !bg-slate-800 hover:!text-white'
+                    className={`!text-xs !h-7 !px-3 rounded-lg font-bold shrink-0 whitespace-nowrap transition-all ${hasKpi && isFullyPublished
+                        ? '!border-slate-700 !text-slate-300 !bg-slate-800 hover:!text-white'
                         : hasKpi && isFullyScheduled
                           ? '!border-cyan-500/30 !text-cyan-200 !bg-cyan-950/40 hover:!bg-cyan-900/60'
                           : '!border-none !bg-gradient-to-r !from-sky-500 !to-blue-600 !text-white hover:opacity-90'
@@ -582,33 +582,33 @@ const DashboardLayout = () => {
   return (
     <Layout className="dashboard-shell app-shell-min" style={shellStyle}>
       {isDesktop ? (
-        <Sider trigger={null} collapsible collapsed={collapsed} theme="dark" width={252} collapsedWidth={80} className="app-sidebar app-sidebar-sticky">
+        <Sider trigger={null} collapsible collapsed={collapsed} theme="dark" width={284} collapsedWidth={80} className="app-sidebar app-sidebar-sticky">
           {sidebar}
         </Sider>
       ) : (
-        <Drawer open={mobileOpen} onClose={() => setMobileOpen(false)} placement="left" size={256} closable={false}>{sidebar}</Drawer>
+        <Drawer open={mobileOpen} onClose={() => setMobileOpen(false)} placement="left" size={284} closable={false}>{sidebar}</Drawer>
       )}
 
       <Layout className="app-main-column">
-        <Header className="app-topbar app-topbar-bar" style={{ lineHeight: 'normal', height: 72 }}>
-          <Flex align="center" className="app-main-column">
+        <Header className="app-topbar app-topbar-bar" style={{ lineHeight: 'normal', height: 74 }}>
+          <Flex align="center" className="app-main-column min-w-0 flex-1 pr-2 sm:pr-4">
             <Button
               type="text"
               icon={isDesktop ? (collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />) : <MenuUnfoldOutlined />}
               onClick={() => isDesktop ? setCollapsed(!collapsed) : setMobileOpen(true)}
               aria-label="Mở menu"
-              className="!text-slate-300 hover:!text-white hover:!bg-white/10 !mr-2.5 !rounded-xl !w-9 !h-9 !flex !items-center !justify-center !border !border-white/5 transition-all"
+              className="!text-slate-200 hover:!text-white hover:!bg-white/10 !mr-2 sm:!mr-3 !rounded-xl !w-10 !h-10 !flex !items-center !justify-center !border !border-white/10 transition-all shrink-0"
             />
-            <div className="app-topbar-heading">
-              <h1 className="app-topbar-title !text-base sm:!text-lg !font-black !text-white !tracking-tight !m-0">{meta.title}</h1>
-              <p className="app-topbar-desc !text-xs !text-slate-300 !mt-0.5 !m-0 !font-medium">{meta.description}</p>
+            <div className="app-topbar-heading min-w-0 flex-1">
+              <h1 className="app-topbar-title !text-base sm:!text-xl !font-extrabold !text-white !tracking-tight !m-0">{meta.title}</h1>
+              <p className="app-topbar-desc !text-[13px] !text-slate-300 !mt-0.5 !m-0 !font-medium">{meta.description}</p>
             </div>
           </Flex>
 
-          <Flex align="center" gap={10} className="app-topbar-actions">
+          <Flex align="center" gap={10} className="app-topbar-actions shrink-0">
             <QueueFinishBadge />
             <Button
-              className="app-topbar-buff !flex !items-center !gap-1.5 !font-bold !text-xs !rounded-xl !bg-gradient-to-r !from-blue-600 !to-indigo-600 hover:!from-blue-500 hover:!to-indigo-500 !text-white !border-blue-400/40 !shadow-md !shadow-blue-600/25 !h-9 !px-3.5 transition-all"
+              className="app-topbar-buff !flex !items-center !gap-1.5 !font-bold !text-[13px] !rounded-xl !bg-gradient-to-r !from-blue-600 !to-indigo-600 hover:!from-blue-500 hover:!to-indigo-500 !text-white !border-blue-400/40 !shadow-md !shadow-blue-600/25 !h-10 !px-4 transition-all whitespace-nowrap shrink-0"
               icon={<LikeOutlined />}
               onClick={() => navigate('/dashboard/buff')}
             >
@@ -618,10 +618,10 @@ const DashboardLayout = () => {
               <Badge count={expiredCookieCount} size="small" offset={[-2, 2]}>
                 <button
                   type="button"
-                  className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer border ${
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer border shrink-0 ${
                     expiredCookieCount > 0
-                      ? 'bg-rose-500/15 text-rose-400 border-rose-500/35 shadow-lg shadow-rose-500/25 animate-pulse'
-                      : 'bg-white/6 text-slate-300 hover:text-white hover:bg-white/10 border-white/10'
+                      ? 'bg-rose-500/15 text-rose-300 border-rose-500/35 shadow-lg shadow-rose-500/25 animate-pulse'
+                      : 'bg-white/6 text-slate-200 hover:text-white hover:bg-white/10 border-white/10'
                   }`}
                   onClick={() => {
                     if (expiredCookieCount > 0) {
@@ -633,12 +633,12 @@ const DashboardLayout = () => {
                   }}
                   aria-label="Cảnh báo"
                 >
-                  <BellOutlined className="text-sm" />
+                  <BellOutlined className="text-base" />
                 </button>
               </Badge>
             </Tooltip>
             <Dropdown
-              dropdownRender={renderUserDropdownCard}
+              popupRender={renderUserDropdownCard}
               placement="bottomRight"
               trigger={['click']}
               open={profileDropdownOpen}
@@ -646,23 +646,23 @@ const DashboardLayout = () => {
             >
               <button
                 type="button"
-                className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-white/6 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all cursor-pointer group select-none"
+                className="flex items-center gap-2 sm:gap-2.5 px-2 sm:px-3 py-1.5 rounded-xl bg-white/6 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all cursor-pointer group select-none shrink-0 whitespace-nowrap"
               >
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-sky-500 to-indigo-600 p-[1.5px] shadow-sm shrink-0">
                   <div className="w-full h-full rounded-[6.5px] bg-[#0b1222] flex items-center justify-center font-black text-white text-xs">
                     {profileInitials}
                   </div>
                 </div>
-                <div className="flex flex-col text-left">
-                  <span className="font-bold text-xs text-slate-100 group-hover:text-white leading-tight">
+                <div className="hidden sm:flex flex-col text-left whitespace-nowrap">
+                  <span className="font-bold text-[13.5px] text-slate-100 group-hover:text-white leading-tight whitespace-nowrap">
                     {profileName}
                   </span>
-                  <span className="text-[10px] text-emerald-400 font-semibold leading-tight flex items-center gap-1">
+                  <span className="text-xs text-emerald-400 font-semibold leading-tight flex items-center gap-1 whitespace-nowrap">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                     Online
                   </span>
                 </div>
-                <DownOutlined className="text-[10px] text-slate-400 group-hover:text-slate-200 transition-transform ml-1" />
+                <DownOutlined className="hidden sm:inline-block text-xs text-slate-300 group-hover:text-white transition-transform ml-0.5 shrink-0" />
               </button>
             </Dropdown>
           </Flex>

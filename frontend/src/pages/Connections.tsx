@@ -231,7 +231,7 @@ const parseCookieString = (accessToken?: string) => {
 const PageAccessStatusTag = ({ status }: { status: FacebookPageAccess['verificationStatus'] }) => {
   if (status === 'VERIFIED') {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 whitespace-nowrap">
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
         Đã xác minh quyền
       </span>
@@ -239,7 +239,7 @@ const PageAccessStatusTag = ({ status }: { status: FacebookPageAccess['verificat
   }
   if (status === 'NO_ACCESS') {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium bg-red-500/10 text-red-400 border border-red-500/20">
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium bg-red-500/10 text-red-300 border border-red-500/20 whitespace-nowrap">
         <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
         Mất quyền quản trị
       </span>
@@ -247,7 +247,7 @@ const PageAccessStatusTag = ({ status }: { status: FacebookPageAccess['verificat
   }
   if (status === 'SESSION_INVALID') {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium bg-rose-500/10 text-rose-400 border border-rose-500/20">
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium bg-rose-500/10 text-rose-300 border border-rose-500/20 whitespace-nowrap">
         <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
         Phiên đăng nhập hết hạn
       </span>
@@ -255,14 +255,14 @@ const PageAccessStatusTag = ({ status }: { status: FacebookPageAccess['verificat
   }
   if (status === 'NOT_SEEN') {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium bg-amber-500/10 text-amber-300 border border-amber-500/20 whitespace-nowrap">
         <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
         Chưa tìm thấy
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium bg-blue-500/10 text-blue-300 border border-blue-500/20 whitespace-nowrap">
       <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
       Đã phát hiện
     </span>
@@ -278,7 +278,7 @@ const StatusBadge = ({ account, onQuickUpdate }: { account: SocialAccount; onQui
   if (status === 'EXPIRED') {
     return (
       <div className="inline-flex items-center gap-2">
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-500/15 text-red-300 border border-red-500/30 shadow-[0_0_12px_rgba(239,68,68,0.2)]">
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-500/15 text-red-300 border border-red-500/30 shadow-[0_0_12px_rgba(239,68,68,0.2)] whitespace-nowrap">
           <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-ping" />
           {label} hết hạn
         </span>
@@ -292,7 +292,7 @@ const StatusBadge = ({ account, onQuickUpdate }: { account: SocialAccount; onQui
               e.stopPropagation();
               onQuickUpdate();
             }}
-            className="text-[11px] h-6 px-2 font-semibold rounded-md shadow-sm"
+            className="text-xs h-7 px-2.5 font-semibold rounded-md shadow-sm"
           >
             Đổi
           </Button>
@@ -786,20 +786,20 @@ const Connections = () => {
                   </a>
                 )}
               </div>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="font-mono text-[10px] text-slate-400 bg-slate-800/90 px-1.5 py-0.2 rounded border border-slate-700/60">
+              <div className="flex items-center gap-1.5 mt-1">
+                <span className="font-mono text-xs text-slate-300 bg-slate-800/90 px-2 py-0.5 rounded border border-slate-700/60">
                   ID: {record.platformAccountId}
                 </span>
                 <Tooltip title="Sao chép ID">
                   <Button
                     type="text"
                     size="small"
-                    icon={<CopyOutlined className="text-slate-500 hover:text-blue-400 text-[10px]" />}
+                    icon={<CopyOutlined className="text-slate-400 hover:text-blue-400 text-xs" />}
                     onClick={() => {
                       navigator.clipboard.writeText(record.platformAccountId);
                       message.success('Đã sao chép ID!');
                     }}
-                    className="h-4 w-4 p-0"
+                    className="h-5 w-5 p-0"
                   />
                 </Tooltip>
               </div>
@@ -815,12 +815,12 @@ const Connections = () => {
             key: 'viaIdentity',
             render: (_: any, record: SocialAccount) => {
               const cUser = viaCUserOf(record);
-              if (!cUser) return <span className="text-xs text-slate-500">—</span>;
+              if (!cUser) return <span className="text-[13px] text-slate-400">—</span>;
               const viaName = viaNameMap.get(cUser) || `Via #${cUser}`;
               return (
-                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-800/80 text-slate-300 border border-slate-700/60 text-xs">
-                  <UserOutlined className="text-blue-400 text-[10px]" />
-                  <span className="max-w-[130px] truncate font-medium">{viaName}</span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-800/80 text-slate-200 border border-slate-700/60 text-[13px] whitespace-nowrap">
+                  <UserOutlined className="text-blue-400 text-xs" />
+                  <span className="max-w-[150px] truncate font-medium">{viaName}</span>
                 </span>
               );
             },
@@ -831,12 +831,12 @@ const Connections = () => {
       title: 'Phương thức',
       dataIndex: 'accountType',
       key: 'accountType',
-      width: 140,
+      width: 178,
       render: (type: string) => {
         const isCookie = isPersonalCookieType(type);
         return (
           <span
-            className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium border ${
+            className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border whitespace-nowrap ${
               isCookie
                 ? 'bg-purple-500/10 text-purple-300 border-purple-500/20'
                 : 'bg-cyan-500/10 text-cyan-300 border-cyan-500/20'
@@ -850,7 +850,7 @@ const Connections = () => {
     {
       title: 'Trạng thái',
       key: 'status',
-      width: 180,
+      width: 195,
       render: (_: any, record: SocialAccount) => (
         <StatusBadge
           account={record}
@@ -864,14 +864,14 @@ const Connections = () => {
     {
       title: 'Giới hạn',
       key: 'limit',
-      width: 120,
+      width: 130,
       render: (_: any, record: SocialAccount) =>
         record.maxPostsPerDay ? (
-          <span className="text-xs font-semibold text-sky-400 bg-sky-500/10 border border-sky-500/20 px-2 py-0.5 rounded">
+          <span className="text-[13px] font-semibold text-sky-300 bg-sky-500/10 border border-sky-500/20 px-2.5 py-0.5 rounded whitespace-nowrap">
             {record.maxPostsPerDay} bài/ngày
           </span>
         ) : (
-          <span className="text-xs text-slate-500">Mặc định</span>
+          <span className="text-[13px] text-slate-400">Mặc định</span>
         ),
     },
     {
@@ -882,19 +882,19 @@ const Connections = () => {
         const hasProxy = Boolean(record.proxyUrl);
 
         return (
-          <div className="flex flex-col gap-0.5 text-xs">
+          <div className="flex flex-col gap-0.5 text-[13px]">
             {backupAcc ? (
-              <span className="text-slate-300 truncate max-w-[160px]" title={`Dự phòng: ${backupAcc.pageName || backupAcc.platformAccountId}`}>
-                <span className="text-slate-500">Dự phòng:</span> {backupAcc.pageName || backupAcc.platformAccountId}
+              <span className="text-slate-200 truncate max-w-[170px]" title={`Dự phòng: ${backupAcc.pageName || backupAcc.platformAccountId}`}>
+                <span className="text-slate-400">Dự phòng:</span> {backupAcc.pageName || backupAcc.platformAccountId}
               </span>
             ) : null}
             {hasProxy ? (
-              <span className="text-emerald-400 font-mono text-[11px] truncate max-w-[160px]" title={record.proxyUrl}>
-                <GlobalOutlined className="mr-1 text-[10px]" />
+              <span className="text-emerald-300 font-mono text-xs truncate max-w-[170px]" title={record.proxyUrl}>
+                <GlobalOutlined className="mr-1 text-xs" />
                 {record.proxyUrl}
               </span>
             ) : null}
-            {!backupAcc && !hasProxy && <span className="text-slate-600 text-[11px]">Mặc định</span>}
+            {!backupAcc && !hasProxy && <span className="text-slate-400 text-[13px]">Mặc định</span>}
           </div>
         );
       },
@@ -1104,7 +1104,7 @@ const Connections = () => {
             <Select
               value={statusFilter}
               onChange={setStatusFilter}
-              className="w-36 text-xs"
+              className="w-44 text-xs"
               options={[
                 { value: 'ALL', label: 'Tất cả trạng thái' },
                 { value: 'OK', label: 'Đang hoạt động' },
@@ -1116,7 +1116,7 @@ const Connections = () => {
               <Select
                 value={viaFilter}
                 onChange={setViaFilter}
-                className="w-44 text-xs"
+                className="w-48 text-xs"
                 options={[
                   { value: 'ALL', label: 'Tất cả Via sở hữu' },
                   ...personalVias.map(({ cUser }) => ({
@@ -1216,7 +1216,7 @@ const Connections = () => {
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="font-bold text-slate-100 text-base">{viaName}</span>
-                            <span className="font-mono text-[11px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-md border border-slate-700/80">
+                            <span className="font-mono text-xs text-slate-300 bg-slate-800 px-2 py-0.5 rounded-md border border-slate-700/80">
                               UID: {cUser}
                             </span>
                             <StatusBadge
@@ -1227,7 +1227,7 @@ const Connections = () => {
                               }}
                             />
                           </div>
-                          <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 mt-1">
+                          <div className="flex flex-wrap items-center gap-3 text-[13px] text-slate-300 mt-1">
                             <span className="flex items-center gap-1.5">
                               <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
                               Quản trị: <b className="text-sky-300 font-semibold">{pages.length} Fanpage</b> trực thuộc
@@ -1238,7 +1238,7 @@ const Connections = () => {
                               </span>
                             )}
                             {viaAccount.tokenCheckedAt && (
-                              <span className="text-slate-500">
+                              <span className="text-slate-400">
                                 · Kiểm tra: {new Date(viaAccount.tokenCheckedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                               </span>
                             )}
@@ -1247,7 +1247,7 @@ const Connections = () => {
                       </div>
 
                       {/* ACTIONS PER VIA */}
-                      <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5 shrink-0">
                         {isViaExpired ? (
                           <Button
                             type="primary"
@@ -1458,23 +1458,23 @@ const Connections = () => {
                               <div className="font-semibold text-slate-100 text-sm truncate" title={acc.pageName || acc.platformAccountId}>
                                 {acc.pageName || acc.platformAccountId}
                               </div>
-                              <span className="font-mono text-[11px] text-slate-400">ID: {acc.platformAccountId}</span>
+                              <span className="font-mono text-xs text-slate-300">ID: {acc.platformAccountId}</span>
                             </div>
                           </div>
-                          <Tag color={isPersonalCookieType(acc.accountType) ? 'purple' : 'cyan'} className="!rounded-md font-medium text-[11px]">
+                          <Tag color={isPersonalCookieType(acc.accountType) ? 'purple' : 'cyan'} className="!rounded-md font-medium !text-xs">
                             {isPersonalCookieType(acc.accountType) ? 'Cookie' : 'Token'}
                           </Tag>
                         </div>
 
-                        <div className="space-y-1.5 text-xs text-slate-400 mb-3 bg-slate-800/40 p-2.5 rounded-xl border border-slate-800">
+                        <div className="space-y-1.5 text-[13px] text-slate-300 mb-3 bg-slate-800/40 p-2.5 rounded-xl border border-slate-800">
                           {viaName && (
                             <div className="flex items-center justify-between">
-                              <span className="text-slate-500">Thuộc Via:</span>
-                              <span className="text-slate-300 font-medium">{viaName}</span>
+                              <span className="text-slate-400">Thuộc Via:</span>
+                              <span className="text-slate-200 font-medium">{viaName}</span>
                             </div>
                           )}
                           <div className="flex items-center justify-between">
-                            <span className="text-slate-500">Trạng thái:</span>
+                            <span className="text-slate-400">Trạng thái:</span>
                             <StatusBadge
                               account={acc}
                               onQuickUpdate={() => {
@@ -1484,21 +1484,21 @@ const Connections = () => {
                             />
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="text-slate-500">Giới hạn:</span>
-                            <span className="text-slate-300">
+                            <span className="text-slate-400">Giới hạn:</span>
+                            <span className="text-slate-200">
                               {acc.maxPostsPerDay ? `${acc.maxPostsPerDay} bài/ngày` : 'Không giới hạn'}
                             </span>
                           </div>
                           {backupAcc && (
                             <div className="flex items-center justify-between">
-                              <span className="text-slate-500">Dự phòng:</span>
-                              <span className="text-slate-300 truncate max-w-[130px]">{backupAcc.pageName || backupAcc.platformAccountId}</span>
+                              <span className="text-slate-400">Dự phòng:</span>
+                              <span className="text-slate-200 truncate max-w-[130px]">{backupAcc.pageName || backupAcc.platformAccountId}</span>
                             </div>
                           )}
                           {acc.proxyUrl && (
                             <div className="flex items-center justify-between">
-                              <span className="text-slate-500">Proxy:</span>
-                              <span className="text-emerald-400 font-mono text-[11px] truncate max-w-[130px]">{acc.proxyUrl}</span>
+                              <span className="text-slate-400">Proxy:</span>
+                              <span className="text-emerald-400 font-mono text-xs truncate max-w-[130px]">{acc.proxyUrl}</span>
                             </div>
                           )}
                         </div>
@@ -2058,16 +2058,16 @@ const Connections = () => {
               {/* TẦNG 1: ĐỊNH DANH VIA */}
               <div className="p-3.5 rounded-2xl border border-blue-500/30 bg-blue-950/20 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-blue-300 flex items-center gap-1.5">
-                    <span className="w-5 h-5 rounded-full bg-blue-500/30 text-blue-300 flex items-center justify-center text-[11px] font-bold">1</span>
+                  <span className="text-[13px] font-bold text-blue-300 flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-blue-500/30 text-blue-300 flex items-center justify-center text-xs font-bold">1</span>
                     TẦNG 1: ĐỊNH DANH NICK / VIA
                   </span>
-                  <Tag color="blue" className="text-[10px] m-0 font-semibold">Bắt buộc</Tag>
+                  <Tag color="blue" className="!text-xs m-0 font-semibold">Bắt buộc</Tag>
                 </div>
 
                 <Form.Item
                   name="profileLabel"
-                  label={<span className="text-xs font-semibold text-slate-300">Tên gợi nhớ của Nick</span>}
+                  label={<span className="text-[13px] font-semibold text-slate-200">Tên gợi nhớ của Nick</span>}
                   rules={[{ required: true, message: 'Vui lòng nhập Tên gợi nhớ!' }]}
                   className="!mb-2"
                 >
@@ -2079,7 +2079,7 @@ const Connections = () => {
 
                 <Form.Item
                   name="cUser"
-                  label={<span className="text-xs font-semibold text-slate-300">UID Facebook cá nhân (c_user)</span>}
+                  label={<span className="text-[13px] font-semibold text-slate-200">UID Facebook cá nhân (c_user)</span>}
                   rules={[
                     { required: true, message: 'Vui lòng nhập UID Facebook (c_user)!' },
                     { pattern: /^\d{5,}$/, message: 'c_user phải là dãy số ID Facebook.' },
@@ -2088,7 +2088,7 @@ const Connections = () => {
                 >
                   <Input
                     placeholder="Ví dụ: 100023403136194 (dãy số c_user trong cookie hoặc ID trang cá nhân)"
-                    className="rounded-xl font-mono text-xs bg-slate-900/90 border-slate-700/80"
+                    className="rounded-xl font-mono text-[13px] bg-slate-900/90 border-slate-700/80"
                   />
                 </Form.Item>
               </div>
@@ -2096,11 +2096,11 @@ const Connections = () => {
               {/* TẦNG 2: PHIÊN ĐĂNG NHẬP PLAYWRIGHT */}
               <div className="p-3.5 rounded-2xl border border-indigo-500/30 bg-indigo-950/20 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
-                    <span className="w-5 h-5 rounded-full bg-indigo-500/30 text-indigo-300 flex items-center justify-center text-[11px] font-bold">2</span>
+                  <span className="text-[13px] font-bold text-indigo-300 flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-indigo-500/30 text-indigo-300 flex items-center justify-center text-xs font-bold">2</span>
                     TẦNG 2: KHÓA PHIÊN ĐĂNG NHẬP (xs)
                   </span>
-                  <Tag color="blue" className="text-[10px] m-0 font-semibold">Bắt buộc</Tag>
+                  <Tag color="blue" className="!text-xs m-0 font-semibold">Bắt buộc</Tag>
                 </div>
 
                 <Form.Item
@@ -2111,7 +2111,7 @@ const Connections = () => {
                   <div className="flex gap-2">
                     <Input.Password
                       placeholder="Dán chuỗi xs... (Ví dụ: 2%3Aabc123...)"
-                      className="rounded-xl font-mono text-xs bg-slate-900/90 border-slate-700/80 flex-1"
+                      className="rounded-xl font-mono text-[13px] bg-slate-900/90 border-slate-700/80 flex-1"
                     />
                     <Button
                       icon={<CopyOutlined />}
@@ -2141,7 +2141,7 @@ const Connections = () => {
                     </Button>
                   </div>
                 </Form.Item>
-                <div className="text-[11px] text-slate-400">
+                <div className="text-xs text-slate-300">
                   🔑 Session token bí mật giúp bot Playwright tự động tương tác Facebook không cần nhập mật khẩu.
                 </div>
               </div>
@@ -2149,21 +2149,21 @@ const Connections = () => {
               {/* TẦNG 3: KHÁNG CHECKPOINT & CHỐNG VĂNG NICK */}
               <div className="p-3.5 rounded-2xl border border-emerald-500/30 bg-emerald-950/20 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
-                    <span className="w-5 h-5 rounded-full bg-emerald-500/30 text-emerald-300 flex items-center justify-center text-[11px] font-bold">3</span>
+                  <span className="text-[13px] font-bold text-emerald-300 flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-emerald-500/30 text-emerald-300 flex items-center justify-center text-xs font-bold">3</span>
                     TẦNG 3: COOKIE BẢO MẬT KHÁNG CHECKPOINT (sb, datr, fr)
                   </span>
-                  <Tag color="green" className="text-[10px] m-0 font-semibold">Khuyên dùng (Để đạt 100% ĐỦ)</Tag>
+                  <Tag color="green" className="!text-xs m-0 font-semibold">Khuyên dùng (Để đạt 100% ĐỦ)</Tag>
                 </div>
 
                 <Form.Item name="securityCookies" className="!mb-0">
                   <Input.TextArea
                     rows={2}
                     placeholder="Ví dụ: sb=...; datr=...; fr=... (hoặc dán toàn bộ chuỗi cookie dài vào đây)"
-                    className="rounded-xl font-mono text-xs bg-slate-900/90 border-slate-700/80"
+                    className="rounded-xl font-mono text-[13px] bg-slate-900/90 border-slate-700/80"
                   />
                 </Form.Item>
-                <div className="text-[11px] text-slate-400">
+                <div className="text-xs text-slate-300">
                   🛡️ Facebook dùng datr và sb để nhận diện thiết bị quen thuộc. Có 2 mã này bot Playwright sẽ không bị Facebook nghi ngờ checkpoint.
                 </div>
               </div>
@@ -2171,20 +2171,20 @@ const Connections = () => {
               {/* TẦNG 4: PROXY RIÊNG CHO NICK */}
               <div className="p-3.5 rounded-2xl border border-slate-700/80 bg-slate-900/60 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                    <span className="w-5 h-5 rounded-full bg-slate-700 text-slate-300 flex items-center justify-center text-[11px] font-bold">4</span>
+                  <span className="text-[13px] font-bold text-slate-200 flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-slate-700 text-slate-200 flex items-center justify-center text-xs font-bold">4</span>
                     TẦNG 4: PROXY RIÊNG CHO NICK (HTTP/SOCKS5)
                   </span>
-                  <Tag className="text-[10px] m-0">Tùy chọn</Tag>
+                  <Tag className="!text-xs m-0">Tùy chọn</Tag>
                 </div>
 
                 <Form.Item name="proxyUrl" className="!mb-0">
                   <Input
                     placeholder="Ví dụ: http://user:pass@103.152.xxx.xxx:8080 (hoặc bỏ trống nếu dùng IP máy)"
-                    className="rounded-xl font-mono text-xs bg-slate-900/90 border-slate-700/80"
+                    className="rounded-xl font-mono text-[13px] bg-slate-900/90 border-slate-700/80"
                   />
                 </Form.Item>
-                <div className="text-[11px] text-slate-400">
+                <div className="text-xs text-slate-300">
                   🌐 Dành cho bạn nuôi nhiều nick cần gán IP riêng cố định để chống checkpoint chùm.
                 </div>
               </div>
@@ -2228,7 +2228,7 @@ const Connections = () => {
                         message.info('Vui lòng dán trực tiếp (Ctrl+V) vào ô bên dưới');
                       }
                     }}
-                    className="text-[11px] h-6 px-2.5 rounded-lg bg-blue-600/30 border-blue-500/40 text-blue-200 hover:bg-blue-600 hover:text-white"
+                    className="text-xs !h-7 px-2.5 rounded-lg bg-blue-600/30 border-blue-500/40 text-blue-200 hover:bg-blue-600 hover:text-white"
                   >
                     Dán từ Clipboard
                   </Button>
@@ -2238,7 +2238,7 @@ const Connections = () => {
                   rows={4}
                   value={rawCookieVia}
                   placeholder="Dán toàn bộ chuỗi Cookie vào đây (ví dụ: sb=...; c_user=1000...; xs=... hoặc định dạng JSON từ J2Team / Cookie-Editor)..."
-                  className="rounded-xl font-mono text-xs bg-slate-900/90 border-slate-700/80"
+                  className="rounded-xl font-mono text-[13px] bg-slate-900/90 border-slate-700/80"
                   onChange={(e) => {
                     const text = e.target.value;
                     setRawCookieVia(text);
@@ -2261,7 +2261,7 @@ const Connections = () => {
                   const parsed = smartExtractCookie(rawCookieVia);
                   if (parsed.isValid) {
                     return (
-                      <div className="space-y-1.5 p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs">
+                      <div className="space-y-1.5 p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[13px]">
                         <div className="flex items-center justify-between">
                           <span className="flex items-center gap-1.5 font-semibold">
                             <CheckCircleOutlined className="text-emerald-400" />
@@ -2269,7 +2269,7 @@ const Connections = () => {
                           </span>
                           <Tag color="success" className="mr-0 font-mono">Đã lấy c_user + xs</Tag>
                         </div>
-                        <div className="text-[11px] text-emerald-200/80 flex items-center justify-between pt-1 border-t border-emerald-500/20">
+                        <div className="text-xs text-emerald-200/90 flex items-center justify-between pt-1 border-t border-emerald-500/20">
                           <span>{parsed.hasDatrOrSb ? '🛡️ Đã có mã kháng checkpoint (sb/datr)!' : '⚠️ Chưa thấy sb/datr (Vẫn đăng được nhưng nên copy full cookie)'}</span>
                           <Button
                             type="link"
@@ -2285,14 +2285,14 @@ const Connections = () => {
                   }
                   if (rawCookieVia.trim()) {
                     return (
-                      <div className="p-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-1.5">
+                      <div className="p-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[13px] flex items-center gap-1.5">
                         <WarningOutlined className="text-amber-400" />
                         Chưa tìm thấy cặp <code className="bg-amber-950/40 px-1 rounded font-mono">c_user</code> và <code className="bg-amber-950/40 px-1 rounded font-mono">xs</code> hợp lệ. Hãy kiểm tra lại chuỗi copy.
                       </div>
                     );
                   }
                   return (
-                    <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                    <div className="text-xs text-slate-300 flex items-center gap-1">
                       <span>💡 Hỗ trợ: Chuỗi Cookie thô, định dạng JSON J2Team, hoặc chuỗi có chứa c_user & xs.</span>
                     </div>
                   );
@@ -2301,8 +2301,8 @@ const Connections = () => {
 
               <Form.Item
                 name="profileLabel"
-                label={<span className="font-medium text-slate-300 text-xs">Tên gợi nhớ Nick / Via</span>}
-                extra={<span className="text-[11px] text-slate-500">Ví dụ: Nick Chính 01, Nick Nuôi, Nick Phụ 1...</span>}
+                label={<span className="font-medium text-slate-200 text-[13px]">Tên gợi nhớ Nick / Via</span>}
+                extra={<span className="text-xs text-slate-400">Ví dụ: Nick Chính 01, Nick Nuôi, Nick Phụ 1...</span>}
               >
                 <Input placeholder="Ví dụ: Nick Chính 01" className="rounded-xl" />
               </Form.Item>
@@ -2318,7 +2318,7 @@ const Connections = () => {
               : 'border-slate-800 bg-slate-900/50'
           }`}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-slate-300">KIỂM TRA ĐỘ ĐẦY ĐỦ THÔNG SỐ CỦA VIA:</span>
+              <span className="text-[13px] font-bold text-slate-200">KIỂM TRA ĐỘ ĐẦY ĐỦ THÔNG SỐ CỦA VIA:</span>
               {viaCompletenessScore === 3 ? (
                 <Tag color="success" className="font-semibold m-0">🟢 100% HOÀN HẢO (ĐÃ ĐỦ)</Tag>
               ) : viaCompletenessScore === 2 ? (
@@ -2328,11 +2328,11 @@ const Connections = () => {
               )}
             </div>
 
-            <div className="grid grid-cols-3 gap-2 text-xs mb-1.5">
-              <div className={`p-1.5 rounded-lg border text-center ${hasViaCUser ? 'border-emerald-500/30 bg-emerald-950/40 text-emerald-300' : 'border-slate-800 bg-slate-900/60 text-slate-500'}`}>
+            <div className="grid grid-cols-3 gap-2 text-[13px] mb-1.5">
+              <div className={`p-1.5 rounded-lg border text-center ${hasViaCUser ? 'border-emerald-500/30 bg-emerald-950/40 text-emerald-300' : 'border-slate-800 bg-slate-900/60 text-slate-400'}`}>
                 👤 UID: {hasViaCUser ? '✅ Đã có' : '❌ Chưa có'}
               </div>
-              <div className={`p-1.5 rounded-lg border text-center ${hasViaXs ? 'border-emerald-500/30 bg-emerald-950/40 text-emerald-300' : 'border-slate-800 bg-slate-900/60 text-slate-500'}`}>
+              <div className={`p-1.5 rounded-lg border text-center ${hasViaXs ? 'border-emerald-500/30 bg-emerald-950/40 text-emerald-300' : 'border-slate-800 bg-slate-900/60 text-slate-400'}`}>
                 🔑 Phiên xs: {hasViaXs ? '✅ Đã có' : '❌ Chưa có'}
               </div>
               <div className={`p-1.5 rounded-lg border text-center ${hasViaSecurity ? 'border-emerald-500/30 bg-emerald-950/40 text-emerald-300' : 'border-amber-500/30 bg-amber-950/40 text-amber-400'}`}>
@@ -2340,7 +2340,7 @@ const Connections = () => {
               </div>
             </div>
 
-            <div className="text-[11px] text-slate-300 leading-relaxed">
+            <div className="text-xs text-slate-200 leading-relaxed">
               {viaCompletenessScore === 3
                 ? '🎉 Tuyệt vời! Nick đã có đủ toàn bộ thông số định danh, phiên làm việc và mã bảo mật (sb/datr) kháng checkpoint tối đa.'
                 : viaCompletenessScore === 2
@@ -2535,17 +2535,17 @@ const Connections = () => {
           {/* Stat counters */}
           <div className="grid grid-cols-3 gap-3">
             <div className="bg-slate-900/60 border border-slate-800 p-3.5 rounded-2xl">
-              <div className="text-[11px] text-slate-400">Tổng Page hợp lệ</div>
+              <div className="text-xs text-slate-300">Tổng Page hợp lệ</div>
               <div className="text-xl font-bold text-slate-100 mt-0.5">{auditedPages.length}</div>
             </div>
             <div className="bg-slate-900/60 border border-slate-800 p-3.5 rounded-2xl">
-              <div className="text-[11px] text-emerald-400">Đã xác minh quyền</div>
+              <div className="text-xs text-emerald-400">Đã xác minh quyền</div>
               <div className="text-xl font-bold text-emerald-400 mt-0.5">
                 {auditedPages.filter((p) => p.verificationStatus === 'VERIFIED').length}
               </div>
             </div>
             <div className="bg-slate-900/60 border border-slate-800 p-3.5 rounded-2xl">
-              <div className="text-[11px] text-slate-400">Trạng thái Via</div>
+              <div className="text-xs text-slate-300">Trạng thái Via</div>
               <div className="mt-1">
                 <StatusBadge account={pageAuditSource!} />
               </div>
@@ -2555,11 +2555,11 @@ const Connections = () => {
           {/* Quick sync all verified pages action bar */}
           <div className="flex items-center justify-between p-3 rounded-2xl bg-gradient-to-r from-blue-950/40 via-indigo-950/30 to-purple-950/40 border border-blue-500/30">
             <div>
-              <div className="font-semibold text-xs text-blue-200 flex items-center gap-1.5">
+              <div className="font-semibold text-[13px] text-blue-200 flex items-center gap-1.5">
                 <ThunderboltOutlined className="text-amber-400" />
                 Đồng bộ vào danh sách kênh xuất bản
               </div>
-              <div className="text-[11px] text-slate-400 mt-0.5">
+              <div className="text-xs text-slate-300 mt-0.5">
                 Thêm ngay toàn bộ Fanpage đã kiểm kê vào hệ thống để bắt đầu lên lịch và đăng bài.
               </div>
             </div>
@@ -2573,7 +2573,7 @@ const Connections = () => {
                   importPagesMutation.mutate({ accountId: pageAuditSource.id });
                 }
               }}
-              className="bg-emerald-600 hover:bg-emerald-500 font-semibold text-xs rounded-xl shadow-md shrink-0"
+              className="bg-emerald-600 hover:bg-emerald-500 font-semibold text-[13px] rounded-xl shadow-md shrink-0"
             >
               Đồng bộ tất cả vào Tool
             </Button>
@@ -2585,7 +2585,7 @@ const Connections = () => {
             dataSource={auditedPages}
             loading={managedPagesQuery.isLoading || scanManagedPagesMutation.isPending}
             pagination={{ pageSize: 8 }}
-            size="small"
+            size="middle"
             columns={[
               {
                 title: 'Fanpage',
@@ -2594,8 +2594,8 @@ const Connections = () => {
                   <div className="flex items-center gap-2.5 py-0.5">
                     <Avatar src={r.avatarUrl} icon={<FacebookOutlined />} size={28} className="bg-blue-600 text-white shrink-0" />
                     <div className="min-w-0">
-                      <div className="font-semibold text-slate-200 text-xs truncate max-w-[200px]">{r.pageName}</div>
-                      <div className="font-mono text-[10px] text-slate-500">ID: {r.pageId}</div>
+                      <div className="font-semibold text-slate-100 text-[13px] truncate max-w-[200px]">{r.pageName}</div>
+                      <div className="font-mono text-xs text-slate-400">ID: {r.pageId}</div>
                     </div>
                   </div>
                 ),
@@ -2604,19 +2604,19 @@ const Connections = () => {
                 title: 'Quyền quản trị',
                 dataIndex: 'verificationStatus',
                 key: 'verificationStatus',
-                width: 160,
+                width: 170,
                 render: (st: FacebookPageAccess['verificationStatus']) => <PageAccessStatusTag status={st} />,
               },
               {
                 title: 'Hành động',
                 key: 'action',
-                width: 140,
+                width: 145,
                 render: (_, r) => {
                   const isConnected = publishableAccounts.some((a) => String(a.platformAccountId) === String(r.pageId));
                   return (
                     <div className="flex items-center justify-end gap-1.5">
                       {isConnected ? (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                        <span className="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                           Đã kết nối
                         </span>
                       ) : (
@@ -2630,7 +2630,7 @@ const Connections = () => {
                               importPagesMutation.mutate({ accountId: pageAuditSource.id, pageIds: [r.pageId] });
                             }
                           }}
-                          className="text-[11px] h-6 px-2.5 bg-blue-600 rounded-md font-medium"
+                          className="text-xs !h-7 px-2.5 bg-blue-600 rounded-md font-medium"
                         >
                           Thêm
                         </Button>
@@ -2720,22 +2720,22 @@ const Connections = () => {
         }
       >
         <div className="space-y-4 pt-2 text-slate-200">
-          <p className="text-xs text-slate-400 leading-relaxed m-0">
+          <p className="text-[13px] text-slate-300 leading-relaxed m-0">
             Nếu bạn quản lý <b>nhiều Chrome Profile</b> (Profile 1, Profile 2, Nick A, Nick B...), bạn không cần copy cookie hay gõ mật khẩu. Chỉ cần dùng Extension ToolZutter có sẵn trong máy:
           </p>
 
           <div className="rounded-xl border border-blue-500/30 bg-blue-950/20 p-3.5 space-y-2">
-            <div className="flex items-center gap-2 text-xs font-bold text-blue-300">
-              <span className="w-5 h-5 rounded-full bg-blue-500/30 flex items-center justify-center text-[11px]">1</span>
+            <div className="flex items-center gap-2 text-[13px] font-bold text-blue-300">
+              <span className="w-5 h-5 rounded-full bg-blue-500/30 flex items-center justify-center text-xs">1</span>
               Cài tiện ích ToolZutter vào Chrome (Chỉ làm 1 lần)
             </div>
-            <ol className="text-xs text-slate-300 space-y-1.5 pl-6 m-0 list-decimal">
+            <ol className="text-[13px] text-slate-200 space-y-1.5 pl-6 m-0 list-decimal">
               <li>Mở tab mới trên Chrome: <code className="bg-slate-800 px-1.5 py-0.5 rounded text-sky-400 font-mono">chrome://extensions/</code></li>
               <li>Bật công tắc <b>"Chế độ dành cho nhà phát triển" (Developer mode)</b> ở góc trên cùng bên phải.</li>
               <li>Bấm nút <b>"Tải tiện ích đã giải nén" (Load unpacked)</b> ở góc trên cùng bên trái.</li>
               <li>Chọn thư mục extension trên máy tính (nằm trong thư mục mã nguồn dự án):
                 <div className="mt-1.5 flex items-center gap-2 bg-slate-900 p-2 rounded-lg border border-slate-700/80">
-                  <span className="text-[11px] font-mono text-emerald-400 truncate flex-1">
+                  <span className="text-xs font-mono text-emerald-400 truncate flex-1">
                     auto-post-saas/extension
                   </span>
                   <Button
@@ -2755,17 +2755,17 @@ const Connections = () => {
           </div>
 
           <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-3.5 space-y-2">
-            <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
-              <span className="w-5 h-5 rounded-full bg-amber-500/30 flex items-center justify-center text-[11px]">2</span>
+            <div className="flex items-center gap-2 text-[13px] font-bold text-amber-300">
+              <span className="w-5 h-5 rounded-full bg-amber-500/30 flex items-center justify-center text-xs">2</span>
               Đồng bộ nick Facebook ở bất kỳ Profile nào (Mất 1 giây)
             </div>
-            <ol className="text-xs text-slate-300 space-y-1.5 pl-6 m-0 list-decimal">
+            <ol className="text-[13px] text-slate-200 space-y-1.5 pl-6 m-0 list-decimal">
               <li>Mở bất kỳ Chrome Profile nào bạn đang đăng nhập Facebook.</li>
               <li>Bấm vào icon <b>ToolZutter (⚡)</b> trên thanh công cụ của Chrome.</li>
               <li>Chuyển sang tab <b>🔑 Cookie FB</b>.</li>
               <li>Bấm nút <b>"⚡ Đồng Bộ Nick Này Sang ToolZutter (1-Chạm)"</b>.</li>
             </ol>
-            <div className="p-2 rounded-lg bg-emerald-950/40 border border-emerald-800/50 text-[11px] text-emerald-300 flex items-center gap-2 mt-2">
+            <div className="p-2 rounded-lg bg-emerald-950/40 border border-emerald-800/50 text-xs text-emerald-300 flex items-center gap-2 mt-2">
               <CheckCircleOutlined className="text-emerald-400 shrink-0" />
               <span><b>Tự động 100%:</b> Tool lập tức nhận diện Nick Via, lưu kết nối và quét sạch toàn bộ Fanpage mà Via đó quản trị!</span>
             </div>

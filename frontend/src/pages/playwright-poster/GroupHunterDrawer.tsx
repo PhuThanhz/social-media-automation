@@ -15,7 +15,6 @@ import {
   App,
 } from 'antd';
 import {
-  CheckCircleOutlined,
   ThunderboltOutlined,
   RocketOutlined,
   TeamOutlined,
@@ -28,15 +27,42 @@ import {
   StarOutlined,
   StarFilled,
   CloseOutlined,
-  FireOutlined,
   PictureOutlined,
   PlayCircleOutlined,
-  RobotOutlined,
+  UserOutlined,
+  VideoCameraOutlined,
+  ClockCircleOutlined,
+  FileTextOutlined,
+  WarningOutlined,
+  SafetyCertificateOutlined,
+  ScheduleOutlined,
+  ExportOutlined,
+  BulbOutlined,
+  CheckOutlined,
+  SyncOutlined,
+  CommentOutlined,
+  ReadOutlined,
+  ScissorOutlined,
+  AppstoreOutlined,
+  CameraOutlined,
+  CrownOutlined,
+  KeyOutlined,
 } from '@ant-design/icons';
 import { getStoredGeminiKeys } from '../../components/modals/AiSettingsModal';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
+import type { ScrapeAccountOption } from './shared';
 import type { SocialAccount } from './types';
+
+function SparklesSvg({ className = 'w-3.5 h-3.5' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
+      <path d="M20 3v4" />
+      <path d="M22 5h-4" />
+    </svg>
+  );
+}
 
 interface GroupHunterDrawerProps {
   groupHunterDrawerVisible: boolean;
@@ -98,7 +124,9 @@ interface GroupHunterDrawerProps {
   allFavoriteGroups: { name: string; url: string; isConnected?: boolean; category: "PHIM" | "GENERAL"; }[];
   filteredFavoriteGroups: { name: string; url: string; isConnected?: boolean; category: "PHIM" | "GENERAL"; }[];
   visibleFavoriteGroups: { name: string; url: string; isConnected?: boolean; category: "PHIM" | "GENERAL"; }[];
-  activeScrapeAccount: SocialAccount;
+  activeScrapeAccount?: SocialAccount;
+  scrapeAccountOptions: ScrapeAccountOption[];
+  setGroupHunterScrapeAccountId: (id: number | null) => void;
 }
 
 // Drawer quét bài viết từ Facebook Group / Fanpage — tách từ PlaywrightPoster, state vẫn nằm ở trang cha
@@ -163,6 +191,8 @@ function GroupHunterDrawer({
   filteredFavoriteGroups,
   visibleFavoriteGroups,
   activeScrapeAccount,
+  scrapeAccountOptions,
+  setGroupHunterScrapeAccountId,
 }: GroupHunterDrawerProps) {
   const { message } = App.useApp();
   return (
@@ -211,7 +241,7 @@ function GroupHunterDrawer({
               icon={<ThunderboltOutlined />}
               className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold border-none shadow-lg shadow-emerald-950/40 rounded-xl"
             >
-              ⚡ Duyệt nhanh kiểu Tinder ({groupHunterSelectedIds.size} bài)
+              Duyệt nhanh kiểu Tinder ({groupHunterSelectedIds.size} bài)
             </Button>
             <Button
               type="primary"
@@ -238,10 +268,49 @@ function GroupHunterDrawer({
               <h3>Chọn nguồn cần quét</h3>
               <p>Dán link Group hoặc chọn nhanh một nhóm bạn thường sử dụng.</p>
             </div>
-            <span className="group-hunter-account">
-              <CheckCircleOutlined />
-              Đang dùng cookie: <b>{activeScrapeAccount?.pageName || 'Tài khoản kết nối'}</b>
-            </span>
+            <Tooltip title="Nhóm riêng tư chỉ Via nào đã tham gia mới quét được. Đổi Via cá nhân tại đây nếu nhóm báo không có quyền xem.">
+              <div className="group-hunter-account is-picker">
+                <UserOutlined />
+                <span>Via quét:</span>
+                {scrapeAccountOptions.length > 0 ? (
+                  <Select
+                    size="small"
+                    variant="borderless"
+                    popupMatchSelectWidth={false}
+                    value={activeScrapeAccount?.id}
+                    onChange={(val) => setGroupHunterScrapeAccountId(Number(val))}
+                    className="group-hunter-via-select"
+                    options={scrapeAccountOptions.map((opt) => ({
+                      value: opt.id,
+                      label: opt.isPersonalVia ? `${opt.name} · Via cá nhân` : opt.name,
+                      opt,
+                    }))}
+                    optionRender={(option) => {
+                      const opt = (option.data as { opt?: ScrapeAccountOption }).opt;
+                      if (!opt) return option.label;
+                      return (
+                        <div className="flex items-center justify-between gap-3 py-0.5">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`w-2 h-2 rounded-full ${
+                                opt.isHealthy ? 'bg-emerald-400' : opt.tokenStatus === 'EXPIRING_SOON' ? 'bg-amber-400' : 'bg-rose-400'
+                              }`}
+                            />
+                            <span className="font-semibold text-slate-100">{opt.name}</span>
+                          </div>
+                          <span className="text-xs text-slate-400">
+                            {opt.isPersonalVia ? 'Via cá nhân' : 'Cookie Page'}
+                            {!opt.isHealthy ? ` · ${opt.tokenStatus === 'EXPIRED' ? 'Hết hạn' : 'Sắp hết hạn'}` : ''}
+                          </span>
+                        </div>
+                      );
+                    }}
+                  />
+                ) : (
+                  <b>{activeScrapeAccount?.pageName || 'Chưa có Via kết nối'}</b>
+                )}
+              </div>
+            </Tooltip>
           </div>
           <div className="group-hunter-form-grid">
             <div className="group-hunter-field group-hunter-field-url">
@@ -378,14 +447,15 @@ function GroupHunterDrawer({
                 <button
                   type="button"
                   onClick={() => setFavoriteGroupCategoryFilter('PHIM')}
-                  className={`px-3 py-1 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-md ${
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md ${
                     favoriteGroupCategoryFilter === 'PHIM'
                       ? 'bg-gradient-to-r from-rose-600 to-amber-600 text-white shadow-rose-600/30 ring-1 ring-white/30'
                       : 'bg-rose-950/60 text-rose-300 border border-rose-800/50 hover:bg-rose-900/60'
                   }`}
                 >
-                  <span>🎬 Nhóm Phim (Bí ý tưởng)</span>
-                  <span className="px-1.5 py-0.2 rounded-full bg-rose-500/30 text-rose-200 text-[10px]">
+                  <VideoCameraOutlined />
+                  <span>Nhóm Phim (Bí ý tưởng)</span>
+                  <span className="px-2 py-0.5 rounded-full bg-rose-500/30 text-rose-200 text-xs">
                     {allFavoriteGroups.filter((g) => g.category === 'PHIM').length}
                   </span>
                 </button>
@@ -415,7 +485,7 @@ function GroupHunterDrawer({
                       className={`group-hunter-favorite-card ${isSelected ? 'is-selected' : ''}`}
                     >
                       <span className="group-hunter-favorite-icon">
-                        {g.category === 'PHIM' ? <span className="text-rose-400">🎬</span> : <TeamOutlined />}
+                        {g.category === 'PHIM' ? <VideoCameraOutlined className="text-rose-400" /> : <TeamOutlined />}
                       </span>
                       <span className="group-hunter-favorite-name" title={g.name}>{g.name}</span>
                       <span className="group-hunter-favorite-actions">
@@ -469,95 +539,97 @@ function GroupHunterDrawer({
             {/* Thanh công cụ lọc & cấu hình rải lịch */}
             <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-3 sm:p-4 space-y-3">
               <div className="flex items-center justify-between flex-wrap gap-3">
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2.5 flex-wrap">
                   <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Lọc loại bài:</span>
                   <Select
                     size="small"
                     value={groupHunterMediaFilter}
                     onChange={(val) => setGroupHunterMediaFilter(val)}
-                    className="w-40 text-xs"
+                    className="w-52 text-xs"
+                    popupMatchSelectWidth={false}
                     options={[
-                      { value: 'ALL', label: '📋 Tất cả bài viết' },
-                      { value: 'MEDIA_ONLY', label: '🖼️ Có Ảnh hoặc Video' },
-                      { value: 'IMAGE_ONLY', label: '📷 Chỉ bài có Ảnh' },
-                      { value: 'VIDEO_ONLY', label: '🎬 Chỉ bài có Video' },
+                      {
+                        value: 'ALL',
+                        label: (
+                          <span className="inline-flex items-center gap-1.5">
+                            <AppstoreOutlined className="text-slate-400" />
+                            <span>Tất cả bài viết ({groupHunterResults.length})</span>
+                          </span>
+                        ),
+                      },
+                      {
+                        value: 'MEDIA_ONLY',
+                        label: (
+                          <span className="inline-flex items-center gap-1.5">
+                            <PictureOutlined className="text-emerald-400" />
+                            <span>Có Ảnh hoặc Video ({groupHunterResults.filter((it) => it.mediaCount > 0).length})</span>
+                          </span>
+                        ),
+                      },
+                      {
+                        value: 'IMAGE_ONLY',
+                        label: (
+                          <span className="inline-flex items-center gap-1.5">
+                            <CameraOutlined className="text-sky-400" />
+                            <span>Chỉ bài có Ảnh ({groupHunterResults.filter((it) => it.mediaType === 'IMAGE').length})</span>
+                          </span>
+                        ),
+                      },
+                      {
+                        value: 'VIDEO_ONLY',
+                        label: (
+                          <span className="inline-flex items-center gap-1.5">
+                            <PlayCircleOutlined className="text-rose-400" />
+                            <span>Chỉ bài có Video ({groupHunterResults.filter((it) => it.mediaType === 'VIDEO').length})</span>
+                          </span>
+                        ),
+                      },
                     ]}
                   />
 
                   <button
                     type="button"
                     onClick={() => setGroupHunterSkipImported(!groupHunterSkipImported)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 ${groupHunterSkipImported
-                      ? 'bg-blue-500/20 text-blue-300 border-blue-500/40 shadow-xs'
-                      : 'bg-slate-800 text-slate-400 border-slate-700'
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all border flex items-center gap-1.5 cursor-pointer ${groupHunterSkipImported
+                      ? 'bg-blue-500/15 text-blue-300 border-blue-500/40'
+                      : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-slate-200'
                       }`}
                   >
-                    <span>🛡️ Bỏ bài đã có trong Lịch ({groupHunterResults.filter((it) => it.isAlreadyImported).length})</span>
-                    <span className={`w-2 h-2 rounded-full ${groupHunterSkipImported ? 'bg-blue-400' : 'bg-slate-500'}`} />
+                    <SafetyCertificateOutlined className={groupHunterSkipImported ? 'text-blue-400' : 'text-slate-500'} />
+                    <span>Bỏ bài đã có trong Lịch ({groupHunterResults.filter((it) => it.isAlreadyImported).length})</span>
+                    <span className={`w-1.5 h-1.5 rounded-full ${groupHunterSkipImported ? 'bg-blue-400' : 'bg-slate-500'}`} />
                   </button>
                 </div>
 
-                {/* Cấu hình rải lịch */}
-                {/* Cấu hình rải lịch */}
+                {/* Xếp vào lịch đăng chung (giờ cụ thể theo Lịch đăng trên header) */}
                 <div className="flex items-center gap-3 flex-wrap">
                   <button
                     type="button"
                     onClick={() => setGroupHunterAutoSchedule(!groupHunterAutoSchedule)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 ${groupHunterAutoSchedule
-                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-xs'
-                      : 'bg-slate-800 text-slate-400 border-slate-700'
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all border flex items-center gap-1.5 cursor-pointer ${groupHunterAutoSchedule
+                      ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
+                      : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-slate-200'
                       }`}
                   >
-                    <span>📅 Tự động rải lịch</span>
-                    <span className={`w-2 h-2 rounded-full ${groupHunterAutoSchedule ? 'bg-emerald-400' : 'bg-slate-500'}`} />
+                    <ScheduleOutlined className={groupHunterAutoSchedule ? 'text-emerald-400' : 'text-slate-500'} />
+                    <span>Xếp vào lịch đăng</span>
+                    <span className={`w-1.5 h-1.5 rounded-full ${groupHunterAutoSchedule ? 'bg-emerald-400' : 'bg-slate-500'}`} />
                   </button>
 
-                  {groupHunterAutoSchedule && (
-                    <div className="flex items-center gap-2 text-xs text-slate-300 bg-slate-950/70 px-2.5 py-1 rounded-xl border border-slate-800">
-                      <Radio.Group
-                        size="small"
-                        value={groupHunterScheduleMode}
-                        onChange={(e) => setGroupHunterScheduleMode(e.target.value)}
-                        className="text-xs"
-                      >
-                        <Radio.Button value="GOLDEN_HOURS" className="text-xs font-bold text-amber-300">
-                          🌟 Giờ Vàng (8h, 12h, 18h, 20h45)
-                        </Radio.Button>
-                        <Radio.Button value="INTERVAL" className="text-xs font-semibold">
-                          ⏱️ Đều đặn
-                        </Radio.Button>
-                      </Radio.Group>
-
-                      {groupHunterScheduleMode === 'INTERVAL' && (
-                        <div className="flex items-center gap-1.5 pl-1 border-l border-slate-800">
-                          <span>Mỗi</span>
-                          <InputNumber
-                            size="small"
-                            min={5}
-                            max={720}
-                            value={groupHunterInterval}
-                            onChange={(v) => setGroupHunterInterval(Number(v) || 60)}
-                            className="w-16"
-                          />
-                          <span>phút/bài</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
               </div>
 
               {/* Hàng công cụ Gemini AI & Làm sạch bài viết */}
-              <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between flex-wrap gap-2 text-xs">
+              <div className="pt-2.5 border-t border-slate-800/80 flex items-center justify-between flex-wrap gap-2 text-xs">
                 <div className="flex items-center gap-2 flex-wrap">
                   <Button
                     size="small"
-                    icon={<RobotOutlined className="text-amber-400" />}
+                    icon={<SparklesSvg className="w-3.5 h-3.5 text-amber-400" />}
                     loading={groupHunterAiCurating}
                     onClick={handleGeminiCurateGroupPosts}
-                    className="text-xs font-bold bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20"
+                    className="text-xs font-semibold bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20 inline-flex items-center"
                   >
-                    ✨ Gemini AI Thẩm định &amp; Lọc rác
+                    Gemini AI Thẩm định &amp; Lọc rác
                   </Button>
 
                   <Button
@@ -565,15 +637,15 @@ function GroupHunterDrawer({
                     icon={<ClearOutlined className="text-emerald-400" />}
                     onClick={handleCleanSpamFromSelectedPosts}
                     disabled={groupHunterSelectedIds.size === 0}
-                    className="text-xs font-bold bg-emerald-500/10 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20"
+                    className="text-xs font-semibold bg-emerald-500/10 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20"
                     title="Xoá sạch số điện thoại, Zalo, link quảng cáo, STK ngân hàng và hashtag thừa"
                   >
-                    🧼 Dọn rác &amp; SĐT ({groupHunterSelectedIds.size})
+                    Dọn rác &amp; SĐT ({groupHunterSelectedIds.size})
                   </Button>
 
                   <Button
                     size="small"
-                    icon={<FireOutlined className="text-purple-400" />}
+                    icon={<EditOutlined className="text-purple-400" />}
                     onClick={() => {
                       if (groupHunterSelectedIds.size === 0) {
                         message.warning('Vui lòng chọn ít nhất 1 bài viết để AI viết lại!');
@@ -583,30 +655,32 @@ function GroupHunterDrawer({
                       setGroupHunterBatchAiOpen(true);
                     }}
                     disabled={groupHunterSelectedIds.size === 0}
-                    className="text-xs font-bold bg-purple-500/10 text-purple-300 border-purple-500/30 hover:bg-purple-500/20"
+                    className="text-xs font-semibold bg-purple-500/10 text-purple-300 border-purple-500/30 hover:bg-purple-500/20"
                     title="Viết lại hàng loạt theo phong cách: Hook giật tít, Storytelling, Kích thích bình luận..."
                   >
-                    ✨ Viết lại AI ({groupHunterSelectedIds.size})
+                    Viết lại AI ({groupHunterSelectedIds.size})
                   </Button>
 
                   {groupHunterResults.some((it) => it.aiCurated) && (
                     <button
                       type="button"
                       onClick={() => setGroupHunterAiOnlyQuality(!groupHunterAiOnlyQuality)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 ${
+                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all border flex items-center gap-1.5 cursor-pointer ${
                         groupHunterAiOnlyQuality
-                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-xs'
-                          : 'bg-slate-800 text-slate-400 border-slate-700'
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                          : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-slate-200'
                       }`}
                     >
-                      <span>💎 Chỉ lấy bài điểm cao (&ge; 70 &amp; Sạch rác)</span>
-                      <span className={`w-2 h-2 rounded-full ${groupHunterAiOnlyQuality ? 'bg-amber-400' : 'bg-slate-500'}`} />
+                      <CrownOutlined className={groupHunterAiOnlyQuality ? 'text-amber-400' : 'text-slate-500'} />
+                      <span>Chỉ lấy bài điểm cao (&ge; 70 &amp; Sạch rác)</span>
+                      <span className={`w-1.5 h-1.5 rounded-full ${groupHunterAiOnlyQuality ? 'bg-amber-400' : 'bg-slate-500'}`} />
                     </button>
                   )}
                 </div>
 
-                <span className="text-[11px] text-slate-400">
-                  Key Gemini: <strong className="text-emerald-400">{getStoredGeminiKeys() ? 'Đã kích hoạt' : 'Hệ thống'}</strong>
+                <span className="inline-flex items-center gap-1.5 text-xs text-slate-300">
+                  <KeyOutlined className="text-emerald-400" />
+                  <span>Key Gemini: <strong className="text-emerald-400">{getStoredGeminiKeys() ? 'Đã kích hoạt' : 'Hệ thống'}</strong></span>
                 </span>
               </div>
             </div>
@@ -672,17 +746,17 @@ function GroupHunterDrawer({
                               </>
                             ) : (
                               <>
-                                <span className="text-base">📝</span>
+                                <FileTextOutlined className="text-xl" />
                                 <span>Bài Text</span>
                               </>
                             )}
                           </div>
                         )}
-                        <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-blue-600/90 text-[10px] text-white font-bold">
+                        <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-blue-600/90 text-xs text-white font-bold">
                           #{idx + 1}
                         </span>
                         {item.mediaCount > 1 && (
-                          <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-md bg-black/80 text-[10px] text-white font-mono font-bold">
+                          <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-md bg-black/80 text-xs text-white font-mono font-bold">
                             +{item.mediaCount}
                           </span>
                         )}
@@ -708,19 +782,22 @@ function GroupHunterDrawer({
                             target="_blank"
                             rel="noreferrer"
                             onClick={(e) => e.stopPropagation()}
-                            className="text-[11px] text-slate-400 hover:text-blue-400 underline font-mono flex items-center gap-1"
+                            className="text-xs text-slate-300 hover:text-blue-400 font-medium inline-flex items-center gap-1 transition-colors"
                           >
-                            Xem trên FB ↗
+                            <span>Xem trên FB</span>
+                            <ExportOutlined className="text-[11px]" />
                           </a>
                         </div>
 
                         <div className="flex items-center justify-between gap-1">
-                          <div className="text-[11px] text-blue-300 font-bold truncate">
-                            👤 {item.author || 'Thành viên'}
+                          <div className="text-xs text-blue-300 font-bold truncate inline-flex items-center gap-1.5">
+                            <UserOutlined className="text-blue-400 shrink-0" />
+                            <span className="truncate">{item.author || 'Thành viên'}</span>
                           </div>
                           {item.isAlreadyImported && (
-                            <span className="px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-bold shrink-0">
-                              ⚠️ Đã có trong Lịch
+                            <span className="px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold shrink-0 inline-flex items-center gap-1">
+                              <WarningOutlined className="text-[11px]" />
+                              <span>Đã có trong Lịch</span>
                             </span>
                           )}
                         </div>
@@ -729,27 +806,30 @@ function GroupHunterDrawer({
                         {item.aiCurated && (
                           <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
                             {item.aiScore !== undefined && item.aiScore >= 80 ? (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                                💎 Cực Phẩm ({item.aiScore}/100)
+                              <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 inline-flex items-center gap-1">
+                                <CrownOutlined className="text-[11px]" />
+                                <span>Cực Phẩm ({item.aiScore}/100)</span>
                               </span>
                             ) : item.aiScore !== undefined && item.aiScore >= 65 ? (
-                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                                ⭐ Đạt chuẩn ({item.aiScore}/100)
+                              <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 inline-flex items-center gap-1">
+                                <StarOutlined className="text-[11px]" />
+                                <span>Đạt chuẩn ({item.aiScore}/100)</span>
                               </span>
                             ) : (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700">
+                              <span className="text-xs px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700">
                                 Điểm: {item.aiScore}/100
                               </span>
                             )}
                             {item.isSpam && (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40">
-                                ⚠️ AI: Rác / Spam
+                              <span className="text-xs font-bold px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 inline-flex items-center gap-1">
+                                <WarningOutlined className="text-[11px]" />
+                                <span>AI: Rác / Spam</span>
                               </span>
                             )}
                           </div>
                         )}
 
-                        <p className="text-xs text-slate-200 line-clamp-2 font-medium mb-0">
+                        <p className="text-[13px] text-slate-200 line-clamp-2 font-medium mb-0">
                           {item.caption || 'Bài viết không có tiêu đề'}
                         </p>
 
@@ -761,55 +841,66 @@ function GroupHunterDrawer({
                               e.stopPropagation();
                               handleApplyGroupHunterHook(item);
                             }}
-                            className="text-[10px] text-amber-300 hover:text-amber-200 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 rounded px-2 py-1 text-left font-medium line-clamp-1 transition-all cursor-pointer block w-full"
+                            className="text-xs text-amber-300 hover:text-amber-200 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 rounded px-2 py-1 text-left font-medium transition-all cursor-pointer flex items-center gap-1.5 w-full"
                             title={`Bấm để chèn vào đầu bài: "${item.suggestedHook}"`}
                           >
-                            🎣 Chèn Hook AI: "{item.suggestedHook}"
+                            <BulbOutlined className="shrink-0 text-amber-400" />
+                            <span className="truncate">Chèn Hook AI: "{item.suggestedHook}"</span>
                           </button>
                         )}
 
                         {item.aiRewritten && (
-                          <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
-                            ✓ Đã chèn Hook AI mở đầu
+                          <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1">
+                            <CheckOutlined /> Đã chèn Hook AI mở đầu
                           </span>
                         )}
 
-                        <div className="flex items-center gap-2 pt-1 flex-wrap text-[10px]">
+                        <div className="flex items-center gap-2 pt-1 flex-wrap text-xs">
                           {item.mediaType === 'VIDEO' && (
-                            <span className="px-1.5 py-0.5 rounded-md bg-rose-500/15 text-rose-300 font-bold border border-rose-500/20">
-                              🎬 Video
+                            <span className="px-2 py-0.5 rounded-md bg-rose-500/15 text-rose-300 font-semibold border border-rose-500/20 inline-flex items-center gap-1">
+                              <PlayCircleOutlined className="text-[11px]" />
+                              <span>Video</span>
                             </span>
                           )}
                           {item.mediaType === 'IMAGE' && (
-                            <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 font-bold border border-emerald-500/20">
-                              🖼️ {item.mediaCount} ảnh
+                            <span className="px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 font-semibold border border-emerald-500/20 inline-flex items-center gap-1">
+                              <PictureOutlined className="text-[11px]" />
+                              <span>{item.mediaCount} ảnh</span>
                             </span>
                           )}
                           {item.mediaType === 'TEXT' && (
-                            <span className="px-1.5 py-0.5 rounded-md bg-slate-700/40 text-slate-400 border border-slate-700/50">
-                              📄 Chữ
+                            <span className="px-2 py-0.5 rounded-md bg-slate-700/40 text-slate-300 border border-slate-700/50 inline-flex items-center gap-1">
+                              <FileTextOutlined className="text-[11px]" />
+                              <span>Chữ</span>
                             </span>
                           )}
                           {item.dateUnknown ? (
-                            <span className="px-1.5 py-0.5 rounded-md bg-slate-700/40 text-slate-300 border border-slate-600/50">
+                            <span className="px-2 py-0.5 rounded-md bg-slate-700/40 text-slate-300 border border-slate-600/50 truncate" style={{ maxWidth: 165 }}>
                               Không rõ ngày{item.postedTime && item.postedTime !== 'Gần đây' ? ` (${item.postedTime})` : ''}
                             </span>
                           ) : item.postedAt ? (
                             <Tooltip title={item.postedTime ? `Facebook hiển thị: ${item.postedTime}` : undefined}>
-                              <span className="px-1.5 py-0.5 rounded-md bg-blue-500/15 text-blue-300 font-semibold border border-blue-500/25 flex items-center gap-1">
-                                ⏰ {dayjs(item.postedAt).format('HH:mm DD/MM/YYYY')}
+                              <span className="px-2 py-0.5 rounded-md bg-blue-500/15 text-blue-300 font-semibold border border-blue-500/25 inline-flex items-center gap-1">
+                                <ClockCircleOutlined className="text-[11px]" />
+                                <span>{dayjs(item.postedAt).format('HH:mm DD/MM/YYYY')}</span>
                               </span>
                             </Tooltip>
                           ) : item.postedTime && (
-                            <span className="px-1.5 py-0.5 rounded-md bg-blue-500/15 text-blue-300 font-semibold border border-blue-500/25 flex items-center gap-1">
-                              ⏰ {item.postedTime}
+                            <span className="px-2 py-0.5 rounded-md bg-blue-500/15 text-blue-300 font-semibold border border-blue-500/25 inline-flex items-center gap-1" style={{ maxWidth: 165 }}>
+                              <ClockCircleOutlined className="text-[11px] shrink-0" />
+                              <span className="truncate">{item.postedTime}</span>
                             </span>
                           )}
                         </div>
 
                         <div className="flex items-center justify-between pt-1.5 border-t border-slate-800/60 mt-1">
-                          <span className="text-[10px] text-slate-400 truncate max-w-[120px]">
-                            {item.originalCaption && item.originalCaption !== item.caption ? '✨ Đã sửa nội dung' : ''}
+                          <span className="text-xs text-slate-300 truncate max-w-[120px] inline-flex items-center gap-1">
+                            {item.originalCaption && item.originalCaption !== item.caption ? (
+                              <>
+                                <SparklesSvg className="w-3 h-3 text-purple-400 shrink-0" />
+                                <span>Đã sửa nội dung</span>
+                              </>
+                            ) : ''}
                           </span>
                           <button
                             type="button"
@@ -817,7 +908,7 @@ function GroupHunterDrawer({
                               e.stopPropagation();
                               setGroupHunterPreviewItem(item);
                             }}
-                            className="text-[10px] text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1 cursor-pointer bg-blue-500/10 hover:bg-blue-500/20 px-2 py-0.5 rounded border border-blue-500/20 transition-all"
+                            className="text-xs text-blue-300 hover:text-white font-semibold flex items-center gap-1 cursor-pointer bg-blue-500/10 hover:bg-blue-500/20 px-2.5 py-1 rounded border border-blue-500/20 transition-all"
                           >
                             <EyeOutlined /> Xem &amp; Sửa bài
                           </button>
@@ -852,8 +943,8 @@ function GroupHunterDrawer({
       <Modal
         title={
           <div className="flex items-center gap-2">
-            <RobotOutlined className="text-amber-400 text-lg" />
-            <span className="font-bold text-white">✨ Viết Lại Nội Dung Hàng Loạt Bằng Gemini AI</span>
+            <SparklesSvg className="w-4 h-4 text-amber-400" />
+            <span className="font-bold text-white">Viết Lại Nội Dung Hàng Loạt Bằng Gemini AI</span>
           </div>
         }
         open={groupHunterBatchAiOpen}
@@ -885,46 +976,61 @@ function GroupHunterDrawer({
             className="w-full space-y-2.5"
           >
             <div className={`p-3 rounded-xl border transition-all cursor-pointer ${groupHunterBatchAiMode === 'REWRITE' ? 'bg-purple-950/30 border-purple-500/60' : 'bg-slate-900/60 border-slate-800'}`}>
-              <Radio value="REWRITE" className="font-bold text-slate-200 text-xs">
-                🔄 Viết lại hoàn toàn (Paraphrase) — Chống trùng lặp FB 100%
+              <Radio value="REWRITE" className="font-bold text-slate-100 text-[13px]">
+                <span className="inline-flex items-center gap-1.5">
+                  <SyncOutlined className="text-purple-400" />
+                  <span>Viết lại hoàn toàn (Paraphrase) — Chống trùng lặp FB 100%</span>
+                </span>
               </Radio>
-              <div className="text-[11px] text-slate-400 pl-6 mt-0.5">
+              <div className="text-xs text-slate-300 pl-6 mt-0.5">
                 Đổi từ ngữ và cấu trúc câu nhưng giữ trọn ý nghĩa và số liệu gốc, giúp bài viết độc bản, không bị Facebook đánh gậy sao chép.
               </div>
             </div>
 
             <div className={`p-3 rounded-xl border transition-all cursor-pointer ${groupHunterBatchAiMode === 'HOOK' ? 'bg-purple-950/30 border-purple-500/60' : 'bg-slate-900/60 border-slate-800'}`}>
-              <Radio value="HOOK" className="font-bold text-slate-200 text-xs">
-                🎣 Thêm Hook giật tít gây tò mò cực mạnh
+              <Radio value="HOOK" className="font-bold text-slate-100 text-[13px]">
+                <span className="inline-flex items-center gap-1.5">
+                  <BulbOutlined className="text-amber-400" />
+                  <span>Thêm Hook giật tít gây tò mò cực mạnh</span>
+                </span>
               </Radio>
-              <div className="text-[11px] text-slate-400 pl-6 mt-0.5">
+              <div className="text-xs text-slate-300 pl-6 mt-0.5">
                 Chèn 1-2 câu mở đầu giật gân, khơi gợi trí tò mò hoặc đặt câu hỏi đánh trúng tâm lý, giữ nguyên thân bài.
               </div>
             </div>
 
             <div className={`p-3 rounded-xl border transition-all cursor-pointer ${groupHunterBatchAiMode === 'ENGAGEMENT' ? 'bg-purple-950/30 border-purple-500/60' : 'bg-slate-900/60 border-slate-800'}`}>
-              <Radio value="ENGAGEMENT" className="font-bold text-slate-200 text-xs">
-                💬 Kích thích bình luận &amp; Tranh luận (Engagement Booster)
+              <Radio value="ENGAGEMENT" className="font-bold text-slate-100 text-[13px]">
+                <span className="inline-flex items-center gap-1.5">
+                  <CommentOutlined className="text-sky-400" />
+                  <span>Kích thích bình luận &amp; Tranh luận (Engagement Booster)</span>
+                </span>
               </Radio>
-              <div className="text-[11px] text-slate-400 pl-6 mt-0.5">
+              <div className="text-xs text-slate-300 pl-6 mt-0.5">
                 Thêm câu hỏi mở thông minh và kêu gọi độc giả bày tỏ quan điểm ở phần bình luận.
               </div>
             </div>
 
             <div className={`p-3 rounded-xl border transition-all cursor-pointer ${groupHunterBatchAiMode === 'STORYTELLING' ? 'bg-purple-950/30 border-purple-500/60' : 'bg-slate-900/60 border-slate-800'}`}>
-              <Radio value="STORYTELLING" className="font-bold text-slate-200 text-xs">
-                📖 Kể chuyện tự nhiên (Storytelling Voice)
+              <Radio value="STORYTELLING" className="font-bold text-slate-100 text-[13px]">
+                <span className="inline-flex items-center gap-1.5">
+                  <ReadOutlined className="text-emerald-400" />
+                  <span>Kể chuyện tự nhiên (Storytelling Voice)</span>
+                </span>
               </Radio>
-              <div className="text-[11px] text-slate-400 pl-6 mt-0.5">
+              <div className="text-xs text-slate-300 pl-6 mt-0.5">
                 Biến tấu nội dung thành dạng câu chuyện kể hấp dẫn, có diễn biến kịch tính và cảm xúc.
               </div>
             </div>
 
             <div className={`p-3 rounded-xl border transition-all cursor-pointer ${groupHunterBatchAiMode === 'SHORTEN' ? 'bg-purple-950/30 border-purple-500/60' : 'bg-slate-900/60 border-slate-800'}`}>
-              <Radio value="SHORTEN" className="font-bold text-slate-200 text-xs">
-                ✂️ Rút gọn súc tích, cô đọng
+              <Radio value="SHORTEN" className="font-bold text-slate-100 text-[13px]">
+                <span className="inline-flex items-center gap-1.5">
+                  <ScissorOutlined className="text-rose-400" />
+                  <span>Rút gọn súc tích, cô đọng</span>
+                </span>
               </Radio>
-              <div className="text-[11px] text-slate-400 pl-6 mt-0.5">
+              <div className="text-xs text-slate-300 pl-6 mt-0.5">
                 Giữ lại chi tiết đắt giá nhất, loại bỏ câu từ rườm rà giúp người lướt nhanh dễ tiếp thu.
               </div>
             </div>
@@ -933,7 +1039,10 @@ function GroupHunterDrawer({
           {groupHunterBatchAiLoading && (
             <div className="p-3.5 bg-purple-950/40 border border-purple-500/30 rounded-xl space-y-2">
               <div className="flex items-center justify-between text-xs text-purple-300 font-semibold">
-                <span>⚡ Đang viết lại bài {groupHunterBatchAiProgress.current} / {groupHunterBatchAiProgress.total}...</span>
+                <span className="inline-flex items-center gap-1.5">
+                  <ThunderboltOutlined />
+                  <span>Đang viết lại bài {groupHunterBatchAiProgress.current} / {groupHunterBatchAiProgress.total}...</span>
+                </span>
                 <span>{Math.round((groupHunterBatchAiProgress.current / (groupHunterBatchAiProgress.total || 1)) * 100)}%</span>
               </div>
               <Progress
@@ -959,9 +1068,10 @@ function GroupHunterDrawer({
                 href={groupHunterPreviewItem.url}
                 target="_blank"
                 rel="noreferrer"
-                className="text-xs text-blue-400 hover:text-blue-300 font-mono underline"
+                className="text-xs text-blue-400 hover:text-blue-300 font-medium inline-flex items-center gap-1"
               >
-                Mở link gốc Facebook ↗
+                <span>Mở link gốc Facebook</span>
+                <ExportOutlined className="text-[11px]" />
               </a>
             )}
           </div>
@@ -989,7 +1099,7 @@ function GroupHunterDrawer({
               setGroupHunterResults((prev) =>
                 prev.map((it) => (it.id === groupHunterPreviewItem.id ? { ...it, caption: text } : it))
               );
-              message.success('🧹 Đã làm sạch SĐT, link và STK của bài này!');
+              message.success('Đã làm sạch SĐT, link và STK của bài này!');
             }}
             className="text-xs font-semibold bg-emerald-500/10 text-emerald-300 border-emerald-500/30"
           >
@@ -998,6 +1108,7 @@ function GroupHunterDrawer({
           groupHunterPreviewItem?.suggestedHook && (
             <Button
               key="applyHook"
+              icon={<BulbOutlined />}
               onClick={() => {
                 if (!groupHunterPreviewItem?.suggestedHook) return;
                 const newCaption = `${groupHunterPreviewItem.suggestedHook}\n\n${groupHunterPreviewItem.caption}`;
@@ -1005,7 +1116,7 @@ function GroupHunterDrawer({
                 setGroupHunterResults((prev) =>
                   prev.map((it) => (it.id === groupHunterPreviewItem.id ? { ...it, caption: newCaption, aiRewritten: true } : it))
                 );
-                message.success('🎣 Đã chèn Hook mở đầu!');
+                message.success('Đã chèn Hook mở đầu!');
               }}
               className="text-xs font-semibold bg-amber-500/10 text-amber-300 border-amber-500/30"
             >
@@ -1015,8 +1126,9 @@ function GroupHunterDrawer({
           <Button
             key="save"
             type="primary"
+            icon={<CheckOutlined />}
             onClick={() => {
-              message.success('✅ Đã lưu cập nhật cho bài viết!');
+              message.success('Đã lưu cập nhật cho bài viết!');
               setGroupHunterPreviewItem(null);
             }}
             className="!bg-blue-600 font-bold"
@@ -1044,11 +1156,13 @@ function GroupHunterDrawer({
 
             {/* Thông tin tác giả & Thời gian */}
             <div className="flex items-center justify-between text-xs text-slate-400 bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
-              <div>
-                👤 Tác giả: <strong className="text-blue-300">{groupHunterPreviewItem.author || 'Thành viên'}</strong>
+              <div className="inline-flex items-center gap-1.5">
+                <UserOutlined className="text-blue-400" />
+                <span>Tác giả: <strong className="text-blue-300">{groupHunterPreviewItem.author || 'Thành viên'}</strong></span>
               </div>
-              <div>
-                ⏰ Thời gian: <strong className="text-slate-200">{groupHunterPreviewItem.postedTime || 'Gần đây'}</strong>
+              <div className="inline-flex items-center gap-1.5">
+                <ClockCircleOutlined className="text-slate-400" />
+                <span>Thời gian: <strong className="text-slate-200">{groupHunterPreviewItem.postedTime || 'Gần đây'}</strong></span>
               </div>
             </div>
 
@@ -1057,7 +1171,7 @@ function GroupHunterDrawer({
               <div className="flex items-center justify-between text-xs">
                 <label className="font-bold text-slate-200">Nội dung Caption (Có thể chỉnh sửa trực tiếp):</label>
                 {groupHunterPreviewItem.caption && (
-                  <span className="text-[11px] text-slate-400">{groupHunterPreviewItem.caption.length} ký tự</span>
+                  <span className="text-xs text-slate-300">{groupHunterPreviewItem.caption.length} ký tự</span>
                 )}
               </div>
               <Input.TextArea

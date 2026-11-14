@@ -286,7 +286,7 @@ const Dashboard = () => {
             </Typography.Text>
           }
           description={
-            <Typography.Text className="text-slate-300 text-xs">
+            <Typography.Text className="text-slate-200 text-sm">
               Các Fanpage: <b>{expiredCookieAccounts.map((a) => a.pageName || a.platformAccountId).join(', ')}</b> đang bị gián đoạn xuất bản.
             </Typography.Text>
           }
@@ -349,12 +349,12 @@ const Dashboard = () => {
 
         {/* Shortcut Dock */}
         <Flex align="center" wrap gap={8} className="mt-4 pt-3 border-t border-slate-800/80">
-          <Typography.Text className="text-xs text-slate-400 font-semibold flex items-center gap-1.5 mr-2">
+          <Typography.Text className="text-[13px] text-slate-300 font-semibold flex items-center gap-1.5 mr-2">
             <CompassOutlined /> Lối tắt nhanh:
           </Typography.Text>
           <Button
             type="dashed"
-            size="small"
+            size="middle"
             icon={<PlayCircleOutlined className="text-blue-400" />}
             onClick={() => navigate('/dashboard/playwright')}
           >
@@ -362,7 +362,7 @@ const Dashboard = () => {
           </Button>
           <Button
             type="dashed"
-            size="small"
+            size="middle"
             icon={<RadarChartOutlined className="text-cyan-400" />}
             onClick={() => navigate('/dashboard/news-radar')}
           >
@@ -370,7 +370,7 @@ const Dashboard = () => {
           </Button>
           <Button
             type="dashed"
-            size="small"
+            size="middle"
             icon={<PictureOutlined className="text-purple-400" />}
             onClick={() => navigate('/dashboard/post-story')}
           >
@@ -378,7 +378,7 @@ const Dashboard = () => {
           </Button>
           <Button
             type="dashed"
-            size="small"
+            size="middle"
             icon={<span className="font-extrabold text-blue-400">@</span>}
             onClick={() => navigate('/dashboard/threads')}
           >
@@ -386,7 +386,7 @@ const Dashboard = () => {
           </Button>
           <Button
             type="link"
-            size="small"
+            size="middle"
             icon={<GlobalOutlined className="text-emerald-400" />}
             onClick={() => navigate('/dashboard/connections')}
             className="ml-auto"
@@ -403,16 +403,16 @@ const Dashboard = () => {
           <Card variant="borderless" className="shadow-lg border border-slate-800/80 bg-[#111a28] h-full">
             <Flex justify="space-between" align="start">
               <div>
-                <Typography.Text className="text-xs text-slate-400 block mb-1">Tổng bài xuất bản</Typography.Text>
+                <Typography.Text className="text-[13.5px] text-slate-300 block mb-1">Tổng bài xuất bản</Typography.Text>
                 <Typography.Title level={2} className="!mb-0 !text-white font-bold">
                   {counts.total}
                 </Typography.Title>
               </div>
               <Tag color="blue" className="!m-0">{range.label}</Tag>
             </Flex>
-            <Flex justify="space-between" align="center" className="mt-4 pt-2 border-t border-slate-800 text-xs text-slate-400">
+            <Flex justify="space-between" align="center" className="mt-4 pt-2.5 border-t border-slate-800 text-[13px] text-slate-300">
               <span>Đã lên lịch trong kỳ</span>
-              <Typography.Text strong className="text-slate-200">{periodPosts.length} bài</Typography.Text>
+              <Typography.Text strong className="text-slate-100">{periodPosts.length} bài</Typography.Text>
             </Flex>
           </Card>
         </Col>
@@ -422,7 +422,7 @@ const Dashboard = () => {
           <Card variant="borderless" className="shadow-lg border border-slate-800/80 bg-[#111a28] h-full">
             <Flex justify="space-between" align="start">
               <div>
-                <Typography.Text className="text-xs text-slate-400 block mb-1">Đã đăng thành công</Typography.Text>
+                <Typography.Text className="text-[13.5px] text-slate-300 block mb-1">Đã đăng thành công</Typography.Text>
                 <Typography.Title level={2} className="!mb-0 !text-emerald-400 font-bold">
                   {counts.published}
                 </Typography.Title>
@@ -431,7 +431,7 @@ const Dashboard = () => {
                 {counts.total ? `${Math.round((counts.published / counts.total) * 100)}%` : '0%'}
               </Tag>
             </Flex>
-            <Flex justify="space-between" align="center" className="mt-4 pt-2 border-t border-slate-800 text-xs text-slate-400">
+            <Flex justify="space-between" align="center" className="mt-4 pt-2.5 border-t border-slate-800 text-[13px] text-slate-300">
               <span>Hiệu suất đăng tải</span>
               <Typography.Text strong className="text-emerald-400">Tự động 100%</Typography.Text>
             </Flex>
@@ -443,14 +443,14 @@ const Dashboard = () => {
           <Card variant="borderless" className="shadow-lg border border-slate-800/80 bg-[#111a28] h-full">
             <Flex justify="space-between" align="start">
               <div>
-                <Typography.Text className="text-xs text-slate-400 block mb-1">Đang chờ xuất bản</Typography.Text>
+                <Typography.Text className="text-[13.5px] text-slate-300 block mb-1">Đang chờ xuất bản</Typography.Text>
                 <Typography.Title level={2} className="!mb-0 !text-amber-400 font-bold">
                   {counts.pending}
                 </Typography.Title>
               </div>
               <Tag color="warning" className="!m-0">Hàng đợi</Tag>
             </Flex>
-            <Flex justify="space-between" align="center" className="mt-4 pt-2 border-t border-slate-800 text-xs text-slate-400">
+            <Flex justify="space-between" align="center" className="mt-4 pt-2.5 border-t border-slate-800 text-[13px] text-slate-300">
               <span>Lịch hẹn tự động</span>
               <Typography.Text strong className="text-amber-400">{upcomingPosts.length} bài sắp đăng</Typography.Text>
             </Flex>
@@ -462,7 +462,7 @@ const Dashboard = () => {
           <Card variant="borderless" className="shadow-lg border border-slate-800/80 bg-[#111a28] h-full">
             <Flex justify="space-between" align="start">
               <div>
-                <Typography.Text className="text-xs text-slate-400 block mb-1">Cần kiểm tra / Lỗi</Typography.Text>
+                <Typography.Text className="text-[13.5px] text-slate-300 block mb-1">Cần kiểm tra / Lỗi</Typography.Text>
                 <Typography.Title level={2} className={`!mb-0 font-bold ${counts.failed > 0 ? '!text-red-400' : '!text-slate-100'}`}>
                   {counts.failed}
                 </Typography.Title>
@@ -471,9 +471,9 @@ const Dashboard = () => {
                 {counts.failed > 0 ? `${counts.failed} lỗi` : 'Ổn định 100%'}
               </Tag>
             </Flex>
-            <Flex justify="space-between" align="center" className="mt-4 pt-2 border-t border-slate-800 text-xs text-slate-400">
-              <span>Trạng thái rủi ro</span>
-              <Typography.Text strong className={counts.failed > 0 ? 'text-red-400' : 'text-emerald-400'}>
+            <Flex justify="space-between" align="center" gap={8} className="mt-4 pt-2.5 border-t border-slate-800 text-[13px] text-slate-300">
+              <span className="whitespace-nowrap">Rủi ro hệ thống</span>
+              <Typography.Text strong className={`whitespace-nowrap ${counts.failed > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
                 {counts.failed > 0 ? 'Cần xử lý lại' : 'Hoàn toàn ổn định'}
               </Typography.Text>
             </Flex>
@@ -485,14 +485,14 @@ const Dashboard = () => {
       <Card variant="borderless" className="mb-4 shadow-xl border border-slate-800/80 bg-[#111a28]">
         <Flex align="center" justify="space-between" className="mb-4">
           <Flex align="center" gap={10}>
-            <div className="w-8 h-8 rounded-lg bg-blue-500/10 grid place-items-center text-blue-400">
+            <div className="w-9 h-9 rounded-lg bg-blue-500/10 grid place-items-center text-blue-400 text-base">
               <AimOutlined />
             </div>
             <div>
               <Typography.Text strong className="text-base text-slate-100 block">
                 Tiến độ KPI hôm nay ({dayjs().format('DD/MM/YYYY')})
               </Typography.Text>
-              <Typography.Text className="text-xs text-slate-400">
+              <Typography.Text className="text-[13.5px] text-slate-300">
                 Đã đạt {kpiSummary.completedCount}/{kpiSummary.totalCount} kênh mục tiêu
               </Typography.Text>
             </div>
@@ -500,7 +500,7 @@ const Dashboard = () => {
 
           <Button
             type="link"
-            size="small"
+            size="middle"
             onClick={() => navigate('/dashboard/calendar')}
           >
             Tùy chỉnh KPI →
@@ -511,9 +511,9 @@ const Dashboard = () => {
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
             description={
-              <Typography.Text className="text-slate-400 text-xs">
+              <Typography.Text className="text-slate-300 text-sm">
                 Chưa thiết lập KPI cho ngày hôm nay.{' '}
-                <Button type="link" size="small" onClick={() => navigate('/dashboard/calendar')} className="!p-0">
+                <Button type="link" size="middle" onClick={() => navigate('/dashboard/calendar')} className="!p-0">
                   Đặt KPI số lượng bài cho từng kênh
                 </Button>
               </Typography.Text>
@@ -535,20 +535,20 @@ const Dashboard = () => {
                         ) : (
                           <FacebookFilled className="text-blue-500 shrink-0" />
                         )}
-                        <Typography.Text strong className="text-slate-200 text-xs truncate" title={t.accountName}>
+                        <Typography.Text strong className="text-slate-100 text-[13.5px] truncate" title={t.accountName}>
                           {t.accountName}
                         </Typography.Text>
                       </Flex>
-                      <Tag color={t.achieved ? 'success' : 'warning'} className="!m-0 !text-[11px]">
+                      <Tag color={t.achieved ? 'success' : 'warning'} className="!m-0 !text-xs">
                         {t.actualCount}/{t.targetCount}
                         {isOverachieved && ' 🚀'}
                       </Tag>
                     </Flex>
 
                     <div>
-                      <Flex justify="space-between" className="text-[11px] text-slate-400 mb-1">
+                      <Flex justify="space-between" className="text-[12.5px] text-slate-300 mb-1">
                         <span>{t.achieved ? (isOverachieved ? 'Vượt chỉ tiêu' : 'Đạt chỉ tiêu') : 'Đang thực hiện'}</span>
-                        <Typography.Text strong className="text-slate-300">{percent}%</Typography.Text>
+                        <Typography.Text strong className="text-slate-200">{percent}%</Typography.Text>
                       </Flex>
                       <Progress
                         percent={percent}
@@ -709,7 +709,7 @@ const Dashboard = () => {
           dataSource={periodPosts.slice(0, 8)}
           pagination={false}
           scroll={{ x: 720 }}
-          size="small"
+          size="middle"
           locale={{ emptyText: 'Chưa có bài đăng nào được ghi nhận' }}
           columns={[
             {

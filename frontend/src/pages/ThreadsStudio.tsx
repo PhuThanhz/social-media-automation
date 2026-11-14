@@ -13,6 +13,8 @@ import {
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
 import api from '../config/axios';
+import ScheduleChoice from '../components/common/ScheduleChoice';
+import { schedulePayload, type ScheduleValue } from '../components/common/postingSchedule';
 
 // ───────────────────────────── Types ─────────────────────────────
 interface ThreadsAccount {
@@ -225,9 +227,9 @@ export default function ThreadsStudio() {
     } catch { /* ignore */ }
     return [newItem()];
   });
-  const [intervalMinutes, setIntervalMinutes] = useState<number>(60);
+  // Thời gian đăng: Đăng ngay / Xếp vào lịch / Hẹn giờ — giờ cụ thể theo Lịch đăng chung (badge trên header)
+  const [scheduleChoice, setScheduleChoice] = useState<ScheduleValue>({ mode: 'QUEUE' });
   const [distribution, setDistribution] = useState<'ROUND_ROBIN' | 'ALL'>('ROUND_ROBIN');
-  const [staggerMinutes, setStaggerMinutes] = useState<number>(5);
   const [varyContent, setVaryContent] = useState(false);
   const [aiLoadingId, setAiLoadingId] = useState<string | null>(null);
   const [previousContents, setPreviousContents] = useState<Record<string, string>>({});
@@ -407,8 +409,7 @@ export default function ThreadsStudio() {
 
   const addItem = () => setItems((prev) => {
     const last = prev[prev.length - 1];
-    const base = !last || last.isNow || !last.scheduledAt ? dayjs() : dayjs(last.scheduledAt);
-    return [...prev, newItem({ isNow: false, scheduledAt: base.add(intervalMinutes, 'minute').second(0).toISOString(), inputType: last?.inputType || 'LINK' })];
+    return [...prev, newItem({ inputType: last?.inputType || 'LINK' })];
   });
 
   const fetchItem = async (item: PostItem): Promise<PostItem | null> => {
@@ -490,7 +491,7 @@ export default function ThreadsStudio() {
 
   const isItemReady = (it: PostItem) => (it.inputType === 'LINK' ? !!it.url.trim() : !!(it.content.trim() || it.media.length));
   const readyItems = items.filter(isItemReady);
-  const firstIsNow = readyItems[0]?.isNow ?? true;
+  const firstIsNow = scheduleChoice.mode === 'NOW';
 
   // Nick sẽ đăng cho bài thứ idx (theo thứ tự các bài hợp lệ)
   const accountsForItem = (it: PostItem, idx: number): number[] => {
@@ -505,8 +506,8 @@ export default function ThreadsStudio() {
       message.warning('Chọn ít nhất 1 nick Threads ở bước 1');
       return;
     }
-    if (readyItems.some((it) => !it.isNow && !it.scheduledAt)) {
-      message.warning('Có bài đang Hẹn giờ nhưng chưa chọn giờ');
+    if (scheduleChoice.mode === 'AT' && !scheduleChoice.at) {
+      message.warning('Chọn giờ hẹn trước khi đăng');
       return;
     }
     let created = 0;
@@ -531,9 +532,7 @@ export default function ThreadsStudio() {
           content,
           mediaUrls: it.media.map((m) => m.url),
           sourceUrl: it.inputType === 'LINK' ? it.url.trim() : undefined,
-          publishNow: it.isNow,
-          scheduledAt: !it.isNow && it.scheduledAt ? dayjs(it.scheduledAt).format('YYYY-MM-DDTHH:mm:ss') : undefined,
-          staggerMinutes,
+          ...schedulePayload(scheduleChoice),
           varyContent: varyContent && accountsForItem(it, i).length > 1,
         });
         created += res.data?.count || 1;
@@ -716,7 +715,7 @@ export default function ThreadsStudio() {
   const previewIdx = previewItem ? readyItems.findIndex((it) => it.id === previewItem.id) : -1;
   const previewAccount = previewItem ? accountById.get(accountsForItem(previewItem, Math.max(0, previewIdx))[0] ?? -1) : undefined;
 
-  const submitLabel = firstIsNow ? 'Đăng ngay lên Threads' : 'Lên lịch lên Threads';
+  const submitLabel = firstIsNow ? 'Đăng ngay lên Threads' : scheduleChoice.mode === 'QUEUE' ? 'Xếp vào lịch Threads' : 'Lên lịch lên Threads';
 
   // ───────────────────────────── Render ─────────────────────────────
   return (
@@ -906,31 +905,6 @@ export default function ThreadsStudio() {
                           ...accounts.filter((a) => a.tokenStatus !== 'EXPIRED').map((a) => ({ value: a.id, label: `Chỉ @${usernameOf(a)}` })),
                         ]}
                       />
-                      <Segmented
-                        size="small"
-                        value={item.isNow ? 'NOW' : 'SCHEDULE'}
-                        onChange={(val) => {
-                          if (val === 'NOW') {
-                            updateItem(item.id, { isNow: true });
-                          } else {
-                            updateItem(item.id, {
-                              isNow: false,
-                              scheduledAt: item.scheduledAt || dayjs().add(intervalMinutes, 'minute').second(0).toISOString(),
-                            });
-                          }
-                        }}
-                        options={[
-                          { label: 'Đăng ngay', value: 'NOW', icon: <ThunderboltOutlined /> },
-                          { label: 'Hẹn giờ', value: 'SCHEDULE', icon: <ClockCircleOutlined /> },
-                        ]}
-                        className="rounded-lg text-xs shrink-0"
-                      />
-                      {!item.isNow && (
-                        <DatePicker size="small" showTime={{ format: 'HH:mm' }} format="HH:mm DD/MM" allowClear={false}
-                          value={item.scheduledAt ? dayjs(item.scheduledAt) : null}
-                          onChange={(d: Dayjs | null) => updateItem(item.id, { scheduledAt: d ? d.toISOString() : null })}
-                          disabledDate={(d) => d.isBefore(dayjs().startOf('day'))} className="!w-36" />
-                      )}
                       <Tooltip title="Xem trước như trên Threads">
                         <Button type="text" icon={<EyeOutlined />} className="poster-icon-action text-blue-600"
                           disabled={!content && item.media.length === 0} onClick={() => setPreviewItemId(item.id)} aria-label={`Xem trước bài ${index + 1}`} />
@@ -1040,10 +1014,6 @@ export default function ThreadsStudio() {
           <Button type="dashed" block icon={<PlusOutlined />} onClick={addItem}
             className="poster-add-post mt-3.5 min-h-[54px] rounded-xl flex items-center justify-center">
             <span className="font-bold">Thêm bài viết tiếp theo</span>
-            <span className="hidden sm:inline font-normal text-slate-400"> · tự hẹn sau </span>
-            <InputNumber size="small" min={5} max={1440} value={intervalMinutes} onChange={(v) => setIntervalMinutes(v || 60)}
-              onClick={(e) => e.stopPropagation()} variant="borderless" className="!w-14 hidden sm:inline-block" />
-            <span className="hidden sm:inline font-normal text-slate-400">phút</span>
           </Button>
         </section>
 
@@ -1077,7 +1047,7 @@ export default function ThreadsStudio() {
                     <div className={`p-3 rounded-lg shrink-0 transition-colors ${active ? 'bg-blue-600 text-white shadow-xs' : 'bg-slate-200/80 text-slate-600'}`}>{mode.icon}</div>
                     <div className="min-w-0 flex-1">
                       <div className="font-bold text-xs sm:text-sm leading-snug text-slate-800">{mode.title}</div>
-                      <div className="text-xs text-slate-500 mt-1 leading-relaxed">{mode.sub}</div>
+                      <div className="text-[13px] text-slate-300 mt-1 leading-relaxed">{mode.sub}</div>
                     </div>
                     {active && <CheckCircleOutlined className="absolute top-3 right-3 text-blue-600" />}
                   </button>
@@ -1085,12 +1055,8 @@ export default function ThreadsStudio() {
               })}
             </div>
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
-              <label className="flex items-center gap-2 text-slate-600">
-                Các nick lệch nhau
-                <InputNumber size="small" min={0} max={720} value={staggerMinutes} onChange={(v) => setStaggerMinutes(v ?? 0)} className="!w-20" /> phút
-              </label>
               {distribution === 'ALL' && (
-                <label className="flex items-center gap-2 text-slate-600">
+                <label className="flex items-center gap-2 text-slate-200">
                   <Switch size="small" checked={varyContent} onChange={setVaryContent} />
                   AI viết lại nội dung khác nhau cho từng nick
                 </label>
@@ -1099,14 +1065,18 @@ export default function ThreadsStudio() {
           </section>
         )}
 
-        <div className="poster-submit-bar flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <span className="text-xs text-slate-500">
+        <div
+          className="poster-submit-bar flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+          style={{ position: 'static', margin: '18px 0 0' }}
+        >
+          <span className="text-[13.5px] text-slate-300 font-medium">
             {submitting || (readyItems.length
-              ? `${readyItems.length} bài viết · ${selectedIds.length || 0} nick. ${firstIsNow ? 'Bài đầu tiên sẽ được ĐĂNG NGAY.' : 'Toàn bộ bài chạy theo lịch hẹn.'}`
+              ? `${readyItems.length} bài viết · ${selectedIds.length || 0} nick`
               : 'Dán link hoặc soạn nội dung để bắt đầu.')}
           </span>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
-            <Button size="large" className="rounded-xl font-semibold text-xs min-w-24" disabled={!!submitting}
+            <ScheduleChoice value={scheduleChoice} onChange={setScheduleChoice} size="small" />
+            <Button size="large" className="rounded-xl font-semibold text-sm min-w-24" disabled={!!submitting}
               onClick={() => { setItems([newItem()]); setPreviousContents({}); }}>
               Đặt lại
             </Button>

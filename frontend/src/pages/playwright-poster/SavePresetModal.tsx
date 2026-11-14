@@ -49,15 +49,15 @@ function SavePresetModal({
           <div className="font-semibold text-slate-100 flex items-center gap-1.5">
             <span>🎯 Cấu hình được lưu trong Combo này:</span>
           </div>
-          <div className="flex items-center justify-between text-[11px] text-slate-400">
+          <div className="flex items-center justify-between text-xs text-slate-300">
             <span>Nhóm nhận bài:</span>
             <span className="font-bold text-amber-300">{activeSelectedGroupIds.length} nhóm</span>
           </div>
-          <div className="flex items-center justify-between text-[11px] text-slate-400">
+          <div className="flex items-center justify-between text-xs text-slate-300">
             <span>Page/Nick đăng:</span>
             <span className="font-bold text-sky-300">{activeSelectedFanpageIds.length} tài khoản</span>
           </div>
-          <div className="flex items-center justify-between text-[11px] text-slate-400">
+          <div className="flex items-center justify-between text-xs text-slate-300">
             <span>Chế độ phân bổ:</span>
             <span className="font-bold text-purple-300">{groupDistributionMode === 'PAGE_PER_GROUP' ? '🛡️ Chia đều Page/Nhóm' : '🔄 Xoay vòng'}</span>
           </div>
@@ -73,7 +73,7 @@ function SavePresetModal({
             autoFocus
             onPressEnter={handleSaveNewPreset}
           />
-          <div className="text-[11px] text-slate-500 mt-1">Lần sau chỉ cần bấm 1 click vào nút Combo này là tự động chọn đủ cả Nhóm lẫn Page!</div>
+          <div className="text-xs text-slate-300 mt-1.5">Lần sau chỉ cần bấm 1 click vào nút Combo này là tự động chọn đủ cả Nhóm lẫn Page!</div>
         </div>
       </div>
     </Modal>

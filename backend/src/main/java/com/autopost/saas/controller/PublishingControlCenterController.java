@@ -37,6 +37,8 @@ public class PublishingControlCenterController {
     private final UserRepository userRepository;
     private final PostQueueRepository postQueueRepository;
     private final SocialAccountRepository socialAccountRepository;
+    private final com.autopost.saas.scheduler.CampaignScheduler campaignScheduler;
+    private final com.autopost.saas.service.PostingWindowService postingWindowService;
 
     private User resolveUser(Authentication authentication) {
         if (authentication != null && authentication.getName() != null) {
@@ -179,6 +181,11 @@ public class PublishingControlCenterController {
         }
 
         int count = controlCenterService.bulkReschedulePosts(user.getId(), postIds, startAt, gapMinutes);
+        // Xếp lại theo lịch đăng chung (khung giờ + giãn cách + làn theo nick) thay vì cộng dồn tuyến tính
+        if (count > 0 && !Boolean.FALSE.equals(body.get("useSchedule"))) {
+            campaignScheduler.packContinuousFrom(postIds, postingWindowService.defaultGapSeconds(),
+                    body.get("startAt") != null ? startAt : null);
+        }
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "rescheduledCount", count,

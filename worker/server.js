@@ -63,6 +63,7 @@ const desktop = require('./desktop-mode');
 const { bulkUploadReels } = require('./meta-bulk-reels');
 const browserPool = require('./browserPool');
 const { renderNewsCard, renderNewsCardHtml, renderHtmlLayers } = require('./news-card');
+const { renderDarkQuoteCard } = require('./quote-card');
 const { generateSeedingComments } = require('./ai-seeding');
 const { huntFacebookFeed } = require('./fb-feed-hunter');
 
@@ -2031,7 +2032,7 @@ async function clickVisibleButtonByText(page, targetTextRegex, maxY = 1050, scop
 // và 2 phiên cùng cookie sẽ tranh nhau danh tính Page. Các nick KHÁC nhau được đăng song song, tối đa
 // MAX_PARALLEL_POSTING phiên Chromium cùng lúc để không quá tải RAM.
 // =============================================================================
-const MAX_PARALLEL_POSTING = Math.max(1, Number(process.env.MAX_PARALLEL_POSTING || 3));
+const MAX_PARALLEL_POSTING = Math.max(1, Number(process.env.MAX_PARALLEL_POSTING || 1));
 
 function postingIdentityKey(cookieString, fallback = 'default') {
   const match = String(cookieString || '').match(/c_user=(\d+)/);
@@ -2689,6 +2690,24 @@ app.post('/api/post-facebook', async (req, res) => {
       }
     }
 
+    // TỰ ĐỘNG 100%: Nếu bài viết là Text thuần (không có video/ảnh đính kèm) và nội dung ngắn (<= 200 ký tự)
+    // -> Tự động render thành ảnh Quote Card nền đen chữ trắng to (style BOX Y Khoa) để tăng tương tác vượt trội
+    if (downloadedFilePaths.length === 0 && (!normalizedMediaUrls || normalizedMediaUrls.length === 0) && content && content.trim().length > 0 && content.trim().length <= 200 && !isColorBackground) {
+      try {
+        console.log(`[Playwright] 🎨 Phát hiện bài text ngắn (${content.trim().length} ký tự <= 200) — Tự động sinh ảnh Nền Đen Chữ Trắng (Quote Card style BOX Y Khoa)...`);
+        const quoteCardBuffer = await renderDarkQuoteCard(content.trim());
+        if (quoteCardBuffer) {
+          const filename = `quote_card_${Date.now()}_${Math.random().toString(36).substring(2, 6)}.png`;
+          const filePath = path.join(CLIP_MEO_DIR, filename);
+          fs.writeFileSync(filePath, quoteCardBuffer);
+          downloadedFilePaths.push(filePath);
+          console.log(`[Playwright] ✅ Đã tạo ảnh Quote Card nền đen thành công: ${filePath} (${(quoteCardBuffer.length / 1024).toFixed(1)} KB)`);
+        }
+      } catch (errCard) {
+        console.warn(`[Playwright] ⚠️ Không thể tạo ảnh Quote Card:`, errCard.message);
+      }
+    }
+
     // Mở trang Fanpage
     const cleanTargetId = (targetFanpageId || '').split(':')[0].trim();
     if (!isPersonal && cleanTargetId && /^\d+$/.test(cleanTargetId)) {
@@ -3333,7 +3352,7 @@ async function postReelWithGroups({ cookieString, targetFanpageId = DEFAULT_FANP
     const editor = dialog.first().locator('div[role="textbox"]').first();
     await editor.click({ force: true }).catch(() => { });
     await page.waitForTimeout(1000);
-    await page.keyboard.type(finalContent, { delay: 10 });
+    await typeMultilinePostContent(page, finalContent);
     await page.waitForTimeout(2000);
 
     console.log(`[Playwright][ReelGroups] 📎 Đính kèm Video: ${downloadedFilePath}`);
@@ -4142,65 +4161,102 @@ async function verifyAndSendComment(page, commentBoxLocator, linkToComment) {
   return { success: true };
 }
 
-// Gõ nội dung bài viết nhiều dòng vào Modal đăng bài của Facebook (dùng Shift+Enter để giữ nguyên toàn bộ ngắt dòng)
-// Gõ nội dung bài viết nhiều dòng vào Modal đăng bài của Facebook (dùng insertText để không kích hoạt autocomplete/tag nhầm và Shift+Enter để giữ nguyên toàn bộ ngắt dòng)
+/**
+ * Ngắt trigger @mention / +mention của trình soạn Lexical trên Facebook bằng zero-width space (\u200B),
+ * đồng thời giữ nguyên 100% URL và địa chỉ email.
+ */
+function neutralizeFacebookMentionTriggers(text) {
+  if (!text || typeof text !== 'string') return text;
+  return text.replace(
+    /(https?:\/\/\S+|www\.\S+|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})|(@)(?=[ \t]*[A-Za-z0-9À-ỹ_])|(\+)(?=[ \t]+[A-Za-z0-9À-ỹ_]|[A-Za-zÀ-ỹ_])/g,
+    (match, protectedToken, atTrigger, plusTrigger) => {
+      if (protectedToken) return protectedToken;
+      return `${atTrigger || plusTrigger}\u200B`;
+    }
+  );
+}
+
+const FB_MENTION_POPUP_SELECTOR = [
+  '[role="listbox"]:visible',
+  '[role="option"]:visible',
+  'div[data-testid*="typeahead"]:visible',
+  'div[aria-label*="Gợi ý" i]:visible',
+  'div[aria-label*="Nhắc đến" i]:visible',
+  'div[aria-label*="Mention" i]:visible',
+].join(', ');
+
+async function hasActiveFacebookMentionPopup(page, editor = null) {
+  const popupVisible = await page.locator(FB_MENTION_POPUP_SELECTOR).first().isVisible().catch(() => false);
+  if (popupVisible) return true;
+  const focusedHasPopup = await page.evaluate(() => {
+    const el = document.activeElement;
+    return Boolean(el && (el.getAttribute('aria-activedescendant') || el.getAttribute('aria-controls')));
+  }).catch(() => false);
+  if (focusedHasPopup) return true;
+  if (editor) {
+    return editor.evaluate((el) => Boolean(el.getAttribute('aria-activedescendant') || el.getAttribute('aria-controls'))).catch(() => false);
+  }
+  return false;
+}
+
+async function dismissFacebookMentionPopups(page, editor = null) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (!(await hasActiveFacebookMentionPopup(page, editor))) return false;
+    console.log('[Playwright] 🛡️ Phát hiện popup gợi ý tag của Facebook, đang bấm Escape để hủy bỏ tag...');
+    await page.keyboard.press('Escape').catch(() => {});
+    await page.waitForTimeout(120);
+  }
+  return true;
+}
+
+// Gõ nội dung bài viết nhiều dòng vào Modal đăng bài của Facebook (chặn mọi trigger tag @ / + / ký tự đầu dòng / từ viết hoa cuối dòng + Shift+Enter giữ nguyên ngắt dòng)
 async function typeMultilinePostContent(page, text) {
   if (!text || typeof text !== 'string') return;
-  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  const safeText = neutralizeFacebookMentionTriggers(text);
+  const lines = safeText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  const activeEditor = page.locator('div[role="dialog"] div[role="textbox"], div[role="textbox"]').first();
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (line.length > 0) {
-      // 1. Dùng insertText để dán nguyên dòng văn bản, KHÔNG gõ từng ký tự phím (tránh kích hoạt autocomplete/tag nhầm như TIKTOK -> Hộp Thư Tiktok)
+      // Thêm 1 dấu cách cuối dòng để ngắt hoàn toàn trigger typeahead của Facebook đối với MỌI ký tự/từ viết hoa ở cuối dòng (- Euro, * Euro, : Euro, TIKTOK, Shopee, Cre: Tên...)
+      const lineToInsert = /\s$/.test(line) ? line : `${line} `;
       try {
-        await page.keyboard.insertText(line);
+        await page.keyboard.insertText(lineToInsert);
       } catch (err) {
-        await page.keyboard.type(line, { delay: 5 });
+        await page.keyboard.type(lineToInsert, { delay: 5 });
       }
-      await page.waitForTimeout(80);
+      await page.waitForTimeout(120);
 
-      // 2. Dismiss Facebook autocomplete/page-tag popup (VD: chữ "TIKTOK", "Shopee", "CafeF", tên người/Page)
-      // Kiểm tra mọi popup gợi ý typeahead và bấm Escape để huỷ tag nhầm
-      const tagSuggestion = page.locator([
-        '[role="listbox"]',
-        '[role="option"]',
-        'div[data-testid*="typeahead"]',
-        'div[aria-label*="Gợi ý" i]',
-        'div[aria-label*="Nhắc đến" i]',
-        'div[aria-label*="Mention" i]'
-      ].join(', ')).first();
-
-      if (await tagSuggestion.isVisible().catch(() => false)) {
-        console.log('[Playwright] 🛡️ Phát hiện popup gợi ý tag của Facebook, đang bấm Escape để hủy bỏ tag...');
-        await page.keyboard.press('Escape').catch(() => {});
-        await page.waitForTimeout(100);
-      }
+      // Dự phòng tầng 2: nếu vẫn bật typeahead (qua :visible hoặc aria-activedescendant/aria-controls), bấm Escape để hủy trước khi Shift+Enter
+      await dismissFacebookMentionPopups(page, activeEditor);
     }
     if (i < lines.length - 1) {
       await page.keyboard.press('Shift+Enter');
-      await page.waitForTimeout(100);
+      await page.waitForTimeout(90);
     }
   }
 
-  // Chắc chắn rằng trước khi chuyển sang bước đính kèm media, không còn popup autocomplete nào đang lơ lửng
-  const anyRemainingTagPopup = page.locator('[role="listbox"], [role="option"], div[data-testid*="typeahead"]').first();
-  if (await anyRemainingTagPopup.isVisible().catch(() => false)) {
-    await page.keyboard.press('Escape').catch(() => {});
-    await page.waitForTimeout(100);
-  }
+  // Chờ nhẹ để typeahead bất đồng bộ (nếu có) kịp hiện rồi dọn lần cuối trước khi gắn media / bấm Đăng
+  await page.waitForTimeout(350);
+  await dismissFacebookMentionPopups(page, activeEditor);
 }
 
 
 // Bình luận 1 link vào đúng bài Fanpage/Group vừa đăng (nhập nhanh & chính xác).
 async function typeSingleMultilineComment(page, text) {
   if (!text) return;
-  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  const safeText = neutralizeFacebookMentionTriggers(text);
+  const lines = safeText.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (line.length > 0) {
-      await page.keyboard.insertText(line).catch(async () => {
-        await page.keyboard.type(line, { delay: 2 });
+      const lineToInsert = /\s$/.test(line) ? line : `${line} `;
+      await page.keyboard.insertText(lineToInsert).catch(async () => {
+        await page.keyboard.type(lineToInsert, { delay: 2 });
       });
-      await page.waitForTimeout(50);
+      await page.waitForTimeout(80);
+      await dismissFacebookMentionPopups(page);
     }
     if (i < lines.length - 1) {
       // Shift+Enter để xuống dòng TRONG CÙNG 1 BÌNH LUẬN (tránh Facebook tự gửi thành nhiều cmt riêng lẻ)
@@ -4208,6 +4264,8 @@ async function typeSingleMultilineComment(page, text) {
       await page.waitForTimeout(80);
     }
   }
+  await page.waitForTimeout(200);
+  await dismissFacebookMentionPopups(page);
 }
 
 async function commentLinkOnFanpagePost(page, targetFanpageId, linkToComment, maxWaitMs = 120000) {
@@ -4748,6 +4806,24 @@ app.post('/api/post-facebook-group', async (req, res) => {
       }
       if (downloadedFilePaths.length === 0) {
         throw new Error(`Chỉ tải được ${successfulGroupDownloadCount}/${urlsToDownload.length} media. Đã dừng đăng Group để tránh bài bị thiếu ảnh/video.`);
+      }
+    }
+
+    // TỰ ĐỘNG 100%: Nếu bài viết là Text thuần (không có video/ảnh đính kèm) và nội dung ngắn (<= 200 ký tự)
+    // -> Tự động render thành ảnh Quote Card nền đen chữ trắng to (style BOX Y Khoa) để tăng tương tác vượt trội
+    if (downloadedFilePaths.length === 0 && urlsToDownload.length === 0 && content && content.trim().length > 0 && content.trim().length <= 200 && !isColorBackground) {
+      try {
+        console.log(`[Playwright][Group] 🎨 Phát hiện bài text ngắn (${content.trim().length} ký tự <= 200) — Tự động sinh ảnh Nền Đen Chữ Trắng (Quote Card style BOX Y Khoa)...`);
+        const quoteCardBuffer = await renderDarkQuoteCard(content.trim());
+        if (quoteCardBuffer) {
+          const filename = `quote_card_${Date.now()}_${Math.random().toString(36).substring(2, 6)}.png`;
+          const filePath = path.join(CLIP_MEO_DIR, filename);
+          fs.writeFileSync(filePath, quoteCardBuffer);
+          downloadedFilePaths.push(filePath);
+          console.log(`[Playwright][Group] ✅ Đã tạo ảnh Quote Card nền đen thành công: ${filePath} (${(quoteCardBuffer.length / 1024).toFixed(1)} KB)`);
+        }
+      } catch (errCard) {
+        console.warn(`[Playwright][Group] ⚠️ Không thể tạo ảnh Quote Card:`, errCard.message);
       }
     }
 
@@ -7226,6 +7302,22 @@ app.post('/api/render-html-layers', async (req, res) => {
   }
 });
 
+// Render ảnh Quote Card nền đen chữ trắng (Style BOX Y Khoa) cho bài text ngắn
+app.post('/api/render-quote-card', async (req, res) => {
+  const { text } = req.body || {};
+  if (!text || !String(text).trim()) {
+    return res.status(400).json({ success: false, error: 'Thiếu nội dung text' });
+  }
+  try {
+    const png = await renderDarkQuoteCard(String(text).trim());
+    if (!png) throw new Error('Không thể render ảnh');
+    res.json({ success: true, pngBase64: png.toString('base64') });
+  } catch (e) {
+    console.error('[QuoteCard] Lỗi tạo ảnh:', e.message);
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 app.post('/api/render-news-card', async (req, res) => {
   const { imageUrl, insetImageUrl, headline, html } = req.body || {};
   try {
@@ -7238,6 +7330,22 @@ app.post('/api/render-news-card', async (req, res) => {
   } catch (e) {
     console.error('[NewsCard] Lỗi tạo ảnh:', e.message);
     res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+// Render ảnh Quote Card nền đen chữ trắng (Style BOX Y Khoa) cho bài text ngắn
+app.post('/api/render-quote-card', async (req, res) => {
+  const { text } = req.body || {};
+  if (!text || !String(text).trim()) {
+    return res.status(400).json({ success: false, error: 'Thiếu nội dung text' });
+  }
+  try {
+    const png = await renderDarkQuoteCard(String(text).trim());
+    if (!png) throw new Error('Không thể render ảnh');
+    res.json({ success: true, pngBase64: png.toString('base64') });
+  } catch (e) {
+    console.error('[QuoteCard] Lỗi tạo ảnh:', e.message);
+    res.status(500).json({ success: false, error: e.message });
   }
 });
 
@@ -8159,11 +8267,11 @@ app.post('/api/scrape-content', async (req, res) => {
 
     let releaseContext = null;
     try {
-      // Context từ browserPool (chung process Chromium) thay vì chromium.launch() riêng mỗi request.
-      const acquired = await browserPool.acquireContext({
+      // Context từ browserPool (chung process Chromium) hoặc tự mở Chromium dự phòng nếu pool đầy/chờ quá 10s
+      const acquired = await browserPool.acquireScrapeContext({
         viewport: { width: 1280, height: 1024 },
         userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      });
+      }, { waitTimeoutMs: 10_000 });
       releaseContext = acquired.release;
       const context = acquired.context;
 
@@ -8632,31 +8740,47 @@ app.post('/api/scrape-content', async (req, res) => {
 
           // Tìm tác giả trong phạm vi bài viết chính (không lấy nhầm tên Group hoặc thanh sidebar)
           let detectedAuthor = '';
-          const authorCandidates = [
-            document.querySelector('[role="article"] a[href*="/user/"]:not([href*="/groups/"])'),
-            document.querySelector('[role="article"] a[href*="profile.php"]:not([href*="/groups/"])'),
-            document.querySelector('[role="article"] a[role="link"][tabindex="0"]:not([href*="/groups/"]):not([href*="/posts/"]):not([href*="/share/"])'),
-            document.querySelector('[role="article"] h2 a:not([href*="/groups/"]), [role="article"] h3 a:not([href*="/groups/"]), [role="article"] h4 a:not([href*="/groups/"])'),
-            document.querySelector('a[href*="/user/"]:not([href*="/groups/"])'),
-            document.querySelector('a[href*="profile.php"]:not([href*="/groups/"])'),
-          ];
 
-          for (const cand of authorCandidates) {
-            if (cand) {
-              const text = (cand.innerText || cand.textContent || '').trim();
-              if (text && text.length > 1 && !/^(Facebook|Home|Trang chủ|Group|Nhóm|Theo dõi|Follow)$/i.test(text)) {
-                if (!detectedGroupName || text.toLowerCase() !== detectedGroupName.toLowerCase()) {
-                  detectedAuthor = text;
-                  break;
+          // Ưu tiên 0: Bóc tách trực tiếp từ h2 trong bài viết hoặc dialog (VD: "Bài viết của Lê Hoàg Thiên" hoặc "Post by John")
+          const allH2 = Array.from(document.querySelectorAll('div[role="dialog"] h2, [role="article"] h2, h2'));
+          for (const h of allH2) {
+            const hTxt = (h.innerText || '').trim();
+            const m = hTxt.match(/^(?:bài viết của|post by)\s+(.+)$/i);
+            if (m && m[1] && m[1].trim().length >= 2 && m[1].trim().length <= 50) {
+              detectedAuthor = m[1].trim();
+              break;
+            }
+          }
+
+          if (!detectedAuthor) {
+            const authorCandidates = [
+              document.querySelector('[role="article"] a[href*="/user/"]:not([href*="/groups/"])'),
+              document.querySelector('[role="article"] a[href*="profile.php"]:not([href*="/groups/"])'),
+              document.querySelector('[role="article"] a[role="link"][tabindex="0"]:not([href*="/groups/"]):not([href*="/posts/"]):not([href*="/share/"])'),
+              document.querySelector('div[role="dialog"] a[href*="/user/"]:not([href*="/groups/"])'),
+              document.querySelector('div[role="dialog"] a[href*="profile.php"]:not([href*="/groups/"])'),
+              document.querySelector('[role="article"] h2 a:not([href*="/groups/"]), [role="article"] h3 a:not([href*="/groups/"]), [role="article"] h4 a:not([href*="/groups/"])'),
+              document.querySelector('a[href*="/user/"]:not([href*="/groups/"])'),
+              document.querySelector('a[href*="profile.php"]:not([href*="/groups/"])'),
+            ];
+
+            for (const cand of authorCandidates) {
+              if (cand) {
+                const text = (cand.getAttribute('aria-label') || cand.innerText || cand.textContent || '').trim();
+                if (text && text.length >= 2 && text.length <= 50 && !text.includes('\n') && !/[.!?]/.test(text) && !/^(Facebook|Home|Trang chủ|Group|Nhóm|Theo dõi|Follow)$/i.test(text)) {
+                  if (!detectedGroupName || text.toLowerCase() !== detectedGroupName.toLowerCase()) {
+                    detectedAuthor = text;
+                    break;
+                  }
                 }
               }
             }
           }
 
           if (!detectedAuthor) {
-            const hStrong = document.querySelector('[role="article"] h2 strong, [role="article"] h3 strong, h2 strong, h3 strong');
+            const hStrong = document.querySelector('[role="article"] h2 strong, [role="article"] h3 strong, div[role="dialog"] h2 strong, h2 strong, h3 strong');
             const hText = (hStrong?.innerText || '').trim();
-            if (hText && (!detectedGroupName || hText.toLowerCase() !== detectedGroupName.toLowerCase())) {
+            if (hText && hText.length <= 50 && !hText.includes('\n') && (!detectedGroupName || hText.toLowerCase() !== detectedGroupName.toLowerCase())) {
               detectedAuthor = hText;
             }
           }
@@ -8666,13 +8790,17 @@ app.post('/api/scrape-content', async (req, res) => {
             if (!raw) return '';
             let a = raw.trim();
             a = a
+              .replace(/Online\s+status\s+in[^\n·•]*/gi, '')
+              .replace(/Chỉ báo trạng thái (?:online|trực tuyến)/gi, '')
               .replace(/[\s\u00A0]*[·•|–—-][\s\u00A0]*(?:Theo dõi|Follow|Following|Đã theo dõi|Quản trị viên|Admin|Người điều hành|Moderator|Người đóng góp hàng đầu|Top Contributor|Tác giả|Author).*$/i, '')
               .replace(/\s*\((?:Admin|Quản trị viên|Tác giả|Author|Mod|Người kiểm duyệt)\)\s*/gi, '')
               .replace(/^bài viết của\s+/i, '')
               .replace(/^post by\s+/i, '')
               .trim();
             if (detectedGroupName && a.toLowerCase() === detectedGroupName.toLowerCase()) return '';
-            if (/^(Facebook|Bài viết Facebook|Video Facebook|Group|Nhóm|Trang chủ|Home|Feed|Reels?|Watch)$/i.test(a)) return '';
+            if (/^(Facebook|Bài viết Facebook|Video Facebook|Group|Nhóm|Trang chủ|Home|Feed|Reels?|Watch|Chỉ báo trạng thái online|Trạng thái online)$/i.test(a)) return '';
+            if (a.toLowerCase().includes('online status') || a.toLowerCase().includes('trực tuyến') || a.length < 2 || a.length > 50) return '';
+            if (/[.!?]/.test(a)) return '';
             return a;
           };
 
@@ -9158,7 +9286,11 @@ app.post('/api/scrape-content', async (req, res) => {
         const results = [];
         const feed = document.querySelector('[role="feed"]');
         const candidateEls = feed
-          ? Array.from(feed.children).filter(c => (c.innerText || '').length > 30)
+          ? Array.from(feed.children).filter(c => {
+              const txt = (c.innerText || '').toLowerCase().trim();
+              if (txt.includes('sắp xếp bảng feed') || txt.includes('sắp xếp theo') || txt.includes('bạn đang nghĩ gì') || txt.includes('tạo bài viết')) return false;
+              return (c.innerText || '').length > 20;
+            })
           : Array.from(document.querySelectorAll('div[role="feed"] div[role="article"], div[role="article"], div[data-ad-preview="message"]'));
 
         for (const el of candidateEls) {
@@ -9166,9 +9298,20 @@ app.post('/api/scrape-content', async (req, res) => {
 
           const rawText = (el.querySelector('div[dir="auto"]')?.innerText || el.innerText || '').trim();
           if (rawText.length < 5) continue;
+          if (/^(?:sắp xếp bảng feed|sắp xếp theo|bạn đang nghĩ gì|tạo bài viết)/i.test(rawText)) continue;
 
           const links = Array.from(el.querySelectorAll('a')).map(a => a.href).filter(Boolean);
           let postLink = links.find(l => l.includes('/posts/') || l.includes('/permalink/') || l.includes('/share/p/'));
+          if (!postLink) {
+            const pcb = links.find(l => /set=(?:pcb|gm|g|a)\.([a-zA-Z0-9_]+)/.test(l));
+            if (pcb) {
+              const m = pcb.match(/set=(?:pcb|gm|g|a)\.([a-zA-Z0-9_]+)/);
+              if (m) {
+                const gid = location.pathname.match(/groups\/([^\/\?]+)/)?.[1];
+                postLink = gid ? `https://www.facebook.com/groups/${gid}/posts/${m[1]}/` : pcb;
+              }
+            }
+          }
           if (postLink) {
             try {
               const u = new URL(postLink);
@@ -9178,8 +9321,28 @@ app.post('/api/scrape-content', async (req, res) => {
             } catch (e) { }
           }
 
-          const authorEl = el.querySelector('h2 a, h3 a, h2 strong, h3 strong, a[role="link"] strong');
-          const authorName = authorEl?.innerText?.trim() || 'Facebook';
+          let authorName = '';
+          const h2 = el.querySelector('h2');
+          if (h2) {
+            const m = (h2.innerText || '').match(/^(?:bài viết của|post by)\s+(.+)$/i);
+            if (m && m[1] && m[1].trim().length >= 2 && m[1].trim().length <= 50) authorName = m[1].trim();
+          }
+          if (!authorName) {
+            const userLink = el.querySelector('a[href*="/user/"]:not([href*="/groups/"]), a[href*="profile.php"]:not([href*="/groups/"]), a[href*="/people/"]:not([href*="/groups/"])');
+            const uText = (userLink?.getAttribute('aria-label') || userLink?.innerText || '').trim();
+            if (uText && uText.length >= 2 && uText.length <= 50 && !uText.includes('\n') && !/[.!?]/.test(uText)) {
+              authorName = uText;
+            }
+          }
+          if (!authorName) {
+            const authorEl = el.querySelector('h2 a, h3 a, h2 strong, h3 strong, a[role="link"] strong');
+            const aTxt = authorEl?.innerText?.trim() || '';
+            if (aTxt && aTxt.length <= 50 && !aTxt.includes('\n') && !/[.!?]/.test(aTxt)) {
+              authorName = aTxt;
+            } else {
+              authorName = 'Facebook';
+            }
+          }
 
           let publishedTime = '';
           const timeEl = el.querySelector('a[aria-label][href*="/posts/"], a[aria-label][href*="/permalink/"], a[aria-label][href*="/groups/"], a[aria-label*="giờ"], a[aria-label*="ngày"], a[aria-label*="phút"], abbr, time');
@@ -9204,7 +9367,8 @@ app.post('/api/scrape-content', async (req, res) => {
 
           const finalMedia = [...new Set(mediaList)];
 
-          if (finalMedia.length > 0 || rawText.length > 20) {
+          // Chỉ nhận phần tử nếu có media hoặc postLink hoặc text dài có nghĩa (loại bỏ 100% controls UI)
+          if (finalMedia.length > 0 || postLink || (rawText.length > 50 && !rawText.toLowerCase().includes('sắp xếp'))) {
             results.push({
               title: rawText.length > 80 ? rawText.slice(0, 80) + '...' : (rawText || `Bài viết từ Facebook (${authorName})`),
               originalUrl: postLink || '',
