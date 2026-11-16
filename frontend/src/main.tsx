@@ -33,6 +33,7 @@ async function renderApp() {
 }
 
 if (isTauri()) {
+  import('./desktop/zoom').then(({ installDesktopZoom }) => installDesktopZoom())
   import('./components/DesktopBoot').then(({ default: DesktopBoot }) => {
     root.render(
       <DesktopBoot

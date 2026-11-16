@@ -21,6 +21,14 @@ fn is_desktop_mode() -> bool {
     true
 }
 
+#[tauri::command]
+fn set_interface_zoom(window: tauri::WebviewWindow, factor: f64) -> Result<(), String> {
+    if !factor.is_finite() || !(0.5..=2.0).contains(&factor) {
+        return Err("Độ phóng giao diện phải nằm trong khoảng 50% đến 200%.".into());
+    }
+    window.set_zoom(factor).map_err(|error| error.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // reqwest dùng rustls không kèm provider; cài ring làm mặc định (bỏ qua nếu plugin khác đã cài)
@@ -45,6 +53,7 @@ pub fn run() {
             desktop_io::save_download,
             desktop_io::reveal_download,
             kill_application,
+            set_interface_zoom,
             is_desktop_mode
         ])
         .setup(|app| {
