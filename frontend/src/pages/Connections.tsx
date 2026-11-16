@@ -25,6 +25,7 @@ import {
   Divider,
   Alert,
   Flex,
+  Collapse,
 } from 'antd';
 import {
   PlusOutlined,
@@ -55,6 +56,7 @@ import {
   ArrowRightOutlined,
   ReloadOutlined,
   LoginOutlined,
+  ClearOutlined,
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../config/axios';
@@ -62,6 +64,13 @@ import { useSearchParams } from 'react-router-dom';
 import QuickUpdateCookieModal from '../components/modals/QuickUpdateCookieModal';
 import FacebookBrowserLoginModal from '../components/modals/FacebookBrowserLoginModal';
 import Groups from './Groups';
+import {
+  FacebookCookies,
+  INITIAL_FACEBOOK_COOKIES,
+  parseAllFacebookCookies,
+  buildCookieString,
+  countCookies,
+} from '@/utils/cookieHelper';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -120,80 +129,22 @@ export interface FacebookPageScanResult {
 const isPersonalCookieType = (accountType?: string) =>
   !accountType || accountType === 'PERSONAL_COOKIE' || accountType === 'PERSONAL_PROFILE_COOKIE';
 
-// Tự động trích xuất c_user & xs từ mọi định dạng (Full Cookie chuỗi dài, JSON mảng, chuỗi gộp)
+// Tự động trích xuất đầy đủ tất cả các cột Cookie Facebook (c_user, xs, datr, sb, fr, wd, locale, vpd...)
 export const smartExtractCookie = (rawInput?: string, defaultCUser: string = '') => {
-  if (!rawInput && !defaultCUser) return { cUser: '', xs: '', sb: '', datr: '', isValid: false, normalized: '', fullCookie: '', hasDatrOrSb: false };
-  const text = (rawInput || '').trim();
-
-  // 1. JSON format từ tiện ích J2Team / Cookie-Editor
-  if (text.startsWith('[') && text.endsWith(']')) {
-    try {
-      const arr = JSON.parse(text);
-      let cUser = '';
-      let xs = '';
-      let sb = '';
-      let datr = '';
-      const pairs: string[] = [];
-      if (Array.isArray(arr)) {
-        for (const item of arr) {
-          const name = String(item?.name || '').trim();
-          const val = String(item?.value || '').trim();
-          if (!name || !val) continue;
-          if (name === 'c_user') cUser = val;
-          if (name === 'xs') xs = val;
-          if (name === 'sb') sb = val;
-          if (name === 'datr') datr = val;
-          pairs.push(`${name}=${val}`);
-        }
-      }
-      if (cUser && xs) {
-        const full = pairs.join('; ');
-        const hasDatrOrSb = Boolean(sb || datr);
-        return { cUser, xs, sb, datr, isValid: true, normalized: full, fullCookie: full, hasDatrOrSb };
-      }
-    } catch {}
-  }
-
-  // 2. Regex trích xuất c_user
-  const cUserMatch = text.match(/(?:c_user=|^c_user:\s*|["']?c_user["']?\s*[:=]\s*["']?)([\d]+)/i);
-  const cUser = (cUserMatch ? cUserMatch[1].trim() : defaultCUser) || '';
-
-  // 3. Regex trích xuất xs
-  const xsMatch = text.match(/(?:xs=|^xs:\s*|["']?xs["']?\s*[:=]\s*["']?)([^;'"\s\n\r]+)/i);
-  let xs = xsMatch ? xsMatch[1].trim() : '';
-
-  if (!xs && text && !text.includes('=')) {
-    xs = text;
-  }
-
-  // 4. Trích xuất sb & datr (kháng checkpoint)
-  const sbMatch = text.match(/(?:sb=|^sb:\s*|["']?sb["']?\s*[:=]\s*["']?)([^;'"\s\n\r]+)/i);
-  const datrMatch = text.match(/(?:datr=|^datr:\s*|["']?datr["']?\s*[:=]\s*["']?)([^;'"\s\n\r]+)/i);
-  const sb = sbMatch ? sbMatch[1].trim() : '';
-  const datr = datrMatch ? datrMatch[1].trim() : '';
-  const hasDatrOrSb = Boolean(sb || datr);
-
-  const isValid = Boolean(cUser && xs);
-  if (!isValid) {
-    return { cUser, xs, sb, datr, isValid: false, normalized: '', fullCookie: '', hasDatrOrSb };
-  }
-
-  let fullCookie = text;
-  if (!text.includes('c_user=') && cUser) {
-    fullCookie = `c_user=${cUser}; ${text}`;
-  }
-  const minimal = `c_user=${cUser}; xs=${xs}`;
-  const normalized = fullCookie.includes(';') ? fullCookie : minimal;
-
+  const parsed = parseAllFacebookCookies(rawInput || '', defaultCUser);
   return {
-    cUser,
-    xs,
-    sb,
-    datr,
-    isValid: true,
-    normalized,
-    fullCookie,
-    hasDatrOrSb,
+    cUser: parsed.cookies.cUser,
+    xs: parsed.cookies.xs,
+    sb: parsed.cookies.sb,
+    datr: parsed.cookies.datr,
+    fr: parsed.cookies.fr,
+    wd: parsed.cookies.wd,
+    cookies: parsed.cookies,
+    isValid: parsed.isValid,
+    normalized: parsed.fullCookie,
+    fullCookie: parsed.fullCookie,
+    hasDatrOrSb: parsed.hasSecuritySuite,
+    count: parsed.count,
   };
 };
 
@@ -212,18 +163,18 @@ export const extractFacebookPageIdentifier = (input?: string): string => {
   return text;
 };
 
-// Phân tách c_user và xs từ chuỗi cookie
+// Phân tách đầy đủ các cookie từ chuỗi accessToken
 const parseCookieString = (accessToken?: string) => {
-  if (!accessToken) return { cUser: '', xs: '' };
+  if (!accessToken) return { cUser: '', xs: '', datr: '', sb: '', fr: '', wd: '', cookies: { ...INITIAL_FACEBOOK_COOKIES } };
   const extracted = smartExtractCookie(accessToken);
-  if (extracted.isValid) {
-    return { cUser: extracted.cUser, xs: extracted.xs };
-  }
-  const cUserMatch = accessToken.match(/c_user=([^;]*)/);
-  const xsMatch = accessToken.match(/xs=([^;]*)/);
   return {
-    cUser: cUserMatch?.[1]?.trim() || '',
-    xs: xsMatch?.[1]?.trim() || '',
+    cUser: extracted.cUser,
+    xs: extracted.xs,
+    datr: extracted.datr,
+    sb: extracted.sb,
+    fr: extracted.fr,
+    wd: extracted.wd,
+    cookies: extracted.cookies,
   };
 };
 
@@ -483,9 +434,17 @@ const Connections = () => {
     [accounts]
   );
 
-  // Danh sách các tài khoản hết hạn cookie
+  // Danh sách các tài khoản hết hạn cookie (chỉ tính Fanpage và Via cá nhân, Group không có cookie)
   const expiredAccounts = useMemo(
-    () => (accounts || []).map(withEffectiveStatus).filter((a) => isPersonalCookieType(a.accountType) && a.tokenStatus === 'EXPIRED'),
+    () =>
+      (accounts || [])
+        .map(withEffectiveStatus)
+        .filter(
+          (a) =>
+            a.platform !== 'FACEBOOK_GROUP' &&
+            isPersonalCookieType(a.accountType) &&
+            a.tokenStatus === 'EXPIRED'
+        ),
     [accounts, withEffectiveStatus]
   );
 
@@ -735,12 +694,31 @@ const Connections = () => {
 
   const openConfigDrawer = (record: SocialAccount) => {
     setConfigDrawerAccount(record);
-    const { cUser, xs } = parseCookieString(record.accessToken);
+    const parsed = parseCookieString(record.accessToken);
     configForm.setFieldsValue({
       pageName: record.pageName || '',
       platformAccountId: record.platformAccountId || '',
-      cUser,
-      xs,
+      cUser: parsed.cUser,
+      xs: parsed.xs,
+      datr: parsed.datr,
+      sb: parsed.sb,
+      fr: parsed.fr,
+      wd: parsed.wd,
+      locale: parsed.cookies.locale,
+      vpd: parsed.cookies.vpd,
+      dpr: parsed.cookies.dpr,
+      extraCookies: buildCookieString({
+        ...parsed.cookies,
+        cUser: '',
+        xs: '',
+        datr: '',
+        sb: '',
+        fr: '',
+        wd: '',
+        locale: '',
+        vpd: '',
+        dpr: '',
+      }),
       accessToken: record.accessToken || '',
       maxPostsPerDay: record.maxPostsPerDay ?? null,
       backupAccountId: record.backupAccountId || undefined,
@@ -1583,11 +1561,22 @@ const Connections = () => {
                 configForm.validateFields().then((values) => {
                   if (!configDrawerAccount) return;
                   const isToken = configDrawerAccount.accountType === 'PAGE_TOKEN';
-                  const accessToken = isToken
-                    ? values.accessToken
-                    : values.cUser && values.xs
-                    ? `c_user=${values.cUser.trim()}; xs=${values.xs.trim()}`
-                    : undefined;
+                  let accessToken = isToken ? values.accessToken : undefined;
+                  if (!isToken && values.cUser && values.xs) {
+                    const extra = values.extraCookies ? parseAllFacebookCookies(values.extraCookies).cookies : {};
+                    accessToken = buildCookieString({
+                      ...extra,
+                      cUser: values.cUser?.trim(),
+                      xs: values.xs?.trim(),
+                      datr: values.datr?.trim() || undefined,
+                      sb: values.sb?.trim() || undefined,
+                      fr: values.fr?.trim() || undefined,
+                      wd: values.wd?.trim() || undefined,
+                      locale: values.locale?.trim() || undefined,
+                      vpd: values.vpd?.trim() || undefined,
+                      dpr: values.dpr?.trim() || undefined,
+                    });
+                  }
 
                   saveConfigMutation.mutate({
                     id: configDrawerAccount.id,
@@ -1638,38 +1627,132 @@ const Connections = () => {
               <Input.Password className="rounded-xl font-mono" />
             </Form.Item>
           ) : (
-            <div className="space-y-3">
-              <div className="text-xs font-semibold text-slate-400">Cookie xác thực Facebook</div>
-              <Form.Item
-                name="cUser"
-                label={<span className="text-xs text-slate-400">c_user (UID)</span>}
-                rules={[{ required: true, message: 'Nhập c_user' }]}
-              >
-                <Input className="rounded-xl font-mono" />
-              </Form.Item>
-              <Form.Item
-                name="xs"
-                label={<span className="text-xs text-slate-400">xs (Session token)</span>}
-                rules={[{ required: true, message: 'Nhập xs' }]}
-              >
-                <div className="flex gap-2">
-                  <Input.Password className="rounded-xl font-mono flex-1" />
-                  <Button
-                    icon={<CopyOutlined />}
-                    onClick={async () => {
-                      try {
-                        const text = await navigator.clipboard.readText();
-                        if (text) configForm.setFieldValue('xs', text.trim());
-                      } catch {
-                        // ignore
+            <div className="space-y-3.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <SafetyCertificateOutlined className="text-emerald-400" /> Toàn bộ Cookie Facebook (Kháng Checkpoint)
+                </span>
+                <Button
+                  size="small"
+                  type="dashed"
+                  icon={<CopyOutlined />}
+                  onClick={async () => {
+                    try {
+                      const text = await navigator.clipboard.readText();
+                      if (text) {
+                        const parsed = parseAllFacebookCookies(text);
+                        configForm.setFieldsValue({
+                          cUser: parsed.cookies.cUser,
+                          xs: parsed.cookies.xs,
+                          datr: parsed.cookies.datr,
+                          sb: parsed.cookies.sb,
+                          fr: parsed.cookies.fr,
+                          wd: parsed.cookies.wd,
+                          locale: parsed.cookies.locale,
+                          vpd: parsed.cookies.vpd,
+                          dpr: parsed.cookies.dpr,
+                        });
+                        message.success(`Đã tự động phân tách và điền ${parsed.count} cookie vào các ô!`);
                       }
-                    }}
-                    className="shrink-0 rounded-xl"
+                    } catch {
+                      message.error('Không thể đọc Clipboard!');
+                    }
+                  }}
+                  className="text-xs"
+                >
+                  📋 Dán tự động điền các ô
+                </Button>
+              </div>
+
+              {/* Tầng 1 */}
+              <div className="p-3 rounded-xl border border-blue-500/30 bg-blue-950/20 space-y-2">
+                <div className="text-xs font-semibold text-blue-300">TẦNG 1: BẮT BUỘC</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Form.Item
+                    name="cUser"
+                    label={<span className="text-xs text-slate-300">c_user (UID)</span>}
+                    rules={[{ required: true, message: 'Nhập c_user' }]}
+                    className="!mb-0"
                   >
-                    Dán
-                  </Button>
+                    <Input className="rounded-lg font-mono text-xs bg-slate-900 border-slate-700" placeholder="100023403136194" />
+                  </Form.Item>
+                  <Form.Item
+                    name="xs"
+                    label={<span className="text-xs text-slate-300">xs (Session token)</span>}
+                    rules={[{ required: true, message: 'Nhập xs' }]}
+                    className="!mb-0"
+                  >
+                    <Input.Password className="rounded-lg font-mono text-xs bg-slate-900 border-slate-700" placeholder="49%3A..." />
+                  </Form.Item>
                 </div>
-              </Form.Item>
+              </div>
+
+              {/* Tầng 2 */}
+              <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-950/20 space-y-2">
+                <div className="flex items-center justify-between text-xs font-semibold text-emerald-300">
+                  <span>TẦNG 2: BẢO MẬT THIẾT BỊ (KHÁNG CHECKPOINT)</span>
+                  <Tag color="green" className="text-[10px] m-0">Khuyên dùng</Tag>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Form.Item
+                    name="datr"
+                    label={<span className="text-xs text-slate-300">datr (Thẻ thiết bị)</span>}
+                    className="!mb-0"
+                  >
+                    <Input className="rounded-lg font-mono text-xs bg-slate-900 border-slate-700" placeholder="VD: imv2alUXVRr_..." />
+                  </Form.Item>
+                  <Form.Item
+                    name="sb"
+                    label={<span className="text-xs text-slate-300">sb (Khóa phiên máy)</span>}
+                    className="!mb-0"
+                  >
+                    <Input className="rounded-lg font-mono text-xs bg-slate-900 border-slate-700" placeholder="VD: f1kNaidy..." />
+                  </Form.Item>
+                  <Form.Item
+                    name="fr"
+                    label={<span className="text-xs text-slate-300">fr (Token phiên)</span>}
+                    className="!mb-0"
+                  >
+                    <Input.Password className="rounded-lg font-mono text-xs bg-slate-900 border-slate-700" placeholder="VD: 1MB8n..." />
+                  </Form.Item>
+                  <Form.Item
+                    name="wd"
+                    label={<span className="text-xs text-slate-300">wd (Màn hình)</span>}
+                    className="!mb-0"
+                  >
+                    <Input className="rounded-lg font-mono text-xs bg-slate-900 border-slate-700" placeholder="VD: 440x956" />
+                  </Form.Item>
+                </div>
+              </div>
+
+              {/* Tầng 3 */}
+              <Collapse
+                ghost
+                size="small"
+                className="border border-slate-800 rounded-xl bg-slate-900/40"
+                items={[
+                  {
+                    key: 'extra',
+                    label: <span className="text-xs text-slate-300 font-semibold">⚙️ Thông số phụ (locale, vpd, dpr, khác...)</span>,
+                    children: (
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <Form.Item name="locale" label={<span className="text-xs text-slate-400">locale</span>} className="!mb-1">
+                          <Input className="rounded-lg font-mono text-xs bg-slate-900 border-slate-700" placeholder="vi_VN" />
+                        </Form.Item>
+                        <Form.Item name="vpd" label={<span className="text-xs text-slate-400">vpd</span>} className="!mb-1">
+                          <Input className="rounded-lg font-mono text-xs bg-slate-900 border-slate-700" placeholder="v1%3B956x440x3" />
+                        </Form.Item>
+                        <Form.Item name="dpr" label={<span className="text-xs text-slate-400">dpr</span>} className="!mb-1">
+                          <Input className="rounded-lg font-mono text-xs bg-slate-900 border-slate-700" placeholder="2" />
+                        </Form.Item>
+                        <Form.Item name="extraCookies" label={<span className="text-xs text-slate-400">Cookie khác</span>} className="!mb-1">
+                          <Input className="rounded-lg font-mono text-xs bg-slate-900 border-slate-700" placeholder="pas=...; wl_cbv=..." />
+                        </Form.Item>
+                      </div>
+                    ),
+                  },
+                ]}
+              />
             </div>
           )}
 
@@ -1969,29 +2052,32 @@ const Connections = () => {
           onFinish={(values) => {
             let cUser = values.cUser?.trim() || '';
             let xs = values.xs?.trim() || '';
-            let fullCookie = values.securityCookies?.trim() || rawCookieVia?.trim() || '';
+            let fullCookie = '';
 
-            if (!cUser || !xs) {
-              if (fullCookie) {
-                const parsed = smartExtractCookie(fullCookie);
-                if (parsed.isValid) {
-                  cUser = parsed.cUser;
-                  xs = parsed.xs;
-                  fullCookie = parsed.fullCookie || parsed.normalized;
-                }
-              }
+            if (viaInputMode === 'quick') {
+              const parsed = smartExtractCookie(rawCookieVia);
+              cUser = parsed.cUser;
+              xs = parsed.xs;
+              fullCookie = parsed.fullCookie;
+            } else {
+              const extra = values.extraCookies ? parseAllFacebookCookies(values.extraCookies).cookies : {};
+              fullCookie = buildCookieString({
+                ...extra,
+                cUser,
+                xs,
+                datr: values.datr?.trim() || undefined,
+                sb: values.sb?.trim() || undefined,
+                fr: values.fr?.trim() || undefined,
+                wd: values.wd?.trim() || undefined,
+                locale: values.locale?.trim() || undefined,
+                vpd: values.vpd?.trim() || undefined,
+                dpr: values.dpr?.trim() || undefined,
+              });
             }
 
             if (!cUser || !xs) {
               message.error('Vui lòng cung cấp ít nhất UID Facebook (c_user) và Mã phiên (xs) hợp lệ!');
               return;
-            }
-
-            if (fullCookie) {
-              if (!fullCookie.includes('c_user=')) fullCookie = `c_user=${cUser}; ${fullCookie}`;
-              if (!fullCookie.includes('xs=')) fullCookie = `${fullCookie}; xs=${xs}`;
-            } else {
-              fullCookie = `c_user=${cUser}; xs=${xs}`;
             }
 
             addPersonalViaMutation.mutate({
@@ -2055,6 +2141,39 @@ const Connections = () => {
           {/* CHẾ ĐỘ 1: NHẬP TỪNG Ô PHÂN TẦNG */}
           {viaInputMode === 'structured' && (
             <div className="space-y-3">
+              <div className="flex justify-end">
+                <Button
+                  size="small"
+                  type="dashed"
+                  icon={<CopyOutlined />}
+                  onClick={async () => {
+                    try {
+                      const text = await navigator.clipboard.readText();
+                      if (text) {
+                        const parsed = parseAllFacebookCookies(text);
+                        personalViaForm.setFieldsValue({
+                          cUser: parsed.cookies.cUser,
+                          xs: parsed.cookies.xs,
+                          datr: parsed.cookies.datr,
+                          sb: parsed.cookies.sb,
+                          fr: parsed.cookies.fr,
+                          wd: parsed.cookies.wd,
+                          locale: parsed.cookies.locale,
+                          vpd: parsed.cookies.vpd,
+                          dpr: parsed.cookies.dpr,
+                        });
+                        message.success(`Đã tự động điền ${parsed.count} cookie từ Clipboard vào các cột!`);
+                      }
+                    } catch {
+                      message.error('Không thể đọc Clipboard!');
+                    }
+                  }}
+                  className="text-xs"
+                >
+                  📋 Dán tự động điền tất cả các tầng
+                </Button>
+              </div>
+
               {/* TẦNG 1: ĐỊNH DANH VIA */}
               <div className="p-3.5 rounded-2xl border border-blue-500/30 bg-blue-950/20 space-y-3">
                 <div className="flex items-center justify-between">
@@ -2108,38 +2227,10 @@ const Connections = () => {
                   rules={[{ required: true, message: 'Vui lòng nhập mã phiên xs!' }]}
                   className="!mb-0"
                 >
-                  <div className="flex gap-2">
-                    <Input.Password
-                      placeholder="Dán chuỗi xs... (Ví dụ: 2%3Aabc123...)"
-                      className="rounded-xl font-mono text-[13px] bg-slate-900/90 border-slate-700/80 flex-1"
-                    />
-                    <Button
-                      icon={<CopyOutlined />}
-                      onClick={async () => {
-                        try {
-                          const text = await navigator.clipboard.readText();
-                          if (text) {
-                            const trimmed = text.trim();
-                            const parsed = smartExtractCookie(trimmed);
-                            if (parsed.isValid) {
-                              personalViaForm.setFieldsValue({
-                                cUser: parsed.cUser,
-                                xs: parsed.xs,
-                                securityCookies: parsed.fullCookie || trimmed,
-                              });
-                              message.success(`Đã tự động trích xuất xs & c_user: ${parsed.cUser}`);
-                            } else {
-                              personalViaForm.setFieldValue('xs', trimmed);
-                              message.success('Đã dán mã phiên xs');
-                            }
-                          }
-                        } catch {}
-                      }}
-                      className="shrink-0 rounded-xl"
-                    >
-                      Dán
-                    </Button>
-                  </div>
+                  <Input.Password
+                    placeholder="Dán chuỗi xs... (Ví dụ: 49%3A8J7w...)"
+                    className="rounded-xl font-mono text-[13px] bg-slate-900/90 border-slate-700/80"
+                  />
                 </Form.Item>
                 <div className="text-xs text-slate-300">
                   🔑 Session token bí mật giúp bot Playwright tự động tương tác Facebook không cần nhập mật khẩu.
@@ -2147,33 +2238,69 @@ const Connections = () => {
               </div>
 
               {/* TẦNG 3: KHÁNG CHECKPOINT & CHỐNG VĂNG NICK */}
-              <div className="p-3.5 rounded-2xl border border-emerald-500/30 bg-emerald-950/20 space-y-2">
+              <div className="p-3.5 rounded-2xl border border-emerald-500/30 bg-emerald-950/20 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="text-[13px] font-bold text-emerald-300 flex items-center gap-1.5">
                     <span className="w-5 h-5 rounded-full bg-emerald-500/30 text-emerald-300 flex items-center justify-center text-xs font-bold">3</span>
-                    TẦNG 3: COOKIE BẢO MẬT KHÁNG CHECKPOINT (sb, datr, fr)
+                    TẦNG 3: COOKIE BẢO MẬT KHÁNG CHECKPOINT (datr, sb, fr, wd)
                   </span>
-                  <Tag color="green" className="!text-xs m-0 font-semibold">Khuyên dùng (Để đạt 100% ĐỦ)</Tag>
+                  <Tag color="green" className="!text-xs m-0 font-semibold">Khuyên dùng (Kháng văng nick)</Tag>
                 </div>
 
-                <Form.Item name="securityCookies" className="!mb-0">
-                  <Input.TextArea
-                    rows={2}
-                    placeholder="Ví dụ: sb=...; datr=...; fr=... (hoặc dán toàn bộ chuỗi cookie dài vào đây)"
-                    className="rounded-xl font-mono text-[13px] bg-slate-900/90 border-slate-700/80"
-                  />
-                </Form.Item>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <Form.Item name="datr" label={<span className="text-xs text-slate-300 font-semibold"><code>datr</code> (Thẻ căn cước thiết bị)</span>} className="!mb-0">
+                    <Input placeholder="VD: imv2alUXVRr_..." className="rounded-xl font-mono text-xs bg-slate-900/90 border-slate-700" />
+                  </Form.Item>
+                  <Form.Item name="sb" label={<span className="text-xs text-slate-300 font-semibold"><code>sb</code> (Ràng buộc trình duyệt)</span>} className="!mb-0">
+                    <Input placeholder="VD: f1kNaidy..." className="rounded-xl font-mono text-xs bg-slate-900/90 border-slate-700" />
+                  </Form.Item>
+                  <Form.Item name="fr" label={<span className="text-xs text-slate-300 font-semibold"><code>fr</code> (Mã bảo mật phiên)</span>} className="!mb-0">
+                    <Input.Password placeholder="VD: 1MB8n..." className="rounded-xl font-mono text-xs bg-slate-900/90 border-slate-700" />
+                  </Form.Item>
+                  <Form.Item name="wd" label={<span className="text-xs text-slate-300 font-semibold"><code>wd</code> (Kích thước màn hình)</span>} className="!mb-0">
+                    <Input placeholder="VD: 440x956 hoặc 1920x1080" className="rounded-xl font-mono text-xs bg-slate-900/90 border-slate-700" />
+                  </Form.Item>
+                </div>
                 <div className="text-xs text-slate-300">
                   🛡️ Facebook dùng datr và sb để nhận diện thiết bị quen thuộc. Có 2 mã này bot Playwright sẽ không bị Facebook nghi ngờ checkpoint.
                 </div>
               </div>
 
-              {/* TẦNG 4: PROXY RIÊNG CHO NICK */}
+              {/* TẦNG 4: THÔNG SỐ BỔ SUNG */}
+              <Collapse
+                ghost
+                size="small"
+                className="border border-slate-800 rounded-2xl bg-slate-900/40"
+                items={[
+                  {
+                    key: 'extra',
+                    label: <span className="text-xs text-slate-300 font-semibold">⚙️ TẦNG 4: THÔNG SỐ DEVTOOLS BỔ SUNG (locale, vpd, dpr, khác...)</span>,
+                    children: (
+                      <div className="grid grid-cols-2 gap-2.5 pt-1">
+                        <Form.Item name="locale" label={<span className="text-xs text-slate-400">locale</span>} className="!mb-1">
+                          <Input className="rounded-xl font-mono text-xs bg-slate-900 border-slate-700" placeholder="vi_VN" />
+                        </Form.Item>
+                        <Form.Item name="vpd" label={<span className="text-xs text-slate-400">vpd</span>} className="!mb-1">
+                          <Input className="rounded-xl font-mono text-xs bg-slate-900 border-slate-700" placeholder="v1%3B956x440x3" />
+                        </Form.Item>
+                        <Form.Item name="dpr" label={<span className="text-xs text-slate-400">dpr</span>} className="!mb-1">
+                          <Input className="rounded-xl font-mono text-xs bg-slate-900 border-slate-700" placeholder="2" />
+                        </Form.Item>
+                        <Form.Item name="extraCookies" label={<span className="text-xs text-slate-400">Cookie khác</span>} className="!mb-1">
+                          <Input className="rounded-xl font-mono text-xs bg-slate-900 border-slate-700" placeholder="pas=...; wl_cbv=..." />
+                        </Form.Item>
+                      </div>
+                    ),
+                  },
+                ]}
+              />
+
+              {/* TẦNG 5: PROXY RIÊNG CHO NICK */}
               <div className="p-3.5 rounded-2xl border border-slate-700/80 bg-slate-900/60 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[13px] font-bold text-slate-200 flex items-center gap-1.5">
-                    <span className="w-5 h-5 rounded-full bg-slate-700 text-slate-200 flex items-center justify-center text-xs font-bold">4</span>
-                    TẦNG 4: PROXY RIÊNG CHO NICK (HTTP/SOCKS5)
+                    <span className="w-5 h-5 rounded-full bg-slate-700 text-slate-200 flex items-center justify-center text-xs font-bold">5</span>
+                    TẦNG 5: PROXY RIÊNG CHO NICK (HTTP/SOCKS5)
                   </span>
                   <Tag className="!text-xs m-0">Tùy chọn</Tag>
                 </div>
@@ -2389,7 +2516,7 @@ const Connections = () => {
             Đóng
           </Button>
         }
-        width={480}
+        width={580}
         centered
         className="dark-modal"
       >
@@ -2409,34 +2536,128 @@ const Connections = () => {
             </div>
           </div>
         ) : (
-          <div className="mt-4 space-y-3">
-            <div>
-              <Text className="font-medium text-slate-300 block mb-1 text-xs">c_user (UID)</Text>
-              <div className="flex gap-2">
-                <Input readOnly value={parseCookieString(viewingAccount?.accessToken).cUser} className="rounded-xl font-mono text-xs" />
-                <Button
-                  icon={<CopyOutlined />}
-                  onClick={() => {
-                    navigator.clipboard.writeText(parseCookieString(viewingAccount?.accessToken).cUser);
-                    message.success('Đã sao chép c_user!');
-                  }}
-                  className="rounded-xl"
-                />
+          <div className="mt-4 space-y-3.5">
+            <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+              <div className="flex items-center gap-2">
+                <SafetyCertificateOutlined className="text-emerald-400 text-base" />
+                <span className="text-xs font-semibold text-slate-200">
+                  {parseCookieString(viewingAccount?.accessToken).datr && parseCookieString(viewingAccount?.accessToken).sb
+                    ? '🟢 Đã nạp đầy đủ bộ Cookie kháng Checkpoint'
+                    : '🟡 Bộ Cookie cơ bản (c_user + xs)'}
+                </span>
               </div>
+              <Button
+                type="primary"
+                size="small"
+                icon={<CopyOutlined />}
+                onClick={() => {
+                  navigator.clipboard.writeText(viewingAccount?.accessToken || '');
+                  message.success('Đã sao chép toàn bộ chuỗi Full Cookie!');
+                }}
+                className="bg-emerald-600 rounded-lg text-xs"
+              >
+                Sao chép Full Cookie
+              </Button>
             </div>
-            <div>
-              <Text className="font-medium text-slate-300 block mb-1 text-xs">xs (Session token)</Text>
-              <div className="flex gap-2">
-                <Input.Password readOnly value={parseCookieString(viewingAccount?.accessToken).xs} className="rounded-xl font-mono text-xs" />
-                <Button
-                  icon={<CopyOutlined />}
-                  onClick={() => {
-                    navigator.clipboard.writeText(parseCookieString(viewingAccount?.accessToken).xs);
-                    message.success('Đã sao chép xs!');
-                  }}
-                  className="rounded-xl"
-                />
+
+            <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+              <div>
+                <Text className="font-medium text-slate-300 block mb-1 text-xs"><code>c_user</code> (UID Facebook):</Text>
+                <div className="flex gap-2">
+                  <Input readOnly value={parseCookieString(viewingAccount?.accessToken).cUser} className="rounded-xl font-mono text-xs" />
+                  <Button
+                    icon={<CopyOutlined />}
+                    onClick={() => {
+                      navigator.clipboard.writeText(parseCookieString(viewingAccount?.accessToken).cUser);
+                      message.success('Đã sao chép c_user!');
+                    }}
+                    className="rounded-xl"
+                  />
+                </div>
               </div>
+
+              <div>
+                <Text className="font-medium text-slate-300 block mb-1 text-xs"><code>xs</code> (Session token):</Text>
+                <div className="flex gap-2">
+                  <Input.Password readOnly value={parseCookieString(viewingAccount?.accessToken).xs} className="rounded-xl font-mono text-xs" />
+                  <Button
+                    icon={<CopyOutlined />}
+                    onClick={() => {
+                      navigator.clipboard.writeText(parseCookieString(viewingAccount?.accessToken).xs);
+                      message.success('Đã sao chép xs!');
+                    }}
+                    className="rounded-xl"
+                  />
+                </div>
+              </div>
+
+              {parseCookieString(viewingAccount?.accessToken).datr && (
+                <div>
+                  <Text className="font-medium text-slate-300 block mb-1 text-xs"><code>datr</code> (Thẻ căn cước thiết bị):</Text>
+                  <div className="flex gap-2">
+                    <Input readOnly value={parseCookieString(viewingAccount?.accessToken).datr} className="rounded-xl font-mono text-xs" />
+                    <Button
+                      icon={<CopyOutlined />}
+                      onClick={() => {
+                        navigator.clipboard.writeText(parseCookieString(viewingAccount?.accessToken).datr);
+                        message.success('Đã sao chép datr!');
+                      }}
+                      className="rounded-xl"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {parseCookieString(viewingAccount?.accessToken).sb && (
+                <div>
+                  <Text className="font-medium text-slate-300 block mb-1 text-xs"><code>sb</code> (Ràng buộc trình duyệt):</Text>
+                  <div className="flex gap-2">
+                    <Input readOnly value={parseCookieString(viewingAccount?.accessToken).sb} className="rounded-xl font-mono text-xs" />
+                    <Button
+                      icon={<CopyOutlined />}
+                      onClick={() => {
+                        navigator.clipboard.writeText(parseCookieString(viewingAccount?.accessToken).sb);
+                        message.success('Đã sao chép sb!');
+                      }}
+                      className="rounded-xl"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {parseCookieString(viewingAccount?.accessToken).fr && (
+                <div>
+                  <Text className="font-medium text-slate-300 block mb-1 text-xs"><code>fr</code> (Mã bảo mật phiên):</Text>
+                  <div className="flex gap-2">
+                    <Input.Password readOnly value={parseCookieString(viewingAccount?.accessToken).fr} className="rounded-xl font-mono text-xs" />
+                    <Button
+                      icon={<CopyOutlined />}
+                      onClick={() => {
+                        navigator.clipboard.writeText(parseCookieString(viewingAccount?.accessToken).fr);
+                        message.success('Đã sao chép fr!');
+                      }}
+                      className="rounded-xl"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {parseCookieString(viewingAccount?.accessToken).wd && (
+                <div>
+                  <Text className="font-medium text-slate-300 block mb-1 text-xs"><code>wd</code> (Kích thước màn hình):</Text>
+                  <div className="flex gap-2">
+                    <Input readOnly value={parseCookieString(viewingAccount?.accessToken).wd} className="rounded-xl font-mono text-xs" />
+                    <Button
+                      icon={<CopyOutlined />}
+                      onClick={() => {
+                        navigator.clipboard.writeText(parseCookieString(viewingAccount?.accessToken).wd);
+                        message.success('Đã sao chép wd!');
+                      }}
+                      className="rounded-xl"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
