@@ -14,6 +14,7 @@ import java.util.List;
 
 @Repository
 public interface PostQueueRepository extends JpaRepository<PostQueue, Long> {
+    boolean existsByStatusIn(java.util.Collection<String> statuses);
     List<PostQueue> findByCampaignId(Long campaignId);
 
     // Bài của Threads Studio: targetFanpageId dạng "username:THREADS_COOKIE:connectionId".

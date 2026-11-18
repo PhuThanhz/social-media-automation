@@ -4,6 +4,7 @@ import { SwapOutlined } from '@ant-design/icons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs, { Dayjs } from 'dayjs';
 import api from '../../config/axios';
+import QueuePowerPanel from './QueuePowerPanel';
 import {
   POSTING_SETTINGS_QUERY_KEY,
   POSTING_WINDOW_QUERY_KEY,
@@ -275,6 +276,7 @@ export default function ScheduleSettingsDrawer({ open, onClose }: { open: boolea
           ))}
         </section>
       )}
+      {open && <QueuePowerPanel />}
     </Drawer>
   );
 }
