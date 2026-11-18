@@ -10,7 +10,11 @@ import api from '../../config/axios';
 
 export type ScheduleMode = 'NOW' | 'QUEUE' | 'AT';
 
-export type ScheduleValue = { mode: ScheduleMode; at?: Dayjs | null };
+export type ScheduleValue = {
+  mode: ScheduleMode;
+  at?: Dayjs | null;
+  intervalMinutes?: number;
+};
 
 export type PostingWindow = {
   enabled: boolean;
@@ -104,14 +108,19 @@ export const onOpenScheduleSettings = (handler: () => void) => {
 
 export const toLocalIso = (t: Dayjs) => t.format('YYYY-MM-DDTHH:mm:ss');
 
-/** Body gửi lên server: {scheduleMode, scheduledAt?}. Server tự xếp giờ cho NOW / QUEUE. */
-export const schedulePayload = (v: ScheduleValue) => ({
-  scheduleMode: v.mode,
-  publishNow: v.mode === 'NOW',
-  // Cờ cũ để backend chưa cập nhật vẫn hiểu "Xếp vào lịch" = nối đuôi hàng đợi
-  appendToQueue: v.mode === 'QUEUE',
-  ...(v.mode === 'AT' && v.at ? { scheduledAt: toLocalIso(v.at) } : {}),
-});
+/** Body gửi lên server: {scheduleMode, scheduledAt?, intervalMinutes?, gapSeconds?}. Server tự xếp giờ cho NOW / QUEUE. */
+export const schedulePayload = (v: ScheduleValue) => {
+  const interval = v.intervalMinutes || 20;
+  return {
+    scheduleMode: v.mode,
+    publishNow: v.mode === 'NOW',
+    // Cờ cũ để backend chưa cập nhật vẫn hiểu "Xếp vào lịch" = nối đuôi hàng đợi
+    appendToQueue: v.mode === 'QUEUE',
+    intervalMinutes: interval,
+    gapSeconds: interval * 60,
+    ...(v.mode === 'AT' && v.at ? { scheduledAt: toLocalIso(v.at) } : {}),
+  };
+};
 
 export const scheduleModeLabel: Record<ScheduleMode, string> = {
   NOW: 'Đăng ngay',

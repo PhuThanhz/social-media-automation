@@ -22,6 +22,7 @@ import { useAuthStore } from '../../store/authStore';
 import { resolveBackgroundImage, useBackgroundStore } from '../../store/backgroundStore';
 import BackgroundPicker from './BackgroundPicker';
 import QueueFinishBadge from './QueueFinishBadge';
+import SystemEngineBadge from './SystemEngineBadge';
 
 interface SocialAccountLite {
   id: number;
@@ -606,6 +607,7 @@ const DashboardLayout = () => {
           </Flex>
 
           <Flex align="center" gap={10} className="app-topbar-actions shrink-0">
+            <SystemEngineBadge />
             <QueueFinishBadge />
             <Button
               className="app-topbar-buff !flex !items-center !gap-1.5 !font-bold !text-[13px] !rounded-xl !bg-gradient-to-r !from-blue-600 !to-indigo-600 hover:!from-blue-500 hover:!to-indigo-500 !text-white !border-blue-400/40 !shadow-md !shadow-blue-600/25 !h-10 !px-4 transition-all whitespace-nowrap shrink-0"

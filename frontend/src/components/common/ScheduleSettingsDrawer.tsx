@@ -27,7 +27,7 @@ export default function ScheduleSettingsDrawer({ open, onClose }: { open: boolea
 
   const [enabled, setEnabled] = useState(false);
   const [range, setRange] = useState<[Dayjs, Dayjs]>([dayjs('08:00', 'HH:mm'), dayjs('22:00', 'HH:mm')]);
-  const [gapMinutes, setGapMinutes] = useState(2);
+  const [gapMinutes, setGapMinutes] = useState(20);
   const [maxPerHour, setMaxPerHour] = useState(35);
   const [respreadExisting, setRespreadExisting] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -77,11 +77,11 @@ export default function ScheduleSettingsDrawer({ open, onClose }: { open: boolea
   });
 
   const packMutation = useMutation({
-    mutationFn: async () => (await api.post('/queue/pack-continuous', {})).data,
+    mutationFn: async () => (await api.post('/queue/pack-continuous', { gapSeconds: gapMinutes * 60 })).data,
     onSuccess: (data: any) => {
       const deferred = Number(data?.deferredCount) || 0;
       message.success(
-        `Đã xếp lại ${data?.updated ?? 0} bài, dự kiến xong ${formatWhen(data?.estimatedFinishAt)}.`
+        `Đã xếp lại ${data?.updated ?? 0} bài (giãn cách ${gapMinutes} phút/bài), dự kiến xong ${formatWhen(data?.estimatedFinishAt)}.`
         + (deferred > 0 ? ` ${deferred} bài sang ngày sau.` : ''),
         6,
       );
@@ -162,7 +162,7 @@ export default function ScheduleSettingsDrawer({ open, onClose }: { open: boolea
           </Checkbox>
         )}
 
-        <div className="schedule-settings-actions">
+        <div className="schedule-settings-actions flex items-center gap-2 mt-3">
           <Button
             type="primary"
             disabled={!dirty}
@@ -177,6 +177,18 @@ export default function ScheduleSettingsDrawer({ open, onClose }: { open: boolea
           >
             Lưu cài đặt
           </Button>
+
+          <Popconfirm
+            title={`Dãn cách ${gapMinutes} phút/bài cho toàn bộ hàng đợi?`}
+            description="Mọi bài đang chờ sẽ được xếp lại cách nhau đều đặn theo số phút này (chống checkpoint spam Facebook)."
+            okText="Dãn cách ngay"
+            cancelText="Hủy"
+            onConfirm={() => packMutation.mutate()}
+          >
+            <Button loading={packMutation.isPending} className="border-emerald-500/40 text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 cursor-pointer font-semibold">
+              ⚡ Dãn cách {gapMinutes}p/bài ngay
+            </Button>
+          </Popconfirm>
         </div>
       </section>
 

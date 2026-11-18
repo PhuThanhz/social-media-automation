@@ -792,15 +792,24 @@ public class PostQueueController {
         // "Hẹn giờ" nhiều bài chỉ với 1 mốc (không gửi giờ riêng từng bài): bắt đầu từ mốc đó, mỗi nick nối đuôi
         if ("AT".equals(scheduleMode) && scheduledTimes == null && !allCreated.isEmpty()
                 && requestBody.get("scheduleMode") != null) {
+            int gapSeconds = parseGapSeconds(requestBody.get("gapSeconds"));
+            if (gapSeconds <= 0 && requestBody.get("intervalMinutes") instanceof Number n) {
+                gapSeconds = n.intValue() * 60;
+            }
+            if (gapSeconds <= 0) gapSeconds = postingWindowService.defaultGapSeconds();
             campaignScheduler.packContinuousFrom(allCreated.stream().map(PostQueue::getId).toList(),
-                    postingWindowService.defaultGapSeconds(), baseScheduledAt);
+                    gapSeconds, baseScheduledAt);
         }
         String windowNote = windowMoved == 0 ? ""
                 : " " + windowMoved + " bài hẹn ngoài khung giờ đăng đã được dời vào khung"
                         + (windowDeferred > 0 ? " (" + windowDeferred + " bài không kịp hôm nay, xem đề xuất ở mục Khung giờ đăng)." : ".");
 
         if (appendToQueue && !publishNow && !allCreated.isEmpty()) {
-            int gapSeconds = postingWindowService.defaultGapSeconds();
+            int gapSeconds = parseGapSeconds(requestBody.get("gapSeconds"));
+            if (gapSeconds <= 0 && requestBody.get("intervalMinutes") instanceof Number n) {
+                gapSeconds = n.intValue() * 60;
+            }
+            if (gapSeconds <= 0) gapSeconds = postingWindowService.defaultGapSeconds();
             // Chỉ xếp nối đuôi cho các bài MỚI tạo (allCreated), giữ nguyên giờ các bài cũ đang chờ
             Map<String, Object> packed = campaignScheduler.packContinuous(
                     allCreated.stream().map(PostQueue::getId).toList(), gapSeconds);
@@ -1308,7 +1317,7 @@ public class PostQueueController {
         String groupScheduleMode = (requestBody.get("scheduleMode") == null && requestBody.get("publishNow") == null)
                 ? "NOW" : resolveScheduleMode(requestBody);
         Boolean publishNow = "NOW".equals(groupScheduleMode);
-        Integer intervalMinutes = requestBody.get("intervalMinutes") instanceof Number ? ((Number) requestBody.get("intervalMinutes")).intValue() : 15;
+        Integer intervalMinutes = requestBody.get("intervalMinutes") instanceof Number ? ((Number) requestBody.get("intervalMinutes")).intValue() : 20;
         List<Long> queuedGroupPostIds = new ArrayList<>();
         LocalDateTime baseScheduledAt = LocalDateTime.now();
         if (!publishNow) {
@@ -1474,7 +1483,12 @@ public class PostQueueController {
         }
 
         if ("QUEUE".equals(groupScheduleMode) && !queuedGroupPostIds.isEmpty()) {
-            campaignScheduler.packContinuous(queuedGroupPostIds, postingWindowService.defaultGapSeconds());
+            int gapSeconds = parseGapSeconds(requestBody.get("gapSeconds"));
+            if (gapSeconds <= 0 && requestBody.get("intervalMinutes") instanceof Number n) {
+                gapSeconds = n.intValue() * 60;
+            }
+            if (gapSeconds <= 0) gapSeconds = postingWindowService.defaultGapSeconds();
+            campaignScheduler.packContinuous(queuedGroupPostIds, gapSeconds);
         }
 
         return ResponseEntity.ok(Map.of(

@@ -336,8 +336,8 @@ const PlaywrightPoster = () => {
   const [isPosting, setIsPosting] = useState(false);
   const [postMode, setPostMode] = useState<PostMode>('FANPAGE_ONLY');
   const [forceRefresh, setForceRefresh] = useState(false);
-  // Khoảng cách thời gian giãn cách giữa các nhóm khi đăng bài vào nhiều nhóm cùng lúc (phút)
-  const [groupStaggerInterval, setGroupStaggerInterval] = useState<number>(2);
+  // Khoảng cách thời gian giãn cách giữa các bài khi đăng cuốn chiếu (mặc định 20 phút để an toàn cho Group)
+  const [groupStaggerInterval, setGroupStaggerInterval] = useState<number>(20);
   const [groupTimingMode, setGroupTimingMode] = useState<'SPREAD_DAY' | 'STAGGER'>('SPREAD_DAY');
   const [groupSpreadStart, setGroupSpreadStart] = useState<Dayjs>(() => dayjs().startOf('day').add(8, 'hour').add(30, 'minute'));
   const [groupSpreadEnd, setGroupSpreadEnd] = useState<Dayjs>(() => dayjs().startOf('day').add(22, 'hour').add(30, 'minute'));
@@ -808,19 +808,23 @@ const PlaywrightPoster = () => {
   // Thời gian đăng: chỉ 3 cách (Đăng ngay / Xếp vào lịch / Hẹn giờ). Giờ cụ thể do server xếp theo
   // "Lịch đăng" chung (bấm badge hàng đợi trên header để cài khung giờ, giãn cách, giới hạn mỗi nick).
   const [scheduleChoice, setScheduleChoiceState] = useState<ScheduleValue>(() => (
-    { mode: localStorage.getItem('poster_schedule_mode') === 'NOW' ? 'NOW' : 'QUEUE' }
+    {
+      mode: localStorage.getItem('poster_schedule_mode') === 'NOW' ? 'NOW' : 'QUEUE',
+      intervalMinutes: Number(localStorage.getItem('poster_schedule_interval')) || 20,
+    }
   ));
   const setScheduleChoice = (v: ScheduleValue) => {
     setScheduleChoiceState(v);
     if (v.mode !== 'AT') localStorage.setItem('poster_schedule_mode', v.mode);
+    if (v.intervalMinutes) localStorage.setItem('poster_schedule_interval', String(v.intervalMinutes));
   };
   // "Hẹn giờ" nhiều bài = bắt đầu từ mốc đã chọn, server tự nối đuôi theo nick → không gửi giờ riêng từng bài
   const scheduleBody = {
     ...schedulePayload(scheduleChoice),
     ...(scheduleChoice.mode === 'AT' ? { scheduledTimes: undefined } : {}),
   };
-  // Chỉ dùng để hiển thị giờ dự kiến tạm trên form, server mới là nơi quyết giờ thật
-  const batchInterval = 15;
+  // Giãn cách phút giữa các bài (lấy trực tiếp từ lựa chọn người dùng, mặc định 20 phút)
+  const batchInterval = scheduleChoice.intervalMinutes || 20;
   const [batchToolsOpen, setBatchToolsOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
@@ -2669,15 +2673,18 @@ const PlaywrightPoster = () => {
   };
 
   // Xếp lại lịch theo cài đặt chung (khung giờ + giãn cách + làn theo nick). ids trống = cả hàng đợi.
-  const handleRepackQueue = (ids?: React.Key[]) => {
+  const handleRepackQueue = (ids?: React.Key[], gapSeconds?: number) => {
     const run = async () => {
       setIsBulkProcessing(true);
       try {
-        const body = ids && ids.length > 0 ? { ids: ids.map((k) => Number(k)) } : {};
+        const body: Record<string, any> = ids && ids.length > 0 ? { ids: ids.map((k) => Number(k)) } : {};
+        if (gapSeconds && gapSeconds > 0) {
+          body.gapSeconds = gapSeconds;
+        }
         const res = await api.post('/queue/pack-continuous', body);
         const finish = res.data?.estimatedFinishAt ? dayjs(res.data.estimatedFinishAt).format('HH:mm DD/MM') : '';
         const deferred = Number(res.data?.deferredCount) || 0;
-        message.success(`Đã xếp lại ${res.data?.updated ?? 0} bài${finish ? `, dự kiến xong lúc ${finish}` : ''}`
+        message.success(`Đã xếp lại ${res.data?.updated ?? 0} bài${gapSeconds ? ` (giãn cách ${Math.round(gapSeconds / 60)} phút)` : ''}${finish ? `, dự kiến xong lúc ${finish}` : ''}`
           + (deferred > 0 ? `. ${deferred} bài sang ngày sau.` : '.'), 5);
         setSelectedRowKeys([]);
         queryClient.invalidateQueries({ queryKey: ['postQueuePlaywright'] });
@@ -2689,6 +2696,10 @@ const PlaywrightPoster = () => {
       }
     };
     if (ids && ids.length > 0) {
+      run();
+      return;
+    }
+    if (gapSeconds) {
       run();
       return;
     }

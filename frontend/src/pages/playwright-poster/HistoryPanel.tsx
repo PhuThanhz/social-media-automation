@@ -42,7 +42,7 @@ interface HistoryPanelProps {
   selectedRowKeys: React.Key[];
   setSelectedRowKeys: React.Dispatch<React.SetStateAction<React.Key[]>>;
   /** Xếp lại lịch theo cài đặt chung: ids = chỉ các bài này, bỏ trống = cả hàng đợi. */
-  onRepack: (ids?: React.Key[]) => void;
+  onRepack: (ids?: React.Key[], gapSeconds?: number) => void;
   /** Rải đều các bài của toàn bộ các nhóm suốt cả ngày (xen kẽ nhóm, không dồn cục). */
   onSpreadGroups?: (ids?: React.Key[]) => void;
   isBulkProcessing: boolean;
@@ -236,6 +236,24 @@ export default function HistoryPanel({
             >
               Xếp lại lịch
             </Button>
+
+            <Popconfirm
+              title="Dãn cách 20 phút/bài?"
+              description="Hệ thống sẽ xếp lại các bài được chọn (hoặc cả hàng đợi) cách nhau đúng 20 phút để chống spam."
+              okText="Đồng ý"
+              cancelText="Hủy"
+              onConfirm={() => onRepack(selectedRowKeys.length > 0 ? selectedRowKeys : undefined, 1200)}
+            >
+              <Button
+                size="small"
+                icon={<ClockCircleOutlined />}
+                disabled={isBulkProcessing}
+                className="bg-emerald-600/25 hover:bg-emerald-600/35 text-emerald-300 border border-emerald-500/40 font-bold text-xs rounded-xl h-8 px-3 transition-all cursor-pointer"
+                title="Tự động giãn cách 20 phút mỗi bài (Chuẩn chống spam Facebook)"
+              >
+                ⏱️ Dãn 20p/bài
+              </Button>
+            </Popconfirm>
 
             <Button
               size="small"
@@ -1076,6 +1094,21 @@ export default function HistoryPanel({
                   >
                     Rải đều các nhóm cả ngày
                   </Button>
+                  <Popconfirm
+                    title="Dãn cách 20 phút/bài cho toàn bộ hàng đợi?"
+                    description={`Xếp lại ${currentPendingDistribution.totalPending} bài đang chờ cách đều nhau đúng 20 phút (chuẩn chống checkpoint/spam Facebook).`}
+                    okText="Dãn 20 phút"
+                    cancelText="Hủy"
+                    onConfirm={() => onRepack(undefined, 1200)}
+                  >
+                    <Button
+                      size="small"
+                      icon={<ClockCircleOutlined />}
+                      className="font-bold text-xs rounded-lg bg-emerald-600/30 hover:bg-emerald-600/40 text-emerald-200 border-emerald-500/40 cursor-pointer"
+                    >
+                      ⏱️ Dãn đều 20p/bài
+                    </Button>
+                  </Popconfirm>
                   <Button
                     type="primary"
                     size="small"

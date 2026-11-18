@@ -10,7 +10,7 @@ import java.time.LocalTime;
  */
 public record PostingWindow(boolean enabled, LocalTime start, LocalTime end, long minGapSeconds) {
 
-    public static final PostingWindow DISABLED = new PostingWindow(false, LocalTime.of(9, 0), LocalTime.of(23, 0), 120);
+    public static final PostingWindow DISABLED = new PostingWindow(false, LocalTime.of(9, 0), LocalTime.of(23, 0), 1200);
 
     public PostingWindow {
         if (start == null) start = LocalTime.of(9, 0);
