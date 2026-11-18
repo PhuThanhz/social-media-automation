@@ -957,8 +957,17 @@ public class CampaignScheduler {
             List<PostQueue> gPosts = entry.getValue();
             int count = gPosts.size();
             for (int pIdx = 0; pIdx < count; pIdx++) {
-                double frac = (count <= 1) ? 0.0 : ((double) pIdx / (count - 1));
-                long offsetSec = (long) (frac * totalSeconds) + (gIdx * 20L);
+                double frac;
+                if (count <= 1) {
+                    // Nếu nhóm chỉ có 1 bài: rải đều vị trí của nhóm này trong toàn bộ khung thời gian
+                    frac = (groupCount <= 1) ? 0.0 : ((double) gIdx / Math.max(1, groupCount - 1));
+                } else {
+                    // Nếu nhóm có nhiều bài: rải đều các bài của nhóm đó dọc theo ngày, so le nhẹ giữa các nhóm
+                    double groupOffset = (groupCount > 1) ? ((double) gIdx / groupCount) : 0.0;
+                    double step = 1.0 / count;
+                    frac = (pIdx * step) + (groupOffset * step * 0.7);
+                }
+                long offsetSec = (long) (Math.min(0.98, Math.max(0.0, frac)) * totalSeconds);
                 LocalDateTime desired = start.plusSeconds(offsetSec);
                 candidates.add(new Candidate(gPosts.get(pIdx), gKey, desired));
             }
@@ -971,7 +980,7 @@ public class CampaignScheduler {
         long minNickGapSeconds = Math.max(120, window.enabled() ? window.minGapSeconds() : 120);
         long minGroupGapSeconds = (minGroupGapMinutes != null && minGroupGapMinutes > 0)
                 ? (minGroupGapMinutes * 60L)
-                : Math.max(180L, minNickGapSeconds);
+                : Math.max(1200L, minNickGapSeconds); // Mặc định 20 phút (1200s) cho cùng 1 Group để chống spam tuyệt đối
 
         Map<String, LocalDateTime> lastNickAssigned = new HashMap<>();
         Map<String, LocalDateTime> lastGroupAssigned = new HashMap<>();
@@ -1063,7 +1072,7 @@ public class CampaignScheduler {
         Set<Long> scope = postIds == null ? null : new HashSet<>(postIds);
         Set<Long> movingIds = new HashSet<>();
 
-        long gapSeconds = window.minGapSeconds() > 0 ? window.minGapSeconds() : 120;
+        long gapSeconds = window.minGapSeconds() > 0 ? window.minGapSeconds() : postingWindowService.defaultGapSeconds();
 
         // Chỉ dời bài đang nằm NGOÀI khung giờ (hoặc bị đánh dấu dư). Trước đây scope == null xếp lại TOÀN BỘ
         // hàng chờ — job 5 phút gọi vậy nên giờ hẹn của mọi bài bị đổi liên tục. Muốn xếp lại cả ngày: spreadEvenly().
@@ -1247,7 +1256,7 @@ public class CampaignScheduler {
         if (!moved.isEmpty()) {
             // Chỉ xếp lại đúng các bài vừa chuyển nick vào làn mới, không xáo trộn toàn bộ hàng đợi
             Map<String, Object> packed = packContinuous(moved.stream().map(PostQueue::getId).toList(),
-                    (int) Math.max(postingWindowService.get().minGapSeconds(), 120));
+                    (int) Math.max(postingWindowService.get().minGapSeconds(), postingWindowService.defaultGapSeconds()));
             result.putAll(packed);
         }
         return result;

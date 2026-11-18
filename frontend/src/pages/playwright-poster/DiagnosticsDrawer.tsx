@@ -1,10 +1,11 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import type React from 'react';
-import { Button, Badge, Alert, Drawer, Spin } from 'antd';
-import { CloseCircleOutlined, CopyOutlined, ReloadOutlined, BugOutlined, CodeOutlined, KeyOutlined } from '@ant-design/icons';
+import { Button, Badge, Alert, Drawer, Spin, App } from 'antd';
+import { CloseCircleOutlined, CopyOutlined, ReloadOutlined, BugOutlined, CodeOutlined, KeyOutlined, UserAddOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import type { RefetchOptions, QueryObserverResult } from '@tanstack/react-query';
 import type { NavigateFunction } from 'react-router-dom';
 import type { DiagnosticEvidence, DiagnosticLogPayload, SocialAccount, PostQueue } from './types';
+import api from '../../config/axios';
 
 interface DiagnosticsDrawerProps {
   navigate: NavigateFunction;
@@ -36,6 +37,37 @@ function DiagnosticsDrawer({
   diagnosticEvidence,
   copyDiagnostic,
 }: DiagnosticsDrawerProps) {
+  const { message } = App.useApp();
+  const [isRetrying, setIsRetrying] = useState(false);
+
+  const handleRetryPost = async () => {
+    if (!diagnosingPost) return;
+    try {
+      setIsRetrying(true);
+      const res = await api.post(`/posts/${diagnosingPost.id}/publish`);
+      if (res.data?.success) {
+        message.success(`Đã kích hoạt đăng lại bài #${diagnosingPost.id} thành công!`);
+        setDiagnosingPost(null);
+      } else {
+        message.warning(res.data?.message || 'Chưa đăng lại được, vui lòng kiểm tra lại log.');
+      }
+    } catch (err: any) {
+      message.error(err?.response?.data?.message || err?.message || 'Lỗi khi yêu cầu đăng lại');
+    } finally {
+      setIsRetrying(false);
+    }
+  };
+
+  const isGroupMembershipIssue = Boolean(
+    diagnosingPost && (
+      diagnosingPost.errorMessage?.toLowerCase().includes('chưa gia nhập') ||
+      diagnosingPost.errorMessage?.toLowerCase().includes('phê duyệt') ||
+      diagnosingPost.errorMessage?.toLowerCase().includes('ô đăng bài trong group') ||
+      diagnosingPost.errorMessage?.toLowerCase().includes('trong nhóm') ||
+      diagnosingPost.errorMessage?.toLowerCase().includes('pending approval') ||
+      diagnosingPost.errorMessage?.toLowerCase().includes('kicked')
+    )
+  );
   return (
     <Drawer
       open={!!diagnosingPost}
@@ -96,9 +128,10 @@ function DiagnosticsDrawer({
             </div>
           </section>
 
-          <div className="diagnostic-actions">
+          <div className="diagnostic-actions flex-wrap">
             <Button icon={<CopyOutlined />} onClick={() => copyDiagnostic(true)}>Sao chép lỗi</Button>
             <Button type="primary" icon={<CopyOutlined />} onClick={() => copyDiagnostic(false)}>Sao chép gói chẩn đoán</Button>
+
             {diagnosingPost && (diagnosingPost.errorMessage?.toLowerCase().includes('cookie') || diagnosingPost.errorMessage?.toLowerCase().includes('hết hạn') || diagnosingPost.errorMessage?.toLowerCase().includes('không hợp lệ')) && (
               <Button
                 type="primary"
@@ -115,6 +148,28 @@ function DiagnosticsDrawer({
                 🔑 Cập nhật Cookie ngay
               </Button>
             )}
+
+            {isGroupMembershipIssue && (
+              <Button
+                type="primary"
+                icon={<UserAddOutlined />}
+                onClick={() => navigate('/dashboard/connections?tab=groups')}
+                className="!bg-emerald-600 hover:!bg-emerald-500 font-bold shadow"
+              >
+                👥 Mở Quản lý Nhóm để Xin vào nhóm
+              </Button>
+            )}
+
+            <Button
+              type="primary"
+              icon={<ThunderboltOutlined />}
+              loading={isRetrying}
+              onClick={handleRetryPost}
+              className="!bg-gradient-to-r !from-sky-500 !to-indigo-600 font-bold shadow"
+            >
+              🚀 Thử đăng lại ngay
+            </Button>
+
             <Button
               icon={<CodeOutlined />}
               onClick={() => navigate(`/dashboard/logs?source=worker&lines=5000&query=${encodeURIComponent(diagnosticEvidence.searchToken)}`)}

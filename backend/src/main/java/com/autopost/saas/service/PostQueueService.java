@@ -984,6 +984,13 @@ public class PostQueueService {
             }
         }
 
+        // QUY TẮC BẢO VỆ CHỈ ĐỊNH: Nếu là Fanpage, TUYỆT ĐỐI KHÔNG tự động nhảy sang một Fanpage khác (như Đỗ Ngân...)!
+        // Chỉ chấp nhận failover nếu là Via đồng quản trị quản lý CÙNG Fanpage đó (đã xử lý ở bước 2 trên).
+        // Nếu không có Via đồng quản trị cùng Page, giữ nguyên để báo lỗi chính xác cho Page đó, tránh đăng nhầm Page.
+        if ("FACEBOOK_PAGE".equalsIgnoreCase(primary.getPlatform())) {
+            return null;
+        }
+
         if (primary.getUser() != null) {
             String primaryPlatform = primary.getPlatform();
             // 3. Tìm tài khoản cùng platform còn active
@@ -1362,6 +1369,14 @@ public class PostQueueService {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("cookieString", account.getAccessToken());
         requestBody.put("targetFanpageId", finalFanpageId);
+        String resolvedPageName = account.getPageName();
+        if (finalFanpageId != null && !finalFanpageId.equals(account.getPlatformAccountId())) {
+            Optional<SocialAccount> targetAcc = socialAccountRepository.findFirstByPlatformAccountIdOrderByIdAsc(finalFanpageId);
+            if (targetAcc.isPresent() && targetAcc.get().getPageName() != null && !targetAcc.get().getPageName().isBlank()) {
+                resolvedPageName = targetAcc.get().getPageName();
+            }
+        }
+        requestBody.put("pageName", resolvedPageName);
         requestBody.put("socialAccountId", String.valueOf(account.getId()));
         if (account.getProxyUrl() != null && !account.getProxyUrl().isBlank()) {
             requestBody.put("proxyUrl", account.getProxyUrl().trim());
@@ -1615,6 +1630,7 @@ public class PostQueueService {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("cookieString", account.getAccessToken());
         requestBody.put("targetFanpageId", account.getPlatformAccountId());
+        requestBody.put("pageName", account.getPageName());
         requestBody.put("socialAccountId", account.getId());
         requestBody.put("content", content);
         requestBody.put("mediaUrls", videoUrl);
@@ -1636,10 +1652,16 @@ public class PostQueueService {
             Long userId = (post.getCampaign() != null && post.getCampaign().getUser() != null)
                     ? post.getCampaign().getUser().getId()
                     : (pageAccount.getUser() != null ? pageAccount.getUser().getId() : null);
-            SocialAccount cookieAccount = (userId != null ? socialAccountRepository.findByUserId(userId) : socialAccountRepository.findAll()).stream()
+            List<SocialAccount> candidates = (userId != null ? socialAccountRepository.findByUserId(userId) : socialAccountRepository.findAll()).stream()
                     .filter(a -> a.getAccessToken() != null && a.getAccessToken().contains("c_user="))
+                    .filter(a -> !"EXPIRED".equalsIgnoreCase(a.getTokenStatus()))
+                    .toList();
+            SocialAccount cookieAccount = candidates.stream()
+                    .filter(a -> "FACEBOOK_PROFILE".equalsIgnoreCase(a.getPlatform())
+                            || "PERSONAL_PROFILE_COOKIE".equalsIgnoreCase(a.getAccountType())
+                            || "PERSONAL_COOKIE".equalsIgnoreCase(a.getAccountType()))
                     .findFirst()
-                    .orElse(null);
+                    .orElse(!candidates.isEmpty() ? candidates.get(0) : null);
             if (cookieAccount == null) {
                 return "Bài đã lên Page nhưng không thể đăng Group: chưa có Cookie cá nhân (chứa c_user) để thực hiện chia sẻ vào Group.";
             }
@@ -1917,13 +1939,39 @@ public class PostQueueService {
                 if (cookieAccounts.size() == 1) {
                     cookieString = cookieAccounts.get(0).getAccessToken();
                 } else if (cookieAccounts.size() > 1) {
-                    String candidateList = cookieAccounts.stream()
-                            .map(a -> a.getId() + " (" + (a.getPageName() != null ? a.getPageName() : "?") + ")")
-                            .collect(java.util.stream.Collectors.joining(", "));
-                    throw new IllegalStateException("Có " + cookieAccounts.size()
-                            + " tài khoản cá nhân đã kết nối (" + candidateList
-                            + ") — không thể tự chọn account nào là thành viên của Group '" + targetGroupId
-                            + "' để đăng. Vui lòng vào trang Kết nối, mở Group này và chọn rõ 'Danh tính đăng bài' (posting identity).");
+                    // Ưu tiên tài khoản cá nhân thật (FACEBOOK_PROFILE hoặc PERSONAL_PROFILE_COOKIE / PERSONAL_COOKIE)
+                    List<SocialAccount> realProfiles = cookieAccounts.stream()
+                            .filter(a -> "FACEBOOK_PROFILE".equalsIgnoreCase(a.getPlatform())
+                                    || "PERSONAL_PROFILE_COOKIE".equalsIgnoreCase(a.getAccountType())
+                                    || "PERSONAL_COOKIE".equalsIgnoreCase(a.getAccountType()))
+                            .toList();
+
+                    if (realProfiles.size() == 1) {
+                        cookieString = realProfiles.get(0).getAccessToken();
+                    } else if (!realProfiles.isEmpty()) {
+                        String firstCUser = extractCUserFromAccount(realProfiles.get(0));
+                        boolean allSame = firstCUser != null && realProfiles.stream()
+                                .allMatch(a -> firstCUser.equals(extractCUserFromAccount(a)));
+                        if (allSame) {
+                            cookieString = realProfiles.get(0).getAccessToken();
+                        }
+                    }
+
+                    if (cookieString == null) {
+                        String firstCUser = extractCUserFromAccount(cookieAccounts.get(0));
+                        boolean allSame = firstCUser != null && cookieAccounts.stream()
+                                .allMatch(a -> firstCUser.equals(extractCUserFromAccount(a)));
+                        if (allSame) {
+                            cookieString = cookieAccounts.get(0).getAccessToken();
+                        } else {
+                            // Nhiều tài khoản cá nhân khác nhau: Tự động dùng tài khoản cá nhân đầu tiên còn hoạt động
+                            // thay vì ném ngoại lệ dừng bài đăng, kèm cảnh báo để người dùng biết.
+                            SocialAccount fallbackCandidate = !realProfiles.isEmpty() ? realProfiles.get(0) : cookieAccounts.get(0);
+                            cookieString = fallbackCandidate.getAccessToken();
+                            log.warn("⚠️ Group '{}' chưa chọn danh tính đăng bài cụ thể giữa {} tài khoản cá nhân — tự động dùng tài khoản '{}' (ID: {}) để đăng.",
+                                    targetGroupId, cookieAccounts.size(), fallbackCandidate.getPageName(), fallbackCandidate.getId());
+                        }
+                    }
                 }
             }
         }
@@ -1932,6 +1980,8 @@ public class PostQueueService {
         requestBody.put("cookieString", cookieString);
         requestBody.put("targetGroupId", targetGroupId);
         requestBody.put("isAnonymous", isAnonymous);
+        requestBody.put("allowPersonalFallback", true);
+        requestBody.put("autoJoin", true);
         // Status nền đỏ: Group không có mẹo 3 chấm như Fanpage nên RED_PHOTO_TRICK cũng đăng thẳng dạng nền đỏ thuần chữ.
         String groupPostType = post != null ? post.getPostType() : null;
         if ("COLOR_BACKGROUND".equalsIgnoreCase(groupPostType) || "RED_PHOTO_TRICK".equalsIgnoreCase(groupPostType)) {

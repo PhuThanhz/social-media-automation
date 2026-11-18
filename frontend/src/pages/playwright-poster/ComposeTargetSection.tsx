@@ -477,7 +477,13 @@ export default function ComposeTargetSection({
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-bold text-slate-100 flex items-center gap-2 flex-wrap">
-                    <span>{postMode === 'FANPAGE_ONLY' ? 'Kênh Fanpage / Nick xuất bản' : 'Tài khoản đại diện đăng bài'}</span>
+                    <span>
+                      {postMode === 'FANPAGE_ONLY'
+                        ? 'Kênh Fanpage / Nick xuất bản'
+                        : postMode === 'FANPAGE_AND_GROUP'
+                        ? 'Fanpage xuất bản (Đăng tường & Share Nhóm)'
+                        : 'Tài khoản đại diện đăng bài'}
+                    </span>
                     {isTwoViaActive ? (
                       <Tag className="!rounded-md font-semibold text-xs !m-0 border border-blue-500/30 bg-blue-500/15 text-blue-300">
                         2 Via song song (50/50)
@@ -492,9 +498,20 @@ export default function ComposeTargetSection({
                       </Tag>
                     ) : null}
                   </div>
-                  <div className="text-xs text-slate-400 mt-0.5 truncate" title={postMode === 'FANPAGE_ONLY' ? 'Chọn 1 hoặc nhiều Fanpage/Via để đăng bài' : 'Chọn 1 hoặc nhiều Nick/Page đại diện để đăng vào các Nhóm:'}>
+                  <div
+                    className="text-xs text-slate-400 mt-0.5 truncate"
+                    title={
+                      postMode === 'FANPAGE_ONLY'
+                        ? 'Chọn 1 hoặc nhiều Fanpage/Via để đăng bài'
+                        : postMode === 'FANPAGE_AND_GROUP'
+                        ? 'Chọn Fanpage xuất bản bài gốc (sau đó bài sẽ được chia sẻ vào các Nhóm đã chọn):'
+                        : 'Chọn 1 hoặc nhiều Nick/Page đại diện để đăng vào các Nhóm:'
+                    }
+                  >
                     {postMode === 'FANPAGE_ONLY'
                       ? 'Chọn Fanpage/Via để đăng bài:'
+                      : postMode === 'FANPAGE_AND_GROUP'
+                      ? 'Chọn Fanpage đăng bài gốc:'
                       : 'Chọn Nick/Page đại diện để đăng vào Nhóm:'}
                   </div>
                 </div>
@@ -518,7 +535,13 @@ export default function ComposeTargetSection({
           <div className="text-xs text-slate-300 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80 flex items-start gap-2 select-none">
             <BulbOutlined className="text-sky-400 shrink-0 text-sm mt-0.5" />
             <span className="leading-relaxed">
-              <b>Hướng dẫn:</b> Chọn Fanpage hoặc Nick cá nhân để đứng tên đăng bài vào Nhóm. Nếu chọn từ 2 tài khoản trở lên, hệ thống sẽ <b>tự động xoay vòng chia đều bài</b> để bảo vệ tài khoản an toàn chống checkpoint Facebook!
+              {postMode === 'FANPAGE_AND_GROUP' ? (
+                <><b>Quy trình:</b> Bài viết sẽ được xuất bản lên tường <b>Fanpage</b> đã chọn dưới đây, sau đó tự động <b>chia sẻ vào các Nhóm</b> bạn đã tick ở trên!</>
+              ) : postMode === 'GROUP_ONLY' ? (
+                <><b>Hướng dẫn:</b> Chọn Fanpage hoặc Nick cá nhân để đứng tên đăng bài vào Nhóm. Nếu Nhóm không cho Fanpage đăng, hệ thống sẽ <b>tự động chuyển sang Nick cá nhân sở hữu</b> để bài viết luôn được đăng thành công! (Nếu chọn từ 2 tài khoản trở lên, hệ thống sẽ <b>tự động xoay vòng chia đều bài</b> chống checkpoint).</>
+              ) : (
+                <><b>Hướng dẫn:</b> Chọn Fanpage hoặc Nick cá nhân để đăng bài lên dòng thời gian. Có thể chọn nhiều tài khoản để <b>chia đều bài đăng</b> tự động!</>
+              )}
             </span>
           </div>
 
@@ -960,33 +983,60 @@ export default function ComposeTargetSection({
                       const numGroups = Math.max(1, activeSelectedGroupIds.length);
                       const postCount = Math.max(1, validLinkCount || 1);
                       const totalSpanMins = Math.max(30, groupSpreadEnd.diff(groupSpreadStart, 'minute'));
-                      const gapPerHour = (totalSpanMins / 60 / postCount).toFixed(1);
-                      const interGroupGap = Math.min(15, Math.max(2, Math.floor(totalSpanMins / postCount / numGroups)));
+                      const avgGapMins = Math.max(20, Math.floor(totalSpanMins / Math.max(1, postCount)));
+                      const hours = Math.floor(avgGapMins / 60);
+                      const mins = avgGapMins % 60;
+                      const gapText = hours > 0 ? `${hours}h${mins > 0 ? `${mins}p` : ''}` : `${mins} phút`;
                       return (
                         <div className="text-xs text-emerald-300 bg-emerald-950/30 border border-emerald-500/20 px-3 py-2 rounded-lg flex items-center gap-1.5">
-                          <CheckCircleOutlined />
+                          <CheckCircleOutlined className="text-emerald-400 shrink-0" />
                           <span>
-                            Dự kiến: <b>{numGroups} nhóm</b> nhận đều bài suốt ngày. Mỗi nhóm cách nhau ~<b>{gapPerHour} tiếng/bài</b>. Các nhóm đăng xen kẽ xoay vòng cách nhau <b>{interGroupGap} phút</b>.
+                            Dự kiến: <b>{postCount} bài</b> rải đều cho <b>{numGroups} nhóm</b> từ {groupSpreadStart.format('HH:mm')} đến {groupSpreadEnd.format('HH:mm')}.
+                            {numGroups === 1
+                              ? ` Mỗi bài cách nhau ~${gapText} (an toàn tuyệt đối cho nhóm).`
+                              : ` Trung bình cách ~${gapText}/bài, cùng 1 nhóm đảm bảo tối thiểu 20 phút.`}
                           </span>
                         </div>
                       );
                     })()}
                   </div>
                 ) : (
-                  <div className="flex items-center justify-between gap-2 bg-slate-950/70 p-2.5 rounded-xl border border-purple-500/30">
-                    <span className="text-xs text-slate-300">
-                      Đăng lần lượt từng nhóm cách nhau:
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <InputNumber
-                        min={1}
-                        max={1440}
-                        value={groupStaggerInterval}
-                        onChange={(val) => setGroupStaggerInterval(val || 2)}
-                        addonAfter="phút"
-                        className="w-28"
-                        size="small"
-                      />
+                  <div className="bg-slate-950/70 p-3 rounded-xl border border-purple-500/30 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-xs font-semibold text-purple-200 shrink-0">
+                          Giãn cách bài:
+                        </span>
+                        {[10, 15, 20, 30, 60].map((mins) => {
+                          const active = groupStaggerInterval === mins;
+                          return (
+                            <button
+                              key={mins}
+                              type="button"
+                              onClick={() => setGroupStaggerInterval(mins)}
+                              className={`px-2 py-0.5 rounded-lg text-xs font-semibold transition-all border cursor-pointer ${
+                                active
+                                  ? 'bg-purple-600/30 border-purple-400 text-purple-200 ring-1 ring-purple-500/40 shadow-sm font-bold'
+                                  : 'bg-slate-800 text-slate-400 border-slate-700 hover:border-slate-600 hover:text-slate-200'
+                              }`}
+                            >
+                              {mins}p {mins === 20 ? '⭐ Khuyên dùng' : ''}
+                            </button>
+                          );
+                        })}
+                        <InputNumber
+                          min={1}
+                          max={1440}
+                          value={groupStaggerInterval}
+                          onChange={(val) => setGroupStaggerInterval(val || 20)}
+                          addonAfter="phút/bài"
+                          className="w-28 !text-xs"
+                          size="small"
+                        />
+                      </div>
+                    </div>
+                    <div className="text-[11px] text-slate-400 italic flex items-center gap-1">
+                      <span>💡 Mỗi bài đăng vào Nhóm cách nhau <b>{groupStaggerInterval} phút</b> (khuyên dùng 20p để tránh bị Facebook đánh dấu spam hoặc admin nhóm chặn).</span>
                     </div>
                   </div>
                 )}

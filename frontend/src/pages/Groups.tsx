@@ -35,6 +35,7 @@ import {
   SafetyCertificateOutlined,
   WarningOutlined,
   InfoCircleOutlined,
+  UserAddOutlined,
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../config/axios';
@@ -107,6 +108,7 @@ const Groups = () => {
   const [bulkInputText, setBulkInputText] = useState('');
   const [editingGroup, setEditingGroup] = useState<SocialAccount | null>(null);
   const [scanningGroupId, setScanningGroupId] = useState<number | null>(null);
+  const [joiningGroupId, setJoiningGroupId] = useState<number | null>(null);
   const [isScanningAll, setIsScanningAll] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
@@ -236,6 +238,28 @@ const Groups = () => {
     onError: () => {
       setIsScanningAll(false);
       message.error('Lỗi khi scan sức khỏe các Group!');
+    },
+  });
+
+  // Tự động xin vào nhóm qua Playwright
+  const joinGroupMutation = useMutation({
+    mutationFn: async (id: number) => {
+      setJoiningGroupId(id);
+      const res = await api.post(`/connections/${id}/join-group`);
+      return res.data;
+    },
+    onSuccess: (data) => {
+      setJoiningGroupId(null);
+      if (data.success) {
+        message.success(data.message || 'Đã gửi yêu cầu tham gia nhóm thành công!');
+      } else {
+        message.warning(data.message || data.error || 'Chưa gửi được yêu cầu tham gia nhóm');
+      }
+      queryClient.invalidateQueries({ queryKey: ['socialAccounts'] });
+    },
+    onError: (err: any) => {
+      setJoiningGroupId(null);
+      message.error(err?.response?.data?.error || err?.message || 'Lỗi khi gửi yêu cầu tham gia nhóm!');
     },
   });
 
@@ -377,7 +401,7 @@ const Groups = () => {
     {
       title: 'Thao tác',
       key: 'action',
-      width: 160,
+      width: 220,
       render: (_: any, record: SocialAccount) => (
         <Space size="small">
           <Button
@@ -389,6 +413,20 @@ const Groups = () => {
           >
             Quét sức khỏe
           </Button>
+          {(record.groupHealthStatus === 'KICKED_OR_NOT_JOINED' || record.groupHealthStatus === 'UNKNOWN' || !record.groupHealthStatus) && (
+            <Tooltip title="Tự động bấm Tham gia nhóm trên Facebook qua Playwright">
+              <Button
+                size="small"
+                type="link"
+                icon={<UserAddOutlined />}
+                loading={joiningGroupId === record.id}
+                onClick={() => joinGroupMutation.mutate(record.id)}
+                className="grp-link-btn text-emerald-400 hover:text-emerald-300"
+              >
+                Xin vào nhóm
+              </Button>
+            </Tooltip>
+          )}
           <Button
             type="text"
             size="small"
@@ -561,15 +599,31 @@ const Groups = () => {
                       </div>
 
                       <Flex align="center" justify="space-between" className="grp-card-foot">
-                        <Button
-                          type="link"
-                          size="small"
-                          loading={scanningGroupId === g.id}
-                          onClick={() => scanHealthMutation.mutate(g.id)}
-                          className="grp-link-btn"
-                        >
-                          Quét sức khỏe
-                        </Button>
+                        <Space size="small">
+                          <Button
+                            type="link"
+                            size="small"
+                            loading={scanningGroupId === g.id}
+                            onClick={() => scanHealthMutation.mutate(g.id)}
+                            className="grp-link-btn"
+                          >
+                            Quét sức khỏe
+                          </Button>
+                          {(g.groupHealthStatus === 'KICKED_OR_NOT_JOINED' || g.groupHealthStatus === 'UNKNOWN' || !g.groupHealthStatus) && (
+                            <Tooltip title="Tự động bấm Tham gia nhóm qua Playwright">
+                              <Button
+                                type="link"
+                                size="small"
+                                icon={<UserAddOutlined />}
+                                loading={joiningGroupId === g.id}
+                                onClick={() => joinGroupMutation.mutate(g.id)}
+                                className="grp-link-btn text-emerald-400 hover:text-emerald-300"
+                              >
+                                Xin vào nhóm
+                              </Button>
+                            </Tooltip>
+                          )}
+                        </Space>
 
                         <Space size="small">
                           <Button

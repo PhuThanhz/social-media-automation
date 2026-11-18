@@ -21,7 +21,7 @@ public class PostingWindowService {
     private static final String KEY_MIN_GAP = "posting_window.min_gap_seconds";
     private static final String KEY_MAX_PER_HOUR = "posting_window.max_posts_per_hour_per_nick";
     public static final int DEFAULT_MAX_POSTS_PER_HOUR_PER_NICK = 35;
-    public static final long DEFAULT_GAP_SECONDS = 120;
+    public static final long DEFAULT_GAP_SECONDS = 1200; // Mặc định 20 phút (1200s) cho mỗi bài để chống spam và an toàn cho group
 
     private final AppSettingRepository repository;
     private volatile PostingWindow cached;
@@ -34,7 +34,7 @@ public class PostingWindowService {
             boolean enabled = "true".equalsIgnoreCase(read(KEY_ENABLED, "false"));
             LocalTime start = LocalTime.parse(read(KEY_START, "09:00"));
             LocalTime end = LocalTime.parse(read(KEY_END, "23:00"));
-            long minGap = Long.parseLong(read(KEY_MIN_GAP, "120"));
+            long minGap = Long.parseLong(read(KEY_MIN_GAP, String.valueOf(DEFAULT_GAP_SECONDS)));
             w = new PostingWindow(enabled, start, end, minGap);
         } catch (Exception e) {
             log.warn("Cài đặt khung giờ đăng không hợp lệ, tạm tắt khung giờ: {}", e.getMessage());

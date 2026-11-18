@@ -711,6 +711,36 @@ function cleanupOldMediaFiles() {
 setTimeout(cleanupOldMediaFiles, 60 * 1000);
 setInterval(cleanupOldMediaFiles, 24 * 60 * 60 * 1000);
 
+// Dọn dẹp ảnh/HTML debug cũ trong DEBUG_OUTPUT_DIR để giải phóng dung lượng ổ đĩa.
+// Xóa file debug phát sinh khi thất bại có tuổi thọ > 48 giờ.
+const DEBUG_RETENTION_HOURS = 48;
+function cleanupOldDebugFiles() {
+  try {
+    if (!fs.existsSync(DEBUG_OUTPUT_DIR)) return;
+    const cutoff = Date.now() - DEBUG_RETENTION_HOURS * 60 * 60 * 1000;
+    const files = fs.readdirSync(DEBUG_OUTPUT_DIR);
+    let deleted = 0;
+    for (const file of files) {
+      if (deleted >= MAX_DELETIONS_PER_CLEANUP) break;
+      const filePath = path.join(DEBUG_OUTPUT_DIR, file);
+      try {
+        const stat = fs.statSync(filePath);
+        if (stat.isFile() && stat.mtimeMs < cutoff) {
+          fs.unlinkSync(filePath);
+          deleted++;
+        }
+      } catch (e) { /* file có thể đã bị xóa — bỏ qua */ }
+    }
+    if (deleted > 0) {
+      console.log(`[Cleanup] 🧹 Đã dọn ${deleted} file debug cũ hơn ${DEBUG_RETENTION_HOURS} giờ trong ${DEBUG_OUTPUT_DIR}`);
+    }
+  } catch (e) {
+    console.error('[Cleanup] ❌ Lỗi dọn dẹp file debug cũ:', e.message);
+  }
+}
+setTimeout(cleanupOldDebugFiles, 30 * 1000);
+setInterval(cleanupOldDebugFiles, 12 * 60 * 60 * 1000);
+
 /**
  * Khoá dedupe cho URL video Threads/Instagram: dùng pathname, bỏ qua query string vì
  * các token ký (efg/oe/_nc_ohc...) có thể đổi giữa 2 lần đọc cùng 1 video vật lý.
@@ -2788,6 +2818,71 @@ app.post('/api/post-facebook', async (req, res) => {
       }
     }
 
+    // Kiểm tra & chuyển đổi danh tính Fanpage trên Header Facebook (đồng bộ như Group)
+    if (!isPersonal && cleanTargetId) {
+      const pageNameForSwitch = (req.body.pageName || '').trim();
+      const accountSwitcherBtn = page.locator(
+        'div[role="button"][aria-label="Trang cá nhân của bạn"], ' +
+        'div[role="button"][aria-label*="Trang cá nhân"], ' +
+        'div[role="button"][aria-label*="Tài khoản"], ' +
+        'div[role="button"][aria-label*="Account"], ' +
+        'div[role="button"][aria-label*="Your profile"], ' +
+        'svg[aria-label*="Trang cá nhân"]'
+      ).first();
+      if (await accountSwitcherBtn.isVisible().catch(() => false)) {
+        console.log('[Playwright] 🎯 Bấm nút switcher Tài khoản trên Header Facebook...');
+        await accountSwitcherBtn.click({ force: true }).catch(() => {});
+        await page.waitForTimeout(1500);
+
+        const seeAllProfilesBtn = page.locator(
+          'div[role="button"]:has-text("Xem tất cả trang cá nhân"), ' +
+          'div[role="button"]:has-text("Xem tất cả các Trang"), ' +
+          'div[role="button"]:has-text("Chuyển sang trang cá nhân khác"), ' +
+          'div[role="button"]:has-text("See all profiles")'
+        ).first();
+        if (await seeAllProfilesBtn.isVisible().catch(() => false)) {
+          console.log('[Playwright] 🎯 Bấm "Xem tất cả trang cá nhân"...');
+          await seeAllProfilesBtn.click({ force: true }).catch(() => {});
+          await page.waitForTimeout(1200);
+        }
+
+        let found = false;
+        let pageOption = null;
+
+        // 1. Thử tìm theo target ID
+        const targetOption = page.locator(`a[href*="${cleanTargetId}"], div[role="button"][data-profile-id="${cleanTargetId}"]`).first();
+        if (await targetOption.isVisible().catch(() => false)) {
+          pageOption = targetOption;
+          found = true;
+        }
+
+        // 2. Thử tìm theo pageName (chính xác hoặc regex không phân biệt hoa thường)
+        if (!found && pageNameForSwitch) {
+          const escPageName = pageNameForSwitch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const nameRegex = new RegExp(escPageName, 'i');
+          const candidate = page.locator('div[role="dialog"] div[role="button"], div[role="dialog"] div[role="option"], div[role="dialog"] span')
+            .filter({ hasText: nameRegex })
+            .first();
+          if (await candidate.isVisible().catch(() => false)) {
+            pageOption = candidate;
+            found = true;
+          }
+        }
+
+        if (found && pageOption) {
+          console.log(`[Playwright] 🎯 Bấm chuyển sang danh tính Fanpage ${cleanTargetId} (${pageNameForSwitch})...`);
+          await pageOption.click({ force: true }).catch(() => {});
+          await page.waitForTimeout(4000);
+          await navigateFacebookSurface(page, pageUrl, 'Fanpage after switch').catch(() => {});
+        } else {
+          console.log(`[Playwright] ℹ️ Không tìm thấy option khớp Fanpage ${cleanTargetId} (${pageNameForSwitch}) trong menu switcher, thoát popup...`);
+          await page.keyboard.press('Escape').catch(() => {});
+          await page.waitForTimeout(500);
+          await page.keyboard.press('Escape').catch(() => {});
+        }
+      }
+    }
+
     // Facebook thỉnh thoảng chèn popup xác nhận danh tính ("Tiếp tục dưới tên X / Dùng trang cá
     // nhân khác") đè lên trang dù i_user cookie đã inject sẵn — popup này chặn mất nút "Tạo bài
     // viết" phía sau khiến bước dưới đây không bấm được. Popup này gắn liền với MỖI LẦN tải trang
@@ -2825,19 +2920,19 @@ app.post('/api/post-facebook', async (req, res) => {
       const primaryComposerBtn = page.locator(
         'div[role="button"][aria-label*="Bạn đang nghĩ gì"], ' +
         'div[role="button"][aria-label*="Tạo bài viết"], ' +
-        'div[role="button"][aria-label*="Ảnh/video"], ' +
-        'div[role="button"][aria-label*="Photo/video"], ' +
+        'div[role="button"][aria-label*="What\'s on your mind"], ' +
+        'div[role="button"][aria-label*="Create a post"], ' +
+        'div[role="button"][aria-label*="Write something"], ' +
         'div[role="button"]:has-text("Bạn đang nghĩ gì?"), ' +
         'div[role="button"]:has-text("Tạo bài viết"), ' +
-        'div[role="button"]:has-text("Ảnh/video"), ' +
-        'div[role="button"][aria-label*="Write something"], ' +
+        'div[role="button"]:has-text("What\'s on your mind?"), ' +
+        'div[role="button"]:has-text("What\'s on your mind"), ' +
         'div[aria-label*="Bạn đang nghĩ gì"], ' +
         'div[aria-label*="Tạo bài viết"], ' +
         'div[aria-label*="What\'s on your mind"], ' +
         'div[aria-label*="Create a post"], ' +
-        'span:has-text("Bạn đang nghĩ gì?"), ' +
-        'span:has-text("Tạo bài viết"), ' +
-        'span:has-text("Ảnh/video")'
+        'span:has-text("What\'s on your mind"), ' +
+        'span:has-text("Bạn đang nghĩ gì?")'
       );
       const fallbackComposerBtn = page.locator(
         'div[role="button"]:has-text("Chia sẻ suy nghĩ"), ' +
@@ -3040,27 +3135,92 @@ app.post('/api/post-facebook', async (req, res) => {
     const activeDialog = dialog.first();
 
     console.log('[Playwright] 🚀 Bấm nút Bước 1 (Tiếp hoặc Đăng)...');
-    let clickedStep1 = await clickVisibleButtonByText(page, /^Tiếp$/, composerMaxButtonY, activeDialog);
+    let clickedStep1 = await clickVisibleButtonByText(page, /^(Tiếp|Next)$/i, composerMaxButtonY, activeDialog);
     let postedDirectly = false;
     if (!clickedStep1) {
-      const clickedPostDirectly = await clickVisibleButtonByText(page, /^Đăng$/, composerMaxButtonY, activeDialog);
+      const clickedPostDirectly = await clickVisibleButtonByText(page, /^(Đăng|Post)$/i, composerMaxButtonY, activeDialog);
       if (clickedPostDirectly) {
         postedDirectly = true;
       } else {
-        const debugPath = path.join(DEBUG_OUTPUT_DIR, `debug_post_facebook_no_button_${Date.now()}.png`);
-        await page.screenshot({ path: debugPath }).catch(() => { });
-        throw new Error(`Không tìm thấy nút "Tiếp" hoặc "Đăng" trong Modal Tạo bài viết. (xem ${path.basename(debugPath)})`);
+        const directSubmitBtn = activeDialog.locator('div[role="button"][aria-label="Đăng"], div[role="button"][aria-label="Post"]').last();
+        if (await directSubmitBtn.isVisible().catch(() => false)) {
+          await directSubmitBtn.click({ force: true }).catch(() => { });
+          postedDirectly = true;
+        } else {
+          const debugPath = path.join(DEBUG_OUTPUT_DIR, `debug_post_facebook_no_button_${Date.now()}.png`);
+          await page.screenshot({ path: debugPath }).catch(() => { });
+          throw new Error(`Không tìm thấy nút "Tiếp/Next" hoặc "Đăng/Post" trong Modal Tạo bài viết. (xem ${path.basename(debugPath)})`);
+        }
       }
     }
+
+    // Hàm gỡ các popup/modal quảng bá của Facebook (VD: "Speak to people directly", "Rời khỏi trang?", v.v.)
+    const dismissPromoModal = async () => {
+      // 1. Popup "Speak to people directly" / "Make it easier for people to speak with you by adding a 'Call Now' button"
+      const upsellModal = page.locator('div[role="dialog"]').filter({
+        hasText: /Speak to people directly|Make it easier for people to speak with you|Trò chuyện trực tiếp với mọi người|Thêm nút Gọi ngay/i
+      });
+      if (await upsellModal.first().isVisible().catch(() => false)) {
+        console.log('[Playwright] ⚠️ Facebook hiện popup quảng bá "Speak to people directly", bấm "Not now" hoặc đóng...');
+        const notNowBtn = upsellModal.first().locator('div[role="button"]').filter({
+          hasText: /^(Not now|Lúc khác|Để sau|Không phải bây giờ|Bỏ qua|Không, cảm ơn)$/i
+        }).first();
+        if (await notNowBtn.isVisible().catch(() => false)) {
+          await notNowBtn.click({ force: true }).catch(() => { });
+          await page.waitForTimeout(1000);
+        } else {
+          const closeBtn = upsellModal.first().locator('div[aria-label="Close"], div[aria-label="Đóng"], svg[aria-label="Close"]').first();
+          if (await closeBtn.isVisible().catch(() => false)) {
+            await closeBtn.click({ force: true }).catch(() => { });
+          } else {
+            await page.keyboard.press('Escape').catch(() => { });
+          }
+          await page.waitForTimeout(1000);
+        }
+      }
+
+      for (let i = 0; i < 3; i++) {
+        const leavePageDialog = page.locator('div[role="dialog"]').filter({ hasText: /Rời khỏi trang\?|Leave page\?/i });
+        if (await leavePageDialog.first().isVisible().catch(() => false)) {
+          console.log('[Playwright] ⚠️ Facebook hiện popup "Rời khỏi trang?", bấm "Tiếp tục chỉnh sửa" và Đăng lại...');
+          const continueEditBtn = leavePageDialog.first().locator('div[role="button"]').filter({ hasText: /Tiếp tục chỉnh sửa|Keep editing/i }).first();
+          if (await continueEditBtn.isVisible().catch(() => false)) {
+            await continueEditBtn.click({ force: true }).catch(() => { });
+            await page.waitForTimeout(1500);
+          }
+          if (!postAlreadySubmitted) {
+            const retrySubmitBtn = page.locator('div[role="dialog"] div[role="button"]').filter({ hasText: /^(Đăng|Post)$/i }).last();
+            if (await retrySubmitBtn.isVisible().catch(() => false)) {
+              await retrySubmitBtn.click({ force: true }).catch(() => { });
+              postAlreadySubmitted = true;
+              await page.waitForTimeout(2000);
+            }
+          }
+        }
+
+        const dismissBtn = page.locator('div[role="dialog"] div[role="button"]').filter({
+          hasText: /^(Not now|Lúc khác|Để sau|Không phải bây giờ|Bỏ qua|Không, cảm ơn|Đăng bài viết gốc|Skip|Cancel)$/i
+        }).first();
+        if (await dismissBtn.isVisible().catch(() => false)) {
+          console.log('[Playwright] ⚠️ Facebook chèn Modal quảng bá phụ/Đăng bài viết gốc, bấm để xuất bản bài...');
+          await dismissBtn.click({ force: true }).catch(() => { });
+          await page.waitForTimeout(2000);
+        } else if (!(await leavePageDialog.first().isVisible().catch(() => false))) {
+          break;
+        }
+      }
+    };
 
     if (!postedDirectly) {
       await page.waitForTimeout(5000);
 
       console.log('[Playwright] 🚀 Bấm nút Bước 2 (Tiếp)...');
-      let clickedStep2Next = await clickVisibleButtonByText(page, /^Tiếp$/, composerMaxButtonY, activeDialog);
+      let clickedStep2Next = await clickVisibleButtonByText(page, /^(Tiếp|Next)$/i, composerMaxButtonY, activeDialog);
       if (clickedStep2Next) {
         await page.waitForTimeout(4000);
       }
+
+      await dismissPromoModal();
 
       console.log('[Playwright] 🚀 Bấm nút Bước cuối (Đăng)...');
       const preciseSubmitBtn = activeDialog.locator('div[role="button"][aria-label="Đăng"], div[role="button"][aria-label="Post"]').last();
@@ -3068,9 +3228,10 @@ app.post('/api/post-facebook', async (req, res) => {
       if (await preciseSubmitBtn.isVisible().catch(() => false)) {
         await preciseSubmitBtn.click({ force: true }).catch(() => { });
       } else {
-        await clickVisibleButtonByText(page, /^Đăng$/, composerMaxButtonY, activeDialog);
+        await clickVisibleButtonByText(page, /^(Đăng|Post)$/i, composerMaxButtonY, activeDialog);
       }
       await page.waitForTimeout(2000);
+      await dismissPromoModal();
     } else {
       console.log('[Playwright] ✅ Đã bấm nút "Đăng" trực tiếp ở Bước 1. Đang chờ Facebook xử lý bài...');
       await page.waitForTimeout(2000);
@@ -3087,49 +3248,14 @@ app.post('/api/post-facebook', async (req, res) => {
       await groupPickerXong.click({ force: true }).catch(() => { });
       await page.waitForTimeout(2000);
       console.log('[Playwright] 🚀 Bấm lại nút "Đăng" thật để xuất bản...');
-      const retryBtn = activeDialog.locator('div[role="button"][aria-label="Đăng"]').last();
+      const retryBtn = activeDialog.locator('div[role="button"][aria-label="Đăng"], div[role="button"][aria-label="Post"]').last();
       if (await retryBtn.isVisible().catch(() => false)) {
         await retryBtn.click({ force: true }).catch(() => { });
       } else {
-        await clickVisibleButtonByText(page, /^Đăng$/, composerMaxButtonY, activeDialog);
+        await clickVisibleButtonByText(page, /^(Đăng|Post)$/i, composerMaxButtonY, activeDialog);
       }
     }
 
-    // Facebook thỉnh thoảng chèn thêm 1 Modal quảng bá tính năng (VD: "Trò chuyện trực tiếp với mọi
-    // người" mời thêm nút "Gọi ngay") ngay trong hoặc ngay sau lúc bấm Đăng, che trên Modal thật —
-    // bài thường ĐÃ đăng xong bên dưới (thấy toast "Thước phim của bạn đã hiển thị rồi đấy!") nhưng
-    // script cứ tưởng còn kẹt vì vẫn có 1 dialog đang mở. Bấm bỏ qua trước khi kiểm tra đóng Modal.
-    const dismissPromoModal = async () => {
-      for (let i = 0; i < 3; i++) {
-        const leavePageDialog = page.locator('div[role="dialog"]').filter({ hasText: 'Rời khỏi trang?' });
-        if (await leavePageDialog.first().isVisible().catch(() => false)) {
-          console.log('[Playwright] ⚠️ Facebook hiện popup "Rời khỏi trang?", bấm "Tiếp tục chỉnh sửa" và Đăng lại...');
-          const continueEditBtn = leavePageDialog.first().locator('div[role="button"]').filter({ hasText: 'Tiếp tục chỉnh sửa' }).first();
-          if (await continueEditBtn.isVisible().catch(() => false)) {
-            await continueEditBtn.click({ force: true }).catch(() => { });
-            await page.waitForTimeout(1500);
-          }
-          // Chặn bấm Đăng lặp lại: nếu đã bấm xuất bản rồi thì không click lại nút Đăng nữa
-          if (!postAlreadySubmitted) {
-            const retrySubmitBtn = page.locator('div[role="dialog"] div[role="button"]').filter({ hasText: /^Đăng$/ }).last();
-            if (await retrySubmitBtn.isVisible().catch(() => false)) {
-              await retrySubmitBtn.click({ force: true }).catch(() => { });
-              postAlreadySubmitted = true;
-              await page.waitForTimeout(2000);
-            }
-          }
-        }
-
-        const dismissBtn = page.locator('div[role="dialog"] div[role="button"]').filter({ hasText: /^(Lúc khác|Để sau|Không phải bây giờ|Bỏ qua|Không, cảm ơn|Đăng bài viết gốc)$/i }).first();
-        if (await dismissBtn.isVisible().catch(() => false)) {
-          console.log('[Playwright] ⚠️ Facebook chèn Modal quảng bá phụ/Đăng bài viết gốc, bấm để xuất bản bài...');
-          await dismissBtn.click({ force: true }).catch(() => { });
-          await page.waitForTimeout(2000);
-        } else if (!(await leavePageDialog.first().isVisible().catch(() => false))) {
-          break;
-        }
-      }
-    };
     await dismissPromoModal();
 
     // Video càng dài/nặng thì Facebook xử lý (encode + "Đang đăng") càng lâu — từng thấy vẫn chưa
@@ -3139,11 +3265,24 @@ app.post('/api/post-facebook', async (req, res) => {
     const composerDialog = activeDialog;
     let modalClosed = false;
     for (let i = 0; i < 120; i++) {
-      if (i % 3 === 0) await dismissPromoModal();
+      if (i % 2 === 0) await dismissPromoModal();
       // Dialog chặn spam giữ composer mở — phát hiện sớm thay vì chờ hết 2 phút rồi báo "kẹt Modal".
       await assertNoFacebookSpamBlock(page, postQueueId, 'Page: đang chờ xuất bản');
       modalClosed = !(await composerDialog.isVisible().catch(() => false));
       if (modalClosed) break;
+
+      // Nếu sau khi dismiss modal quảng bá mà nút Submit vẫn còn hiển thị và đang bật -> bấm lại nút Đăng
+      if (i > 5 && i % 10 === 0) {
+        const lingeringSubmitBtn = activeDialog.locator('div[role="button"][aria-label="Đăng"], div[role="button"][aria-label="Post"]').last();
+        if (await lingeringSubmitBtn.isVisible().catch(() => false)) {
+          const isDisabled = (await lingeringSubmitBtn.getAttribute('aria-disabled').catch(() => null)) === 'true';
+          if (!isDisabled) {
+            console.log('[Playwright] 🔄 Thử bấm lại nút "Post/Đăng" sau khi gỡ popup quảng bá...');
+            await lingeringSubmitBtn.click({ force: true }).catch(() => { });
+          }
+        }
+      }
+
       if (i > 0 && i % 10 === 0) {
         console.log(`[Playwright] ⏳ Vẫn đang chờ Facebook xử lý video... (${i}s)`);
       }
@@ -3195,11 +3334,10 @@ app.post('/api/post-facebook', async (req, res) => {
         : 'Đã đăng bài lên Fanpage nhưng chưa kịp bình luận tự động.';
     }
 
-    const refreshedCookieString = await refreshedFbCookieForSameUser(context, cookieString);
-    await browser.close();
-    for (const downloadedFilePath of downloadedFilePaths) {
-      if (fs.existsSync(downloadedFilePath)) fs.unlinkSync(downloadedFilePath);
-    }
+    let refreshedCookieString = null;
+    try {
+      refreshedCookieString = await refreshedFbCookieForSameUser(context, cookieString);
+    } catch (_) {}
 
     console.log(`[Playwright] ✅ Đã hoàn tất tiến trình Đăng bài MỚI lên Fanpage ID ${targetFanpageId}!`);
     autoEnqueueOwnPost(fanpagePostUrl, 'FANPAGE');
@@ -3212,12 +3350,14 @@ app.post('/api/post-facebook', async (req, res) => {
     });
   } catch (error) {
     console.error('[Playwright] ❌ Lỗi đăng bài Facebook:', error.message);
-    if (browser) await browser.close();
-    for (const downloadedFilePath of downloadedFilePaths) {
-      if (fs.existsSync(downloadedFilePath)) fs.unlinkSync(downloadedFilePath);
-    }
     res.status(500).json({ success: false, error: error.message });
   } finally {
+    if (browser) {
+      try { await browser.close(); } catch (_) {}
+    }
+    for (const downloadedFilePath of downloadedFilePaths) {
+      try { if (fs.existsSync(downloadedFilePath)) fs.unlinkSync(downloadedFilePath); } catch (_) {}
+    }
     releaseLock();
     console.log(`[PostingLock] 🔓 Đã giải phóng phiên đăng Fanpage ${targetFanpageId}.`);
   }
@@ -3313,8 +3453,18 @@ async function postReelWithGroups({ cookieString, targetFanpageId = DEFAULT_FANP
     const primaryComposerBtn = page.locator(
       'div[role="button"][aria-label*="Bạn đang nghĩ gì"], ' +
       'div[role="button"][aria-label*="Tạo bài viết"], ' +
+      'div[role="button"][aria-label*="What\'s on your mind"], ' +
+      'div[role="button"][aria-label*="Create a post"], ' +
+      'div[role="button"][aria-label*="Write something"], ' +
       'div[role="button"]:has-text("Bạn đang nghĩ gì?"), ' +
       'div[role="button"]:has-text("Tạo bài viết"), ' +
+      'div[role="button"]:has-text("What\'s on your mind?"), ' +
+      'div[role="button"]:has-text("What\'s on your mind"), ' +
+      'div[aria-label*="Bạn đang nghĩ gì"], ' +
+      'div[aria-label*="Tạo bài viết"], ' +
+      'div[aria-label*="What\'s on your mind"], ' +
+      'div[aria-label*="Create a post"], ' +
+      'span:has-text("What\'s on your mind"), ' +
       'span:has-text("Bạn đang nghĩ gì?"), ' +
       'span:has-text("Tạo bài viết")'
     );
@@ -3403,7 +3553,7 @@ async function postReelWithGroups({ cookieString, targetFanpageId = DEFAULT_FANP
 
     // --- BƯỚC 1: Modal "Tạo bài viết" -> "Tiếp" ---
     console.log('[Playwright][ReelGroups] 👉 [Bước 1] Bấm "Tiếp"...');
-    if (!(await clickVisibleButtonByText(page, /^Tiếp$/))) {
+    if (!(await clickVisibleButtonByText(page, /^(Tiếp|Next)$/i))) {
       throw new Error('[Bước 1] Không tìm thấy nút "Tiếp" đang hiển thị trong viewport');
     }
     await page.waitForTimeout(4000);
@@ -3415,7 +3565,7 @@ async function postReelWithGroups({ cookieString, targetFanpageId = DEFAULT_FANP
     await page.waitForTimeout(1500);
 
     console.log('[Playwright][ReelGroups] 👉 [Bước 2] Bấm "Tiếp"...');
-    if (!(await clickVisibleButtonByText(page, /^Tiếp$/))) {
+    if (!(await clickVisibleButtonByText(page, /^(Tiếp|Next)$/i))) {
       throw new Error('[Bước 2] Không tìm thấy nút "Tiếp" đang hiển thị trong viewport');
     }
     await page.waitForTimeout(5000);
@@ -3427,7 +3577,7 @@ async function postReelWithGroups({ cookieString, targetFanpageId = DEFAULT_FANP
     await page.mouse.wheel(0, 350);
     await page.waitForTimeout(2000);
 
-    const shareGroupRow = page.locator('div[role="button"], div[role="listitem"], div').filter({ hasText: /^Chia sẻ lên nhóm$/ }).first();
+    const shareGroupRow = page.locator('div[role="button"], div[role="listitem"], div').filter({ hasText: /^(Chia sẻ lên nhóm|Share to groups?|Share to a group)$/i }).first();
     const groupRowBox = await shareGroupRow.boundingBox().catch(() => null);
     if (!groupRowBox) {
       await shot('03_share_group_row_not_found');
@@ -3493,7 +3643,7 @@ async function postReelWithGroups({ cookieString, targetFanpageId = DEFAULT_FANP
     await shot('07_all_groups_ticked');
 
     console.log('[Playwright][ReelGroups] 👉 Bấm "Xong" để xác nhận danh sách nhóm...');
-    const xongBtn = page.locator('div[role="button"]').filter({ hasText: /^Xong$/ }).first();
+    const xongBtn = page.locator('div[role="button"]').filter({ hasText: /^(Xong|Done|Save)$/i }).first();
     const xongBox = await xongBtn.boundingBox().catch(() => null);
     if (xongBox) {
       await page.mouse.click(xongBox.x + xongBox.width / 2, xongBox.y + xongBox.height / 2);
@@ -3507,18 +3657,34 @@ async function postReelWithGroups({ cookieString, targetFanpageId = DEFAULT_FANP
 
     // --- BẤM "ĐĂNG" ĐỂ XUẤT BẢN ---
     console.log('[Playwright][ReelGroups] 🎯 Bấm "Đăng" để xuất bản Reel + chia sẻ nhóm...');
-    if (!(await clickVisibleButtonByText(page, /^Đăng$/))) {
+    if (!(await clickVisibleButtonByText(page, /^(Đăng|Post)$/i))) {
       throw new Error('[Bước 3] Không tìm thấy nút "Đăng" đang hiển thị trong viewport sau khi chọn nhóm');
     }
     await page.waitForTimeout(3000);
     await assertNoFacebookSpamBlock(page, postQueueId, 'Reel: sau khi bấm Đăng');
 
     // Facebook thỉnh thoảng chèn thêm 1 Modal quảng bá tính năng (VD: "Trò chuyện trực tiếp với mọi
-    // người" mời thêm nút "Gọi ngay") ngay sau khi bấm Đăng, che trên Modal thật và CHẶN việc xuất
-    // bản thực sự cho tới khi bấm bỏ qua — phát hiện được ở lần chạy 2026-08-04: bài báo "thành
-    // công" nhưng Reel không hề xuất hiện, vì browser đóng lại trong khi Modal phụ này còn treo.
-    for (let i = 0; i < 3; i++) {
-      const dismissBtn = page.locator('div[role="dialog"] div[role="button"]').filter({ hasText: /^(Lúc khác|Để sau|Không phải bây giờ|Bỏ qua|Không, cảm ơn)$/ }).first();
+    // người" / "Speak to people directly" mời thêm nút "Gọi ngay") ngay sau khi bấm Đăng, che trên Modal thật
+    for (let i = 0; i < 4; i++) {
+      const upsellModal = page.locator('div[role="dialog"]').filter({
+        hasText: /Speak to people directly|Make it easier for people to speak with you|Trò chuyện trực tiếp với mọi người|Thêm nút Gọi ngay/i
+      });
+      if (await upsellModal.first().isVisible().catch(() => false)) {
+        console.log('[Playwright][ReelGroups] ⚠️ Facebook hiện popup quảng bá "Speak to people directly", bấm "Not now" hoặc đóng...');
+        const notNowBtn = upsellModal.first().locator('div[role="button"]').filter({
+          hasText: /^(Not now|Lúc khác|Để sau|Không phải bây giờ|Bỏ qua|Không, cảm ơn)$/i
+        }).first();
+        if (await notNowBtn.isVisible().catch(() => false)) {
+          await notNowBtn.click({ force: true }).catch(() => { });
+        } else {
+          await page.keyboard.press('Escape').catch(() => { });
+        }
+        await page.waitForTimeout(1500);
+      }
+
+      const dismissBtn = page.locator('div[role="dialog"] div[role="button"]').filter({
+        hasText: /^(Not now|Lúc khác|Để sau|Không phải bây giờ|Bỏ qua|Không, cảm ơn|Skip)$/i
+      }).first();
       if (await dismissBtn.isVisible().catch(() => false)) {
         console.log('[Playwright][ReelGroups] ⚠️ Facebook chèn Modal phụ sau khi bấm Đăng, bấm bỏ qua để tiếp tục...');
         await dismissBtn.click({ force: true }).catch(() => { });
@@ -4494,13 +4660,20 @@ app.post('/api/check-group-health', async (req, res) => {
       return res.json({ success: true, status: 'PRIVATE_NO_ACCESS', message: 'Group riêng tư hoặc không xem được nội dung' });
     }
 
+    // Kiểm tra thông tin nhóm (Công khai / Riêng tư)
+    const isPublic = await page.locator('text=/Nhóm công khai|Public group/i').first().isVisible().catch(() => false);
+    const isPrivate = await page.locator('text=/Nhóm riêng tư|Private group/i').first().isVisible().catch(() => false);
+    const privacyType = isPublic ? 'PUBLIC' : (isPrivate ? 'PRIVATE' : 'UNKNOWN');
+
     // Locator ô đăng bài
     const createPostBtn = page.locator(
       'div[role="button"][aria-label*="Viết gì đó"], div[role="button"][aria-label*="Tạo bài viết"], ' +
       'div[role="button"][aria-label*="Bạn đang nghĩ gì"], div[role="button"][aria-label*="Bạn viết gì đi"], ' +
+      'div[role="button"][aria-label*="Tạo bài viết công khai"], div[role="button"][aria-label*="Create a public post"], ' +
       'span:has-text("Viết gì đó cho nhóm"), div[role="button"]:has-text("Viết gì đó cho nhóm"), ' +
       'span:has-text("Bạn viết gì đi"), div[role="button"]:has-text("Bạn viết gì đi"), ' +
       'span:has-text("Tạo bài viết"), div[role="button"]:has-text("Tạo bài viết"), ' +
+      'div[role="button"]:has-text("Tạo bài viết công khai"), div[role="button"]:has-text("Create a public post"), ' +
       'div[role="button"][aria-label*="Write something"], div[role="button"]:has-text("Write something")'
     );
 
@@ -4508,7 +4681,7 @@ app.post('/api/check-group-health', async (req, res) => {
 
     if (isComposerVisible) {
       console.log(`[Playwright][GroupHealth] 🟢 Group ${targetGroupId} hoạt động tốt (Đã gia nhập & có ô đăng bài).`);
-      return res.json({ success: true, status: 'JOINED', message: 'Đã gia nhập nhóm và có quyền đăng bài' });
+      return res.json({ success: true, status: 'JOINED', canPost: true, privacy: privacyType, message: 'Đã gia nhập nhóm và có quyền đăng bài' });
     }
 
     // Nút Tham gia nhóm
@@ -4521,27 +4694,47 @@ app.post('/api/check-group-health', async (req, res) => {
 
     if (isRequestedVisible) {
       console.log(`[Playwright][GroupHealth] 🟡 Group ${targetGroupId} đang chờ duyệt thành viên.`);
-      return res.json({ success: true, status: 'PENDING_APPROVAL', message: 'Đã gửi yêu cầu tham gia nhóm, đang chờ Admin duyệt' });
+      return res.json({ success: true, status: 'PENDING_APPROVAL', canPost: false, privacy: privacyType, message: 'Đã gửi yêu cầu tham gia nhóm, đang chờ Admin duyệt' });
     }
 
     if (isJoinBtnVisible) {
       if (req.body.autoJoin) {
         console.log(`[Playwright][GroupHealth] 👉 Phát hiện nút Tham gia nhóm, đang tự động click cho Group ${targetGroupId}...`);
         await joinBtn.click().catch(() => { });
-        await page.waitForTimeout(2500);
-        const modalSubmit = page.locator('div[role="dialog"] div[role="button"]:has-text("Gửi"), div[role="dialog"] div[role="button"]:has-text("Submit"), div[role="dialog"] div[role="button"]:has-text("Đồng ý")').first();
+        await page.waitForTimeout(2000);
+
+        // Tích đồng ý quy tắc nhóm nếu có
+        const rulesCheckbox = page.locator('div[role="dialog"] input[type="checkbox"], div[role="dialog"] div[role="checkbox"]').first();
+        if (await rulesCheckbox.isVisible().catch(() => false)) {
+          console.log('[Playwright][GroupHealth] 📋 Tích đồng ý với quy tắc nhóm...');
+          await rulesCheckbox.click({ force: true }).catch(() => {});
+          await page.waitForTimeout(600);
+        }
+
+        const modalSubmit = page.locator('div[role="dialog"] div[role="button"]:has-text("Gửi"), div[role="dialog"] div[role="button"]:has-text("Submit"), div[role="dialog"] div[role="button"]:has-text("Đồng ý"), div[role="dialog"] div[role="button"]:has-text("Tham gia nhóm"), div[role="dialog"] div[role="button"]:has-text("Hoàn tất")').first();
         if (await modalSubmit.isVisible().catch(() => false)) {
           await modalSubmit.click().catch(() => { });
           await page.waitForTimeout(1500);
         }
-        return res.json({ success: true, status: 'PENDING_APPROVAL', canPost: false, message: 'Đã tự động gửi yêu cầu tham gia nhóm' });
+
+        // Tải lại trang để kiểm tra xem có được duyệt tự động ngay không
+        await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+        await page.waitForTimeout(2500);
+
+        const canPostNow = await createPostBtn.first().isVisible().catch(() => false);
+        if (canPostNow) {
+          console.log(`[Playwright][GroupHealth] 🟢 Group ${targetGroupId} được duyệt thành viên ngay lập tức!`);
+          return res.json({ success: true, status: 'JOINED', canPost: true, privacy: privacyType, message: 'Đã tự động tham gia nhóm và được duyệt ngay lập tức!' });
+        }
+
+        return res.json({ success: true, status: 'PENDING_APPROVAL', canPost: false, privacy: privacyType, message: 'Đã tự động gửi yêu cầu tham gia nhóm, đang chờ Admin duyệt' });
       }
       console.log(`[Playwright][GroupHealth] 🔴 Group ${targetGroupId} chưa gia nhập hoặc đã bị Kick.`);
-      return res.json({ success: true, status: 'KICKED_OR_NOT_JOINED', canPost: false, message: 'Chưa gia nhập nhóm hoặc đã bị rời nhóm' });
+      return res.json({ success: true, status: 'KICKED_OR_NOT_JOINED', canPost: false, privacy: privacyType, message: 'Chưa gia nhập nhóm hoặc đã bị rời nhóm' });
     }
 
     console.log(`[Playwright][GroupHealth] 🔴 Group ${targetGroupId} không tìm thấy ô đăng bài.`);
-    return res.json({ success: true, status: 'KICKED_OR_NOT_JOINED', canPost: false, message: 'Không thể đăng bài trong nhóm này' });
+    return res.json({ success: true, status: 'KICKED_OR_NOT_JOINED', canPost: false, privacy: privacyType, message: 'Không thể đăng bài trong nhóm này' });
 
   } catch (err) {
     console.error(`[Playwright][GroupHealth] ❌ Lỗi kiểm tra sức khỏe Group ${targetGroupId}:`, err.message);
@@ -4653,7 +4846,15 @@ app.post('/api/join-group', async (req, res) => {
         }
       }
 
-      const submitBtn = page.locator('div[role="dialog"] div[role="button"]:has-text("Gửi"), div[role="dialog"] div[role="button"]:has-text("Submit"), div[role="dialog"] div[role="button"]:has-text("Tham gia nhóm"), div[role="dialog"] div[role="button"]:has-text("Đồng ý")').first();
+      // Xử lý tích đồng ý quy tắc nhóm nếu có
+      const rulesCheckbox = page.locator('div[role="dialog"] input[type="checkbox"], div[role="dialog"] div[role="checkbox"]').first();
+      if (await rulesCheckbox.isVisible().catch(() => false)) {
+        console.log('[Playwright][JoinGroup] 📋 Tích đồng ý với quy tắc nhóm...');
+        await rulesCheckbox.click({ force: true }).catch(() => {});
+        await page.waitForTimeout(600);
+      }
+
+      const submitBtn = page.locator('div[role="dialog"] div[role="button"]:has-text("Gửi"), div[role="dialog"] div[role="button"]:has-text("Submit"), div[role="dialog"] div[role="button"]:has-text("Tham gia nhóm"), div[role="dialog"] div[role="button"]:has-text("Đồng ý"), div[role="dialog"] div[role="button"]:has-text("Hoàn tất")').first();
       if (await submitBtn.isVisible().catch(() => false)) {
         await submitBtn.click().catch(() => { });
         await page.waitForTimeout(1500);
@@ -4903,11 +5104,15 @@ app.post('/api/post-facebook-group', async (req, res) => {
     const createPostBtn = page.locator(
       'div[role="button"][aria-label*="Viết gì đó"], div[role="button"][aria-label*="Tạo bài viết"], ' +
       'div[role="button"][aria-label*="Bạn đang nghĩ gì"], div[role="button"][aria-label*="Bạn viết gì đi"], ' +
+      'div[role="button"][aria-label*="Tạo bài viết công khai"], div[role="button"][aria-label*="Create a public post"], ' +
+      'div[role="button"][aria-label*="Create post"], ' +
       'div[role="button"]:has-text("Viết gì đó cho nhóm"), ' +
       'div[role="button"]:has-text("Bạn viết gì đi"), ' +
+      'div[role="button"]:has-text("Tạo bài viết công khai"), ' +
       'div[role="button"]:has-text("Tạo bài viết"), ' +
       'div[role="button"]:has-text("Bạn đang nghĩ gì"), ' +
-      'div[role="button"][aria-label*="Write something"], div[role="button"]:has-text("Write something")'
+      'div[role="button"][aria-label*="Write something"], div[role="button"]:has-text("Write something"), ' +
+      'div[role="button"]:has-text("Create a public post")'
     );
 
     const findVisibleCreatePostButton = async () => {
@@ -4918,7 +5123,50 @@ app.post('/api/post-facebook-group', async (req, res) => {
         const box = await candidate.boundingBox().catch(() => null);
         if (box && box.width > 20 && box.height > 20) return candidate;
       }
+      // Fallback: Tìm qua thẻ cha của text placeholder tạo bài viết trên layout mới
+      const textSpans = page.locator('span:has-text("Bạn viết gì đi"), span:has-text("Viết gì đó"), span:has-text("Tạo bài viết công khai"), span:has-text("Write something"), span:has-text("Create a public post")');
+      const spanCount = await textSpans.count().catch(() => 0);
+      for (let i = 0; i < spanCount; i++) {
+        const sp = textSpans.nth(i);
+        if (!(await sp.isVisible().catch(() => false))) continue;
+        const parentBtn = sp.locator('xpath=ancestor::div[@role="button" or @tabindex="0"][1]');
+        if (await parentBtn.isVisible().catch(() => false)) {
+          const box = await parentBtn.boundingBox().catch(() => null);
+          if (box && box.width > 20 && box.height > 20) return parentBtn;
+        }
+      }
       return null;
+    };
+
+    const handleJoinGroupFlow = async () => {
+      const joinGroupBtn = page.locator('div[role="button"]:has-text("Tham gia nhóm"), div[role="button"]:has-text("Join group"), div[role="button"][aria-label*="Tham gia"]').first();
+      if (await joinGroupBtn.isVisible().catch(() => false)) {
+        console.log(`[Playwright][Group] 👉 Phát hiện nút "Tham gia nhóm" cho Group ${targetGroupId}, đang tự động bấm Tham gia nhóm...`);
+        await joinGroupBtn.click().catch(() => { });
+        await page.waitForTimeout(2000);
+
+        // Tích đồng ý quy tắc nhóm nếu có
+        const rulesCheckbox = page.locator('div[role="dialog"] input[type="checkbox"], div[role="dialog"] div[role="checkbox"]').first();
+        if (await rulesCheckbox.isVisible().catch(() => false)) {
+          console.log('[Playwright][Group] 📋 Tích đồng ý với quy tắc nhóm...');
+          await rulesCheckbox.click({ force: true }).catch(() => {});
+          await page.waitForTimeout(600);
+        }
+
+        const modalSubmit = page.locator('div[role="dialog"] div[role="button"]:has-text("Gửi"), div[role="dialog"] div[role="button"]:has-text("Submit"), div[role="dialog"] div[role="button"]:has-text("Đồng ý"), div[role="dialog"] div[role="button"]:has-text("Tham gia nhóm"), div[role="dialog"] div[role="button"]:has-text("Hoàn tất")').first();
+        if (await modalSubmit.isVisible().catch(() => false)) {
+          console.log('[Playwright][Group] 📩 Bấm gửi câu trả lời / xác nhận tham gia nhóm...');
+          await modalSubmit.click({ force: true }).catch(() => { });
+          await page.waitForTimeout(2000);
+        }
+
+        // Tải lại trang để cập nhật quyền đăng bài ngay lập tức (nếu là nhóm công khai duyệt tự động)
+        console.log('[Playwright][Group] 🔄 Đang tải lại trang Group để cập nhật trạng thái thành viên...');
+        await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+        await page.waitForTimeout(3000);
+        return true;
+      }
+      return false;
     };
 
     // LUÔN BẮT BUỘC thử chuyển sang danh tính Page mong muốn trước (ví dụ: "Làm Sen")
@@ -5046,24 +5294,26 @@ app.post('/api/post-facebook-group', async (req, res) => {
     let isComposerVisible = (await findVisibleCreatePostButton()) !== null;
     let isContentBlocked = await page.locator('text="Bạn hiện không xem được nội dung này", text="Content Not Found"').first().isVisible().catch(() => false);
 
-    // Nếu danh tính Trang không thể xem/đăng bài trong Group (Group riêng tư hoặc Trang chưa gia nhập Group):
+    // Nếu danh tính chưa thể xem/đăng bài trong Group (Group riêng tư hoặc chưa gia nhập Group):
     if (!isComposerVisible || isContentBlocked) {
       console.log(`[Playwright][Group] ⚠️ Danh tính "${effectivePageName}" chưa thấy ô đăng bài trong Group ${targetGroupId}. Đang tự động xử lý...`);
 
       // 1. Thử bấm nút "Tham gia nhóm" nếu có
-      const joinGroupBtn = page.locator('div[role="button"]:has-text("Tham gia nhóm"), div[role="button"]:has-text("Join group"), div[role="button"][aria-label*="Tham gia"]').first();
-      if (await joinGroupBtn.isVisible().catch(() => false)) {
-        console.log('[Playwright][Group] 👉 Phát hiện nút "Tham gia nhóm", đang tự động bấm Tham gia nhóm...');
-        await joinGroupBtn.click().catch(() => { });
-        await page.waitForTimeout(3000);
-      }
+      await handleJoinGroupFlow();
+
+      // Cuộn nhẹ để kích hoạt tải feed nếu bị lazy-load
+      await page.evaluate(() => window.scrollBy(0, 350)).catch(() => {});
+      await page.waitForTimeout(1000);
+      await page.evaluate(() => window.scrollBy(0, -350)).catch(() => {});
 
       // Re-check composer
       isComposerVisible = (await findVisibleCreatePostButton()) !== null;
+      isContentBlocked = await page.locator('text="Bạn hiện không xem được nội dung này", text="Content Not Found"').first().isVisible().catch(() => false);
 
-      // 2. Chỉ chuyển sang Nick cá nhân nếu người dùng cho phép fallback (allowPersonalFallback: true)
-      if (!isComposerVisible && !isPersonal && req.body.allowPersonalFallback === true) {
-        console.log('[Playwright][Group] 🔄 Đang tự động chuyển lại sang danh tính Tài khoản Cá nhân để đăng bài vào Group...');
+      // 2. Tự động chuyển sang Nick cá nhân nếu đang dùng Page mà không thấy ô đăng bài (mặc định allowPersonalFallback: true)
+      const allowPersonalFallback = req.body.allowPersonalFallback !== false;
+      if (!isComposerVisible && !isPersonal && allowPersonalFallback) {
+        console.log(`[Playwright][Group] 🔄 Trang "${effectivePageName}" chưa được phép đăng vào Group ${targetGroupId}. Đang tự động chuyển sang danh tính Nick Cá Nhân (c_user) để đăng bài...`);
         const currentCookies = await context.cookies();
         const nonIUserCookies = currentCookies.filter(c => c.name !== 'i_user');
         await context.clearCookies();
@@ -5072,15 +5322,44 @@ app.post('/api/post-facebook-group', async (req, res) => {
         console.log(`[Playwright][Group] 🌐 Mở lại Group dưới danh tính Cá nhân: ${groupUrl}`);
         await navigateFacebookSurface(page, groupUrl, `Group ${targetGroupId}`).catch(() => { });
         await page.waitForTimeout(3500);
+
+        // Kiểm tra xem Nick cá nhân có thấy ô đăng bài không
+        isComposerVisible = (await findVisibleCreatePostButton()) !== null;
+
+        // Nếu Nick cá nhân cũng chưa thấy ô đăng bài, thử bấm Tham gia nhóm cho Nick cá nhân
+        if (!isComposerVisible) {
+          console.log(`[Playwright][Group] 👉 Nick cá nhân cũng chưa có ô đăng bài trong Group ${targetGroupId}, thử xin vào nhóm...`);
+          await handleJoinGroupFlow();
+
+          await page.evaluate(() => window.scrollBy(0, 350)).catch(() => {});
+          await page.waitForTimeout(1000);
+          await page.evaluate(() => window.scrollBy(0, -350)).catch(() => {});
+
+          isComposerVisible = (await findVisibleCreatePostButton()) !== null;
+        }
       }
     }
 
     if (!(await findVisibleCreatePostButton())) {
       await debugShot(page, 'no_composer');
+
+      // 1. Kiểm tra trạng thái đang chờ Admin duyệt (Pending approval)
+      const isPendingApproval = await page.locator('div[role="button"]:has-text("Đã gửi yêu cầu"), div[role="button"]:has-text("Requested"), div[role="button"]:has-text("Đang chờ")').first().isVisible().catch(() => false);
+      if (isPendingApproval) {
+        throw new Error(`Group ${targetGroupId}: Tài khoản đã gửi yêu cầu tham gia nhóm nhưng đang chờ Quản trị viên nhóm phê duyệt (Pending approval). Vui lòng đợi Admin duyệt thành viên trước khi đăng bài.`);
+      }
+
+      // 2. Kiểm tra trạng thái bị chặn nội dung / Group riêng tư không có quyền truy cập
+      const isBlocked = await page.locator('text="Bạn hiện không xem được nội dung này", text="Content Not Found"').first().isVisible().catch(() => false);
+      if (isBlocked) {
+        throw new Error(`Group ${targetGroupId}: Không thể truy cập (Group riêng tư hoặc link không hợp lệ). Tài khoản chưa được cấp quyền vào nhóm.`);
+      }
+
+      // 3. Thông báo chi tiết rõ ràng
       if (isPersonal) {
-        throw new Error(`Không tìm thấy ô đăng bài trong Group ${targetGroupId} — Nick cá nhân chưa gia nhập Group này hoặc chưa được phê duyệt thành viên.`);
+        throw new Error(`Không tìm thấy ô đăng bài trong Group ${targetGroupId} — Nick cá nhân chưa gia nhập Group này hoặc bị Quản trị viên nhóm hạn chế quyền đăng.`);
       } else {
-        throw new Error(`Không tìm thấy ô đăng bài trong Group ${targetGroupId} — Cả Fanpage "${effectivePageName}" và Tài khoản cá nhân đều chưa gia nhập Group này hoặc chưa được phê duyệt thành viên.`);
+        throw new Error(`Không tìm thấy ô đăng bài trong Group ${targetGroupId} — Cả Fanpage "${effectivePageName}" và Nick cá nhân đều chưa gia nhập Group này hoặc bị Quản trị viên nhóm hạn chế quyền đăng.`);
       }
     }
 
@@ -5164,7 +5443,7 @@ app.post('/api/post-facebook-group', async (req, res) => {
       const modalFullText = await dialog.first().innerText().catch(() => '');
       console.log(`[Playwright][Group] 👤 Text trong Modal: "${modalFullText.slice(0, 150)}" (targetProfile="${targetProfileName}")`);
 
-      if (targetProfileName && !modalFullText.includes(targetProfileName)) {
+      if (targetProfileName && !modalFullText.toLowerCase().includes(targetProfileName.toLowerCase())) {
         console.log(`[Playwright][Group] 🔄 Modal chưa hiển thị danh tính "${targetProfileName}". Đang đổi danh tính trong Modal...`);
         
         // Bấm nút danh tính trong Modal (bỏ qua nút Đóng 'X')
@@ -5178,7 +5457,10 @@ app.post('/api/post-facebook-group', async (req, res) => {
           await modalPosterBtn.click({ force: true }).catch(() => {});
           await page.waitForTimeout(2000);
 
-          const profileOption = page.locator(`div[role="button"]:has-text("${targetProfileName}"), div[role="option"]:has-text("${targetProfileName}"), span:has-text("${targetProfileName}")`).first();
+          const escProfile = targetProfileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const profileRegex = new RegExp(escProfile, 'i');
+          const profileOption = page.locator('div[role="dialog"] div[role="button"], div[role="dialog"] div[role="option"], div[role="dialog"] span')
+            .filter({ hasText: profileRegex }).first();
           if (await profileOption.isVisible().catch(() => false)) {
             console.log(`[Playwright][Group] 🎯 Click chọn option "${targetProfileName}" trong Modal menu...`);
             await profileOption.click({ force: true }).catch(() => {});
@@ -5331,7 +5613,8 @@ app.post('/api/post-facebook-group', async (req, res) => {
     // 1. GÕ VĂN BẢN TRƯỚC (FIRST) - Focus trực tiếp ô soạn thảo trước khi gõ
     if (content && content.trim().length > 0) {
       console.log('[Playwright][Group] Gõ nội dung bài viết vào Modal...');
-      const editor = dialog.locator('div[role="textbox"]').first();
+      const editor = dialog.locator('div[role="textbox"], [contenteditable="true"]').first();
+      await editor.waitFor({ state: 'visible', timeout: 10000 }).catch(() => { });
       if (!(await editor.isVisible().catch(() => false))) {
         await debugShot(page, 'no_editor');
         throw new Error('Không tìm thấy ô nhập nội dung bài viết trong Modal (xem debug_group_no_editor.png).');
@@ -5407,7 +5690,17 @@ app.post('/api/post-facebook-group', async (req, res) => {
       await debugShot(page, 'after_media_attached');
     }
 
-    const submitBtn = dialog.locator('div[role="button"][aria-label="Đăng"], div[role="button"][aria-label="Tiếp"], div[role="button"][aria-label="Post"], div[role="button"][aria-label="Next"], div[role="button"]:has-text("Đăng"), div[role="button"]:has-text("Tiếp"), div[role="button"]:has-text("Post"), div[role="button"]:has-text("Next")').first();
+    // Nút Đăng/Tiếp màu xanh ở dưới đáy Modal (chính xác aria-label hoặc text là "Đăng" / "Post" / "Tiếp" / "Next").
+    // QUAN TRỌNG: KHÔNG dùng :has-text("Post") với .first() vì giao diện Facebook tiếng Anh có thanh
+    // "Add to your post" nằm PHÍA TRÊN nút submit -> nếu match substring "Post", Playwright sẽ bấm nhầm vào
+    // thanh "Add to your post" mở popup gắn ảnh thay vì bấm nút Submit thật sự!
+    let submitBtn = dialog.locator('div[role="button"][aria-label="Đăng"], div[role="button"][aria-label="Post"], div[role="button"][aria-label="Tiếp"], div[role="button"][aria-label="Next"]').last();
+    if (!(await submitBtn.isVisible().catch(() => false))) {
+      submitBtn = dialog.locator('div[role="button"]:text-is("Đăng"), div[role="button"]:text-is("Post"), div[role="button"]:text-is("Tiếp"), div[role="button"]:text-is("Next")').last();
+    }
+    if (!(await submitBtn.isVisible().catch(() => false))) {
+      submitBtn = dialog.locator('div[role="button"]').filter({ hasText: /^(\s*)(Đăng|Post|Tiếp|Next)(\s*)$/i }).last();
+    }
     if (!(await submitBtn.isVisible().catch(() => false))) {
       await debugShot(page, 'no_submit');
       throw new Error('Không tìm thấy nút Đăng/Tiếp trong Modal (xem debug_group_no_submit.png).');
@@ -5468,7 +5761,10 @@ app.post('/api/post-facebook-group', async (req, res) => {
       await dialog.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => { });
     } else {
       await page.waitForTimeout(3000);
-      const confirmBtn = dialog.locator('div[role="button"][aria-label="Đăng"], div[role="button"][aria-label="Post"], div[role="button"]:has-text("Đăng"), div[role="button"]:has-text("Post")').first();
+      let confirmBtn = dialog.locator('div[role="button"][aria-label="Đăng"], div[role="button"][aria-label="Post"]').last();
+      if (!(await confirmBtn.isVisible().catch(() => false))) {
+        confirmBtn = dialog.locator('div[role="button"]:text-is("Đăng"), div[role="button"]:text-is("Post")').last();
+      }
       if (await confirmBtn.isVisible().catch(() => false)) {
         await waitUntilEnabled(confirmBtn, page, 20000);
         if (await confirmBtn.isVisible().catch(() => false)) {
@@ -5486,9 +5782,9 @@ app.post('/api/post-facebook-group', async (req, res) => {
     await debugShot(page, 'after_submit');
 
     // Xác nhận bài THỰC SỰ đã được Facebook chấp nhận xuất bản hay bị chặn
-    const isModalStillOpen = await dialog.isVisible().catch(() => false);
+    const isModalStillOpen = await dialog.first().isVisible().catch(() => false);
     if (isModalStillOpen) {
-      const modalText = await dialog.innerText().catch(() => '');
+      const modalText = await dialog.first().innerText().catch(() => '');
       if (modalText.includes('giới hạn tần suất') || modalText.includes('spam') || modalText.includes('Để bảo vệ cộng đồng') || modalText.includes('thử lại sau')) {
         console.error('[Playwright][Group] ⛔ Bị Facebook chặn đăng spam rate limit!');
         throw new Error('FB_SPAM_BLOCK: Facebook chặn đăng tạm thời do đăng quá nhanh ("Để bảo vệ cộng đồng khỏi spam, chúng tôi giới hạn tần suất bạn đăng bài..."). Cần giãn cách thời gian đăng!');
@@ -5498,9 +5794,9 @@ app.post('/api/post-facebook-group', async (req, res) => {
         throw new Error(`FB_POST_FAILED: Facebook từ chối đăng bài: ${modalText.replace(/\n+/g, ' ').slice(0, 200)}`);
       }
       // Chờ thêm 10s dự phòng nếu Facebook upload media lâu
-      await dialog.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => { });
-      if (await dialog.isVisible().catch(() => false)) {
-        const remainingText = await dialog.innerText().catch(() => '');
+      await dialog.first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => { });
+      if (await dialog.first().isVisible().catch(() => false)) {
+        const remainingText = await dialog.first().innerText().catch(() => '');
         console.error('[Playwright][Group] ⛔ Modal Tạo bài viết không đóng sau khi bấm Đăng!');
         throw new Error(`FB_MODAL_STUCK: Modal Tạo bài viết không đóng sau khi bấm Đăng (Bài CHƯA được đăng lên Nhóm). Lỗi: ${remainingText.replace(/\n+/g, ' ').slice(0, 200)}`);
       }
@@ -5526,15 +5822,16 @@ app.post('/api/post-facebook-group', async (req, res) => {
         : 'affiliateLink trống';
       console.log(`[Playwright][Group] ℹ️ Bỏ qua bình luận link cho bài này (${skipReason}).`);
     }
-    if (!pageId) {
+    const effectiveSearchId = (isPersonal && cUserId) ? cUserId : (pageId || cUserId);
+    if (!effectiveSearchId) {
       if (hasAffiliateLink) {
-        commentWarning = 'Đã đăng bài nhưng KHÔNG bình luận được link: thiếu pageId để tìm lại bài vừa đăng.';
+        commentWarning = 'Đã đăng bài nhưng KHÔNG bình luận được link: thiếu pageId/cUserId để tìm lại bài vừa đăng.';
         console.log(`[Playwright][Group] ⚠️ ${commentWarning}`);
       }
     } else {
-      console.log(`[Playwright][Group] 🔎 Đang tìm lại bài vừa đăng${hasAffiliateLink ? ' để bình luận link' : ' để lấy link lưu Lịch sử'}...`);
+      console.log(`[Playwright][Group] 🔎 Đang tìm lại bài vừa đăng (ID: ${effectiveSearchId})${hasAffiliateLink ? ' để bình luận link' : ' để lấy link lưu Lịch sử'}...`);
       const commentResult = await commentLinkOnGroupPost(
-        page, targetGroupId, pageId, hasAffiliateLink ? affiliateLink.trim() : null,
+        page, targetGroupId, effectiveSearchId, hasAffiliateLink ? affiliateLink.trim() : null,
         hasAffiliateLink ? 60000 : 10000
       ).catch((e) => {
         console.log('[Playwright][Group][Comment] ⚠️ Lỗi khi tìm/bình luận bài:', e.message);
@@ -5548,11 +5845,10 @@ app.post('/api/post-facebook-group', async (req, res) => {
       }
     }
 
-    const refreshedCookieString = await refreshedFbCookieForSameUser(context, cookieString);
-    await browser.close();
-    for (const filePath of downloadedFilePaths) {
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    }
+    let refreshedCookieString = null;
+    try {
+      refreshedCookieString = await refreshedFbCookieForSameUser(context, cookieString);
+    } catch (_) {}
 
     const anonymousFailedWarning = (isAnonReq && !anonymousSucceeded)
       ? '⛔ ĐÃ ĐĂNG LỘ DANH TÍNH: Yêu cầu "Đăng ẩn danh" nhưng Facebook không cho bật (Group này có thể không hỗ trợ, hoặc giao diện Facebook đã đổi). Bài đã đăng bằng danh nghĩa Nick cá nhân thật.'
@@ -5571,12 +5867,14 @@ app.post('/api/post-facebook-group', async (req, res) => {
     });
   } catch (error) {
     console.error('[Playwright][Group] ❌ Lỗi đăng bài vào Group:', error.message);
-    if (browser) await browser.close();
-    for (const filePath of downloadedFilePaths) {
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    }
     res.status(500).json({ success: false, error: error.message });
   } finally {
+    if (browser) {
+      try { await browser.close(); } catch (_) {}
+    }
+    for (const filePath of downloadedFilePaths) {
+      try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch (_) {}
+    }
     releaseLock();
     console.log(`[PostingLock] 🔓 Đã giải phóng phiên đăng Group ${targetGroupId}.`);
   }
@@ -5585,7 +5883,7 @@ app.post('/api/post-facebook-group', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // HEALTH CHECK — Java backend dùng để kiểm tra Worker còn sống không
 // ─────────────────────────────────────────────────────────────────────────────
-app.get('/api/health', (req, res) => {
+app.get(['/health', '/api/health'], (req, res) => {
   res.json({ status: 'ok', worker: 'Playwright Worker', port: PORT, time: new Date().toISOString() });
 });
 

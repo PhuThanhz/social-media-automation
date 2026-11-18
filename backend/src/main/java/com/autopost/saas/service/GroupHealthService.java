@@ -147,7 +147,7 @@ public class GroupHealthService {
 
     /**
      * Lấy cookie cá nhân dùng để thao tác (check sức khỏe / tham gia) với 1 Group.
-     * Ưu tiên danh tính đăng bài đã cấu hình sẵn cho Group (posting_identity_account_id) nếu có cookie
+     * Ưu tiên danh tính đăng bài đã cấu hình sẵn cho Group      (posting_identity_account_id) nếu có cookie
      * hợp lệ. Nếu không, chỉ tự chọn khi user có DUY NHẤT 1 tài khoản cá nhân chứa cookie — không đoán
      * đại findFirst() giữa nhiều tài khoản trùng, tránh check nhầm/join nhầm bằng login không phải
      * thành viên Group này (cùng nguyên tắc chống "đăng nhầm account" áp dụng ở PostQueueService).
@@ -164,11 +164,48 @@ public class GroupHealthService {
                 return identityAcc;
             }
         }
+        if (groupAccount.getUser() == null || groupAccount.getUser().getId() == null) {
+            return null;
+        }
+
         List<SocialAccount> cookieAccounts = socialAccountRepository.findByUserId(groupAccount.getUser().getId()).stream()
                 .filter(a -> a.getAccessToken() != null && a.getAccessToken().contains("c_user="))
                 .filter(a -> !"EXPIRED".equalsIgnoreCase(a.getTokenStatus()))
                 .toList();
-        return cookieAccounts.size() == 1 ? cookieAccounts.get(0) : null;
+
+        if (cookieAccounts.isEmpty()) {
+            return null;
+        }
+
+        // Ưu tiên tài khoản cá nhân thật (FACEBOOK_PROFILE hoặc PERSONAL_PROFILE_COOKIE / PERSONAL_COOKIE)
+        List<SocialAccount> realProfiles = cookieAccounts.stream()
+                .filter(a -> "FACEBOOK_PROFILE".equalsIgnoreCase(a.getPlatform())
+                        || "PERSONAL_PROFILE_COOKIE".equalsIgnoreCase(a.getAccountType())
+                        || "PERSONAL_COOKIE".equalsIgnoreCase(a.getAccountType()))
+                .toList();
+
+        if (realProfiles.size() == 1) {
+            return realProfiles.get(0);
+        } else if (!realProfiles.isEmpty()) {
+            String firstCUser = PostQueueService.extractCUserFromAccount(realProfiles.get(0));
+            boolean allSame = firstCUser != null && realProfiles.stream()
+                    .allMatch(a -> firstCUser.equals(PostQueueService.extractCUserFromAccount(a)));
+            if (allSame) {
+                return realProfiles.get(0);
+            }
+            // Nếu có nhiều Nick cá nhân khác nhau, chọn Nick đầu tiên thay vì trả về null
+            return realProfiles.get(0);
+        }
+
+        // Nếu tất cả cookieAccounts có cùng c_user (ví dụ toàn bộ Group/Page kế thừa cùng 1 Via)
+        String firstCUser = PostQueueService.extractCUserFromAccount(cookieAccounts.get(0));
+        boolean allSame = firstCUser != null && cookieAccounts.stream()
+                .allMatch(a -> firstCUser.equals(PostQueueService.extractCUserFromAccount(a)));
+        if (allSame) {
+            return cookieAccounts.get(0);
+        }
+
+        return !cookieAccounts.isEmpty() ? cookieAccounts.get(0) : null;
     }
 
     /**
