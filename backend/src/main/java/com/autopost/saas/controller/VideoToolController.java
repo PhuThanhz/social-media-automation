@@ -31,6 +31,7 @@ public class VideoToolController {
     private final com.autopost.saas.repository.SocialAccountRepository socialAccountRepository;
     private final com.autopost.saas.repository.PostQueueRepository postQueueRepository;
     private final com.autopost.saas.service.RedditService redditService;
+    private final com.autopost.saas.service.ScraperService scraperService;
 
     @GetMapping("/proxy-image")
     public ResponseEntity<byte[]> proxyImage(@RequestParam String url) {
@@ -65,20 +66,7 @@ public class VideoToolController {
             String cookieString = payload.get("cookieString");
             if ((cookieString == null || cookieString.isBlank()) && url != null
                     && (url.contains("facebook.com") || url.contains("fb.watch") || url.contains("fb.me"))) {
-                cookieString = socialAccountRepository.findByAccountType("PERSONAL_COOKIE").stream()
-                        .filter(a -> a.getAccessToken() != null && !a.getAccessToken().isBlank())
-                        .sorted((a, b) -> {
-                            boolean aOk = "OK".equals(a.getTokenStatus());
-                            boolean bOk = "OK".equals(b.getTokenStatus());
-                            if (aOk && !bOk) return -1;
-                            if (!aOk && bOk) return 1;
-                            java.time.LocalDateTime tA = a.getUpdatedAt() != null ? a.getUpdatedAt() : java.time.LocalDateTime.MIN;
-                            java.time.LocalDateTime tB = b.getUpdatedAt() != null ? b.getUpdatedAt() : java.time.LocalDateTime.MIN;
-                            return tB.compareTo(tA);
-                        })
-                        .map(com.autopost.saas.entity.SocialAccount::getAccessToken)
-                        .findFirst()
-                        .orElse(null);
+                cookieString = scraperService.resolveBestFacebookCookie(null);
                 if (cookieString != null && !cookieString.isBlank()) {
                     payload.put("cookieString", cookieString);
                 }

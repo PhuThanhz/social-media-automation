@@ -40,11 +40,23 @@ function run(cmd, args, opts = {}) {
 }
 
 function javaHome() {
-  if (process.env.JAVA_HOME) return process.env.JAVA_HOME;
+  if (process.env.JAVA_HOME && fs.existsSync(process.env.JAVA_HOME)) return process.env.JAVA_HOME;
   if (process.platform === 'darwin') {
-    return execFileSync('/usr/libexec/java_home', ['-v', '21']).toString().trim();
+    try {
+      return execFileSync('/usr/libexec/java_home', ['-v', '21']).toString().trim();
+    } catch {}
   }
-  throw new Error('Thiếu JAVA_HOME (JDK 21)');
+  if (isWin) {
+    const commonPaths = [
+      'C:\\Program Files\\Microsoft\\jdk-21.0.13.21-hotspot',
+      'C:\\Program Files\\Eclipse Adoptium\\jdk-21',
+      'C:\\Program Files\\Java\\jdk-21',
+    ];
+    for (const p of commonPaths) {
+      if (fs.existsSync(p)) return p;
+    }
+  }
+  throw new Error('Thiếu biến JAVA_HOME (JDK 21). Vui lòng cài đặt OpenJDK 21 hoặc cấu hình JAVA_HOME.');
 }
 
 function step(name) {

@@ -84,20 +84,60 @@ public class ScraperService {
         return fetchScrapedResponse(sourceUrl, sourceType, limit, includeCredit, forceRefresh, null);
     }
 
+    /**
+     * Tự động chọn Cookie Facebook sống tốt nhất (ưu tiên Via cá nhân FACEBOOK_PROFILE / PERSONAL_PROFILE_COOKIE
+     * rồi tới PERSONAL_COOKIE của Fanpage) để phục vụ việc cào dữ liệu, xem trước hoặc tải video.
+     */
+    public String resolveBestFacebookCookie(Long userId) {
+        List<SocialAccount> candidates = (userId != null ? socialAccountRepository.findByUserId(userId) : socialAccountRepository.findAll()).stream()
+                .filter(a -> a.getAccessToken() != null && a.getAccessToken().contains("c_user="))
+                .filter(a -> !"EXPIRED".equalsIgnoreCase(a.getTokenStatus()))
+                .toList();
+
+        if (candidates.isEmpty()) {
+            return null;
+        }
+
+        // 1. Ưu tiên tài khoản cá nhân thật (Via) có trạng thái OK
+        SocialAccount bestVia = candidates.stream()
+                .filter(a -> "FACEBOOK_PROFILE".equalsIgnoreCase(a.getPlatform())
+                        || "PERSONAL_PROFILE_COOKIE".equalsIgnoreCase(a.getAccountType()))
+                .sorted((a, b) -> {
+                    boolean aOk = "OK".equalsIgnoreCase(a.getTokenStatus());
+                    boolean bOk = "OK".equalsIgnoreCase(b.getTokenStatus());
+                    if (aOk && !bOk) return -1;
+                    if (!aOk && bOk) return 1;
+                    LocalDateTime tA = a.getUpdatedAt() != null ? a.getUpdatedAt() : LocalDateTime.MIN;
+                    LocalDateTime tB = b.getUpdatedAt() != null ? b.getUpdatedAt() : LocalDateTime.MIN;
+                    return tB.compareTo(tA);
+                })
+                .findFirst()
+                .orElse(null);
+
+        if (bestVia != null) {
+            return bestVia.getAccessToken();
+        }
+
+        // 2. Nếu không có Via riêng, lấy cookie Fanpage (PERSONAL_COOKIE) sống mới nhất
+        return candidates.stream()
+                .sorted((a, b) -> {
+                    boolean aOk = "OK".equalsIgnoreCase(a.getTokenStatus());
+                    boolean bOk = "OK".equalsIgnoreCase(b.getTokenStatus());
+                    if (aOk && !bOk) return -1;
+                    if (!aOk && bOk) return 1;
+                    LocalDateTime tA = a.getUpdatedAt() != null ? a.getUpdatedAt() : LocalDateTime.MIN;
+                    LocalDateTime tB = b.getUpdatedAt() != null ? b.getUpdatedAt() : LocalDateTime.MIN;
+                    return tB.compareTo(tA);
+                })
+                .map(SocialAccount::getAccessToken)
+                .findFirst()
+                .orElse(null);
+    }
+
     public Map<String, Object> fetchScrapedResponse(String sourceUrl, String sourceType, int limit, Boolean includeCredit, boolean forceRefresh, String cookieString) {
         if ((cookieString == null || cookieString.isBlank()) && sourceUrl != null
                 && (sourceUrl.contains("facebook.com") || sourceUrl.contains("fb.watch"))) {
-            cookieString = socialAccountRepository.findByAccountType("PERSONAL_COOKIE").stream()
-                    .filter(a -> !"EXPIRED".equalsIgnoreCase(a.getTokenStatus()))
-                    .filter(a -> a.getAccessToken() != null && !a.getAccessToken().isBlank())
-                    .sorted((a, b) -> {
-                        LocalDateTime tA = a.getUpdatedAt() != null ? a.getUpdatedAt() : LocalDateTime.MIN;
-                        LocalDateTime tB = b.getUpdatedAt() != null ? b.getUpdatedAt() : LocalDateTime.MIN;
-                        return tB.compareTo(tA);
-                    })
-                    .map(SocialAccount::getAccessToken)
-                    .findFirst()
-                    .orElse(null);
+            cookieString = resolveBestFacebookCookie(null);
         }
 
         // 5s connect, 180s read — live test xác nhận cào 1 bài (ảnh/video) qua Playwright có thể mất

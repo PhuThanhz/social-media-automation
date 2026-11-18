@@ -321,9 +321,12 @@ const PlaywrightPoster = () => {
   };
 
   const showScrapeErrorToast = (err: any) => {
-    const raw: string = err?.response?.data?.message || err?.message || 'Có lỗi xảy ra khi đăng bài!';
-    if (raw.includes('cần đăng nhập lại')) {
-      message.warning(`🔒 ${raw} — vào mục Fanpage để cập nhật lại Cookie/Token.`, 8);
+    const raw: string = err?.response?.data?.message || err?.message || 'Có lỗi xảy ra khi cào nội dung bài viết!';
+    if (/cookie.*(hết hạn|không hợp lệ|đăng xuất|checkpoint)|đăng nhập lại|redirect sang trang khác/i.test(raw)) {
+      message.warning(
+        `🔒 Cookie Facebook đang dùng để cào bài đã hết hạn hoặc phiên đăng nhập bị đăng xuất. Vui lòng vào trang "Quản lý kết nối" cập nhật lại Cookie mới (c_user + xs).`,
+        10
+      );
     } else if (raw.includes('đã bị xóa') || raw.includes('riêng tư') || raw.includes('không còn tồn tại')) {
       message.warning(`⚠️ ${raw}`, 8);
     } else {

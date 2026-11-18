@@ -222,44 +222,14 @@ public class PostQueueController {
         if (url == null || url.trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "URL không hợp lệ"));
         }
-        String cookieString = null;
+        User user = null;
         try {
-            User user = resolveUser(authentication);
-            if (user != null) {
-                List<SocialAccount> accounts = socialAccountRepository.findByUserId(user.getId());
-                SocialAccount cookieAccount = accounts.stream()
-                        .filter(a -> "PERSONAL_COOKIE".equals(a.getAccountType()) && a.getAccessToken() != null && !a.getAccessToken().trim().isEmpty())
-                        .sorted((a, b) -> {
-                            boolean aOk = "OK".equals(a.getTokenStatus());
-                            boolean bOk = "OK".equals(b.getTokenStatus());
-                            if (aOk && !bOk) return -1;
-                            if (!aOk && bOk) return 1;
-                            return 0;
-                        })
-                        .findFirst()
-                        .orElse(null);
-                if (cookieAccount != null) {
-                    cookieString = cookieAccount.getAccessToken();
-                }
-            }
+            user = resolveUser(authentication);
         } catch (Exception ignored) {}
 
-        if ((cookieString == null || cookieString.isBlank()) && url.contains("facebook.com")) {
-            cookieString = socialAccountRepository.findByAccountType("PERSONAL_COOKIE").stream()
-                    .filter(a -> a.getAccessToken() != null && !a.getAccessToken().isBlank())
-                    .sorted((a, b) -> {
-                        boolean aOk = "OK".equals(a.getTokenStatus());
-                        boolean bOk = "OK".equals(b.getTokenStatus());
-                        if (aOk && !bOk) return -1;
-                        if (!aOk && bOk) return 1;
-                        LocalDateTime tA = a.getUpdatedAt() != null ? a.getUpdatedAt() : LocalDateTime.MIN;
-                        LocalDateTime tB = b.getUpdatedAt() != null ? b.getUpdatedAt() : LocalDateTime.MIN;
-                        return tB.compareTo(tA);
-                    })
-                    .map(SocialAccount::getAccessToken)
-                    .findFirst()
-                    .orElse(null);
-        }
+        String cookieString = (url.contains("facebook.com") || url.contains("fb.watch") || url.contains("fb.me"))
+                ? scraperService.resolveBestFacebookCookie(user != null ? user.getId() : null)
+                : null;
 
         String sourceType = url.contains("facebook.com") || url.contains("fb.watch")
                 ? "FB_PAGE"
