@@ -121,7 +121,7 @@ const PostStory = () => {
   const [kpiModalOpen, setKpiModalOpen] = useState(false);
   const [kpiDrafts, setKpiDrafts] = useState<Record<number, number | null>>({});
   const [kpiFilterMode, setKpiFilterMode] = useState<'ACTIVE_ONLY' | 'ALL'>('ACTIVE_ONLY');
-  const [kpiBoardExpanded, setKpiBoardExpanded] = useState<boolean>(true);
+  const [kpiBoardExpanded, setKpiBoardExpanded] = useState<boolean>(false);
   const [kpiSearchTerm, setKpiSearchTerm] = useState<string>('');
 
   // Lấy danh sách kết nối
@@ -1020,108 +1020,68 @@ const PostStory = () => {
   ];
 
   return (
-    <div className="app-page max-w-5xl mx-auto space-y-6">
-      {/* Header Bar */}
-      <Card variant="borderless">
-        <Flex justify="space-between" align="center" wrap="wrap" gap="middle">
-          <Flex align="center" gap={14}>
-            <div className="w-10 h-10 bg-purple-500/15 border border-purple-500/30 text-purple-300 rounded-xl flex items-center justify-center text-lg shadow-sm shrink-0">
-              <VideoCameraOutlined />
-            </div>
-            <div>
-              <Title level={4} className="!mb-0.5 flex items-center gap-2">
-                Đăng Story Facebook & Quản Lý KPI Story
-              </Title>
-              <Text type="secondary" className="text-xs font-medium">
-                Tự động bóc tách Clip từ Threads, TikTok, Reels và theo dõi tiến độ KPI Story hàng ngày của từng Fanpage
-              </Text>
-            </div>
-          </Flex>
-
-          <Button
-            type="primary"
-            icon={<AimOutlined />}
-            onClick={openKpiModal}
-            className="bg-indigo-600 hover:bg-indigo-500 font-bold text-xs"
-          >
-            Đặt KPI Story Hôm Nay
-          </Button>
-        </Flex>
-      </Card>
-
-      {/* ── BẢNG THEO DÕI TIẾN ĐỘ KPI STORY HÔM NAY CHO CÁC FANPAGE ── */}
-      <Card variant="borderless" className="space-y-3">
-        {/* Header với bộ lọc và nút thu gọn */}
+    <div className="app-page max-w-5xl mx-auto space-y-4">
+      {/* ── BẢNG TIẾN ĐỘ KPI STORY ── */}
+      <Card variant="borderless" className="!p-3.5">
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <div className="flex items-center gap-2">
-              <BarChartOutlined className="text-purple-400 text-sm" />
-              <span className="font-bold text-slate-100 text-sm">
-                Tiến Độ KPI Story Hôm Nay ({dayjs().format('DD/MM/YYYY')}):
-              </span>
-            </div>
+          <div className="flex items-center gap-2.5">
+            <BarChartOutlined className="text-purple-400 text-base" />
+            <span className="font-bold text-slate-100 text-sm">
+              Tiến Độ KPI ({dayjs().format('DD/MM')}):
+            </span>
             {totalHasKpiCount > 0 ? (
               <Tag color={totalAchievedCount === totalHasKpiCount ? 'success' : 'processing'} className="!text-xs font-semibold !m-0">
-                {totalAchievedCount}/{totalHasKpiCount} trang đạt KPI
+                {totalAchievedCount}/{totalHasKpiCount} trang đạt
               </Tag>
             ) : (
               <Tag className="!bg-[#1c2433] !text-slate-300 !border-[#2a374d] !text-xs !m-0">
-                Chưa gán KPI ({fanpageConnections.length} trang)
+                {fanpageConnections.length} trang
               </Tag>
             )}
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            <Segmented
+          <div className="flex items-center gap-2">
+            <Button
               size="small"
-              value={kpiFilterMode}
-              onChange={(val) => setKpiFilterMode(val as 'ACTIVE_ONLY' | 'ALL')}
-              options={[
-                {
-                  label: (
-                    <span className="text-xs px-1">
-                      Đang theo dõi ({activeKpiPages.length})
-                    </span>
-                  ),
-                  value: 'ACTIVE_ONLY'
-                },
-                {
-                  label: (
-                    <span className="text-xs px-1">
-                      Tất cả trang ({fanpageStoryKpiStats.length})
-                    </span>
-                  ),
-                  value: 'ALL'
-                }
-              ]}
-              className="bg-[#0b1017] border border-[#202a3a] text-slate-300"
-            />
-
+              type="primary"
+              icon={<AimOutlined />}
+              onClick={openKpiModal}
+              className="bg-indigo-600 hover:bg-indigo-500 font-semibold text-xs rounded-lg h-7"
+            >
+              Đặt KPI
+            </Button>
             <Button
               size="small"
               type="text"
               icon={kpiBoardExpanded ? <UpOutlined /> : <DownOutlined />}
               onClick={() => setKpiBoardExpanded(!kpiBoardExpanded)}
-              className="text-slate-400 hover:text-slate-200 text-xs flex items-center"
+              className="text-slate-400 hover:text-slate-200 text-xs flex items-center h-7"
             >
-              {kpiBoardExpanded ? 'Thu gọn' : 'Mở rộng'}
+              {kpiBoardExpanded ? 'Thu gọn' : 'Chi tiết'}
             </Button>
           </div>
         </div>
 
         {/* Nội dung khi mở rộng */}
-        {kpiBoardExpanded ? (
-          <>
-            {/* Thanh tìm kiếm & hướng dẫn nhanh */}
-            <div className="flex items-center justify-between gap-3 pt-1 border-t border-[#1c2636]">
-              <span className="text-xs text-slate-300 hidden sm:inline">
-                Bấm vào thẻ Fanpage bên dưới để chọn nhanh trang đăng Story
-              </span>
+        {kpiBoardExpanded && (
+          <div className="pt-3 mt-3 border-t border-[#1c2636] space-y-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <Segmented
+                size="small"
+                value={kpiFilterMode}
+                onChange={(val) => setKpiFilterMode(val as 'ACTIVE_ONLY' | 'ALL')}
+                options={[
+                  { label: <span className="text-xs px-1">Đang theo dõi ({activeKpiPages.length})</span>, value: 'ACTIVE_ONLY' },
+                  { label: <span className="text-xs px-1">Tất cả trang ({fanpageStoryKpiStats.length})</span>, value: 'ALL' }
+                ]}
+                className="bg-[#0b1017] border border-[#202a3a] text-slate-300"
+              />
+
               {(kpiFilterMode === 'ALL' || fanpageStoryKpiStats.length > 6) && (
-                <div className="w-full sm:w-64">
+                <div className="w-full sm:w-56">
                   <Input
                     size="small"
-                    placeholder="Tìm tên hoặc ID trang..."
+                    placeholder="Tìm tên trang..."
                     prefix={<SearchOutlined className="text-slate-500" />}
                     allowClear
                     value={kpiSearchTerm}
@@ -1133,41 +1093,14 @@ const PostStory = () => {
             </div>
 
             {displayedKpiStats.length === 0 ? (
-              <div className="py-6 text-center bg-[#0d131d]/60 rounded-xl border border-dashed border-[#202a3a]">
-                <p className="text-xs text-slate-400 mb-2">
-                  {kpiFilterMode === 'ACTIVE_ONLY'
-                    ? 'Chưa có trang nào có KPI hoặc bài đăng hôm nay.'
-                    : 'Không tìm thấy trang nào khớp với từ khóa tìm kiếm.'}
-                </p>
-                <div className="flex items-center justify-center gap-2">
-                  {kpiFilterMode === 'ACTIVE_ONLY' ? (
-                    <>
-                      <Button
-                        size="small"
-                        type="primary"
-                        icon={<AimOutlined />}
-                        onClick={openKpiModal}
-                        className="bg-indigo-600 hover:bg-indigo-500 text-xs rounded-lg"
-                      >
-                        Đặt KPI Ngay
-                      </Button>
-                      <Button
-                        size="small"
-                        onClick={() => setKpiFilterMode('ALL')}
-                        className="text-xs rounded-lg"
-                      >
-                        Xem tất cả trang ({fanpageStoryKpiStats.length})
-                      </Button>
-                    </>
-                  ) : (
-                    <Button size="small" onClick={() => setKpiSearchTerm('')} className="text-xs rounded-lg">
-                      Xóa bộ lọc tìm kiếm
-                    </Button>
-                  )}
-                </div>
+              <div className="py-4 text-center bg-[#0d131d]/60 rounded-xl border border-dashed border-[#202a3a]">
+                <p className="text-xs text-slate-400 mb-2">Chưa có KPI hôm nay.</p>
+                <Button size="small" type="primary" icon={<AimOutlined />} onClick={openKpiModal} className="bg-indigo-600 text-xs rounded-lg">
+                  Đặt KPI Ngay
+                </Button>
               </div>
             ) : (
-              <Row gutter={[10, 10]}>
+              <Row gutter={[8, 8]}>
                 {displayedKpiStats.map(stat => {
                   const isSelected = form.getFieldValue('connectionId') === stat.connection.id;
                   return (
@@ -1177,129 +1110,69 @@ const PostStory = () => {
                           form.setFieldsValue({ connectionId: stat.connection.id });
                           setTargetMode('SELECT');
                         }}
-                        className={`p-3 rounded-xl border cursor-pointer transition-all relative overflow-hidden group ${
+                        className={`p-2.5 rounded-xl border cursor-pointer transition-all relative overflow-hidden group ${
                           isSelected
                             ? 'border-purple-500 bg-purple-950/40 shadow-sm ring-1 ring-purple-500/40'
                             : 'border-[#202a3a] bg-[#0d131d] hover:border-purple-500/40 hover:bg-[#151f2e]'
                         }`}
                       >
-                        <div className="flex items-center justify-between gap-1 mb-2">
+                        <div className="flex items-center justify-between gap-1 mb-1.5">
                           <div className="flex items-center gap-1.5 overflow-hidden">
                             <FacebookFilled className="text-blue-400 text-xs shrink-0" />
-                            <span className="font-bold text-slate-100 text-[13px] truncate" title={stat.connection.pageName}>
+                            <span className="font-bold text-slate-100 text-xs truncate" title={stat.connection.pageName}>
                               {stat.connection.pageName || stat.connection.platformAccountId}
                             </span>
                           </div>
                           {stat.hasKpi ? (
                             stat.isAchieved ? (
-                              <Tag color="success" className="font-bold !text-xs !m-0">
-                                Đạt KPI
-                              </Tag>
+                              <Tag color="success" className="font-bold !text-[11px] !m-0">Đạt KPI</Tag>
                             ) : (
-                              <Tag color="warning" className="font-bold !text-xs !m-0">
-                                Thiếu {stat.remaining} Story
-                              </Tag>
+                              <Tag color="warning" className="font-bold !text-[11px] !m-0">Thiếu {stat.remaining}</Tag>
                             )
-                          ) : stat.publishedToday > 0 ? (
-                            <Tag color="blue" className="!text-xs !m-0 font-medium">
-                              Đã đăng {stat.publishedToday}
-                            </Tag>
                           ) : (
-                            <Tag className="!bg-[#1c2433] !text-slate-300 !border-[#2a374d] !text-xs !m-0">
-                              Chưa đặt KPI
-                            </Tag>
+                            <Tag className="!bg-[#1c2433] !text-slate-400 !border-[#2a374d] !text-[11px] !m-0">Chưa đặt</Tag>
                           )}
                         </div>
-
-                        {/* Thanh tiến trình KPI */}
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-slate-300">
-                              {stat.hasKpi ? 'Tiến độ hôm nay:' : 'Đã đăng hôm nay:'}
-                            </span>
-                            <span className="font-bold text-slate-100">
-                              {stat.hasKpi ? (
-                                <>
-                                  {stat.publishedToday} / {stat.targetCount} Story
-                                  {stat.pendingToday > 0 && (
-                                    <span className="text-purple-300 font-normal text-xs ml-1">
-                                      (+{stat.pendingToday} chờ)
-                                    </span>
-                                  )}
-                                </>
-                              ) : (
-                                <>
-                                  {stat.publishedToday} Story
-                                  {stat.pendingToday > 0 && (
-                                    <span className="text-purple-300 font-normal text-xs ml-1">
-                                      (+{stat.pendingToday} chờ)
-                                    </span>
-                                  )}
-                                </>
-                              )}
-                            </span>
-                          </div>
-
-                          <Progress
-                            percent={stat.hasKpi ? stat.progressPercent : (stat.publishedToday > 0 ? 100 : 0)}
-                            size="small"
-                            status={stat.hasKpi ? (stat.isAchieved ? 'success' : 'active') : 'normal'}
-                            strokeColor={
-                              stat.hasKpi
-                                ? (stat.isAchieved ? '#10b981' : { from: '#7c3aed', to: '#ec4899' })
-                                : (stat.publishedToday > 0 ? '#3b82f6' : '#2a374d')
-                            }
-                            trailColor="#1f293d"
-                            showInfo={false}
-                          />
-                        </div>
+                        <Progress
+                          percent={stat.hasKpi ? stat.progressPercent : (stat.publishedToday > 0 ? 100 : 0)}
+                          size="small"
+                          status={stat.hasKpi ? (stat.isAchieved ? 'success' : 'active') : 'normal'}
+                          strokeColor={stat.hasKpi ? (stat.isAchieved ? '#10b981' : { from: '#7c3aed', to: '#ec4899' }) : '#3b82f6'}
+                          trailColor="#1f293d"
+                          showInfo={false}
+                        />
                       </div>
                     </Col>
                   );
                 })}
               </Row>
             )}
-          </>
-        ) : (
-          <div className="flex items-center justify-between pt-1 border-t border-[#1c2636] text-xs text-slate-400">
-            <span>
-              Bảng KPI đang thu gọn ({displayedKpiStats.length} trang).
-            </span>
-            <Button
-              size="small"
-              type="link"
-              onClick={() => setKpiBoardExpanded(true)}
-              className="text-purple-400 hover:text-purple-300 text-xs p-0 h-auto font-medium"
-            >
-              Mở rộng bảng chi tiết
-            </Button>
           </div>
         )}
       </Card>
 
-      {/* Progress Steps (Dark Mode) */}
-      <Card variant="borderless">
+      {/* Progress Steps */}
+      <Card variant="borderless" className="!p-2.5">
         <Steps
           current={step}
+          size="small"
           className="dark-steps"
           items={[
-            { title: <span className="font-semibold text-slate-100 text-[13px]">Nhập Link & Trích Xuất Clip</span>, description: <span className="text-xs text-slate-300">Xem trước video & chọn Fanpage</span> },
+            { title: <span className="font-semibold text-slate-100 text-xs">1. Chọn Story & Fanpage</span> },
             {
-              title: <span className="font-semibold text-slate-100 text-[13px]">Đang Xử Lý</span>,
-              description: <span className="text-xs text-slate-300">{isProcessing ? currentProgressText : 'Upload lên Story Facebook'}</span>,
+              title: <span className="font-semibold text-slate-100 text-xs">2. Đang đăng</span>,
               icon: step === 1 ? <LoadingOutlined className="text-purple-400" /> : undefined
             },
             {
-              title: <span className="font-semibold text-slate-100 text-[13px]">Kết Quả</span>,
-              description: <span className="text-xs text-slate-300">{step === 2 ? `${successCount} thành công, ${failCount} lỗi` : 'Chờ hoàn thành'}</span>,
+              title: <span className="font-semibold text-slate-100 text-xs">3. Hoàn tất</span>,
               icon: step === 2 ? (failCount === 0 ? <CheckCircleOutlined className="text-emerald-400" /> : <WarningOutlined className="text-amber-400" />) : undefined
             }
           ]}
         />
       </Card>
 
-      {/* Nhật ký Worker thời gian thực */}
-      <PostStoryLogPanel isProcessing={isProcessing} />
+      {/* Nhật ký Worker (chỉ hiển thị khi đang đăng) */}
+      {isProcessing && <PostStoryLogPanel isProcessing={isProcessing} />}
 
       {/* Bước 1: Đang xử lý */}
       {step === 1 && (
@@ -1419,18 +1292,15 @@ const PostStory = () => {
             <Form form={form} layout="vertical" onFinish={onFinish} disabled={isProcessing}>
               
               {/* Chọn chế độ Fanpage */}
-              <div className="mb-6 bg-[#0d131d] p-4 rounded-xl border border-[#202a3a]">
-                <Text className="font-bold text-slate-200 block mb-3 text-sm flex items-center gap-2">
-                  <FacebookFilled className="text-purple-400" /> Phương thức chọn Fanpage đăng Story:
-                </Text>
+              <div className="mb-4 bg-[#0d131d] p-3 rounded-xl border border-[#202a3a]">
                 <Radio.Group
                   value={targetMode}
                   onChange={(e) => setTargetMode(e.target.value)}
                   className="w-full"
                 >
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div
-                      className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+                      className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center ${
                         targetMode === 'SELECT'
                           ? 'border-purple-500 bg-purple-950/40 shadow-sm ring-1 ring-purple-500/40 text-purple-200'
                           : 'border-[#202a3a] bg-[#111722] hover:border-purple-500/40 hover:bg-[#151f2e] text-slate-300'
@@ -1438,15 +1308,12 @@ const PostStory = () => {
                       onClick={() => setTargetMode('SELECT')}
                     >
                       <Radio value="SELECT">
-                        <span className="font-bold text-xs sm:text-sm text-slate-100">Chọn Fanpage từ danh sách ({fanpageConnections.length})</span>
+                        <span className="font-bold text-xs sm:text-sm text-slate-100">Chọn Fanpage ({fanpageConnections.length})</span>
                       </Radio>
-                      <div className="text-xs text-slate-400 mt-1 pl-6">
-                        Sử dụng các kết nối Fanpage đã lưu trong hệ thống
-                      </div>
                     </div>
 
                     <div
-                      className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+                      className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center ${
                         targetMode === 'DIRECT'
                           ? 'border-purple-500 bg-purple-950/40 shadow-sm ring-1 ring-purple-500/40 text-purple-200'
                           : 'border-[#202a3a] bg-[#111722] hover:border-purple-500/40 hover:bg-[#151f2e] text-slate-300'
@@ -1454,11 +1321,8 @@ const PostStory = () => {
                       onClick={() => setTargetMode('DIRECT')}
                     >
                       <Radio value="DIRECT">
-                        <span className="font-bold text-xs sm:text-sm text-slate-100">Nhập Page Access Token trực tiếp</span>
+                        <span className="font-bold text-xs sm:text-sm text-slate-100">Nhập Token trực tiếp</span>
                       </Radio>
-                      <div className="text-xs text-slate-400 mt-1 pl-6">
-                        Dán trực tiếp Page ID & Token (EAAG...) để đăng ngay
-                      </div>
                     </div>
                   </div>
                 </Radio.Group>
@@ -1603,54 +1467,51 @@ const PostStory = () => {
 
 
               {/* Loại media (Video Story / Photo Story) */}
-              <div className="mb-6 bg-[#0d131d] p-4 rounded-xl border border-[#202a3a]">
-                <Text className="font-bold text-slate-200 block mb-3 text-sm">📂 Loại Media Story:</Text>
+              <div className="mb-4 bg-[#0d131d] p-3 rounded-xl border border-[#202a3a]">
                 <Radio.Group
                   value={mediaType}
                   onChange={e => setMediaType(e.target.value)}
                   className="w-full"
                 >
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-2.5">
                     <div
-                      className={`p-3.5 rounded-xl border cursor-pointer transition-all text-center flex flex-col items-center justify-center ${
+                      className={`p-2.5 rounded-xl border cursor-pointer transition-all text-center flex items-center justify-center gap-2 ${
                         mediaType === 'video'
                           ? 'border-purple-500 bg-purple-950/40 shadow-sm ring-1 ring-purple-500/40 text-purple-200'
                           : 'border-[#202a3a] bg-[#111722] hover:border-purple-500/40 hover:bg-[#151f2e] text-slate-300'
                       }`}
                       onClick={() => setMediaType('video')}
                     >
-                      <VideoCameraOutlined className="text-xl text-purple-400 mb-1.5" />
-                      <div className="font-bold text-slate-100 text-sm">Video Story</div>
-                      <div className="text-xs text-slate-300 mt-0.5">File .MP4 hoặc link Reels / Threads / TikTok</div>
+                      <VideoCameraOutlined className="text-base text-purple-400" />
+                      <span className="font-bold text-slate-100 text-xs sm:text-sm">Video Story</span>
                     </div>
                     <div
-                      className={`p-3.5 rounded-xl border cursor-pointer transition-all text-center flex flex-col items-center justify-center ${
+                      className={`p-2.5 rounded-xl border cursor-pointer transition-all text-center flex items-center justify-center gap-2 ${
                         mediaType === 'photo'
                           ? 'border-pink-500 bg-pink-950/40 shadow-sm ring-1 ring-pink-500/40 text-pink-200'
                           : 'border-[#202a3a] bg-[#111722] hover:border-pink-500/40 hover:bg-[#151f2e] text-slate-300'
                       }`}
                       onClick={() => setMediaType('photo')}
                     >
-                      <PictureOutlined className="text-xl text-pink-400 mb-1.5" />
-                      <div className="font-bold text-slate-100 text-sm">Photo Story</div>
-                      <div className="text-xs text-slate-300 mt-0.5">Ảnh JPG/PNG — tỉ lệ 9:16</div>
+                      <PictureOutlined className="text-base text-pink-400" />
+                      <span className="font-bold text-slate-100 text-xs sm:text-sm">Ảnh Story</span>
                     </div>
                   </div>
                 </Radio.Group>
               </div>
 
               {/* URL Media Input & Trích xuất Clip */}
-              <div className="mb-6 bg-[#0d131d] p-4 rounded-xl border border-[#202a3a]">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+              <div className="mb-4 bg-[#0d131d] p-3.5 rounded-xl border border-[#202a3a]">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2.5">
                   <span className="font-bold text-slate-200 flex items-center gap-1.5 text-xs sm:text-sm">
                     <LinkOutlined className="text-purple-400" />
-                    Danh sách Link bài viết Story (Mỗi dòng 1 link):
+                    Link bài viết Story:
                   </span>
                   
                   <div className="flex items-center gap-2 flex-wrap">
                     {clips.length > 0 && (
-                      <Tag color="purple" className="font-bold !m-0">
-                        {clips.length} Link Story
+                      <Tag color="purple" className="font-bold !m-0 text-xs">
+                        {clips.length} link
                       </Tag>
                     )}
                     <Button
@@ -1675,7 +1536,7 @@ const PostStory = () => {
                         loading={isUploadingFiles}
                         className="text-xs font-semibold rounded-lg bg-[#172230] border-[#2d3b4f] hover:border-purple-400 text-purple-300"
                       >
-                        Tải file từ máy
+                        Tải file
                       </Button>
                     </Upload>
                     <Button
@@ -1686,13 +1547,13 @@ const PostStory = () => {
                       onClick={handleExtractAll}
                       className="bg-purple-600 hover:bg-purple-500 font-bold text-xs rounded-lg"
                     >
-                      Quét & Trích Xuất Clip
+                      Trích xuất
                     </Button>
                   </div>
                 </div>
 
                 <Input.TextArea
-                  rows={4}
+                  rows={3}
                   value={storyUrlsText}
                   onChange={handleTextChange}
                   onPaste={handleTextAreaPaste}
@@ -1701,17 +1562,13 @@ const PostStory = () => {
                       syncClipsFromText(storyUrlsText, false);
                     }
                   }}
-                  placeholder={`Dán 1 hoặc nhiều link Story vào đây (mỗi dòng 1 link):\nhttps://www.threads.net/@user/post/...\nhttps://www.tiktok.com/@user/video/...\nhttps://www.facebook.com/reel/...`}
+                  placeholder="Dán 1 hoặc nhiều link Story (Threads, TikTok, Reels, Facebook, MP4)..."
                   className="rounded-xl font-mono text-xs p-3 !bg-[#111722] !border-[#202a3a] text-slate-200"
                   allowClear
                 />
 
-                <div className="mt-2.5 flex items-center justify-between flex-wrap gap-2 text-xs text-slate-300">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-emerald-400 font-medium">Hỗ trợ link:</span>
-                    <span>Threads</span> • <span>TikTok</span> • <span>Reels / FB</span> • <span>Video MP4 trực tiếp</span>
-                  </div>
-                  <span className="text-slate-300">Hệ thống sẽ tự động bóc tách video MP4 sắc nét</span>
+                <div className="mt-2 flex items-center justify-between text-xs text-slate-400">
+                  <span>Hỗ trợ: Threads · TikTok · Reels / FB · Video MP4 trực tiếp</span>
                 </div>
               </div>
 

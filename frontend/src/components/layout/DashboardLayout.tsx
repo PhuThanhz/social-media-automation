@@ -67,7 +67,6 @@ const navigation = [
   {
     type: 'group' as const, label: 'KÊNH & TÀI NGUYÊN', children: [
       { key: '/dashboard/connections', icon: <FacebookFilled />, label: 'Quản lý kết nối' },
-      { key: '/dashboard/buff', icon: <LikeOutlined />, label: 'Tăng tương tác' },
       { key: '/dashboard/download-video', icon: <DownloadOutlined />, label: 'Tải video' },
       { key: '/dashboard/video-library', icon: <VideoCameraOutlined />, label: 'Thư viện video' },
     ]
@@ -90,7 +89,6 @@ const pageMeta: Record<string, { title: string; description: string }> = {
   '/dashboard/viral-hunter': { title: 'Săn Bài Viral (FB & Threads)', description: 'Cào bài Facebook Group & Threads theo từ khoá, lọc tương tác khủng và tích hợp Gemini AI viết lại' },
   '/dashboard/queue': { title: 'Quản lý bài đăng', description: 'Lập lịch, kiểm tra trạng thái và xử lý bài đăng' },
   '/dashboard/playwright': { title: 'Đăng tự động', description: '' },
-  '/dashboard/buff': { title: 'Tăng tương tác', description: 'Like, bình luận bằng Fanpage, tăng view và tự săn bài mới vào hàng đợi' },
   '/dashboard/connections': { title: 'Quản lý kết nối', description: '' },
   '/dashboard/download-video': { title: 'Tải video', description: 'Tải và xử lý video từ các nền tảng' },
   '/dashboard/video-library': { title: 'Thư viện video', description: 'Quản lý toàn bộ video đã tải về' },
@@ -605,13 +603,6 @@ const DashboardLayout = () => {
           <Flex align="center" gap={10} className="app-topbar-actions shrink-0">
             <SystemEngineBadge />
             <QueueFinishBadge />
-            <Button
-              className="hidden xl:inline-flex !items-center !gap-1.5 !font-bold !text-[13px] !rounded-xl !bg-gradient-to-r !from-blue-600 !to-indigo-600 hover:!from-blue-500 hover:!to-indigo-500 !text-white !border-blue-400/40 !shadow-md !shadow-blue-600/25 !h-10 !px-4 transition-all whitespace-nowrap shrink-0"
-              icon={<LikeOutlined />}
-              onClick={() => navigate('/dashboard/buff')}
-            >
-              Tăng tương tác
-            </Button>
             <Tooltip title={expiredCookieCount > 0 ? `${expiredCookieCount} Fanpage có Cookie hết hạn — Bấm để cập nhật ngay` : 'Không có cảnh báo'}>
               <Badge count={expiredCookieCount} size="small" offset={[-2, 2]}>
                 <button
@@ -726,7 +717,7 @@ const DashboardLayout = () => {
         {[
           { path: '/dashboard', icon: <DashboardOutlined />, label: 'Tổng quan' },
           { path: '/dashboard/playwright', icon: <PlayCircleOutlined />, label: 'Đăng bài' },
-          { path: '/dashboard/buff', icon: <LikeOutlined />, label: 'Tăng tương tác' },
+          { path: '/dashboard/post-story', icon: <PictureOutlined />, label: 'Story' },
           { path: '/dashboard/download-video', icon: <DownloadOutlined />, label: 'Tải video' },
           { path: '/dashboard/connections', icon: <FacebookFilled />, label: 'Fanpage' },
         ].map(({ path, icon, label }) => (
