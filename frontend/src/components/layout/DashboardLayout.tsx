@@ -67,8 +67,6 @@ const navigation = [
   {
     type: 'group' as const, label: 'KÊNH & TÀI NGUYÊN', children: [
       { key: '/dashboard/connections', icon: <FacebookFilled />, label: 'Quản lý kết nối' },
-      { key: '/dashboard/download-video', icon: <DownloadOutlined />, label: 'Tải video' },
-      { key: '/dashboard/video-library', icon: <VideoCameraOutlined />, label: 'Thư viện video' },
     ]
   },
   {
@@ -90,8 +88,6 @@ const pageMeta: Record<string, { title: string; description: string }> = {
   '/dashboard/queue': { title: 'Quản lý bài đăng', description: 'Lập lịch, kiểm tra trạng thái và xử lý bài đăng' },
   '/dashboard/playwright': { title: 'Đăng tự động', description: '' },
   '/dashboard/connections': { title: 'Quản lý kết nối', description: '' },
-  '/dashboard/download-video': { title: 'Tải video', description: 'Tải và xử lý video từ các nền tảng' },
-  '/dashboard/video-library': { title: 'Thư viện video', description: 'Quản lý toàn bộ video đã tải về' },
   '/dashboard/post-story': { title: 'Đăng story', description: 'Tạo và đăng Facebook Story nhanh chóng' },
   '/dashboard/threads': { title: 'Đăng Threads', description: 'Đăng và hẹn giờ bài lên một hoặc nhiều nick Threads' },
   '/dashboard/license': { title: 'Quản lý bản quyền', description: 'Kiểm soát ai đang dùng phần mềm, tạo key và khóa tức thì từ xa (Kill-Switch)' },
@@ -718,7 +714,7 @@ const DashboardLayout = () => {
           { path: '/dashboard', icon: <DashboardOutlined />, label: 'Tổng quan' },
           { path: '/dashboard/playwright', icon: <PlayCircleOutlined />, label: 'Đăng bài' },
           { path: '/dashboard/post-story', icon: <PictureOutlined />, label: 'Story' },
-          { path: '/dashboard/download-video', icon: <DownloadOutlined />, label: 'Tải video' },
+          { path: '/dashboard/threads', icon: <span className="app-nav-icon-at">@</span>, label: 'Threads' },
           { path: '/dashboard/connections', icon: <FacebookFilled />, label: 'Fanpage' },
         ].map(({ path, icon, label }) => (
           <button

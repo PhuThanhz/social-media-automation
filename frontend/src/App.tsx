@@ -14,8 +14,6 @@ const About = lazy(() => import('./pages/About'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const ThreadsStudio = lazy(() => import('./pages/ThreadsStudio'));
 const Connections = lazy(() => import('./pages/Connections'));
-const DownloadVideo = lazy(() => import('./pages/DownloadVideo'));
-const VideoLibrary = lazy(() => import('./pages/VideoLibrary'));
 const PostStory = lazy(() => import('./pages/PostStory'));
 const PlaywrightPoster = lazy(() => import('./pages/PlaywrightPoster'));
 const NewsCardStudio = lazy(() => import('./pages/NewsCardStudio'));
@@ -169,7 +167,7 @@ function App() {
             <Route path="/about" element={<About />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={isTauri() ? <Navigate to="/login" replace /> : <Register />} />
-            <Route path="/download-video" element={<Navigate to="/dashboard/download-video" replace />} />
+            <Route path="/download-video" element={<Navigate to="/dashboard" replace />} />
             
             {/* Bản Desktop bắt buộc đăng nhập (máy có thể dùng chung nhiều người) */}
             <Route path="/dashboard" element={<RequireDesktopLogin><DashboardLayout /></RequireDesktopLogin>}>
@@ -183,8 +181,8 @@ function App() {
               <Route path="queue" element={<Navigate to="/dashboard/playwright" replace />} />
               <Route path="calendar" element={<Navigate to="/dashboard/playwright" replace />} />
               <Route path="playwright" element={<PlaywrightPoster />} />
-              <Route path="download-video" element={<DownloadVideo />} />
-              <Route path="video-library" element={<VideoLibrary />} />
+              <Route path="download-video" element={<Navigate to="/dashboard" replace />} />
+              <Route path="video-library" element={<Navigate to="/dashboard" replace />} />
               <Route path="post-story" element={<PostStory />} />
               <Route path="threads" element={<ThreadsStudio />} />
               <Route path="buff" element={<Navigate to="/dashboard" replace />} />
