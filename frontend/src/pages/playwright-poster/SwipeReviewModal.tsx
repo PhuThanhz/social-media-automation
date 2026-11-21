@@ -216,11 +216,15 @@ function SwipeReviewModal({
           setSwipeMediaIndex((c) => (c - 1 + activeSwipeMediaUrls.length) % activeSwipeMediaUrls.length);
         }
       } else if (e.key === ' ' || e.code === 'Space') {
-        e.preventDefault();
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT') return;
         const currentUrl = activeSwipeMediaUrls[swipeMediaIndex] || activeSwipeMediaUrls[0];
         if (currentUrl) {
           const kind = isMediaVideo(currentUrl, activeSwipeMediaKinds[swipeMediaIndex]) ? 'video' : 'image';
-          setMediaViewer({ url: currentUrl, kind, title: `Bài ${swipeReviewIndex + 1} - Media ${swipeMediaIndex + 1}` });
+          if (kind !== 'video') {
+            e.preventDefault();
+            setMediaViewer({ url: currentUrl, kind, title: `Bài ${swipeReviewIndex + 1} - Media ${swipeMediaIndex + 1}` });
+          }
         }
       } else if (/^[1-9]$/.test(e.key)) {
         const idx = parseInt(e.key, 10) - 1;
@@ -386,7 +390,14 @@ function SwipeReviewModal({
                           onClick={() => !isVid && setMediaViewer({ url: mediaUrl, kind: 'image', title: `Bài ${swipeReviewIndex + 1} - Media ${mediaIndex + 1}` })}
                         >
                           {isVid ? (
-                            <video src={mediaUrl} controls playsInline preload="metadata" />
+                            <video
+                              src={mediaUrl.includes('#t=') ? mediaUrl : `${mediaUrl}#t=0.001`}
+                              controls
+                              playsInline
+                              preload="auto"
+                              onClick={(e) => e.stopPropagation()}
+                              onPointerDown={(e) => e.stopPropagation()}
+                            />
                           ) : (
                             <img src={mediaUrl} alt={`Media ${mediaIndex + 1}`} loading="eager" decoding="async" />
                           )}
@@ -413,16 +424,22 @@ function SwipeReviewModal({
                 );
               })() : (
               <div
-                className="poster-swipe-media-stage relative group cursor-pointer"
+                className={`poster-swipe-media-stage relative group ${
+                  isMediaVideo(activeSwipeMediaUrls[swipeMediaIndex] || activeSwipeMediaUrls[0], activeSwipeMediaKinds[swipeMediaIndex])
+                    ? ''
+                    : 'cursor-pointer'
+                }`}
                 onClick={() => {
                   const currentUrl = activeSwipeMediaUrls[swipeMediaIndex] || activeSwipeMediaUrls[0];
                   if (currentUrl) {
                     const kind = isMediaVideo(currentUrl, activeSwipeMediaKinds[swipeMediaIndex]) ? 'video' : 'image';
+                    if (kind === 'video') return;
                     setMediaViewer({ url: currentUrl, kind, title: `Bài ${swipeReviewIndex + 1} - Media ${swipeMediaIndex + 1}` });
                   }
                 }}
               >
-                {activeSwipeMediaUrls.length > 0 && (
+                {activeSwipeMediaUrls.length > 0 &&
+                  !isMediaVideo(activeSwipeMediaUrls[swipeMediaIndex] || activeSwipeMediaUrls[0], activeSwipeMediaKinds[swipeMediaIndex]) && (
                   <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-950/85 text-slate-200 text-xs px-2 py-1 rounded-md flex items-center gap-1" title="Phóng to (Space)">
                     <ZoomInOutlined />
                   </div>
@@ -448,10 +465,15 @@ function SwipeReviewModal({
                   isMediaVideo(activeSwipeMediaUrls[swipeMediaIndex] || activeSwipeMediaUrls[0], activeSwipeMediaKinds[swipeMediaIndex]) ? (
                     <video
                       key={activeSwipeMediaUrls[swipeMediaIndex] || activeSwipeMediaUrls[0]}
-                      src={activeSwipeMediaUrls[swipeMediaIndex] || activeSwipeMediaUrls[0]}
+                      src={(() => {
+                        const u = activeSwipeMediaUrls[swipeMediaIndex] || activeSwipeMediaUrls[0];
+                        return u.includes('#t=') ? u : `${u}#t=0.001`;
+                      })()}
                       controls
                       playsInline
-                      preload="metadata"
+                      preload="auto"
+                      onClick={(e) => e.stopPropagation()}
+                      onPointerDown={(e) => e.stopPropagation()}
                     />
                   ) : (
                     <img
