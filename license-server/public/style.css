@@ -470,24 +470,70 @@ body {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(8px);
+  background: rgba(3, 7, 18, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 16px;
+  padding: 20px;
 }
 
 .modal {
+  position: relative;
   width: 100%;
   max-width: 480px;
   padding: 32px;
+  border-radius: 20px;
+}
+
+#dialog .modal {
+  max-width: 720px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 34px 38px;
+  background: radial-gradient(circle at 50% 0%, rgba(30, 58, 138, 0.25) 0%, rgba(11, 19, 41, 0.96) 80%);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.85), 0 0 40px rgba(59, 130, 246, 0.15);
+}
+
+.modal-close-btn {
+  position: absolute;
+  top: 20px;
+  right: 22px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-muted);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  line-height: 1;
+}
+
+.modal-close-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+  transform: rotate(90deg);
 }
 
 .modal-header {
   text-align: center;
-  margin-bottom: 24px;
+  margin-bottom: 26px;
+}
+
+.modal-header h2 {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #f8fafc;
 }
 
 .logo-badge {
@@ -499,16 +545,39 @@ body {
 }
 
 .subtitle {
-  font-size: 13px;
+  font-size: 13.5px;
   color: var(--text-muted);
   margin-top: 6px;
 }
 
+#dialog-body {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px 20px;
+  margin-top: 6px;
+}
+
 .form-group {
-  margin-bottom: 18px;
+  margin-bottom: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* Fields spanning full width (2 columns) */
+#dialog-body [data-field="customerId"],
+#dialog-body [data-field="clientName"],
+#dialog-body [data-field="durationPreset"],
+#dialog-body [data-field="notes"],
+#dialog-body [data-field="note"],
+#dialog-body [data-field="preset"],
+#dialog-body [data-field="name"],
+#dialog-body [data-field="email"],
+#dialog-body .extend-preview,
+#dialog-body .section-header,
+#dialog-body .licenses-table,
+#dialog-body .logs-container {
+  grid-column: span 2;
 }
 
 .form-row {
@@ -521,9 +590,9 @@ body {
 }
 
 label {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--text-muted);
+  color: #cbd5e1;
 }
 
 input[type="text"],
@@ -532,52 +601,84 @@ input[type="number"],
 input[type="email"],
 select,
 textarea {
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid var(--border-glass);
-  border-radius: 10px;
-  padding: 11px 14px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 11px;
+  padding: 12px 14px;
   color: var(--text-main);
   font-size: 14px;
   font-family: inherit;
   outline: none;
-  transition: border-color 0.2s ease;
+  transition: all 0.2s ease;
+  width: 100%;
 }
 
-input:focus {
-  border-color: var(--border-focus);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: #3b82f6;
+  background: rgba(15, 23, 42, 0.9);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
 }
 
 .preset-pills {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(5, 1fr);
   gap: 8px;
+  width: 100%;
 }
 
 .preset-pill {
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border-glass);
-  color: var(--text-muted);
-  padding: 10px;
-  border-radius: 8px;
-  font-size: 12.5px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+  padding: 11px 8px;
+  border-radius: 10px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
   font-family: inherit;
+  text-align: center;
+}
+
+.preset-pill:hover {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.4);
+  color: #bfdbfe;
 }
 
 .preset-pill.active {
-  background: rgba(59, 130, 246, 0.2);
-  border-color: var(--primary);
-  color: #93c5fd;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.35), rgba(37, 99, 235, 0.45));
+  border-color: #3b82f6;
+  color: #ffffff;
+  box-shadow: 0 0 14px rgba(59, 130, 246, 0.4);
 }
 
 .modal-actions {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  margin-top: 24px;
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 680px) {
+  #dialog .modal {
+    max-width: 95vw;
+    padding: 24px 20px;
+  }
+  #dialog-body {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  #dialog-body [data-field] {
+    grid-column: span 1 !important;
+  }
+  .preset-pills {
+    grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  }
 }
 
 /* Toast */
