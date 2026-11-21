@@ -1,4 +1,4 @@
-// ToolZutter License Guard — trang quản trị
+// PhuSocial License Guard — trang quản trị
 const API_BASE = window.location.origin;
 const ROLE_RANK = { VIEWER: 1, STAFF: 2, OWNER: 3 };
 const ROLE_LABEL = { OWNER: 'Chủ', STAFF: 'Nhân viên', VIEWER: 'Chỉ xem' };
@@ -151,16 +151,16 @@ async function reloadAll() {
 
 // ===== Key =====
 function statusBadge(l) {
-  if (l.status === 'LOCKED') return '<span class="badge badge-locked">Đã khóa</span>';
-  if (l.status === 'EXPIRED' || (l.expires_at && new Date(l.expires_at) < Date.now())) return '<span class="badge badge-expired">Hết hạn</span>';
-  return '<span class="badge badge-active">Hoạt động</span>';
+  if (l.status === 'LOCKED') return '<span class="badge badge-locked"><span class="badge-dot"></span>Đã khóa</span>';
+  if (l.status === 'EXPIRED' || (l.expires_at && new Date(l.expires_at) < Date.now())) return '<span class="badge badge-expired"><span class="badge-dot"></span>Hết hạn</span>';
+  return '<span class="badge badge-active"><span class="badge-dot"></span>Hoạt động</span>';
 }
 
 function expiryCell(l) {
   if (!l.expires_at) return '<span class="muted">Vĩnh viễn</span>';
   const days = Math.ceil((new Date(l.expires_at) - Date.now()) / DAY_MS);
   const cls = days <= 0 ? 'text-danger' : days <= 7 ? 'text-warning' : 'muted';
-  return `${dateVi(l.expires_at)}<div class="small ${cls}">${days > 0 ? `còn ${days} ngày` : 'đã hết hạn'}</div>`;
+  return `<div class="expiry-cell"><span class="expiry-date">${dateVi(l.expires_at)}</span><div class="small ${cls}">${days > 0 ? `còn ${days} ngày` : 'đã hết hạn'}</div></div>`;
 }
 
 function licenseMatches(l, q) {
@@ -183,25 +183,39 @@ function renderLicenses() {
   }
   $('licenses-tbody').innerHTML = rows.map((l) => `
     <tr>
-      <td><div class="license-key-cell" data-action="copy" data-value="${esc(l.license_key)}">${esc(l.license_key)}</div>
-        ${l.notes ? `<div class="small muted">${esc(l.notes)}</div>` : ''}</td>
-      <td><a class="link" data-action="customer" data-id="${l.customer_id}">${esc(l.customer_name || l.client_name)}</a>
-        ${l.customer_phone ? `<div class="small muted">${esc(l.customer_phone)}</div>` : ''}</td>
-      <td>${l.hwid ? `<span class="hwid-tag" title="${esc(l.hwid)}">${esc(l.hwid)}</span>` : '<span class="muted">Chưa gắn máy</span>'}
-        ${l.client_os || l.app_version ? `<div class="small muted">${esc(osLabel(l.client_os))}${l.app_version ? ` · app v${esc(l.app_version)}` : ''}</div>` : ''}</td>
-      <td class="small">${esc(l.max_accounts)} tài khoản<br>${esc(l.max_users || 1)} người dùng</td>
+      <td>
+        <div class="license-key-cell" data-action="copy" data-value="${esc(l.license_key)}">${esc(l.license_key)}</div>
+        ${l.notes ? `<div class="small muted">${esc(l.notes)}</div>` : ''}
+      </td>
+      <td>
+        <a class="link" data-action="customer" data-id="${l.customer_id}">${esc(l.customer_name || l.client_name)}</a>
+        ${l.customer_phone ? `<div class="small muted">${esc(l.customer_phone)}</div>` : ''}
+      </td>
+      <td>
+        ${l.hwid ? `<span class="hwid-tag" title="${esc(l.hwid)}">${esc(l.hwid)}</span>` : '<span class="muted">Chưa gắn máy</span>'}
+        ${l.client_os || l.app_version ? `<div class="small muted hwid-meta">${esc(osLabel(l.client_os))}${l.app_version ? ` · app v${esc(l.app_version)}` : ''}</div>` : ''}
+      </td>
+      <td>
+        <div class="pkg-pill">
+          <span class="pkg-val">${esc(l.max_accounts)}</span><span class="pkg-lbl">TK</span><span class="pkg-dot">·</span><span class="pkg-val">${esc(l.max_users || 1)}</span><span class="pkg-lbl">User</span>
+        </div>
+      </td>
       <td>${statusBadge(l)}</td>
       <td>${expiryCell(l)}</td>
-      <td>${l.last_ping_at ? (isOnline(l.last_ping_at) ? '<span class="text-success">● Online</span>' : esc(ago(l.last_ping_at))) : '<span class="muted">Chưa kết nối</span>'}
-        ${l.last_ip ? `<div class="small muted">IP: ${esc(l.last_ip)}</div>` : ''}</td>
-      <td style="text-align:right"><div class="row-actions">
-        ${can('STAFF') ? `
-          <button class="btn btn-sm btn-unlock" data-action="extend" data-id="${l.id}">Gia hạn</button>
-          <button class="btn btn-sm btn-secondary" data-action="plan" data-id="${l.id}">Gói</button>
-          <button class="btn btn-sm ${l.status === 'ACTIVE' ? 'btn-kill' : 'btn-unlock'}" data-action="toggle" data-id="${l.id}">${l.status === 'ACTIVE' ? 'Khóa' : 'Mở khóa'}</button>
-          ${l.hwid ? `<button class="btn btn-sm btn-reset-hwid" data-action="reset" data-id="${l.id}">Đổi máy</button>` : ''}` : ''}
-        ${can('OWNER') ? `<button class="btn btn-sm btn-delete" data-action="delete-license" data-id="${l.id}" title="Xóa key">Xóa</button>` : ''}
-      </div></td>
+      <td>
+        ${l.last_ping_at ? (isOnline(l.last_ping_at) ? '<div class="online-tag"><span class="live-pulse"></span>Online</div>' : `<div class="ago-text">${esc(ago(l.last_ping_at))}</div>`) : '<span class="muted">Chưa kết nối</span>'}
+        ${l.last_ip ? `<div class="small muted ip-meta">IP: ${esc(l.last_ip)}</div>` : ''}
+      </td>
+      <td style="text-align:right">
+        <div class="row-actions">
+          ${can('STAFF') ? `
+            <button class="btn btn-sm btn-action-renew" data-action="extend" data-id="${l.id}">Gia hạn</button>
+            <button class="btn btn-sm btn-action-plan" data-action="plan" data-id="${l.id}">Gói</button>
+            <button class="btn btn-sm ${l.status === 'ACTIVE' ? 'btn-action-lock' : 'btn-action-unlock'}" data-action="toggle" data-id="${l.id}">${l.status === 'ACTIVE' ? 'Khóa' : 'Mở khóa'}</button>
+            ${l.hwid ? `<button class="btn btn-sm btn-action-reset" data-action="reset" data-id="${l.id}">Đổi máy</button>` : ''}` : ''}
+          ${can('OWNER') ? `<button class="btn btn-sm btn-action-delete" data-action="delete-license" data-id="${l.id}" title="Xóa key">Xóa</button>` : ''}
+        </div>
+      </td>
     </tr>`).join('');
 }
 
@@ -227,12 +241,12 @@ function renderCustomers() {
       <td class="small">${[c.phone && `SĐT: ${esc(c.phone)}`, c.zalo && `Zalo: ${esc(c.zalo)}`, c.email && esc(c.email)].filter(Boolean).join('<br>') || '<span class="muted">—</span>'}</td>
       <td>${esc(c.active_count)} / ${esc(c.license_count)}</td>
       <td>${c.next_expiry ? expiryCell({ expires_at: c.next_expiry }) : '<span class="muted">—</span>'}</td>
-      <td>${c.last_seen ? (isOnline(c.last_seen) ? '<span class="text-success">● Online</span>' : esc(ago(c.last_seen))) : '<span class="muted">—</span>'}</td>
+      <td>${c.last_seen ? (isOnline(c.last_seen) ? '<div class="online-tag"><span class="live-pulse"></span>Online</div>' : `<div class="ago-text">${esc(ago(c.last_seen))}</div>`) : '<span class="muted">—</span>'}</td>
       <td>${money(c.total_paid)}</td>
       <td style="text-align:right"><div class="row-actions">
         <button class="btn btn-sm btn-secondary" data-action="customer" data-id="${c.id}">Xem</button>
         ${can('STAFF') ? `<button class="btn btn-sm btn-secondary" data-action="edit-customer" data-id="${c.id}">Sửa</button>` : ''}
-        ${can('OWNER') ? `<button class="btn btn-sm btn-delete" data-action="delete-customer" data-id="${c.id}">Xóa</button>` : ''}
+        ${can('OWNER') ? `<button class="btn btn-sm btn-action-delete" data-action="delete-customer" data-id="${c.id}">Xóa</button>` : ''}
       </div></td>
     </tr>`).join('');
 }
@@ -249,8 +263,8 @@ function renderAdmins(admins) {
       <td>${a.last_login_at ? esc(ago(a.last_login_at)) : '<span class="muted">Chưa đăng nhập</span>'}</td>
       <td style="text-align:right"><div class="row-actions">
         <button class="btn btn-sm btn-secondary" data-action="edit-admin" data-id="${a.id}">Sửa</button>
-        <button class="btn btn-sm ${a.active ? 'btn-kill' : 'btn-unlock'}" data-action="toggle-admin" data-id="${a.id}" data-active="${a.active ? 1 : 0}">${a.active ? 'Khóa' : 'Mở khóa'}</button>
-        <button class="btn btn-sm btn-delete" data-action="delete-admin" data-id="${a.id}" data-name="${esc(a.username)}">Xóa</button>
+        <button class="btn btn-sm ${a.active ? 'btn-action-lock' : 'btn-action-unlock'}" data-action="toggle-admin" data-id="${a.id}" data-active="${a.active ? 1 : 0}">${a.active ? 'Khóa' : 'Mở khóa'}</button>
+        <button class="btn btn-sm btn-action-delete" data-action="delete-admin" data-id="${a.id}" data-name="${esc(a.username)}">Xóa</button>
       </div></td>
     </tr>`).join('')
     : '<tr><td colspan="6" class="loading-state">Chưa có tài khoản nào. Đang đăng nhập bằng Admin Secret — hãy tạo tài khoản cho bạn và nhân viên.</td></tr>';

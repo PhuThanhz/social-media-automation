@@ -16,6 +16,9 @@
     <div id="login-modal" class="modal-overlay">
       <div class="modal glass-card">
         <div class="modal-header">
+          <div class="login-brand-logo">
+            <img src="logo.png" alt="PhuSocial Logo" class="login-logo-img">
+          </div>
           <div class="logo-badge">PHUSOCIAL GUARD</div>
           <h2>Đăng Nhập Quản Trị</h2>
           <p class="subtitle">Đăng nhập bằng tài khoản admin được cấp</p>
@@ -91,7 +94,10 @@
       <main id="tab-licenses" class="main-card glass-card tab-panel">
         <div class="table-header-bar">
           <div class="search-box">
-            <span class="search-icon">🔍</span>
+            <svg class="search-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
             <input type="text" id="license-search" placeholder="Tìm theo key, khách hàng, SĐT, HWID, IP...">
           </div>
           <div class="filter-tabs" id="license-filters">
@@ -125,7 +131,10 @@
       <main id="tab-customers" class="main-card glass-card tab-panel hidden">
         <div class="table-header-bar">
           <div class="search-box">
-            <span class="search-icon">🔍</span>
+            <svg class="search-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
             <input type="text" id="customer-search" placeholder="Tìm theo tên, SĐT, Zalo, email...">
           </div>
           <button id="btn-add-customer" class="btn btn-primary" data-min-role="STAFF">+ Thêm Khách</button>
