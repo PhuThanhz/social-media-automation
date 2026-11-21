@@ -7,7 +7,7 @@ import BrandLogo from '../BrandLogo';
 type AuthLayoutProps = {
   children: ReactNode;
   title: string;
-  description: string;
+  description?: string;
 };
 
 const AuthLayout = ({ children, title, description }: AuthLayoutProps) => (
@@ -30,10 +30,10 @@ const AuthLayout = ({ children, title, description }: AuthLayoutProps) => (
         {/* Brand Logo & Title */}
         <div className="auth-simple-head">
           <div className="auth-simple-logo">
-            <BrandLogo light />
+            <BrandLogo compact light />
           </div>
           <h1 className="auth-simple-title">{title}</h1>
-          <p className="auth-simple-desc">{description}</p>
+          {description && <p className="auth-simple-desc">{description}</p>}
         </div>
 
         {/* Form Body */}

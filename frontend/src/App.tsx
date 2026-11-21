@@ -25,7 +25,6 @@ const SystemLogs = lazy(() => import('./pages/SystemLogs'));
 const ViralHunter = lazy(() => import('./pages/ViralHunter'));
 const LicenseManager = lazy(() => import('./pages/LicenseManager'));
 const DesktopUsers = lazy(() => import('./pages/DesktopUsers'));
-const PublishingControlCenter = lazy(() => import('./pages/PublishingControlCenter'));
 
 // Kiểm tra lúc render route (không phải lúc App render) để đăng nhập xong vào được ngay
 function RequireDesktopLogin({ children }: { children: React.ReactElement }) {
@@ -177,7 +176,7 @@ function App() {
             <Route path="/dashboard" element={<RequireDesktopLogin><DashboardLayout /></RequireDesktopLogin>}>
               <Route path="users" element={isTauri() ? <DesktopUsers /> : <Navigate to="/dashboard" replace />} />
               <Route index element={<Dashboard />} />
-              <Route path="publishing-control-center" element={<PublishingControlCenter />} />
+              <Route path="publishing-control-center" element={<Navigate to="/dashboard" replace />} />
               <Route path="economy-job" element={<Navigate to="/dashboard/playwright" replace />} />
               <Route path="connections" element={<Connections />} />
               <Route path="groups" element={<Navigate to="/dashboard/connections?tab=groups" replace />} />

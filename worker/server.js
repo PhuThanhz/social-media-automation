@@ -654,6 +654,10 @@ function extractAllThreadsMediaFromHtml(html, targetUrl = '') {
   if (results.length > 0) {
     results.sort((a, b) => b.score - a.score);
     const best = results[0];
+    // Đã biết mã bài mà không thấy đúng bài trong JSON → không lấy media của bài khác (bình luận/gợi ý) cho đúng bài
+    if (shortcode && best.score < 1000) {
+      return { videos: [], photos: [], orderedMedia: [] };
+    }
     return {
       orderedMedia: best.items.map(i => i.url),
       videos: best.items.filter(i => i.type === 'video').map(i => i.url),
@@ -1088,9 +1092,13 @@ function pruneExpiredScrapeCache() {
 function saveScrapeCache() {
   // Tự động dọn dẹp các mục đã hết hạn (> 6 giờ) trước khi lưu để file không bị phình to
   pruneExpiredScrapeCache();
-  const tmpFile = `${SCRAPE_CACHE_FILE}.tmp`;
-  fs.writeFileSync(tmpFile, JSON.stringify(scrapeCache, null, 2));
-  fs.renameSync(tmpFile, SCRAPE_CACHE_FILE);
+  const tmpFile = `${SCRAPE_CACHE_FILE}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2, 6)}.tmp`;
+  try {
+    fs.writeFileSync(tmpFile, JSON.stringify(scrapeCache, null, 2));
+    fs.renameSync(tmpFile, SCRAPE_CACHE_FILE);
+  } catch (err) {
+    try { fs.unlinkSync(tmpFile); } catch (_) {}
+  }
 }
 // Khóa cache PHẢI phân biệt theo tài khoản/cookie dùng để cào — nếu không, 2 tài khoản khác nhau
 // (VD account Graph API và account Playwright cùng trỏ 1 Fanpage) cùng cào 1 sourceUrl trong vòng
@@ -1313,11 +1321,15 @@ function parseCookies(cookieString, targetPageId = null) {
   }
 
   const parts = cookieString.split(';');
+  const isValidCookieName = (n) => typeof n === 'string' && /^[\w!#$%&'*+\-.^`|~]+$/.test(n.trim());
   for (const part of parts) {
     const [name, ...valueParts] = part.trim().split('=');
     if (name && valueParts.length > 0) {
       const trimmedName = name.trim();
       let val = valueParts.join('=').trim();
+      if (!isValidCookieName(trimmedName) || val.includes('<') || val.includes('>') || val.length > 4096) {
+        continue;
+      }
       if (trimmedName === 'i_user' && targetPageId) {
         val = targetPageId.toString().trim(); // Luôn cập nhật i_user theo đúng Page ID mục tiêu
       }
@@ -7739,7 +7751,15 @@ app.post('/api/tts-edge', async (req, res) => {
   }
 });
 
-app.post('/api/scrape-content', async (req, res) => {
+// Lỗi tạm thời của trình duyệt/trang (Facebook tự chuyển trang, tab bị đóng, tải quá lâu) — cào lại 1 lần thường thành công.
+// Chữ trên trang báo lỗi của Facebook (bài bị xoá/giới hạn người xem) — không bao giờ là caption thật
+const FB_UNAVAILABLE_TEXT_RE = /(?:chủ sở hữu chỉ chia sẻ|owner only shared it with a small group|nội dung này hiện không (?:hiển thị|có sẵn)|this content isn['’]t available|thay đổi người được xem|changed who can see it)/i;
+const TRANSIENT_SCRAPE_ERROR_RE = /Execution context was destroyed|Target page, context or browser has been closed|Target closed|page\.goto: Timeout|Navigation timeout|net::ERR_(?:NETWORK_CHANGED|CONNECTION_RESET|TIMED_OUT|ABORTED)/i;
+const isTransientScrapeError = (err) => TRANSIENT_SCRAPE_ERROR_RE.test(String(err?.message || err || ''));
+
+app.post('/api/scrape-content', (req, res) => scrapeContentHandler(req, res));
+
+async function scrapeContentHandler(req, res) {
   let { sourceUrl, sourceType = 'WEBSITE_CRAWLER', limit, minViews, includeCredit, forceRefresh, socialAccountId, cookieString } = req.body;
   const shouldIncludeCredit = includeCredit === true || includeCredit === 'true';
   const shouldForceRefresh = forceRefresh === true || forceRefresh === 'true';
@@ -8323,9 +8343,11 @@ app.post('/api/scrape-content', async (req, res) => {
             // HD với URL CDN khác nhau (token ký khác nhau dù cùng 1 video vật lý) — dedupe theo pathname
             // trước khi đếm. Chỉ dùng một nguồn cho bài có một video; nếu carousel thực sự có nhiều video
             // (pathname khác nhau) thì giữ đầy đủ carousel. JSON HD được ưu tiên cho bài một video để giữ chất lượng.
+            // Video HD lấy từ HTML cả trang — chỉ tin khi chính bài này có dấu hiệu video, tránh gán video của bình luận/bài gợi ý
+            const trustedJsonHdVideos = (hasScopedVideoEvidence || carouselVideosDeduped.length > 0 || domVideos.length > 0) ? jsonHdVideos : [];
             const rawAllVideos = carouselVideosDeduped.length > 1
               ? carouselVideosDeduped
-              : (jsonHdVideos.length > 0 ? jsonHdVideos : (carouselVideosDeduped.length > 0 ? carouselVideosDeduped : domVideos));
+              : (trustedJsonHdVideos.length > 0 ? trustedJsonHdVideos : (carouselVideosDeduped.length > 0 ? carouselVideosDeduped : domVideos));
             const allVideos = dedupeVideosByKey(rawAllVideos);
             const allPhotos = [...new Set([...(threadsCarouselPhotosArg || []), ...(mainPhotoUrls || []), ...(carouselImgUrls || [])])].filter(Boolean);
 
@@ -8475,6 +8497,13 @@ app.post('/api/scrape-content', async (req, res) => {
       saveScrapeCache();
       return res.json(threadsResult);
     } catch (err) {
+      if (isTransientScrapeError(err) && !req._scrapeRetried && !res.headersSent) {
+        console.warn(`[Threads] 🔁 Lỗi tạm thời (${err.message.split('\n')[0]}) — cào lại 1 lần: ${sourceUrl}`);
+        req._scrapeRetried = true;
+        await releaseContext?.();
+        releaseContext = null;
+        return await scrapeContentHandler(req, res);
+      }
       console.error('[Threads] ❌ Lỗi:', err.message);
       return res.status(500).json({ success: false, error: err.message });
     } finally {
@@ -8615,16 +8644,23 @@ app.post('/api/scrape-content', async (req, res) => {
 
       // Nếu có cookieString (tài khoản Facebook đã kết nối), nạp Cookie vào context
       if (req.body.cookieString) {
-        const cookies = req.body.cookieString.split(';').map(pair => {
-          const [name, ...val] = pair.trim().split('=');
-          return {
-            name: name.trim(),
-            value: val.join('=').trim(),
-            domain: '.facebook.com',
-            path: '/'
-          };
-        }).filter(c => c.name && c.value);
-        await context.addCookies(cookies);
+        try {
+          const isValidCookieName = (n) => typeof n === 'string' && /^[\w!#$%&'*+\-.^`|~]+$/.test(n.trim());
+          const cookies = req.body.cookieString.split(';').map(pair => {
+            const [name, ...val] = pair.trim().split('=');
+            return {
+              name: (name || '').trim(),
+              value: (val.join('=') || '').trim(),
+              domain: '.facebook.com',
+              path: '/'
+            };
+          }).filter(c => c.name && c.value && isValidCookieName(c.name) && !c.value.includes('<') && !c.value.includes('>') && c.value.length < 4096);
+          if (cookies.length > 0) {
+            await context.addCookies(cookies);
+          }
+        } catch (cookieErr) {
+          console.warn(`[FB_Scraper] ⚠️ Nạp cookie thất bại (${cookieErr.message}) — tiếp tục cào ẩn danh không dùng cookie.`);
+        }
       }
 
       const isAudioOnlyMp4 = (url) => {
@@ -8714,6 +8750,8 @@ app.post('/api/scrape-content', async (req, res) => {
         const missingMarkers = [
           "isn't available", 'không có sẵn', 'không khả dụng', 'no longer available',
           'nội dung này hiện không', 'This content isn’t available',
+          'chủ sở hữu chỉ chia sẻ', 'owner only shared it with a small group',
+          'thay đổi người được xem', 'changed who can see it',
         ];
         const loginTitleMarkers = ['Log in to Facebook', 'Log In or Sign Up', 'Đăng nhập vào Facebook'];
         // Bài trong Group/Page riêng tư mà cookie chưa phải thành viên: Facebook KHÔNG báo lỗi hay đưa
@@ -9510,6 +9548,9 @@ app.post('/api/scrape-content', async (req, res) => {
         // chạy quá sớm (ngay sau page.goto, trước khi cuộn/bấm "Xem thêm"/chờ thêm) nên có thể chụp lúc
         // trang mới chỉ hiện khung tạm, chưa lên câu mời đăng nhập; caption cuối cùng này mới là thứ thực
         // sự được dùng làm content bài đăng nên phải chặn ở đây mới chắc chắn không lọt garbage xuống.
+        if (FB_UNAVAILABLE_TEXT_RE.test(postData.caption || '')) {
+          throw new Error('Không cào được: bài viết có thể đã bị xóa, chuyển sang chế độ riêng tư, hoặc giới hạn người xem');
+        }
         if (/để kết nối với bạn bè, gia đình|connect with friends, family and people you know/i.test(postData.caption || '')) {
           throw new Error('Không cào được: bài viết yêu cầu đăng nhập/là thành viên mới xem được nội dung thật (có thể trong Group riêng tư mà cookie đang dùng chưa phải thành viên) — Facebook chỉ trả về trang mời đăng nhập chung chung, không phải nội dung bài viết.');
         }
@@ -9744,6 +9785,10 @@ app.post('/api/scrape-content', async (req, res) => {
         const dedupKey = normalizedContent || item.originalUrl;
         if (seenContent.has(dedupKey)) continue;
         seenContent.add(dedupKey);
+        if (FB_UNAVAILABLE_TEXT_RE.test(item.content || '')) {
+          console.warn(`[FB_Scraper] ⚠️ Bỏ kết quả: caption là chữ của trang báo lỗi Facebook (bài bị xoá/giới hạn): ${item.originalUrl || sourceUrl}`);
+          continue;
+        }
         dedupedItems.push(attachMediaMetadata(item));
       }
       console.log(`[FB_Scraper] ✅ Cào thành công ${dedupedItems.length} bài từ Facebook Group/Page!`);
@@ -9754,6 +9799,13 @@ app.post('/api/scrape-content', async (req, res) => {
       }
       return res.json(bulkResult);
     } catch (err) {
+      if (isTransientScrapeError(err) && !req._scrapeRetried && !res.headersSent) {
+        console.warn(`[FB_Scraper] 🔁 Lỗi tạm thời (${err.message.split('\n')[0]}) — cào lại 1 lần: ${sourceUrl}`);
+        req._scrapeRetried = true;
+        await releaseContext?.();
+        releaseContext = null;
+        return await scrapeContentHandler(req, res);
+      }
       console.error('[FB_Scraper] ❌ Lỗi:', err.message);
       return res.status(500).json({ success: false, error: err.message });
     } finally {
@@ -10025,7 +10077,7 @@ app.post('/api/scrape-content', async (req, res) => {
   } finally {
     await releaseContext?.();
   }
-});
+}
 
 
 // Endpoint tự động lấy tên Facebook / Fanpage thực tế từ Cookie
@@ -10405,17 +10457,22 @@ async function extractVideoDirectly(url, options = {}) {
     const context = acquired.context;
 
     if (cookieString && isFb) {
-      const cookies = cookieString.split(';').map(pair => {
-        const [name, ...val] = pair.trim().split('=');
-        return {
-          name: name.trim(),
-          value: val.join('=').trim(),
-          domain: '.facebook.com',
-          path: '/'
-        };
-      }).filter(c => c.name && c.value);
-      if (cookies.length > 0) {
-        await context.addCookies(cookies);
+      try {
+        const isValidCookieName = (n) => typeof n === 'string' && /^[\w!#$%&'*+\-.^`|~]+$/.test(n.trim());
+        const cookies = cookieString.split(';').map(pair => {
+          const [name, ...val] = pair.trim().split('=');
+          return {
+            name: (name || '').trim(),
+            value: (val.join('=') || '').trim(),
+            domain: '.facebook.com',
+            path: '/'
+          };
+        }).filter(c => c.name && c.value && isValidCookieName(c.name) && !c.value.includes('<') && !c.value.includes('>') && c.value.length < 4096);
+        if (cookies.length > 0) {
+          await context.addCookies(cookies);
+        }
+      } catch (cookieErr) {
+        console.warn(`[VideoExtractor] ⚠️ Nạp cookie thất bại (${cookieErr.message}) — tiếp tục không dùng cookie.`);
       }
     }
 

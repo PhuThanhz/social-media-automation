@@ -44,9 +44,9 @@ export default function QueueFinishBadge() {
           icon={badgeIcon}
           onClick={() => setOpen(true)}
         >
-          <span className="qfb-label-full">{label}</span>
-          <span className="qfb-label-short">
-            {isProcessing ? '⚡' : (queue?.totalPending ?? '')}
+          <span className="hidden xl:inline">{label}</span>
+          <span className="xl:hidden inline text-xs font-semibold">
+            {isProcessing ? '⚡ Đang đăng' : (hasPending ? `Hàng đợi: ${queue?.totalPending}` : 'Lịch đăng')}
           </span>
         </Button>
       </Tooltip>

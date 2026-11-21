@@ -238,6 +238,24 @@ export default function HistoryPanel({
             </Button>
 
             <Popconfirm
+              title="Xếp lịch Đăng nhanh 1 phút/bài (2 Worker)?"
+              description="Hệ thống sẽ xếp lại các bài được chọn chạy song song qua 2 Worker, mỗi phút giải phóng 2 bài."
+              okText="Đồng ý"
+              cancelText="Hủy"
+              onConfirm={() => onRepack(selectedRowKeys.length > 0 ? selectedRowKeys : undefined, 60)}
+            >
+              <Button
+                size="small"
+                icon={<ThunderboltOutlined />}
+                disabled={isBulkProcessing}
+                className="bg-amber-500/25 hover:bg-amber-500/35 text-amber-300 border border-amber-500/40 font-bold text-xs rounded-xl h-8 px-3 transition-all cursor-pointer shadow-sm"
+                title="Tốc độ tối đa: 2 Worker song song, cách 1 phút/bài"
+              >
+                ⚡ Đăng nhanh 2 Worker (1p)
+              </Button>
+            </Popconfirm>
+
+            <Popconfirm
               title="Dãn cách 20 phút/bài?"
               description="Hệ thống sẽ xếp lại các bài được chọn (hoặc cả hàng đợi) cách nhau đúng 20 phút để chống spam."
               okText="Đồng ý"
@@ -251,7 +269,7 @@ export default function HistoryPanel({
                 className="bg-emerald-600/25 hover:bg-emerald-600/35 text-emerald-300 border border-emerald-500/40 font-bold text-xs rounded-xl h-8 px-3 transition-all cursor-pointer"
                 title="Tự động giãn cách 20 phút mỗi bài (Chuẩn chống spam Facebook)"
               >
-                ⏱️ Dãn 20p/bài
+                ⏱️ Dãn 20p (An toàn)
               </Button>
             </Popconfirm>
 
@@ -1213,7 +1231,7 @@ export default function HistoryPanel({
           pageSizeOptions: ['10', '20', '50'],
           onChange: (current, pageSize) => setHistoryTablePage({ current, pageSize }),
         }}
-        scroll={{ x: 720 }}
+        scroll={{ x: 1140 }}
         sticky={{ offsetHeader: 0 }}
         rowClassName={(record: PostQueue) =>
           `history-row history-row-${(record.status || 'PENDING').toLowerCase()}`

@@ -13,7 +13,7 @@ import {
   FacebookFilled, QuestionCircleOutlined, CalendarOutlined, BankOutlined,
   CodeOutlined, AimOutlined, LikeOutlined, FireOutlined, SearchOutlined, RadarChartOutlined,
   RobotOutlined, BgColorsOutlined, CloseOutlined, SafetyCertificateOutlined,
-  DownOutlined, RightOutlined, SettingOutlined, RocketOutlined,
+  DownOutlined, RightOutlined, SettingOutlined,
 } from '@ant-design/icons';
 import api from '../../config/axios';
 import dayjs from 'dayjs';
@@ -52,7 +52,6 @@ const navigation = [
   {
     type: 'group' as const, label: 'TỔNG QUAN', children: [
       { key: '/dashboard', icon: <DashboardOutlined />, label: 'Bảng điều khiển' },
-      { key: '/dashboard/publishing-control-center', icon: <RocketOutlined className="app-nav-icon-cyan" />, label: 'Publishing Control Center' },
     ]
   },
   {
@@ -86,14 +85,13 @@ const navigation = [
 
 const pageMeta: Record<string, { title: string; description: string }> = {
   '/dashboard': { title: 'Tổng quan', description: 'Theo dõi hoạt động đăng bài và tình trạng hệ thống' },
-  '/dashboard/publishing-control-center': { title: 'Publishing Control Center', description: 'Trung tâm điều hành xuất bản — Giám sát 3 Worker, kiểm soát hàng đợi 1,000+ bài và giải quyết sự cố' },
   '/dashboard/news-studio': { title: 'Studio Ảnh Tin', description: 'Cào full bài báo, AI viết tiêu đề, ghép ảnh kiểu page tin tức rồi lên lịch đăng' },
   '/dashboard/video-studio': { title: 'Studio Video Tin', description: 'Dán link video, thêm khung tiêu đề + giọng AI đọc vài giây đầu, trộn nhạc nền rồi xuất hoặc lên lịch đăng' },
   '/dashboard/viral-hunter': { title: 'Săn Bài Viral (FB & Threads)', description: 'Cào bài Facebook Group & Threads theo từ khoá, lọc tương tác khủng và tích hợp Gemini AI viết lại' },
   '/dashboard/queue': { title: 'Quản lý bài đăng', description: 'Lập lịch, kiểm tra trạng thái và xử lý bài đăng' },
-  '/dashboard/playwright': { title: 'Đăng tự động', description: 'Xuất bản nội dung trực tiếp bằng Playwright' },
+  '/dashboard/playwright': { title: 'Đăng tự động', description: '' },
   '/dashboard/buff': { title: 'Tăng tương tác', description: 'Like, bình luận bằng Fanpage, tăng view và tự săn bài mới vào hàng đợi' },
-  '/dashboard/connections': { title: 'Quản lý kết nối', description: 'Quản lý tài khoản Via cá nhân, Cookie, Fanpage và Nhóm Facebook' },
+  '/dashboard/connections': { title: 'Quản lý kết nối', description: '' },
   '/dashboard/download-video': { title: 'Tải video', description: 'Tải và xử lý video từ các nền tảng' },
   '/dashboard/video-library': { title: 'Thư viện video', description: 'Quản lý toàn bộ video đã tải về' },
   '/dashboard/post-story': { title: 'Đăng story', description: 'Tạo và đăng Facebook Story nhanh chóng' },
@@ -251,10 +249,8 @@ const DashboardLayout = () => {
       {/* User Header Profile Card */}
       <div className="relative flex items-center gap-3.5 pb-3.5 border-b border-white/10">
         <div className="relative shrink-0">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-sky-400 via-blue-500 to-indigo-600 p-[2px] shadow-lg shadow-sky-500/25">
-            <div className="w-full h-full rounded-[14px] bg-[#0b1222] flex items-center justify-center font-black text-white text-base">
-              {profileInitials}
-            </div>
+          <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-sky-400 via-blue-600 to-indigo-600 flex items-center justify-center font-black text-white text-base shadow-lg shadow-sky-500/25 ring-2 ring-white/20">
+            {profileInitials}
           </div>
           <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-[#0b1222]" title="Hệ thống trực tuyến" />
         </div>
@@ -555,7 +551,7 @@ const DashboardLayout = () => {
         justify={collapsed && isDesktop ? 'center' : undefined}
         className={`app-sidebar-brand app-sidebar-brand-box ${collapsed && isDesktop ? '' : 'app-sidebar-brand-pad'}`}
       >
-        <BrandLogo compact={collapsed && isDesktop} light to="/" hideMark />
+        <BrandLogo compact={collapsed && isDesktop} light to="/" />
       </Flex>
 
       <div className="app-sidebar-scroll">
@@ -591,8 +587,8 @@ const DashboardLayout = () => {
       )}
 
       <Layout className="app-main-column">
-        <Header className="app-topbar app-topbar-bar" style={{ lineHeight: 'normal', height: 74 }}>
-          <Flex align="center" className="app-main-column min-w-0 flex-1 pr-2 sm:pr-4">
+        <Header className="app-topbar app-topbar-bar overflow-hidden" style={{ lineHeight: 'normal', height: 74 }}>
+          <Flex align="center" className="min-w-0 flex-1 pr-2 sm:pr-4">
             <Button
               type="text"
               icon={isDesktop ? (collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />) : <MenuUnfoldOutlined />}
@@ -601,8 +597,8 @@ const DashboardLayout = () => {
               className="!text-slate-200 hover:!text-white hover:!bg-white/10 !mr-2 sm:!mr-3 !rounded-xl !w-10 !h-10 !flex !items-center !justify-center !border !border-white/10 transition-all shrink-0"
             />
             <div className="app-topbar-heading min-w-0 flex-1">
-              <h1 className="app-topbar-title !text-base sm:!text-xl !font-extrabold !text-white !tracking-tight !m-0">{meta.title}</h1>
-              <p className="app-topbar-desc !text-[13px] !text-slate-300 !mt-0.5 !m-0 !font-medium">{meta.description}</p>
+              <h1 className="app-topbar-title !text-base sm:!text-xl !font-extrabold !text-white !tracking-tight !m-0 truncate">{meta.title}</h1>
+              {meta.description && <p className="app-topbar-desc !text-[13px] !text-slate-300 !mt-0.5 !m-0 !font-medium truncate max-w-xs md:max-w-sm lg:max-w-md xl:max-w-xl hidden sm:block">{meta.description}</p>}
             </div>
           </Flex>
 
@@ -610,7 +606,7 @@ const DashboardLayout = () => {
             <SystemEngineBadge />
             <QueueFinishBadge />
             <Button
-              className="app-topbar-buff !flex !items-center !gap-1.5 !font-bold !text-[13px] !rounded-xl !bg-gradient-to-r !from-blue-600 !to-indigo-600 hover:!from-blue-500 hover:!to-indigo-500 !text-white !border-blue-400/40 !shadow-md !shadow-blue-600/25 !h-10 !px-4 transition-all whitespace-nowrap shrink-0"
+              className="hidden xl:inline-flex !items-center !gap-1.5 !font-bold !text-[13px] !rounded-xl !bg-gradient-to-r !from-blue-600 !to-indigo-600 hover:!from-blue-500 hover:!to-indigo-500 !text-white !border-blue-400/40 !shadow-md !shadow-blue-600/25 !h-10 !px-4 transition-all whitespace-nowrap shrink-0"
               icon={<LikeOutlined />}
               onClick={() => navigate('/dashboard/buff')}
             >
@@ -648,23 +644,20 @@ const DashboardLayout = () => {
             >
               <button
                 type="button"
-                className="flex items-center gap-2 sm:gap-2.5 px-2 sm:px-3 py-1.5 rounded-xl bg-white/6 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all cursor-pointer group select-none shrink-0 whitespace-nowrap"
+                className="h-10 flex items-center gap-2 sm:gap-2.5 px-2.5 sm:px-3 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/80 hover:border-slate-600 transition-all cursor-pointer group select-none shrink-0 whitespace-nowrap shadow-sm"
               >
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-sky-500 to-indigo-600 p-[1.5px] shadow-sm shrink-0">
-                  <div className="w-full h-full rounded-[6.5px] bg-[#0b1222] flex items-center justify-center font-black text-white text-xs">
+                <div className="relative shrink-0">
+                  <div className="topbar-avatar">
                     {profileInitials}
                   </div>
+                  <span className="topbar-avatar-dot" aria-hidden="true" />
                 </div>
-                <div className="hidden sm:flex flex-col text-left whitespace-nowrap">
-                  <span className="font-bold text-[13.5px] text-slate-100 group-hover:text-white leading-tight whitespace-nowrap">
+                <div className="hidden sm:flex flex-col text-left whitespace-nowrap leading-tight">
+                  <span className="font-bold text-[13px] text-slate-100 group-hover:text-white transition-colors">
                     {profileName}
                   </span>
-                  <span className="text-xs text-emerald-400 font-semibold leading-tight flex items-center gap-1 whitespace-nowrap">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    Online
-                  </span>
                 </div>
-                <DownOutlined className="hidden sm:inline-block text-xs text-slate-300 group-hover:text-white transition-transform ml-0.5 shrink-0" />
+                <DownOutlined className="hidden sm:inline-block text-[10px] text-slate-400 group-hover:text-slate-200 transition-transform ml-0.5 shrink-0" />
               </button>
             </Dropdown>
           </Flex>

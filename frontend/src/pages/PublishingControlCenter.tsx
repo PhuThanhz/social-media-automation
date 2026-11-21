@@ -919,6 +919,7 @@ const PublishingControlCenter: React.FC = () => {
               setSize(s);
             },
           }}
+          scroll={{ x: 1150 }}
           className="ant-table-dark overflow-x-auto"
         />
       </Card>

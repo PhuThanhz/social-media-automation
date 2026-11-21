@@ -250,8 +250,7 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
               <KeyOutlined className="qcm-ic-base" />
             </div>
             <div>
-              <div className="qcm-title-text">Cập Nhật Toàn Bộ Cookie Facebook (Kháng Checkpoint)</div>
-              <div className="qcm-title-sub">Hỗ trợ đầy đủ từng cột DevTools: c_user, xs, datr, sb, fr, wd, locale...</div>
+              <div className="qcm-title-text">Cập nhật Cookie</div>
             </div>
           </Flex>
           {expiredAccounts.length > 0 && (
@@ -266,7 +265,7 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
         {/* Chọn tài khoản */}
         <div>
           <label className="qcm-label">
-            Tài khoản / Fanpage cần cập nhật:
+            Tài khoản
           </label>
           <Select
             value={selectedAccountId}
@@ -313,31 +312,21 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
                   Cookie của &quot;{currentAccount.pageName || currentAccount.platformAccountId}&quot; đã bị hết hạn!
                 </span>
                 <p className="qcm-alert-desc">
-                  Tất cả tác vụ đăng bài bằng Cookie này sẽ bị lỗi. Hãy nạp đầy đủ các cột Cookie bên dưới để kích hoạt lại ngay.
+                  Bài đăng bằng cookie này sẽ lỗi cho tới khi cập nhật.
                 </p>
               </div>
             }
             className="qcm-alert"
           />
-        ) : (
-          <div className="qcm-cuser-row">
-            <span className="qcm-slate-600">Trạng thái hiện tại:</span>
-            <Tag color={currentAccount?.tokenStatus === 'OK' ? 'success' : 'default'} className="qcm-pill-bold">
-              {currentAccount?.tokenStatus === 'OK' ? 'Cookie đang hoạt động' : 'Chưa kiểm tra'}
-            </Tag>
-          </div>
-        )}
+        ) : null}
 
         {/* Banner thông báo tự động đồng bộ theo Nick Via */}
         {targetCUser && linkedAccounts.length > 1 && (
-          <div className="shadow-2xs qcm-guide">
-            <div className="qcm-guide-title">
-              <ThunderboltOutlined className="qcm-ic-amber" />
-              Tự động đồng bộ Cookie cho {linkedAccounts.length} Fanpage & Nhóm:
-            </div>
-            <div className="qcm-guide-text">
-              Chỉ cần cập nhật Cookie của Nick này (UID: <span className="qcm-guide-code">{targetCUser}</span>), hệ thống sẽ tự động cập nhật và kích hoạt sống cho tất cả {linkedAccounts.length} trang ({linkedAccounts.slice(0, 4).map(a => a.pageName || a.platformAccountId).join(', ')}{linkedAccounts.length > 4 ? ` và ${linkedAccounts.length - 4} trang khác` : ''}).
-            </div>
+          <div className="text-xs text-slate-400 flex items-center gap-1.5">
+            <ThunderboltOutlined className="text-amber-400" />
+            <span title={linkedAccounts.map(a => a.pageName || a.platformAccountId).join(', ')}>
+              Áp dụng luôn cho {linkedAccounts.length} Page & Nhóm dùng nick này
+            </span>
           </div>
         )}
 
@@ -356,8 +345,8 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
               setInputMode(newMode);
             }}
             options={[
-              { label: '📊 Nhập từng cột theo DevTools (Khuyên dùng)', value: 'COLUMNS' },
-              { label: '🚀 Dán nguyên chuỗi Cookie', value: 'RAW' },
+              { label: 'Từng cột', value: 'COLUMNS' },
+              { label: 'Dán chuỗi', value: 'RAW' },
             ]}
             className="qcm-mode"
           />
@@ -370,7 +359,7 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
                 onClick={handlePasteClipboardToColumns}
                 className="qcm-paste-btn"
               >
-                📋 Dán tự động điền các cột
+                Dán tự động
               </Button>
               <Button
                 size="small"
@@ -390,15 +379,12 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
             {/* TẦNG 1: BẮT BUỘC */}
             <div className="p-3 rounded-xl border border-blue-500/30 bg-blue-950/20 space-y-2.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-blue-300 uppercase tracking-wider flex items-center gap-1.5">
-                  <Badge status="processing" color="#3b82f6" /> Tầng 1: Tài khoản & Phiên đăng nhập (Bắt buộc)
-                </span>
-                <Tag color="blue" className="text-[11px] m-0 font-semibold">Bắt buộc</Tag>
+                <span className="text-xs font-semibold text-blue-300">Bắt buộc</span>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-slate-300 font-semibold mb-1 block">
-                    <code>c_user</code> <span className="text-slate-400 font-normal">(UID Facebook)</span>:
+                    <code title="UID Facebook">c_user</code>
                   </label>
                   <Input
                     value={cookies.cUser}
@@ -409,7 +395,7 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
                 </div>
                 <div>
                   <label className="text-xs text-slate-300 font-semibold mb-1 block">
-                    <code>xs</code> <span className="text-slate-400 font-normal">(Session Token)</span>:
+                    <code title="Session Token">xs</code>
                   </label>
                   <Input.Password
                     value={cookies.xs}
@@ -424,17 +410,13 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
             {/* TẦNG 2: KHÁNG CHECKPOINT THIẾT BỊ (CỰC KỲ QUAN TRỌNG) */}
             <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-950/20 space-y-2.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
-                  <SafetyCertificateOutlined className="text-emerald-400" /> Tầng 2: Bộ Kháng Checkpoint Thiết Bị (Khuyên Dùng)
-                </span>
-                <Tag color="green" className="text-[11px] m-0 font-semibold">Kháng Checkpoint</Tag>
+                <span className="text-xs font-semibold text-emerald-300">Chống checkpoint (nên có)</span>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-slate-300 font-semibold mb-1 flex items-center justify-between">
-                    <span><code>datr</code> <span className="text-slate-400 font-normal">(Thẻ căn cước thiết bị)</span>:</span>
-                    <Tooltip title="Facebook lưu 2 năm để nhận diện thiết bị quen thuộc, bắt buộc để không bị văng phiên khi đổi máy.">
-                      <span className="text-emerald-400 cursor-pointer text-[10px]">ℹ️ Quan trọng</span>
+                    <Tooltip title="Nhận diện thiết bị quen thuộc, giúp không bị văng phiên khi đổi máy">
+                      <code>datr</code>
                     </Tooltip>
                   </label>
                   <Input
@@ -446,9 +428,8 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
                 </div>
                 <div>
                   <label className="text-xs text-slate-300 font-semibold mb-1 flex items-center justify-between">
-                    <span><code>sb</code> <span className="text-slate-400 font-normal">(Ràng buộc trình duyệt)</span>:</span>
-                    <Tooltip title="Khóa ràng buộc phiên đăng nhập với cấu hình phần cứng trình duyệt.">
-                      <span className="text-emerald-400 cursor-pointer text-[10px]">ℹ️ Cần thiết</span>
+                    <Tooltip title="Ràng buộc phiên đăng nhập với trình duyệt">
+                      <code>sb</code>
                     </Tooltip>
                   </label>
                   <Input
@@ -460,7 +441,7 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
                 </div>
                 <div>
                   <label className="text-xs text-slate-300 font-semibold mb-1 block">
-                    <code>fr</code> <span className="text-slate-400 font-normal">(Mã bảo mật phiên)</span>:
+                    <code title="Mã bảo mật phiên">fr</code>
                   </label>
                   <Input.Password
                     value={cookies.fr}
@@ -471,7 +452,7 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
                 </div>
                 <div>
                   <label className="text-xs text-slate-300 font-semibold mb-1 block">
-                    <code>wd</code> <span className="text-slate-400 font-normal">(Kích thước màn hình)</span>:
+                    <code title="Kích thước màn hình">wd</code>
                   </label>
                   <Input
                     value={cookies.wd}
@@ -493,8 +474,7 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
                   key: 'extra',
                   label: (
                     <span className="text-xs text-slate-300 font-semibold flex items-center gap-2">
-                      <span>⚙️ Thông số bổ sung từ DevTools (dpr, locale, vpd, presence, pas...)</span>
-                      <Tag color="default" className="text-[10px] m-0">Tùy chọn (Điền đủ 100%)</Tag>
+                      <span>Thêm (dpr, locale, vpd…) · không bắt buộc</span>
                     </span>
                   ),
                   children: (
@@ -594,7 +574,7 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
               autoFocus
             />
             <div className="qcm-hint-row">
-              <span>Hệ thống tự động nhận diện và bóc tách đầy đủ tất cả các trường: <code>c_user</code>, <code>xs</code>, <code>datr</code>, <code>sb</code>, <code>fr</code>, <code>wd</code>...</span>
+              <span>Tự nhận c_user, xs, datr, sb, fr, wd…</span>
             </div>
           </div>
         )}
@@ -603,15 +583,15 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
         <div className="qcm-preview p-3 rounded-xl bg-slate-900/80 border border-slate-800">
           <Flex align="center" justify="space-between" className="qcm-preview-head mb-2">
             <span className="qcm-preview-title text-xs font-semibold text-slate-300">
-              Tổng quan bộ Cookie: <Tag color="blue">{parsedData.count} cookie đã nạp</Tag>
+              <Tag color="blue">{parsedData.count} cookie</Tag>
             </span>
             {parsedData.hasSecuritySuite ? (
               <Tag icon={<CheckCircleOutlined />} color="success" className="qcm-pill-bold">
-                🛡️ Kháng Checkpoint Tối Đa (Đủ datr / sb)
+                Đủ chống checkpoint
               </Tag>
             ) : parsedData.isValid ? (
               <Tag icon={<WarningOutlined />} color="warning" className="qcm-pill-bold">
-                ⚠️ Chỉ có UID & xs (Khuyên điền thêm datr & sb)
+                Nên thêm datr, sb
               </Tag>
             ) : (
               <Tag icon={<WarningOutlined />} color="error" className="qcm-pill-bold">
@@ -665,7 +645,7 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
             disabled={!parsedData.isValid}
             className="qcm-save-btn"
           >
-            Lưu & Kích Hoạt Ngay
+            Lưu
           </Button>
         </div>
       </div>

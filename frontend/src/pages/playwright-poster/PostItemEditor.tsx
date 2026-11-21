@@ -225,8 +225,8 @@ function PostItemEditor({
               : (item.url.trim() ? 'text-emerald-400 font-semibold' : 'text-slate-300')
               }`}>
               {item.inputType === 'MANUAL'
-                ? (item.manualContent?.trim() || (item.manualMediaUrls && item.manualMediaUrls.length > 0) ? '✍️ Đã soạn nội dung' : '✍️ Chưa nhập nội dung')
-                : (item.url.trim() ? '🌐 Đã nhận liên kết nguồn' : '🌐 Chưa có liên kết nguồn')}
+                ? (item.manualContent?.trim() || (item.manualMediaUrls && item.manualMediaUrls.length > 0) ? 'Đã soạn' : '')
+                : (item.url.trim() ? 'Đã có link' : '')}
             </div>
           </div>
         </div>
@@ -299,7 +299,7 @@ function PostItemEditor({
               {
                 label: (
                   <span className="flex items-center gap-2 px-3 py-1 text-xs font-semibold">
-                    <GlobalOutlined className="text-sm" /> Dán link cào tự động
+                    <GlobalOutlined className="text-sm" /> Dán link
                   </span>
                 ),
                 value: 'LINK',
@@ -307,7 +307,7 @@ function PostItemEditor({
               {
                 label: (
                   <span className="flex items-center gap-2 px-3 py-1 text-xs font-semibold">
-                    <EditOutlined className="text-sm" /> Tự soạn nội dung & Studio
+                    <EditOutlined className="text-sm" /> Tự soạn
                   </span>
                 ),
                 value: 'MANUAL',
@@ -1038,10 +1038,7 @@ function PostItemEditor({
               </div>
 
 
-              <div className="poster-post-options !p-2.5 sm:!p-3 bg-slate-950/60 rounded-2xl border border-slate-700/60 flex items-center gap-2 flex-wrap shadow-inner backdrop-blur-sm">
-                <span className="text-xs font-bold text-slate-400 flex items-center gap-1.5 mr-1 select-none">
-                  <SettingOutlined className="text-slate-400 text-xs" /> Tùy chọn:
-                </span>
+              <div className="mt-3 flex items-center gap-2 flex-wrap">
 
                 <Tooltip title="Đăng status phông nền màu đỏ giật tít trên Facebook (Tối đa 130 ký tự, toàn bộ nội dung bài viết & hashtag sẽ tự động thả ở bình luận đầu tiên)">
                   <button
@@ -1052,8 +1049,7 @@ function PostItemEditor({
                         : 'poster-opt-chip'
                       }`}
                   >
-                    <span className="poster-opt-dot" /><span>Status nền đỏ</span>
-                    <span className="text-xs opacity-80">(&lt; 130 ký tự)</span>
+                    <span className="poster-opt-dot" /><span>Nền đỏ</span>
                     {item.colorBackground && <CheckOutlined className="text-xs text-rose-400" />}
                   </button>
                 </Tooltip>
@@ -1069,7 +1065,7 @@ function PostItemEditor({
                       }`}
                   >
                     <MessageOutlined className="text-xs text-cyan-400" />
-                    <span>{hasCustomComment ? 'Có bình luận riêng' : 'Thêm bình luận riêng'}</span>
+                    <span>{hasCustomComment ? 'Có bình luận riêng' : 'Bình luận riêng'}</span>
                     {(hasCustomComment || isCommentOpen) && <CheckOutlined className="text-xs text-cyan-400" />}
                   </button>
                 </Tooltip>
@@ -1084,7 +1080,7 @@ function PostItemEditor({
                       }`}
                   >
                     <StopOutlined className="text-xs text-amber-400" />
-                    <span>Không bình luận</span>
+                    <span>Tắt bình luận</span>
                     {item.skipComment && <CheckOutlined className="text-xs text-amber-400" />}
                   </button>
                 </Tooltip>
@@ -1101,7 +1097,7 @@ function PostItemEditor({
                         }`}
                     >
                       <TeamOutlined className="text-xs text-emerald-400" />
-                      <span>Bình luận trong Nhóm</span>
+                      <span>Bình luận Nhóm</span>
                       {item.groupCommentEnabled && <CheckOutlined className="text-xs text-emerald-400" />}
                     </button>
                   </Tooltip>
@@ -1312,10 +1308,9 @@ function PostItemEditor({
         ) : (
           /* ================= GIAO DIỆN DÁN LINK CÀO TỰ ĐỘNG ================= */
           <>
-            <label htmlFor={`post-link-${item.id}`} className="poster-field-label">Liên kết bài viết</label>
             <PasteLinkInput
               inputId={`post-link-${item.id}`}
-              placeholder="Dán link Facebook, Threads, TikTok (No-Watermark), Reel hoặc video vào đây..."
+              placeholder="Dán link bài viết hoặc video"
               value={item.url}
               onChange={(val) => updateLinkUrl(item.id, val)}
               size="middle"
@@ -1759,10 +1754,7 @@ function PostItemEditor({
 
 
                       {/* Tùy chọn bài viết */}
-                      <div className="poster-post-options !p-2.5 sm:!p-3 bg-slate-950/60 rounded-2xl border border-slate-700/60 flex items-center gap-2 flex-wrap shadow-inner backdrop-blur-sm">
-                        <span className="text-xs font-bold text-slate-400 flex items-center gap-1.5 mr-1 select-none">
-                          <SettingOutlined className="text-slate-400 text-xs" /> Tùy chọn:
-                        </span>
+                      <div className="mt-3 flex items-center gap-2 flex-wrap">
 
                         <Tooltip title="Đăng status phông nền màu đỏ giật tít trên Facebook (Tối đa 130 ký tự, toàn bộ nội dung bài báo & hashtag sẽ tự động thả ở bình luận đầu tiên)">
                           <button
@@ -1773,7 +1765,7 @@ function PostItemEditor({
                                 : 'poster-opt-chip'
                               }`}
                           >
-                            <span className="poster-opt-dot" /><span>Status nền đỏ</span>
+                            <span className="poster-opt-dot" /><span>Nền đỏ</span>
                             <span className="text-[10px] opacity-75">(&lt; 130 ký tự)</span>
                             {item.colorBackground && <CheckOutlined className="text-xs text-rose-400" />}
                           </button>
@@ -1789,7 +1781,7 @@ function PostItemEditor({
                               }`}
                           >
                             <UserOutlined className="text-xs text-blue-400" />
-                            <span>Ghi nguồn tác giả</span>
+                            <span>Ghi nguồn</span>
                             {item.includeCredit !== false && <CheckOutlined className="text-xs text-blue-400" />}
                           </button>
                         </Tooltip>
@@ -1805,7 +1797,7 @@ function PostItemEditor({
                               }`}
                           >
                             <MessageOutlined className="text-xs text-cyan-400" />
-                            <span>{hasCustomComment ? 'Có bình luận riêng' : 'Thêm bình luận riêng'}</span>
+                            <span>{hasCustomComment ? 'Có bình luận riêng' : 'Bình luận riêng'}</span>
                             {(hasCustomComment || isCommentOpen) && <CheckOutlined className="text-xs text-cyan-400" />}
                           </button>
                         </Tooltip>
@@ -1820,7 +1812,7 @@ function PostItemEditor({
                               }`}
                           >
                             <StopOutlined className="text-xs text-amber-400" />
-                            <span>Không bình luận</span>
+                            <span>Tắt bình luận</span>
                             {item.skipComment && <CheckOutlined className="text-xs text-amber-400" />}
                           </button>
                         </Tooltip>
@@ -1837,7 +1829,7 @@ function PostItemEditor({
                                 }`}
                             >
                               <TeamOutlined className="text-xs text-emerald-400" />
-                              <span>Bình luận trong Nhóm</span>
+                              <span>Bình luận Nhóm</span>
                               {item.groupCommentEnabled && <CheckOutlined className="text-xs text-emerald-400" />}
                             </button>
                           </Tooltip>
@@ -1887,10 +1879,7 @@ function PostItemEditor({
             {(!item.url.trim() || !preview || preview?.loading || preview?.error) && (
               <>
 
-                <div className="poster-post-options !p-2.5 sm:!p-3 bg-slate-950/60 rounded-2xl border border-slate-700/60 flex items-center gap-2 flex-wrap shadow-inner backdrop-blur-sm">
-                  <span className="text-xs font-bold text-slate-400 flex items-center gap-1.5 mr-1 select-none">
-                    <SettingOutlined className="text-slate-400 text-xs" /> Tùy chọn:
-                  </span>
+                <div className="mt-3 flex items-center gap-2 flex-wrap">
 
                   <Tooltip title="Đăng status phông nền màu đỏ (tối đa 130 ký tự). Dán link xong sẽ hiện khung chọn Thuần chữ / Kèm ảnh và xem trước.">
                     <button
@@ -1901,8 +1890,7 @@ function PostItemEditor({
                           : 'poster-opt-chip'
                         }`}
                     >
-                      <span className="poster-opt-dot" /><span>Status nền đỏ</span>
-                      <span className="text-xs opacity-80">(&lt; 130 ký tự)</span>
+                      <span className="poster-opt-dot" /><span>Nền đỏ</span>
                       {item.colorBackground && <CheckOutlined className="text-xs text-rose-400" />}
                     </button>
                   </Tooltip>
@@ -1917,7 +1905,7 @@ function PostItemEditor({
                         }`}
                     >
                       <UserOutlined className="text-xs text-blue-400" />
-                      <span>Ghi nguồn tác giả</span>
+                      <span>Ghi nguồn</span>
                       {item.includeCredit !== false && <CheckOutlined className="text-xs text-blue-400" />}
                     </button>
                   </Tooltip>
@@ -1933,7 +1921,7 @@ function PostItemEditor({
                         }`}
                     >
                       <MessageOutlined className="text-xs text-cyan-400" />
-                      <span>{hasCustomComment ? 'Có bình luận riêng' : 'Thêm bình luận riêng'}</span>
+                      <span>{hasCustomComment ? 'Có bình luận riêng' : 'Bình luận riêng'}</span>
                       {(hasCustomComment || isCommentOpen) && <CheckOutlined className="text-xs text-cyan-400" />}
                     </button>
                   </Tooltip>
@@ -1948,7 +1936,7 @@ function PostItemEditor({
                         }`}
                     >
                       <StopOutlined className="text-xs text-amber-400" />
-                      <span>Không bình luận</span>
+                      <span>Tắt bình luận</span>
                       {item.skipComment && <CheckOutlined className="text-xs text-amber-400" />}
                     </button>
                   </Tooltip>
@@ -1965,7 +1953,7 @@ function PostItemEditor({
                           }`}
                       >
                         <TeamOutlined className="text-xs text-emerald-400" />
-                        <span>Bình luận trong Nhóm</span>
+                        <span>Bình luận Nhóm</span>
                         {item.groupCommentEnabled && <CheckOutlined className="text-xs text-emerald-400" />}
                       </button>
                     </Tooltip>
@@ -2015,7 +2003,7 @@ function PostItemEditor({
           <div className="mt-2 pt-2.5 border-t border-slate-800/70 flex flex-col sm:flex-row sm:items-center gap-2">
             <span className="text-xs font-bold text-indigo-300 flex items-center gap-1.5 shrink-0">
               <TeamOutlined className="text-indigo-400" />
-              <span>Đăng thêm sang nhóm khác:</span>
+              <span>Nhóm thêm</span>
               {itemExtraGroupIds.length > 0 && (
                 <Tag color="geekblue" className="!m-0 !rounded-md !text-[11px] font-bold">
                   +{itemExtraGroupIds.length} nhóm
@@ -2027,7 +2015,7 @@ function PostItemEditor({
               size="small"
               allowClear
               showSearch
-              placeholder="Chọn thêm nhóm đăng chéo riêng bài này (nếu có)..."
+              placeholder="Không bắt buộc"
               value={itemExtraGroupIds}
               onChange={(vals: string[]) => updateLinkExtraGroupIds(item.id, vals)}
               options={extraGroupOptions}

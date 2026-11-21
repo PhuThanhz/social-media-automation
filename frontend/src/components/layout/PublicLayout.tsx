@@ -1,6 +1,6 @@
 import { type ReactNode, useState } from 'react';
 import { Button, Drawer } from 'antd';
-import { ArrowRightOutlined, CloseOutlined, MenuOutlined } from '@ant-design/icons';
+import { CloseOutlined, MenuOutlined } from '@ant-design/icons';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import BrandLogo from '../BrandLogo';
 
@@ -30,7 +30,6 @@ const PublicLayout = ({ children }: { children?: ReactNode }) => {
           <div className="public-nav-desktop">{navigation}</div>
           <div className="public-header-actions">
             <Link to="/login" className="public-login-link">Đăng nhập</Link>
-            <Button type="primary" href="/login" className="public-cta">Mở workspace <ArrowRightOutlined /></Button>
           </div>
           <Button className="public-menu-button" type="text" icon={<MenuOutlined />} onClick={() => setMenuOpen(true)} aria-label="Mở menu" />
         </div>
@@ -41,7 +40,7 @@ const PublicLayout = ({ children }: { children?: ReactNode }) => {
       <footer className="public-footer">
         <div className="public-container public-footer-compact">
           <BrandLogo light />
-          <span>© 2026 PhuSocial</span>
+          <span>© {new Date().getFullYear()} PhuSocial • Tối giản & Tinh tế</span>
           <div><Link to="/about">Giới thiệu</Link><a href="mailto:support@phusocial.vn">Hỗ trợ</a></div>
         </div>
       </footer>
@@ -58,7 +57,6 @@ const PublicLayout = ({ children }: { children?: ReactNode }) => {
         {navigation}
         <div className="public-mobile-actions">
           <Button block onClick={() => { setMenuOpen(false); location.href = '/login'; }}>Đăng nhập</Button>
-          <Button block type="primary" onClick={() => { setMenuOpen(false); location.href = '/login'; }}>Mở workspace</Button>
         </div>
       </Drawer>
     </div>

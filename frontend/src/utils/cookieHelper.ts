@@ -39,6 +39,11 @@ export function assignCookieField(target: FacebookCookies, rawName: string, val:
   const cleanVal = val.trim();
   if (!name || !cleanVal) return;
 
+  // Bỏ qua nếu name hoặc val chứa thẻ HTML hoặc là attribute HTML (class, style, data-...)
+  if (name.includes('<') || name.includes('>') || cleanVal.includes('<') || cleanVal.includes('>')) return;
+  if (name === 'class' || name === 'style' || name.startsWith('data-') || name.includes(' ') || name.includes('"') || name.includes("'")) return;
+  if (!/^[a-zA-Z0-9_\-\.]+$/.test(rawName.trim())) return;
+
   switch (name) {
     case 'c_user':
       target.cUser = cleanVal;
@@ -202,7 +207,9 @@ export function buildCookieString(cookies: Partial<FacebookCookies>): string {
   if (cookies.wl_cbv) parts.push(`wl_cbv=${cookies.wl_cbv.trim()}`);
   if (cookies.extraPairs) {
     for (const [k, v] of Object.entries(cookies.extraPairs)) {
-      if (k && v) parts.push(`${k}=${v.trim()}`);
+      if (k && v && !k.includes('<') && !v.includes('<') && !v.includes('>') && /^[a-zA-Z0-9_\-\.]+$/.test(k)) {
+        parts.push(`${k}=${v.trim()}`);
+      }
     }
   }
   return parts.join('; ');

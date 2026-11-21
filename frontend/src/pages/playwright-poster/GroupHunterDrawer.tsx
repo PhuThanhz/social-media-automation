@@ -241,7 +241,7 @@ function GroupHunterDrawer({
               icon={<ThunderboltOutlined />}
               className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold border-none shadow-lg shadow-emerald-950/40 rounded-xl"
             >
-              Duyệt nhanh kiểu Tinder ({groupHunterSelectedIds.size} bài)
+              Duyệt {groupHunterSelectedIds.size} bài
             </Button>
             <Button
               type="primary"

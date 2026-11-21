@@ -63,9 +63,8 @@ export default function ComposeAdvancedOptions({
         </div>
         <div className="min-w-0 flex-1">
           <div className="font-bold text-sm text-slate-200 flex items-center gap-2">
-            <span>Bình luận tự động & tùy chọn nâng cao</span>
+            <span>Bình luận & nâng cao</span>
           </div>
-          <div className="text-xs text-slate-400">Thiết lập bình luận mặc định, link tiếp thị và làm mới dữ liệu nguồn</div>
         </div>
         <span className="text-xs font-semibold text-blue-400 shrink-0 px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20">{advancedOpen ? 'Thu gọn' : 'Thiết lập'}</span>
       </button>
@@ -180,7 +179,7 @@ export default function ComposeAdvancedOptions({
                 const label = matched ? stripEmojiPrefix(matched.pageName) : gId;
                 return (
                   <Option key={gId} value={gId} label={label}>
-                    {label} · ID {gId}
+                    {label}
                   </Option>
                 );
               })}
@@ -207,7 +206,7 @@ export default function ComposeAdvancedOptions({
                 const label = matched ? stripEmojiPrefix(matched.pageName) : gId;
                 return (
                   <Option key={gId} value={gId} label={label}>
-                    {label} · ID {gId}
+                    {label}
                   </Option>
                 );
               })}

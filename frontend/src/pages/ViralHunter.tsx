@@ -2921,6 +2921,7 @@ export default function ViralHunter() {
                   pageSizeOptions: ['25', '50', '80', '100'],
                   className: '!px-4 !py-3 !mb-0 text-slate-400 font-medium',
                 }}
+                scroll={{ x: 860 }}
                 className="lookup-groups-table"
                 columns={[
                   {

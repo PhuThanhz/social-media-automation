@@ -143,10 +143,45 @@ export default function ScheduleSettingsDrawer({ open, onClose }: { open: boolea
         </div>
 
         <div className="schedule-settings-field">
-          <label>Giãn cách giữa 2 bài cùng nick</label>
-          <div className="schedule-settings-control">
-            <InputNumber min={1} max={60} value={gapMinutes} onChange={(v) => { setGapMinutes(typeof v === 'number' ? v : 2); change(); }} suffix="phút" style={{ width: 120 }} />
+          <label>Tốc độ / Giãn cách giữa 2 bài</label>
+          <div className="schedule-settings-control flex-wrap gap-2 items-center">
+            <InputNumber min={1} max={60} value={gapMinutes} onChange={(v) => { setGapMinutes(typeof v === 'number' ? v : 1); change(); }} suffix="phút" style={{ width: 125 }} />
+            <div className="flex items-center gap-1 flex-wrap">
+              {[
+                { mins: 1, label: '⚡ 1p (2 Worker)' },
+                { mins: 2, label: '⚡ 2p (Nhanh)' },
+                { mins: 5, label: '5p' },
+                { mins: 10, label: '10p' },
+                { mins: 20, label: '20p (An toàn)' },
+              ].map(({ mins, label }) => (
+                <button
+                  key={mins}
+                  type="button"
+                  onClick={() => { setGapMinutes(mins); change(); }}
+                  className={`px-2 py-0.5 rounded-lg text-xs font-semibold transition-all border cursor-pointer ${
+                    gapMinutes === mins
+                      ? mins === 1
+                        ? 'bg-amber-500/30 border-amber-400 text-amber-200 ring-1 ring-amber-500/50 font-bold'
+                        : mins === 2
+                          ? 'bg-emerald-500/30 border-emerald-400 text-emerald-200 ring-1 ring-emerald-500/50 font-bold'
+                          : 'bg-sky-500/25 border-sky-400 text-sky-200 ring-1 ring-sky-500/40 font-bold'
+                      : 'bg-slate-800 text-slate-400 border-slate-700 hover:border-slate-600 hover:text-slate-200'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
+          <span className="schedule-settings-help">
+            {gapMinutes === 1 ? (
+              <span className="text-amber-300 font-semibold">⚡ Chế độ 2 Worker: Đăng song song liên tục, mỗi phút 2 bài.</span>
+            ) : gapMinutes === 2 ? (
+              <span className="text-emerald-300 font-semibold">⚡ Chế độ nhanh: Đăng an toàn (~1 bài/phút).</span>
+            ) : (
+              <span>Giãn cách khuyến nghị: 20 phút khi đăng cùng 1 Page/Group; 1–2 phút khi chạy cụm 2 Worker chia đều các nhóm.</span>
+            )}
+          </span>
         </div>
 
         <div className="schedule-settings-field">
@@ -154,7 +189,7 @@ export default function ScheduleSettingsDrawer({ open, onClose }: { open: boolea
           <div className="schedule-settings-control">
             <InputNumber min={1} max={200} value={maxPerHour} onChange={(v) => { setMaxPerHour(typeof v === 'number' ? v : 35); change(); }} suffix="bài/giờ" style={{ width: 140 }} />
           </div>
-          <span className="schedule-settings-help">Vượt mức này nick tạm nghỉ để tránh bị Facebook chặn spam.</span>
+          <span className="schedule-settings-help">Vượt mức này nick tạm nghỉ để tránh bị Facebook chặn spam (mặc định 40 bài/giờ cho 2 nick chạy 80 bài/giờ).</span>
         </div>
 
         {enabled && (
@@ -163,7 +198,7 @@ export default function ScheduleSettingsDrawer({ open, onClose }: { open: boolea
           </Checkbox>
         )}
 
-        <div className="schedule-settings-actions flex items-center gap-2 mt-3">
+        <div className="schedule-settings-actions flex items-center gap-2 mt-3 flex-wrap">
           <Button
             type="primary"
             disabled={!dirty}
@@ -180,6 +215,24 @@ export default function ScheduleSettingsDrawer({ open, onClose }: { open: boolea
           </Button>
 
           <Popconfirm
+            title="Dãn 1 phút/bài cho toàn bộ hàng đợi (Chế độ 2 Worker)?"
+            description="2 Worker sẽ đăng song song luân phiên liên tục, mỗi phút giải phóng 2 bài."
+            okText="Chạy ngay"
+            cancelText="Hủy"
+            onConfirm={() => {
+              setGapMinutes(1);
+              api.post('/queue/pack-continuous', { gapSeconds: 60 }).then((res) => {
+                message.success(`Đã xếp lại ${res.data?.updated ?? 0} bài (1 phút/bài cho 2 Worker), dự kiến xong ${formatWhen(res.data?.estimatedFinishAt)}.`);
+                refreshQueue();
+              }).catch((err) => message.error(err?.response?.data?.message || 'Lỗi xếp lại hàng đợi'));
+            }}
+          >
+            <Button className="border-amber-500/50 text-amber-300 bg-amber-500/15 hover:bg-amber-500/25 cursor-pointer font-bold">
+              ⚡ Đăng nhanh 2 Worker (1p/bài)
+            </Button>
+          </Popconfirm>
+
+          <Popconfirm
             title={`Dãn cách ${gapMinutes} phút/bài cho toàn bộ hàng đợi?`}
             description="Mọi bài đang chờ sẽ được xếp lại cách nhau đều đặn theo số phút này (chống checkpoint spam Facebook)."
             okText="Dãn cách ngay"
@@ -187,7 +240,7 @@ export default function ScheduleSettingsDrawer({ open, onClose }: { open: boolea
             onConfirm={() => packMutation.mutate()}
           >
             <Button loading={packMutation.isPending} className="border-emerald-500/40 text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 cursor-pointer font-semibold">
-              ⚡ Dãn cách {gapMinutes}p/bài ngay
+              ⏱️ Dãn {gapMinutes}p/bài ngay
             </Button>
           </Popconfirm>
         </div>

@@ -10122,7 +10122,7 @@ body .dashboard-shell .app-sidebar-brand {
 }
 
 body .dashboard-shell .app-sidebar-brand .brand-logo-mark {
-  display: none !important;
+  display: inline-flex !important;
 }
 
 body .dashboard-shell .app-sidebar-brand .brand-logo-copy b {
@@ -10637,10 +10637,10 @@ body .ant-popover .ant-popover-arrow::before {
 }
 .poster-summary-title { color: rgba(226, 236, 250, .82); font-size: 12.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
 .poster-summary-list { display: flex; flex-direction: column; gap: 0; margin: 0 0 6px; }
-.poster-summary-list > div { padding: 9px 0; border-bottom: 1px solid rgba(255, 255, 255, .07); }
+.poster-summary-list > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, .07); }
 .poster-summary-list > div:last-child { border-bottom: 0; }
-.poster-summary-list dt { margin-bottom: 2px; color: rgba(214, 228, 248, .75); font-size: 12.5px; font-weight: 600; }
-.poster-summary-list dd { margin: 0; overflow: hidden; color: #f8fafc; font-size: 14px; font-weight: 650; text-overflow: ellipsis; }
+.poster-summary-list dt { flex-shrink: 0; color: rgba(214, 228, 248, .7); font-size: 13px; font-weight: 500; }
+.poster-summary-list dd { min-width: 0; margin: 0; overflow: hidden; color: #f8fafc; font-size: 13.5px; font-weight: 600; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
 .poster-summary-list dd.is-missing { color: #fcd34d; }
 .poster-summary-warning {
   padding: 10px 12px;
@@ -11604,7 +11604,6 @@ body .lookup-groups-table .ant-pagination .ant-pagination-item-active a {
 }
 
 .bulk-paste-simple-primary.ant-btn {
-  min-width: 200px;
   font-weight: 600;
 }
 
@@ -12243,3 +12242,119 @@ body .lookup-groups-table .ant-pagination .ant-pagination-item-active a {
 }
 
 
+
+/* Home hero headline: uppercase display font */
+.home-hero-title {
+  font-family: 'Montserrat', 'Be Vietnam Pro', sans-serif;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  font-size: clamp(2rem, 6vw, 3.75rem);
+}
+
+/* Bulk paste drawer: thẻ bài gọn — media trái, caption phải */
+.bpd-item-body { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 14px; }
+@media (min-width: 1024px) { .bpd-item-body { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.bpd-item-full { grid-column: 1 / -1; }
+.bpd-video { display: block; width: 100%; max-height: 280px; object-fit: contain; background: #000; }
+.bpd-media-del.ant-btn { position: absolute; top: 8px; right: 8px; z-index: 10; width: 28px; height: 28px; padding: 0; }
+
+/* Bảng Page trong Quản lý kết nối: tiêu đề cột không xuống dòng */
+.conn-page-table .ant-table-thead > tr > th { white-space: nowrap; }
+
+/* Avatar trên thanh trên cùng + chấm Online ở góc phải dưới */
+.topbar-avatar {
+  width: 30px; height: 30px; border-radius: 9999px;
+  display: flex; align-items: center; justify-content: center;
+  background: #2563eb; color: #fff; font-size: 11px; font-weight: 700;
+}
+.topbar-avatar-dot {
+  position: absolute; right: -1px; bottom: -1px;
+  width: 9px; height: 9px; border-radius: 9999px;
+  background: #34d399; box-shadow: 0 0 0 2px #0f172a;
+}
+
+/* Màn "Đã duyệt xong" / danh sách trống: hộp nhỏ vừa nội dung */
+.poster-swipe-review-modal.is-compact .ant-modal-body { min-height: 0; height: auto; }
+.poster-swipe-review-modal.is-compact .poster-swipe-complete { min-height: 0; padding: 32px 24px 28px; background: #09131e; }
+@media (max-width: 900px) {
+  .poster-swipe-review-modal.is-compact { top: auto; max-width: calc(100vw - 24px); }
+  .poster-swipe-review-modal.is-compact .ant-modal-body { height: auto; }
+}
+
+/* Bước 3: ô bấm mở bảng dán link */
+.add-links-tile {
+  display: flex; width: 100%; align-items: center; justify-content: center; gap: 12px;
+  margin-bottom: 14px; padding: 22px 16px;
+  border: 1.5px dashed #475569; border-radius: 14px;
+  background: rgba(15, 23, 42, .55); color: #e2e8f0;
+  cursor: pointer; transition: border-color .15s, background .15s;
+}
+.add-links-tile:hover { border-color: #3b82f6; background: rgba(30, 58, 138, .18); }
+.add-links-tile-icon {
+  display: grid; width: 36px; height: 36px; place-items: center; flex-shrink: 0;
+  border-radius: 10px; background: #2563eb; color: #fff; font-size: 16px;
+}
+.add-links-tile-text { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.35; }
+.add-links-tile-text strong { font-size: 15px; font-weight: 700; color: #f1f5f9; }
+.add-links-tile-text small { font-size: 12.5px; color: #94a3b8; }
+
+/* Màn duyệt: xoá ảnh/clip */
+.swipe-thumb-wrap { position: relative; flex: 0 0 auto; }
+.swipe-thumb-del {
+  position: absolute; top: -5px; right: -5px; z-index: 2;
+  width: 18px; height: 18px; padding: 0; border: 0; border-radius: 9999px;
+  background: #e11d48; color: #fff; font-size: 13px; line-height: 18px; cursor: pointer;
+  display: none;
+}
+.swipe-thumb-wrap:hover .swipe-thumb-del { display: block; }
+.swipe-media-del {
+  position: absolute; top: 8px; left: 8px; z-index: 10;
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border: 1px solid rgba(244, 63, 94, .45); border-radius: 8px;
+  background: rgba(2, 6, 23, .85); color: #fda4af; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.swipe-media-del:hover { background: #e11d48; color: #fff; }
+/* Ghi đè style chung của .poster-swipe-thumbnails button cho nút xoá nhỏ */
+.poster-swipe-thumbnails .swipe-thumb-wrap { position: relative; display: block; }
+.poster-swipe-thumbnails .swipe-thumb-wrap > .swipe-thumb-del {
+  position: absolute; top: -6px; right: -6px; z-index: 3;
+  display: none; place-items: center;
+  width: 18px; height: 18px; min-width: 0; padding: 0;
+  border: 2px solid #09131e; border-radius: 9999px; overflow: visible;
+  background: #e11d48; color: #fff; font-size: 12px; font-weight: 700; line-height: 1; box-shadow: none;
+}
+.poster-swipe-thumbnails .swipe-thumb-wrap:hover > .swipe-thumb-del { display: grid; }
+.poster-swipe-thumbnails { padding-top: 10px; padding-right: 6px; }
+
+/* Màn duyệt: lưới đủ ảnh/clip khi bài có nhiều media */
+.swipe-media-grid {
+  display: grid; flex: 1; gap: 6px; min-height: 0; width: 100%; height: 100%;
+  padding: 6px; border: 1px solid #1e3042; border-radius: 11px; background: #020508;
+}
+.swipe-media-tile {
+  position: relative; min-width: 0; min-height: 0; overflow: hidden;
+  border-radius: 8px; background: #0b1520; cursor: zoom-in;
+}
+.swipe-media-tile img, .swipe-media-tile video {
+  display: block; width: 100%; height: 100%; object-fit: cover;
+}
+.swipe-media-tile video { object-fit: contain; background: #000; cursor: default; }
+.swipe-media-tile-num {
+  position: absolute; left: 6px; bottom: 6px; padding: 1px 6px; border-radius: 5px;
+  background: rgba(2, 8, 15, .8); color: #e2e8f0; font-size: 11px; font-weight: 700; pointer-events: none;
+}
+.swipe-media-tile-del {
+  position: absolute; top: 6px; right: 6px; z-index: 2;
+  display: none; place-items: center; width: 28px; height: 28px; padding: 0;
+  border: 0; border-radius: 8px; background: rgba(225, 29, 72, .92); color: #fff; font-size: 13px; cursor: pointer;
+}
+.swipe-media-tile:hover .swipe-media-tile-del { display: grid; }
+@media (hover: none) { .swipe-media-tile-del { display: grid; } }
+
+/* Bảng hàng đợi: bấm vào giờ để đổi giờ đăng */
+.queue-time-edit { padding: 4px 6px; margin: -4px -6px; border: 0; border-radius: 8px; background: transparent; cursor: pointer; }
+.queue-time-edit:hover { background: rgba(245, 158, 11, .08); }
+.queue-time-edit-icon { opacity: .45; }
+.queue-time-edit:hover .queue-time-edit-icon { opacity: 1; }

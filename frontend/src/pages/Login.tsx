@@ -33,8 +33,7 @@ const Login = () => {
 
   return (
     <AuthLayout
-      title={desktop ? "Đăng nhập ToolZutter" : "Đăng nhập PhuSocial"}
-      description="Nhập thông tin tài khoản để truy cập workspace của bạn"
+      title={desktop ? "Đăng nhập ToolZutter" : "Đăng nhập"}
     >
       <Form<LoginFormValues>
         name="login_form"
@@ -104,7 +103,7 @@ const Login = () => {
             iconPlacement="end"
             className="auth-simple-submit"
           >
-            Đăng nhập vào hệ thống
+            Đăng nhập
           </Button>
         </Form.Item>
 

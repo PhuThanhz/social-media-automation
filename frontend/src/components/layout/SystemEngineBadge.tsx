@@ -1,11 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { Popover, Button } from 'antd';
-import { ThunderboltFilled, DesktopOutlined, ArrowRightOutlined, SyncOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { ThunderboltFilled, SyncOutlined } from '@ant-design/icons';
 import api from '../../config/axios';
 
 export default function SystemEngineBadge() {
-  const navigate = useNavigate();
   const { data, isError, refetch } = useQuery({
     queryKey: ['publishing-overview-badge'],
     queryFn: async () => {
@@ -69,17 +67,6 @@ export default function SystemEngineBadge() {
           <b className="text-slate-200 font-bold">{data?.totalAccountsCount || 0} nick</b>
         </div>
       </div>
-
-      <Button
-        type="primary"
-        block
-        size="small"
-        icon={<DesktopOutlined />}
-        onClick={() => navigate('/dashboard/publishing-control-center')}
-        className="!bg-gradient-to-r !from-sky-600 !to-indigo-600 font-bold text-xs !rounded-lg"
-      >
-        Mở Cockpit Điều hành <ArrowRightOutlined />
-      </Button>
     </div>
   );
 
@@ -101,10 +88,10 @@ export default function SystemEngineBadge() {
         <span className={`w-2 h-2 rounded-full shrink-0 ${
           isError ? 'bg-rose-400' : isAllOnline ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
         }`} />
-        <span className="hidden sm:inline">
+        <span className="hidden lg:inline">
           {isError ? 'Lỗi kết nối' : isAllOnline ? `${onlineWorkers.length} Worker Online` : 'Worker kiểm tra...'}
         </span>
-        <span className="sm:hidden font-mono text-[11px]">
+        <span className="lg:hidden font-mono text-[11px]">
           {onlineWorkers.length}W
         </span>
       </button>

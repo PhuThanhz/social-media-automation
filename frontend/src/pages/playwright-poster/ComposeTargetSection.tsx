@@ -1,4 +1,5 @@
-import type React from 'react';
+import React, { useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Button,
   Form,
@@ -8,10 +9,10 @@ import {
   Alert,
   Popconfirm,
   InputNumber,
-  Radio,
   Switch,
   App,
   TimePicker,
+  Segmented,
 } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import {
@@ -176,13 +177,17 @@ export default function ComposeTargetSection({
   setGroupCheckModalVisible,
 }: ComposeTargetSectionProps) {
   const { message } = App.useApp();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ['socialAccounts'] });
+  }, [queryClient]);
   return (
     <section id="poster-step-2" className="poster-form-section">
       <div className="poster-section-heading">
         <span className="poster-step-number">2</span>
         <div>
           <h2>Chọn nơi xuất bản</h2>
-          <p>Chọn đúng Fanpage/Nick và nhóm nhận bài.</p>
         </div>
       </div>
 
@@ -348,10 +353,10 @@ export default function ComposeTargetSection({
       {/* BƯỚC 2: KHUNG ĐIỀU KHIỂN XUẤT BẢN */}
       <div className="space-y-4">
         {/* Lưới 2 cột trực quan: Cột trái chọn Nhóm, Cột phải chọn Người đăng */}
-        <div className={postMode !== 'FANPAGE_ONLY' ? 'grid grid-cols-1 xl:grid-cols-2 gap-4 items-stretch' : 'space-y-4'}>
+        <div className={postMode !== 'FANPAGE_ONLY' ? 'grid grid-cols-1 xl:grid-cols-2 gap-4 items-start' : 'space-y-4'}>
           {/* NẾU LÀ GROUP_ONLY HOẶC FANPAGE_AND_GROUP: HIỂN THỊ KHUNG CHỌN NHÓM ĐẦU TIÊN ĐỂ LUỒNG TỰ NHIÊN HƠN */}
           {(postMode === 'GROUP_ONLY' || postMode === 'FANPAGE_AND_GROUP') && (
-            <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/80 border border-emerald-500/30 shadow-xl backdrop-blur-md flex flex-col justify-between">
+            <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/80 border border-emerald-500/30 shadow-xl backdrop-blur-md">
               <div className="space-y-3.5">
                 <div className="flex items-start sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-800">
                   <div className="flex items-center gap-2.5 min-w-0 flex-1">
@@ -359,33 +364,36 @@ export default function ComposeTargetSection({
                       <TeamOutlined />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-bold text-slate-100 flex items-center gap-2 flex-wrap">
-                        <span>Nhóm Facebook nhận bài</span>
-                        {activeSelectedGroupIds.length > 0 ? (
-                          <Tag color="emerald" className="!rounded-full font-bold text-xs !m-0 border-0 bg-emerald-500/20 text-emerald-300 inline-flex items-center gap-1">
-                            <CheckCircleOutlined /> Đã chọn {activeSelectedGroupIds.length} nhóm
-                          </Tag>
-                        ) : (
-                          <Tag color="warning" className="!rounded-full font-semibold text-xs !m-0 border-0 bg-amber-500/20 text-amber-300 inline-flex items-center gap-1">
-                            <WarningOutlined /> Chưa chọn nhóm
-                          </Tag>
-                        )}
-                      </div>
-                      <div className="text-xs text-slate-400 mt-0.5 truncate" title={`Chọn các nhóm Facebook sẽ nhận bài viết xuất bản (${groupAccountsWithId.length} Nhóm có sẵn)`}>
-                        Chọn nhóm nhận bài ({groupAccountsWithId.length} nhóm có sẵn)
+                      <div className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                        <span className="whitespace-nowrap">Nhóm nhận bài</span>
+                        <span className={`text-xs font-semibold ${activeSelectedGroupIds.length > 0 ? 'text-emerald-300' : 'text-slate-400'}`}>
+                          {activeSelectedGroupIds.length}/{groupAccountsWithId.length}
+                        </span>
                       </div>
                     </div>
                   </div>
 
-                  <Button
-                    size="small"
-                    icon={<SafetyCertificateOutlined className="text-emerald-400" />}
-                    onClick={() => setGroupCheckModalVisible(true)}
-                    className="text-xs text-emerald-300 hover:text-emerald-200 bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 rounded-xl h-8 px-2.5 font-semibold shrink-0 whitespace-nowrap"
-                    title="Kiểm tra tư cách thành viên và sức khỏe nhóm Facebook"
-                  >
-                    Kiểm tra nhóm
-                  </Button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <Button
+                      size="small"
+                      icon={<ReloadOutlined className="text-sky-400" />}
+                      onClick={() => {
+                        queryClient.invalidateQueries({ queryKey: ['socialAccounts'] });
+                        message.success('Đã tải lại danh sách nhóm mới nhất!');
+                      }}
+                      className="rounded-xl h-8 w-8 shrink-0"
+                      title="Làm mới danh sách nhóm"
+                      aria-label="Làm mới danh sách nhóm"
+                    />
+                    <Button
+                      size="small"
+                      icon={<SafetyCertificateOutlined className="text-emerald-400" />}
+                      onClick={() => setGroupCheckModalVisible(true)}
+                      className="rounded-xl h-8 w-8 shrink-0"
+                      title="Kiểm tra nhóm"
+                      aria-label="Kiểm tra nhóm"
+                    />
+                  </div>
                 </div>
 
                 <Form.Item
@@ -396,7 +404,7 @@ export default function ComposeTargetSection({
                   <Select
                     mode="multiple"
                     size="large"
-                    placeholder="Gõ tên hoặc ID nhóm Facebook để tìm kiếm và chọn nhanh..."
+                    placeholder="Tìm nhóm theo tên hoặc ID"
                     showSearch
                     allowClear
                     optionFilterProp="filterLabel"
@@ -468,7 +476,7 @@ export default function ComposeTargetSection({
           )}
 
         {/* KHUNG CHỌN TÀI KHOẢN ĐẠI DIỆN ĐĂNG BÀI */}
-        <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/80 border border-sky-500/30 shadow-xl space-y-4 backdrop-blur-md flex flex-col justify-between">
+        <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/80 border border-sky-500/30 shadow-xl space-y-4 backdrop-blur-md">
           {/* Header: Tiêu đề & Trạng thái phân bổ đang kích hoạt + Nút reset */}
             <div className="flex items-start sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-800">
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
@@ -476,175 +484,116 @@ export default function ComposeTargetSection({
                   <ShareAltOutlined />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-bold text-slate-100 flex items-center gap-2 flex-wrap">
-                    <span>
+                  <div className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                    <span className="whitespace-nowrap">
                       {postMode === 'FANPAGE_ONLY'
-                        ? 'Kênh Fanpage / Nick xuất bản'
+                        ? 'Tài khoản đăng'
                         : postMode === 'FANPAGE_AND_GROUP'
-                        ? 'Fanpage xuất bản (Đăng tường & Share Nhóm)'
-                        : 'Tài khoản đại diện đăng bài'}
+                        ? 'Fanpage đăng bài'
+                        : 'Tài khoản đăng'}
                     </span>
-                    {isTwoViaActive ? (
-                      <Tag className="!rounded-md font-semibold text-xs !m-0 border border-blue-500/30 bg-blue-500/15 text-blue-300">
-                        2 Via song song (50/50)
-                      </Tag>
-                    ) : activeSelectedFanpageIds.length > 1 ? (
-                      <Tag className="!rounded-md font-semibold text-xs !m-0 border border-emerald-500/30 bg-emerald-500/15 text-emerald-300">
-                        Đang chia {activeSelectedFanpageIds.length} tài khoản
-                      </Tag>
-                    ) : activeSelectedFanpageIds.length === 1 ? (
-                      <Tag className="!rounded-md font-semibold text-xs !m-0 border border-slate-700 bg-slate-800 text-slate-300">
-                        1 tài khoản
-                      </Tag>
-                    ) : null}
-                  </div>
-                  <div
-                    className="text-xs text-slate-400 mt-0.5 truncate"
-                    title={
-                      postMode === 'FANPAGE_ONLY'
-                        ? 'Chọn 1 hoặc nhiều Fanpage/Via để đăng bài'
-                        : postMode === 'FANPAGE_AND_GROUP'
-                        ? 'Chọn Fanpage xuất bản bài gốc (sau đó bài sẽ được chia sẻ vào các Nhóm đã chọn):'
-                        : 'Chọn 1 hoặc nhiều Nick/Page đại diện để đăng vào các Nhóm:'
-                    }
-                  >
-                    {postMode === 'FANPAGE_ONLY'
-                      ? 'Chọn Fanpage/Via để đăng bài:'
-                      : postMode === 'FANPAGE_AND_GROUP'
-                      ? 'Chọn Fanpage đăng bài gốc:'
-                      : 'Chọn Nick/Page đại diện để đăng vào Nhóm:'}
+                    {activeSelectedFanpageIds.length > 0 && (
+                      <span className="text-xs font-semibold text-sky-300 whitespace-nowrap">
+                        {isTwoViaActive ? '2 Via' : activeSelectedFanpageIds.length}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
 
-              {/* Nút reset nếu đang chọn nhiều tài khoản */}
-              {activeSelectedFanpageIds.length > 1 && (
-                <Button
-                  size="small"
-                  type="text"
-                  icon={<ReloadOutlined />}
-                  onClick={handleResetToSingleTarget}
-                  className="text-xs text-slate-300 hover:text-rose-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl h-8 px-2.5 shrink-0 whitespace-nowrap"
-                >
-                  Về 1 tài khoản
-                </Button>
-              )}
             </div>
 
-          {/* Hướng dẫn ngắn gọn, dễ hiểu cho người mới */}
-          <div className="text-xs text-slate-300 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80 flex items-start gap-2 select-none">
-            <BulbOutlined className="text-sky-400 shrink-0 text-sm mt-0.5" />
-            <span className="leading-relaxed">
-              {postMode === 'FANPAGE_AND_GROUP' ? (
-                <><b>Quy trình:</b> Bài viết sẽ được xuất bản lên tường <b>Fanpage</b> đã chọn dưới đây, sau đó tự động <b>chia sẻ vào các Nhóm</b> bạn đã tick ở trên!</>
-              ) : postMode === 'GROUP_ONLY' ? (
-                <><b>Hướng dẫn:</b> Chọn Fanpage hoặc Nick cá nhân để đứng tên đăng bài vào Nhóm. Nếu Nhóm không cho Fanpage đăng, hệ thống sẽ <b>tự động chuyển sang Nick cá nhân sở hữu</b> để bài viết luôn được đăng thành công! (Nếu chọn từ 2 tài khoản trở lên, hệ thống sẽ <b>tự động xoay vòng chia đều bài</b> chống checkpoint).</>
-              ) : (
-                <><b>Hướng dẫn:</b> Chọn Fanpage hoặc Nick cá nhân để đăng bài lên dòng thời gian. Có thể chọn nhiều tài khoản để <b>chia đều bài đăng</b> tự động!</>
-              )}
-            </span>
-          </div>
+          {postMode === 'GROUP_ONLY' && (
+            <div className="text-xs text-slate-400 flex items-center gap-2 select-none">
+              <BulbOutlined className="text-sky-400 shrink-0" />
+              <span>Nhóm không cho Page đăng thì tự chuyển sang nick cá nhân.</span>
+            </div>
+          )}
 
-          {/* Dòng 1: Chọn nhanh dạng pill gọn gàng, rõ nghĩa */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-slate-400 mr-1 flex items-center gap-1.5">
-              <ThunderboltOutlined className="text-blue-400" /> Chọn nhanh:
-            </span>
-
-            {/* 1 Tài khoản đơn lẻ */}
-            <button
-              type="button"
-              onClick={handleResetToSingleTarget}
-              className={`h-8 px-3 rounded-lg text-xs font-semibold transition-all border cursor-pointer flex items-center gap-1.5 ${
-                activeSelectedFanpageIds.length === 1 && !isTwoViaActive
-                  ? 'bg-blue-500/20 text-blue-300 border-blue-500/50 shadow-sm ring-1 ring-blue-500/30'
-                  : 'bg-slate-800/80 text-slate-300 border-slate-700/80 hover:border-slate-600 hover:bg-slate-700/80 hover:text-white'
-              }`}
-              title="Đăng bằng 1 tài khoản đơn lẻ (Chế độ tiêu chuẩn)"
-            >
-              <UserOutlined className="text-xs text-slate-400" />
-              <span>1 Tài khoản đơn lẻ</span>
-              {activeSelectedFanpageIds.length === 1 && !isTwoViaActive && <CheckCircleOutlined className="text-xs text-blue-400" />}
-            </button>
-
-            {/* Tất cả Page */}
-            {playwrightAccounts.length > 0 && (
-              <button
-                type="button"
-                onClick={handleQuickSelectAllPages}
-                className="h-8 px-3 rounded-lg text-xs font-semibold transition-all border border-slate-700/80 bg-slate-800/80 text-slate-300 hover:border-slate-600 hover:bg-slate-700/80 hover:text-white cursor-pointer flex items-center gap-1.5"
-                title={`Tự động chia đều bài cho toàn bộ ${playwrightAccounts.length} Fanpage`}
-              >
-                <FileTextOutlined className="text-xs text-blue-400" />
-                <span>Tất cả {playwrightAccounts.length} Page</span>
-              </button>
-            )}
-
-            {/* Tất cả Nick cá nhân (Via) */}
-            {validPersonalVias.length > 0 && (
-              <button
-                type="button"
-                onClick={handleQuickSelectAllVias}
-                className="h-8 px-3 rounded-lg text-xs font-semibold transition-all border border-slate-700/80 bg-slate-800/80 text-slate-300 hover:border-slate-600 hover:bg-slate-700/80 hover:text-white cursor-pointer flex items-center gap-1.5"
-                title={`Tự động chia đều bài cho toàn bộ ${validPersonalVias.length} Nick Via cá nhân`}
-              >
-                <TeamOutlined className="text-xs text-emerald-400" />
-                <span>Tất cả {validPersonalVias.length} Nick Via</span>
-              </button>
-            )}
-
-            {/* Song song 2 Via (Nếu hệ thống có từ 2 Via) */}
-            {validPersonalVias.length >= 2 && (
-              <button
-                type="button"
-                onClick={handleQuickSelectTwoVias}
-                className={`h-8 px-3 rounded-lg text-xs font-semibold transition-all border cursor-pointer flex items-center gap-1.5 ${
-                  isTwoViaActive
-                    ? 'bg-blue-500/20 text-blue-300 border-blue-500/50 shadow-sm ring-1 ring-blue-500/30'
-                    : 'bg-slate-800/80 text-slate-300 border-slate-700/80 hover:border-slate-600 hover:bg-slate-700/80 hover:text-white'
-                }`}
-                title="Dùng 2 Nick Via chạy song song để tăng gấp đôi tốc độ và chống checkpoint"
-              >
-                <ThunderboltOutlined className="text-xs text-amber-400" />
-                <span>Song song 2 Via (Chống Spam)</span>
-                {isTwoViaActive && <CheckCircleOutlined className="text-xs text-blue-400" />}
-              </button>
-            )}
-
-            {/* Page đồng quản trị Co-Admin (Chỉ hiện khi có các page được 2 Via cùng quản lý) */}
-            {playwrightAccounts.some((a) => {
+          {/* Chọn nhanh: một hàng chip cùng kiểu, chữ ngắn */}
+          {(() => {
+            const chip = (on: boolean) =>
+              `h-7 px-3 rounded-lg text-xs font-semibold transition-colors border cursor-pointer whitespace-nowrap ${
+                on
+                  ? 'bg-blue-500/20 text-blue-300 border-blue-500/50'
+                  : 'bg-slate-800/80 text-slate-300 border-slate-700/80 hover:bg-slate-700 hover:text-white'
+              }`;
+            const hasCoAdminPages = playwrightAccounts.some((a) => {
               const norm = (a.pageName || a.platformAccountId).trim().toLowerCase();
               return (coAdminViasByPageName.get(norm) || []).length > 1 && a.tokenStatus !== 'EXPIRED';
-            }) && (
-              <button
-                type="button"
-                onClick={() => {
-                  const sharedVals = playwrightAccounts
-                    .filter((a) => {
-                      const norm = (a.pageName || a.platformAccountId).trim().toLowerCase();
-                      const coAdmins = coAdminViasByPageName.get(norm) || [];
-                      return coAdmins.length > 1 && a.tokenStatus !== 'EXPIRED';
-                    })
-                    .map((a) => accountTargetValue(a));
-                  if (sharedVals.length === 0) {
-                    message.warning('Không tìm thấy Page đồng quản trị nào!');
-                    return;
-                  }
-                  form.setFieldValue('targetFanpageId', sharedVals);
-                  setIsMultiDistributeActive(true);
-                  setMultiSelectedTargets(sharedVals);
-                  setDistributionStrategy('ROUND_ROBIN');
-                  setGroupDistributionMode('PAGE_PER_GROUP');
-                  message.success('⚡ Đã bật chia bài cho các Page có nhiều Via đồng quản trị!');
-                }}
-                className="h-8 px-3 rounded-lg text-xs font-semibold transition-all border border-purple-500/40 bg-purple-950/40 text-purple-300 hover:border-purple-400 hover:bg-purple-900/60 hover:text-white cursor-pointer flex items-center gap-1.5"
-                title="Chọn các Fanpage có nhiều Via cùng làm quản trị viên để tự động chia đều bài viết chạy song song"
-              >
-                <ShareAltOutlined className="text-xs text-purple-400" />
-                <span>Page đồng quản trị (Co-Admin)</span>
-              </button>
-            )}
-          </div>
+            });
+            const selectCoAdminPages = () => {
+              const sharedVals = playwrightAccounts
+                .filter((a) => {
+                  const norm = (a.pageName || a.platformAccountId).trim().toLowerCase();
+                  const coAdmins = coAdminViasByPageName.get(norm) || [];
+                  return coAdmins.length > 1 && a.tokenStatus !== 'EXPIRED';
+                })
+                .map((a) => accountTargetValue(a));
+              if (sharedVals.length === 0) {
+                message.warning('Không tìm thấy Page đồng quản trị nào!');
+                return;
+              }
+              form.setFieldValue('targetFanpageId', sharedVals);
+              setIsMultiDistributeActive(true);
+              setMultiSelectedTargets(sharedVals);
+              setDistributionStrategy('ROUND_ROBIN');
+              setGroupDistributionMode('PAGE_PER_GROUP');
+              message.success('Đã bật chia bài cho các Page có nhiều Via đồng quản trị');
+            };
+            return (
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleResetToSingleTarget}
+                  className={chip(activeSelectedFanpageIds.length === 1 && !isTwoViaActive)}
+                  title="Đăng bằng 1 tài khoản"
+                >
+                  1 tài khoản
+                </button>
+                {playwrightAccounts.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleQuickSelectAllPages}
+                    className={chip(false)}
+                    title={`Chia đều bài cho ${playwrightAccounts.length} Fanpage`}
+                  >
+                    Tất cả Page ({playwrightAccounts.length})
+                  </button>
+                )}
+                {validPersonalVias.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleQuickSelectAllVias}
+                    className={chip(false)}
+                    title={`Chia đều bài cho ${validPersonalVias.length} Nick Via`}
+                  >
+                    Tất cả Via ({validPersonalVias.length})
+                  </button>
+                )}
+                {validPersonalVias.length >= 2 && (
+                  <button
+                    type="button"
+                    onClick={handleQuickSelectTwoVias}
+                    className={chip(isTwoViaActive)}
+                    title="2 Nick Via chạy song song, chống spam"
+                  >
+                    2 Via song song
+                  </button>
+                )}
+                {hasCoAdminPages && (
+                  <button
+                    type="button"
+                    onClick={selectCoAdminPages}
+                    className={chip(false)}
+                    title="Chọn các Page có nhiều Via cùng quản trị để chia bài song song"
+                  >
+                    Co-Admin
+                  </button>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Dòng 2: Ô Select tìm kiếm thông minh */}
           <div>
@@ -679,15 +628,15 @@ export default function ComposeTargetSection({
                   const isCoAdmin = coAdmins.length > 1;
 
                   return (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-xs font-medium text-slate-200 mr-2 my-1 shadow-sm">
+                    <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-xs font-medium text-slate-200 mr-2 my-1 whitespace-nowrap">
                       {isPersonal ? <UserOutlined className="text-slate-400 text-xs" /> : <FileTextOutlined className="text-slate-400 text-xs" />}
                       <span className="font-semibold text-slate-100">{name}</span>
                       {isCoAdmin && (
-                        <span className="px-1.5 py-0.5 rounded text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/35" title="Trang có nhiều Nick Via cùng làm quản trị viên">
+                        <span className="text-xs font-semibold text-purple-300" title="Trang có nhiều Nick Via cùng quản trị">
                           Co-Admin
                         </span>
                       )}
-                      {viaName && <span className="text-xs font-normal text-slate-300 bg-slate-900/60 px-1.5 py-0.5 rounded border border-slate-700/60">qua {viaName}</span>}
+                      {viaName && <span className="text-xs font-normal text-slate-400" title={`Đăng qua ${viaName}`}>· {viaName}</span>}
                       {closable && (
                         <CloseOutlined
                           onClick={onClose}
@@ -721,69 +670,29 @@ export default function ComposeTargetSection({
 
             {/* Báo hiệu và nút hỗ trợ thông minh khi chọn Page đồng quản trị (Co-admin) */}
             {selectedCoAdminPageNames.length > 0 && !isAllCoAdminsSelected && (
-              <div className="mt-2.5 p-3 rounded-xl bg-purple-950/40 border border-purple-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-sm">
-                <div className="flex items-center gap-2 text-xs text-purple-200">
-                  <ThunderboltFilled className="text-purple-400 text-sm shrink-0" />
-                  <span>
-                    Trang <b>{selectedCoAdminPageNames.join(', ')}</b> có <b>nhiều Nick Via cùng quản lý</b>. Bạn có muốn kích hoạt cả 2 Via để chia đều bài đăng chạy song song không?
-                  </span>
-                </div>
-                <Button
-                  size="small"
-                  type="primary"
-                  icon={<ThunderboltOutlined />}
-                  className="bg-purple-600 hover:bg-purple-500 text-xs font-bold rounded-lg h-8 px-3 shrink-0"
-                  onClick={handleAutoSelectBothViasForSelectedPages}
-                >
-                  Bật song song 2 Via
-                </Button>
+              <div className="mt-2 flex items-center gap-2 text-xs text-slate-300">
+                <span>
+                  <b>{selectedCoAdminPageNames.join(', ')}</b> có 2 Via quản lý.
+                </span>
+                <button type="button" onClick={handleAutoSelectBothViasForSelectedPages} className="text-sky-300 hover:underline cursor-pointer font-semibold">
+                  Chạy song song
+                </button>
               </div>
             )}
 
             {selectedCoAdminPageNames.length > 0 && isAllCoAdminsSelected && (
-              <div className="mt-2.5 p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/40 flex items-center justify-between gap-2 text-xs text-emerald-200">
-                <div className="flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center shrink-0">
-                    <CheckCircleOutlined />
-                  </span>
-                  <span>
-                    Đang bật <b>chạy song song cho trang {selectedCoAdminPageNames.join(', ')}</b>: Hệ thống sẽ tự động dùng cả 2 Via luân phiên đăng bài vào các nhóm để chống checkpoint!
-                  </span>
-                </div>
-                <Button
-                  size="small"
-                  type="text"
-                  onClick={handleResetToSingleTarget}
-                  className="text-xs text-slate-300 hover:text-rose-300 bg-slate-800/80 hover:bg-slate-700 h-7 px-2.5 rounded-lg shrink-0 border border-slate-700"
-                >
-                  Về 1 Via duy nhất
-                </Button>
+              <div className="mt-2 flex items-center gap-2 text-xs text-emerald-300">
+                <CheckCircleOutlined />
+                <span>
+                  Song song 2 Via cho <b>{selectedCoAdminPageNames.join(', ')}</b>
+                </span>
+                <button type="button" onClick={handleResetToSingleTarget} className="text-slate-400 hover:text-white hover:underline cursor-pointer">
+                  Tắt
+                </button>
               </div>
             )}
           </div>
         </div>
-
-        {/* Tóm tắt nhanh Nơi đăng & Người đăng */}
-        {postMode !== 'FANPAGE_ONLY' && (
-          <div className="px-4 py-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-slate-300 flex items-center justify-between gap-2 flex-wrap">
-            <span className="flex items-center gap-2 flex-wrap">
-              <span className="text-emerald-400 font-bold inline-flex items-center gap-1.5">
-                <TeamOutlined /> {activeSelectedGroupIds.length} Nhóm nhận bài
-              </span>
-              <span className="text-slate-600">→</span>
-              <span className="text-sky-400 font-bold inline-flex items-center gap-1.5">
-                <UserOutlined /> {activeSelectedFanpageIds.length} Người đăng / Page đại diện
-              </span>
-            </span>
-            <span className="text-slate-300 text-xs inline-flex items-center gap-1.5">
-              {activeSelectedGroupIds.length === 0 ? (
-                <><WarningOutlined className="text-amber-400" /> Hãy chọn ít nhất 1 nhóm ở cột bên trái</>
-              ) : (
-                <><CheckCircleOutlined className="text-emerald-400" /> Sẵn sàng xuất bản</>
-              )}
-            </span>
-          </div>
-        )}
 
           {/* Tự động hiện cấu hình phân phối đa kênh khi FANPAGE_ONLY và chọn nhiều tài khoản */}
           {postMode === 'FANPAGE_ONLY' && activeSelectedFanpageIds.length > 1 && (
@@ -819,115 +728,62 @@ export default function ComposeTargetSection({
 
         {/* Chế độ phân bổ Nhóm & Page linh hoạt khi chọn N Nhóm và N Page */}
         {(postMode === 'GROUP_ONLY' || postMode === 'FANPAGE_AND_GROUP') && activeSelectedGroupIds.length > 0 && (
-          <div className="p-4 sm:p-5 rounded-2xl border border-indigo-500/40 bg-gradient-to-r from-slate-900/90 via-indigo-950/40 to-slate-900/90 shadow-xl space-y-4 backdrop-blur-md">
-            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3.5 border-b border-indigo-500/20 pb-3">
-              <div className="flex items-start sm:items-center gap-2.5 min-w-0 flex-1">
-                <div className="w-8 h-8 rounded-xl bg-indigo-600/30 border border-indigo-400/40 flex items-center justify-center text-indigo-300 shrink-0 mt-0.5 sm:mt-0">
+          <div className="p-4 sm:p-5 rounded-2xl border border-slate-700/80 bg-slate-900/80 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-indigo-600/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300 shrink-0">
                   <DeploymentUnitOutlined className="text-base" />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-bold text-slate-100 flex flex-wrap items-center gap-2">
-                    <span>Phân bổ Page / Nick đăng bài vào {activeSelectedGroupIds.length} Nhóm</span>
-                    <Tag color="cyan" className="!rounded-full !text-xs font-bold shrink-0 m-0">Smart Allocation</Tag>
-                  </div>
-                  <div className="text-[13px] text-slate-300 mt-0.5">
-                    Tuỳ chỉnh số Page xuất bản (1 Page, 2 Page hoặc {activeSelectedGroupIds.length} Page) cho {activeSelectedGroupIds.length} Nhóm đã chọn.
-                  </div>
-                </div>
+                <span className="text-sm font-bold text-slate-100 whitespace-nowrap">Chia Page vào {activeSelectedGroupIds.length} Nhóm</span>
               </div>
-              <Radio.Group
+              <Segmented
                 value={groupDistributionMode}
-                onChange={(e) => setGroupDistributionMode(e.target.value)}
-                buttonStyle="solid"
-                size="middle"
-                className="shrink-0 flex flex-wrap sm:flex-nowrap"
-              >
-                <Radio.Button value="PAGE_PER_GROUP" className="text-xs">
-                  <span className="inline-flex items-center gap-1"><SafetyCertificateOutlined /> 1 Page / Nhóm (Khuyên dùng)</span>
-                </Radio.Button>
-                <Radio.Button value="ROUND_ROBIN_POSTS" className="text-xs">
-                  <span className="inline-flex items-center gap-1"><SyncOutlined /> Xoay vòng qua Nhóm</span>
-                </Radio.Button>
-                <Radio.Button value="CROSS_ALL" className="text-xs">
-                  <span className="inline-flex items-center gap-1"><ThunderboltOutlined /> Tất cả Page × Tất cả Nhóm</span>
-                </Radio.Button>
-              </Radio.Group>
+                onChange={(v) => setGroupDistributionMode(v as typeof groupDistributionMode)}
+                className="shrink-0"
+                options={[
+                  { value: 'PAGE_PER_GROUP', label: '1 Page / Nhóm', title: 'Mỗi nhóm 1 Page, các Page luân phiên (khuyên dùng)' },
+                  { value: 'ROUND_ROBIN_POSTS', label: 'Xoay vòng', title: 'Mỗi bài chỉ vào 1 nhóm, xoay vòng các nhóm' },
+                  { value: 'CROSS_ALL', label: 'Tất cả × Tất cả', title: 'Mỗi bài được mọi Page đăng vào mọi nhóm' },
+                ]}
+              />
             </div>
 
-            {/* Phân tích sơ đồ gán việc */}
-            <div className="bg-slate-950/70 p-3.5 rounded-xl border border-indigo-900/50 text-xs text-slate-300 space-y-2.5">
-              <div className="flex flex-wrap items-center justify-between gap-2 font-semibold text-indigo-200">
-                <span className="flex items-center gap-1.5">
-                  <BarChartOutlined className="text-indigo-400" />
-                  <span>Dự kiến phân bổ công việc:</span>
-                  <span className="text-slate-400 font-normal">({validLinkCount || 10} bài × {activeSelectedGroupIds.length} Nhóm × {Math.max(1, activeSelectedFanpageIds.length)} Page)</span>
-                </span>
-                <Tag color="purple" className="!rounded-full font-mono text-xs px-2.5 py-0.5 font-bold inline-flex items-center gap-1">
-                  <AimOutlined /> Tạo tổng cộng: {calculatedTotalQueueCount} bài queue
-                </Tag>
-              </div>
-
-              {groupDistributionMode === 'PAGE_PER_GROUP' && (
-                <div className="space-y-2 pt-0.5">
-                  <div className="text-emerald-400 font-medium text-xs flex items-center gap-1.5">
-                    <CheckCircleOutlined />
-                    <span>Tất cả {validLinkCount || 10} bài đều đăng đủ vào cả {activeSelectedGroupIds.length} Nhóm (tổng cộng {(validLinkCount || 10) * Math.max(1, activeSelectedGroupIds.length)} bài queue). Các bài trong từng nhóm sẽ được luân phiên chia đều qua cả {Math.max(1, activeSelectedFanpageIds.length)} Page để không Page nào bị ôm nhiều bài.</span>
-                  </div>
-                </div>
-              )}
-
-              {groupDistributionMode === 'ROUND_ROBIN_POSTS' && (
-                <div className="space-y-1.5 pt-0.5">
-                  <div className="text-blue-400 font-medium text-xs flex items-center gap-1.5">
-                    <SyncOutlined />
-                    <span>{validLinkCount || 10} bài viết sẽ được xoay vòng chia đều lần lượt cho {activeSelectedGroupIds.length} nhóm (mỗi bài xuất hiện 1 nhóm, không trùng nội dung).</span>
-                  </div>
-                </div>
-              )}
-
-              {groupDistributionMode === 'CROSS_ALL' && (
-                <div className="space-y-1.5 pt-0.5">
-                  <div className="text-amber-400 font-medium text-xs flex items-center gap-1.5">
-                    <WarningOutlined />
-                    <span>Chế độ nhân bản dồn: Mỗi bài sẽ được đăng bởi TẤT CẢ {Math.max(1, activeSelectedFanpageIds.length)} Page/Nick vào TẤT CẢ {activeSelectedGroupIds.length} Nhóm ({validLinkCount || 10} bài x {activeSelectedGroupIds.length} Nhóm x {Math.max(1, activeSelectedFanpageIds.length)} Page = {calculatedTotalQueueCount} bài queue).</span>
-                  </div>
-                </div>
-              )}
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+              <span>
+                {groupDistributionMode === 'PAGE_PER_GROUP'
+                  ? `Mỗi bài vào đủ ${activeSelectedGroupIds.length} nhóm, chia đều qua ${Math.max(1, activeSelectedFanpageIds.length)} Page`
+                  : groupDistributionMode === 'ROUND_ROBIN_POSTS'
+                    ? `Mỗi bài vào 1 nhóm, xoay vòng ${activeSelectedGroupIds.length} nhóm`
+                    : `Mỗi bài do ${Math.max(1, activeSelectedFanpageIds.length)} Page đăng vào ${activeSelectedGroupIds.length} nhóm`}
+              </span>
+              <span className={groupDistributionMode === 'CROSS_ALL' ? 'text-amber-300' : 'text-slate-300'}>
+                {validLinkCount || 0} bài → {calculatedTotalQueueCount} lượt đăng
+              </span>
             </div>
 
             {/* Cấu hình phân bổ thời gian cho Nhóm: Rải đều cả ngày vs Cuốn chiếu nối đuôi */}
             {hasMultipleGroupsSelected && (
-              <div className="pt-3 border-t border-indigo-500/20 space-y-3">
+              <div className="pt-3 border-t border-slate-800 space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                   <div className="flex items-center gap-2.5">
                     <div className="w-7 h-7 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center shrink-0 text-purple-300">
                       <ClockCircleOutlined className="text-sm" />
                     </div>
                     <div>
-                      <div className="text-xs font-bold text-purple-200 flex items-center gap-1.5">
-                        <span>Phân bổ thời gian đăng giữa các nhóm:</span>
-                      </div>
-                      <div className="text-xs text-slate-400 mt-0.5">
-                        {groupTimingMode === 'SPREAD_DAY'
-                          ? 'Tự động rải đều và xen kẽ các nhóm suốt cả ngày, không bị dồn cục vào 1 khung giờ.'
-                          : 'Đăng các nhóm nối đuôi nhau liên tục với khoảng giãn cách ngắn.'}
-                      </div>
+                      <div className="text-xs font-semibold text-slate-200">Giờ đăng giữa các nhóm</div>
                     </div>
                   </div>
 
-                  <Radio.Group
+                  <Segmented
                     size="small"
                     value={groupTimingMode}
-                    onChange={(e) => setGroupTimingMode(e.target.value)}
-                    className="self-start sm:self-auto shrink-0 bg-slate-950/80 p-0.5 rounded-lg border border-purple-500/30"
-                  >
-                    <Radio.Button value="SPREAD_DAY" className="!rounded-md text-xs font-semibold">
-                      <span className="inline-flex items-center gap-1"><AimOutlined /> Rải đều cả ngày</span>
-                    </Radio.Button>
-                    <Radio.Button value="STAGGER" className="!rounded-md text-xs">
-                      <span className="inline-flex items-center gap-1"><ClockCircleOutlined /> Cuốn chiếu ({groupStaggerInterval}p)</span>
-                    </Radio.Button>
-                  </Radio.Group>
+                    onChange={(v) => setGroupTimingMode(v as typeof groupTimingMode)}
+                    className="self-start sm:self-auto shrink-0"
+                    options={[
+                      { value: 'SPREAD_DAY', label: 'Rải đều', title: 'Rải đều các nhóm trong khung giờ' },
+                      { value: 'STAGGER', label: `Nối đuôi (${groupStaggerInterval}p)`, title: 'Nối đuôi nhau, cách nhau vài phút' },
+                    ]}
+                  />
                 </div>
 
                 {groupTimingMode === 'SPREAD_DAY' ? (

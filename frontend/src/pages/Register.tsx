@@ -29,8 +29,7 @@ const Register = () => {
 
   return (
     <AuthLayout
-      title="Tạo tài khoản mới"
-      description="Bắt đầu quản lý và tự động hóa mạng xã hội của bạn"
+      title="Tạo tài khoản"
     >
       <Form<RegisterFormValues>
         name="register_form"

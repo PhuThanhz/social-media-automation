@@ -708,7 +708,7 @@ const Dashboard = () => {
           loading={loadingPosts}
           dataSource={periodPosts.slice(0, 8)}
           pagination={false}
-          scroll={{ x: 720 }}
+          scroll={{ x: 820 }}
           size="middle"
           locale={{ emptyText: 'Chưa có bài đăng nào được ghi nhận' }}
           columns={[

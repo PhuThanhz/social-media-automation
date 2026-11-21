@@ -331,19 +331,23 @@ async function huntFacebookFeed(params, deps = {}) {
       userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
       viewport: { width: 1280, height: 900 }
     });
+    if (!acquired) {
+      throw new Error('Browser pool đang bận hoặc quá tải, không thể lấy context duyệt web');
+    }
     releaseContext = acquired.release;
     const context = acquired.context;
 
     let cUserId = '';
     if (cookieString && String(cookieString).trim().length > 0) {
       // Bỏ i_user để luôn quét bằng Via cá nhân (c_user), tránh dính danh nghĩa Fanpage khi vào Group kín
+      const isValidCookieName = (n) => typeof n === 'string' && /^[\w!#$%&'*+\-.^`|~]+$/.test(n.trim());
       const cookies = String(cookieString).split(';')
         .map(c => {
           const idx = c.indexOf('=');
           if (idx === -1) return null;
           const name = c.slice(0, idx).trim();
           const value = c.slice(idx + 1).trim();
-          if (!name || name === 'i_user') return null;
+          if (!name || name === 'i_user' || !isValidCookieName(name) || value.includes('<') || value.includes('>') || value.length > 4096) return null;
           if (name === 'c_user' && /^\d+$/.test(value)) cUserId = value;
           return {
             name,
@@ -354,7 +358,11 @@ async function huntFacebookFeed(params, deps = {}) {
         })
         .filter(Boolean);
       if (cookies.length > 0) {
-        await context.addCookies(cookies);
+        try {
+          await context.addCookies(cookies);
+        } catch (cErr) {
+          console.warn(`[FB_Hunter] ⚠️ Nạp cookie thất bại (${cErr.message}) — tiếp tục quét ẩn danh.`);
+        }
       }
     }
 

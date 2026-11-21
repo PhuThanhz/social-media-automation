@@ -13,6 +13,7 @@ import {
   Drawer,
   Image,
   App,
+  Tooltip,
 } from 'antd';
 import {
   ClockCircleOutlined,
@@ -20,9 +21,7 @@ import {
   CheckCircleFilled,
   LoadingOutlined,
   DeleteOutlined,
-  ThunderboltOutlined,
   CopyOutlined,
-  RocketOutlined,
   EyeOutlined,
   ReloadOutlined,
 } from '@ant-design/icons';
@@ -130,7 +129,7 @@ function BulkPasteDrawer({
         footer: { background: '#0b141f', borderTop: '1px solid #223247', padding: '11px 22px' },
       }}
       footer={
-        <div className="bulk-paste-footer">
+        <div className="bulk-paste-footer flex-wrap gap-2.5">
           <Button
             size="large"
             onClick={() => setBulkModalVisible(false)}
@@ -138,40 +137,32 @@ function BulkPasteDrawer({
           >
             Hủy
           </Button>
-          <div className="bulk-paste-footer-primary">
+          <div className="bulk-paste-footer-primary flex-wrap gap-2">
             <span>
               <b>{bulkPasteSummary.finalUrls.length}</b> bài hợp lệ
               {bulkPasteSummary.invalidLineCount > 0 && <small> · {bulkPasteSummary.invalidLineCount} dòng lỗi</small>}
             </span>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <Checkbox
                 checked={bulkAutoDistributeTwoVias}
                 onChange={(e) => setBulkAutoDistributeTwoVias(e.target.checked)}
-                className="text-xs font-bold text-purple-300 select-none bg-purple-950/40 px-2.5 py-1.5 rounded-lg border border-purple-500/30"
+                className="text-xs text-slate-300 select-none"
+                title={twoMainViasDisplayNames || undefined}
               >
-                ⚡ Chia đều 2 Via ({twoMainViasDisplayNames || 'Song song'})
+                Chia đều 2 Via
               </Checkbox>
-              <Button
-                size="large"
-                icon={<ThunderboltOutlined />}
-                disabled={bulkPasteSummary.finalUrls.length === 0}
-                onClick={handleApplyAndOpenSwipeReview}
-                className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold border-none shadow-lg shadow-emerald-950/40 rounded-xl"
-                title="Duyệt từng bài theo giao diện Tinder (Giữ/Bỏ bằng phím mũi tên hoặc nút bấm)"
-              >
-                ⚡ Duyệt nhanh kiểu Tinder ({bulkPasteSummary.finalUrls.length} bài)
-              </Button>
               <Button
                 type="primary"
                 size="large"
-                icon={<RocketOutlined />}
+                icon={<CheckCircleOutlined />}
                 disabled={bulkPasteSummary.finalUrls.length === 0}
-                onClick={handleApplyBulkPaste}
+                onClick={handleApplyAndOpenSwipeReview}
                 className="bulk-paste-apply"
+                title="Tạo bài rồi duyệt lần lượt: giữ hoặc bỏ từng bài (phím mũi tên)"
               >
                 {bulkPasteSummary.finalUrls.length > 0
-                  ? `Tạo ${bulkPasteSummary.finalUrls.length} bài & áp dụng lịch`
-                  : 'Dán link để tạo bài viết'}
+                  ? `Duyệt ${bulkPasteSummary.finalUrls.length} bài`
+                  : 'Dán link để tạo bài'}
               </Button>
             </div>
           </div>
@@ -182,49 +173,22 @@ function BulkPasteDrawer({
         {/* BANNER THÔNG BÁO TIẾN ĐỘ CÀO DỮ LIỆU */}
         {bulkScrapeStats.total > 0 && (
           bulkScrapeStats.isDone ? (
-            <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/90 via-[#06241a] to-teal-950/90 border border-emerald-500/60 shadow-xl flex items-center justify-between gap-4 flex-wrap">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-emerald-500/20 border border-emerald-400/50 flex items-center justify-center text-emerald-400 text-xl shadow-lg shrink-0">
-                  <CheckCircleFilled />
-                </div>
-                <div>
-                  <div className="text-base font-black text-emerald-200 flex items-center gap-2 flex-wrap">
-                    <span>🎉 ĐÃ CÀO XONG TOÀN BỘ {bulkScrapeStats.total}/{bulkScrapeStats.total} BÀI VIẾT (100%)</span>
-                    <Tag color="success" className="!m-0 !text-xs !font-bold">ĐÃ SẴN SÀNG</Tag>
-                  </div>
-                  <div className="text-xs text-emerald-300/80 mt-0.5">
-                    Toàn bộ hình ảnh, video & caption đã được tải trước đầy đủ. Bạn có thể duyệt bài ngay ở thanh điều khiển bên dưới.
-                  </div>
-                </div>
-              </div>
+            <div className="px-4 py-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 flex items-center gap-2 text-sm text-emerald-200">
+              <CheckCircleFilled className="text-emerald-400" />
+              <span>Đã tải xong {bulkScrapeStats.total}/{bulkScrapeStats.total} bài</span>
             </div>
           ) : (
-            <div className="p-4 rounded-2xl bg-gradient-to-r from-sky-950/90 via-[#0a1a33] to-blue-950/90 border border-sky-500/40 shadow-xl flex items-center justify-between gap-4 flex-wrap">
-              <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className="w-11 h-11 rounded-2xl bg-sky-500/20 border border-sky-400/40 flex items-center justify-center text-sky-400 text-xl shadow-lg shrink-0">
-                  <LoadingOutlined spin />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-black text-sky-200 flex items-center gap-2 flex-wrap">
-                    <span>🔄 Đang cào dữ liệu & tải trước: {bulkScrapeStats.completed}/{bulkScrapeStats.total} bài hoàn tất ({bulkScrapeStats.percent}%)</span>
-                    {bulkScrapeStats.error > 0 && (
-                      <Tag color="error" className="!m-0 !text-xs !font-bold">{bulkScrapeStats.error} bài lỗi</Tag>
-                    )}
-                  </div>
-                  <div className="text-xs text-sky-300/80 mt-0.5">
-                    Đang xử lý {bulkScrapeStats.loading} bài còn lại... Quá trình chạy ngầm cực nhanh.
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <Progress
-                  percent={bulkScrapeStats.percent}
-                  strokeColor="#38bdf8"
-                  trailColor="#1e293b"
-                  size="small"
-                  style={{ width: 140 }}
-                />
-              </div>
+            <div className="px-4 py-3 rounded-xl bg-sky-950/40 border border-sky-500/30 flex items-center gap-3 text-sm text-sky-200">
+              <LoadingOutlined spin className="text-sky-400" />
+              <span className="whitespace-nowrap">Đang tải {bulkScrapeStats.completed}/{bulkScrapeStats.total} bài</span>
+              <Progress
+                percent={bulkScrapeStats.percent}
+                showInfo={false}
+                strokeColor="#38bdf8"
+                trailColor="#1e293b"
+                size="small"
+                className="!m-0 flex-1"
+              />
             </div>
           )
         )}
@@ -284,8 +248,7 @@ function BulkPasteDrawer({
             <div className="flex items-center justify-between gap-2">
               <div>
                 <div className="text-sm font-extrabold text-slate-100 flex items-center gap-2">
-                  <span>📋</span>
-                  <span>Danh sách đường dẫn (Links)</span>
+                  <span>Danh sách link</span>
                 </div>
                 <div className="text-xs text-slate-400 mt-0.5">Dán mỗi dòng một link, hoặc dán nguyên đoạn văn bản chứa link.</div>
               </div>
@@ -314,7 +277,7 @@ function BulkPasteDrawer({
                 }}
                 className="bg-blue-600 hover:bg-blue-500 border-0 text-white font-bold text-xs rounded-xl px-3.5 py-1 shrink-0 shadow-md"
               >
-                📋 Dán từ bộ nhớ tạm
+                Dán từ bộ nhớ tạm
               </Button>
             </div>
 
@@ -431,7 +394,7 @@ function BulkPasteDrawer({
                 const hasMedia = (preview?.mediaUrls?.length || 0) > 0;
                 const rawMedia = preview?.mediaUrls || [];
                 const originalMedia = preview?.originalMediaUrls || [];
-                const hasCustomMedia = rawMedia.length !== originalMedia.length || rawMedia.some((u, i) => u !== originalMedia[i]);
+                const hasCustomMedia = !!preview?.originalMediaUrls && (rawMedia.length !== originalMedia.length || rawMedia.some((u, i) => u !== originalMedia[i]));
                 const isVideo = (u: string, idx: number) => isMediaVideo(u, preview?.mediaKinds?.[idx]);
                 const videoUrls = rawMedia.filter((u, i) => isVideo(u, i));
                 const photoUrls = rawMedia.filter((u, i) => !isVideo(u, i));
@@ -538,76 +501,36 @@ function BulkPasteDrawer({
 
                     {/* NỘI DUNG CHI TIẾT THEO CÁC MỤC DỌC (GIỐNG HỆT MODAL XEM CHI TIẾT) */}
                     {!preview?.loading && (
-                      <div className="mt-5 space-y-6">
-                        {/* ── MỤC 1: VIDEO & HÌNH ẢNH ĐÍNH KÈM ── */}
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="w-1 h-4 bg-rose-500 rounded-full inline-block" />
-                              <span className="text-xs font-black tracking-wider text-rose-400 uppercase">
-                                VIDEO & HÌNH ẢNH ĐÍNH KÈM
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {videoUrls.length > 0 && (
-                                <Tag color="purple" className="!m-0 !text-xs !font-bold !px-2.5 !py-0.5">🎥 {videoUrls.length} Video</Tag>
-                              )}
-                              {photoUrls.length > 0 && (
-                                <Tag color="blue" className="!m-0 !text-xs !font-bold !px-2.5 !py-0.5">🖼️ {photoUrls.length} Ảnh</Tag>
-                              )}
-                              {(url.includes('tiktok.com') || preview?.watermarkRemoved) && (
-                                <Tag color="green" className="!m-0 !text-xs !font-bold !px-2.5 !py-0.5 !text-emerald-300 !bg-emerald-950/80 !border-emerald-500/50">
-                                  ✨ Sạch Logo TikTok
-                                </Tag>
-                              )}
-                            </div>
+                      <div className="bpd-item-body">
+                        {/* Media */}
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-xs text-slate-400">
+                            {videoUrls.length > 0 && <span>{videoUrls.length} video</span>}
+                            {photoUrls.length > 0 && <span>{photoUrls.length} ảnh</span>}
+                            {(url.includes('tiktok.com') || preview?.watermarkRemoved) && <span className="text-emerald-300">Đã xoá logo</span>}
+                            {hasCustomMedia && (
+                              <button type="button" onClick={() => resetDrawerMedia(url)} className="ml-auto text-amber-300 hover:underline cursor-pointer">
+                                Khôi phục media gốc
+                              </button>
+                            )}
                           </div>
 
-                          <div className="p-4 sm:p-5 rounded-2xl bg-[#060b14] border border-slate-800/90 space-y-5">
-                            {/* Thanh khôi phục nếu đã chỉnh sửa/xóa bớt media */}
-                            {hasCustomMedia && (
-                              <div className="flex items-center justify-between bg-amber-500/10 border border-amber-500/30 rounded-xl px-3.5 py-2">
-                                <span className="text-xs text-amber-300 font-medium">
-                                  ⚠️ Bạn đã chỉnh sửa/xóa bớt video hoặc hình ảnh của bài này.
-                                </span>
-                                <Button
-                                  size="small"
-                                  type="link"
-                                  onClick={() => resetDrawerMedia(url)}
-                                  className="!text-xs !text-amber-400 hover:!text-amber-300 !p-0 font-bold underline"
-                                >
-                                  Khôi phục media gốc
-                                </Button>
-                              </div>
-                            )}
-
+                          <div className="space-y-3">
                             {/* Danh sách Video Player */}
                             {videoUrls.map((vUrl, vIdx) => {
                               const mediaIdx = rawMedia.indexOf(vUrl);
                               return (
-                                <div key={vIdx} className="space-y-2">
-                                  <div className="flex items-center justify-between text-xs text-slate-400">
-                                    <span className="font-bold text-purple-300 flex items-center gap-1.5">
-                                      🎥 Video đính kèm {videoUrls.length > 1 ? `#${vIdx + 1}` : ''}:
-                                    </span>
-                                    <Button
-                                      size="small"
-                                      danger
-                                      icon={<DeleteOutlined className="text-xs" />}
-                                      onClick={() => removeDrawerMedia(url, mediaIdx)}
-                                      className="!text-xs bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-300 rounded-lg font-bold flex items-center gap-1 !h-7 !px-3"
-                                    >
-                                      Xóa video này
-                                    </Button>
-                                  </div>
-                                  <div className="relative rounded-2xl overflow-hidden bg-black border border-slate-800 shadow-2xl flex justify-center items-center">
-                                    <video
-                                      controls
-                                      src={vUrl}
-                                      className="w-full max-h-[420px] object-contain bg-black"
-                                      preload="metadata"
-                                    />
-                                  </div>
+                                <div key={vIdx} className="relative rounded-xl overflow-hidden bg-black border border-slate-800">
+                                  <video controls src={vUrl} className="bpd-video" preload="metadata" />
+                                  <Button
+                                    size="small"
+                                    danger
+                                    icon={<DeleteOutlined className="text-xs" />}
+                                    onClick={() => removeDrawerMedia(url, mediaIdx)}
+                                    className="bpd-media-del"
+                                    title="Xoá video này"
+                                    aria-label="Xoá video này"
+                                  />
                                 </div>
                               );
                             })}
@@ -615,13 +538,8 @@ function BulkPasteDrawer({
                             {/* Album ảnh */}
                             {photoUrls.length > 0 && (
                               <div className="space-y-3">
-                                <div className="flex items-center justify-between text-xs text-slate-300">
-                                  <span className="font-bold text-slate-200">📄 Album ảnh đính kèm:</span>
-                                  <span className="text-xs text-slate-300">(Click vào ảnh để phóng to toàn màn hình)</span>
-                                </div>
-
                                 <Image.PreviewGroup>
-                                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                                  <div className="grid grid-cols-3 gap-2">
                                     {photoUrls.map((imgSrc, imgIdx) => {
                                       const mediaIdx = rawMedia.indexOf(imgSrc);
                                       return (
@@ -685,71 +603,54 @@ function BulkPasteDrawer({
 
                             {!hasMedia && !preview?.error && (
                               <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-800 text-center text-xs text-slate-500">
-                                📄 Bài viết dạng văn bản thuần (không có video hoặc hình ảnh).
+                                Bài chỉ có chữ
                               </div>
                             )}
                           </div>
                         </div>
 
-                        {/* ── MỤC 2: NỘI DUNG CAPTION BÀI VIẾT ── */}
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="w-1 h-4 bg-rose-500 rounded-full inline-block" />
-                              <span className="text-xs font-black tracking-wider text-rose-400 uppercase">
-                                NỘI DUNG CAPTION BÀI VIẾT
-                              </span>
-                            </div>
-                            <span className="text-xs text-slate-400 font-mono">
-                              {preview?.caption?.length || 0} ký tự
-                            </span>
-                          </div>
-
-                          <div className="p-4 sm:p-5 rounded-2xl bg-[#060b14] border border-slate-800/90 space-y-3">
-                            <TextArea
-                              autoSize={{ minRows: 4, maxRows: 12 }}
-                              value={preview?.caption || ''}
-                              onChange={(e) => updateDrawerPreviewCaption(url, e.target.value)}
-                              placeholder="Chưa cào được caption hoặc bài viết không có text..."
-                              className="bg-transparent border-0 text-slate-100 text-sm font-sans focus:shadow-none p-0 leading-relaxed placeholder:text-slate-600"
-                            />
-
-                            <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-3 flex-wrap">
+                        {/* Caption */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-xs text-slate-400">
+                            <span>Caption · {preview?.caption?.length || 0} ký tự</span>
+                            <Tooltip title='Khi đăng, tự thêm "Cre: @tác giả" vào cuối caption'>
                               <Checkbox
                                 checked={isCredit}
                                 onChange={() => toggleDrawerCredit(url)}
-                                className="text-xs font-semibold text-slate-300"
+                                className="text-xs text-slate-300"
                               >
-                                📌 Nguồn bài viết: Tự động gắn "Cre: @tác giả" vào cuối caption
+                                Ghi nguồn
                               </Checkbox>
-                            </div>
+                            </Tooltip>
                           </div>
+                          <TextArea
+                            autoSize={{ minRows: 4, maxRows: 12 }}
+                            value={preview?.caption || ''}
+                            onChange={(e) => updateDrawerPreviewCaption(url, e.target.value)}
+                            placeholder="Chưa có caption"
+                            className="text-sm leading-relaxed"
+                          />
                         </div>
 
-                        {/* ── MỤC 3: BÌNH LUẬN TỰ ĐỘNG & TIẾP THỊ LIÊN KẾT ── */}
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="w-1 h-4 bg-amber-500 rounded-full inline-block" />
-                              <span className="text-xs font-black tracking-wider text-amber-400 uppercase">
-                                BÌNH LUẬN TỰ ĐỘNG & TIẾP THỊ LIÊN KẾT
-                              </span>
-                            </div>
+                        {/* Bình luận */}
+                        <div className="bpd-item-full space-y-2">
+                          <div className="flex items-center justify-between text-xs text-slate-400">
+                            <span>Bình luận</span>
                             <Checkbox
                               checked={isSkipComment}
                               onChange={() => toggleDrawerSkipComment(url)}
-                              className="text-xs text-red-400 font-bold"
+                              className="text-xs text-slate-300"
                             >
-                              🚫 Tắt bình luận bài này
+                              Tắt bình luận
                             </Checkbox>
                           </div>
 
                           {!isSkipComment && (
-                            <div className="p-4 rounded-2xl bg-[#060b14] border border-slate-800/90">
+                            <div>
                               <Input
                                 value={preview?.affiliateComment || ''}
                                 onChange={(e) => updateDrawerComment(url, e.target.value)}
-                                placeholder="Mặc định dùng bình luận chung của hệ thống (hoặc nhập riêng link Shopee/bình luận cho bài này)..."
+                                placeholder="Để trống = dùng bình luận chung"
                                 className="bg-slate-950 border-slate-800 text-slate-100 text-xs rounded-xl p-3 placeholder:text-slate-600"
                               />
                             </div>

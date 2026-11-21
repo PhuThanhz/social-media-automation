@@ -690,16 +690,20 @@ const PlaywrightPoster = () => {
   const activeSwipeMediaUrls = activeSwipeItem
     ? (activeSwipeItem.inputType === 'MANUAL'
         ? activeSwipeItem.manualMediaUrls || []
-        : (activeSwipePreview?.mediaUrls && activeSwipePreview.mediaUrls.length > 0)
-          ? activeSwipePreview.mediaUrls
-          : (bulkDrawerPreviews[activeSwipeItem.url?.trim()]?.mediaUrls || []))
+        : previews[activeSwipeItem.id]?.mediaUrls
+          ? previews[activeSwipeItem.id].mediaUrls!
+          : (activeSwipePreview?.mediaUrls && activeSwipePreview.mediaUrls.length > 0)
+            ? activeSwipePreview.mediaUrls
+            : (bulkDrawerPreviews[activeSwipeItem.url?.trim()]?.mediaUrls || []))
     : [];
   const activeSwipeMediaKinds = activeSwipeItem
     ? (activeSwipeItem.inputType === 'MANUAL'
         ? activeSwipeItem.manualMediaKinds || []
-        : (activeSwipePreview?.mediaKinds && activeSwipePreview.mediaKinds.length > 0)
-          ? activeSwipePreview.mediaKinds
-          : (bulkDrawerPreviews[activeSwipeItem.url?.trim()]?.mediaKinds || []))
+        : previews[activeSwipeItem.id]?.mediaUrls
+          ? (previews[activeSwipeItem.id].mediaKinds || [])
+          : (activeSwipePreview?.mediaKinds && activeSwipePreview.mediaKinds.length > 0)
+            ? activeSwipePreview.mediaKinds
+            : (bulkDrawerPreviews[activeSwipeItem.url?.trim()]?.mediaKinds || []))
     : [];
   const activeSwipeCaption = activeSwipeItem
     ? (activeSwipeItem.customCaption !== undefined && activeSwipeItem.customCaption.trim() !== ''
@@ -742,8 +746,24 @@ const PlaywrightPoster = () => {
 
   const handleSwipeDecision = (decision: 'KEEP' | 'REJECT') => {
     if (!activeSwipeItem) return;
-    setSwipeDecisions((current) => ({ ...current, [activeSwipeItem.id]: decision }));
+    const itemId = activeSwipeItem.id;
+    setSwipeDecisions((current) => ({ ...current, [itemId]: decision }));
     setSwipeMediaIndex(0);
+    if (decision === 'REJECT') {
+      // Bỏ = xoá khỏi danh sách ngay; bài kế tiếp trượt vào đúng vị trí hiện tại nên không tăng index
+      setLinkItems((prev) => {
+        const next = prev.filter((item) => item.id !== itemId);
+        return next.length > 0
+          ? next
+          : [{ id: Math.random().toString(36).substring(2, 9), url: '', isNow: true, scheduledAt: dayjs(), includeCredit: true }];
+      });
+      setPreviews((current) => {
+        const next = { ...current };
+        delete next[itemId];
+        return next;
+      });
+      return;
+    }
     setSwipeReviewIndex((current) => Math.min(current + 1, swipeReviewItems.length));
   };
 
@@ -772,13 +792,8 @@ const PlaywrightPoster = () => {
       rejectedIds.forEach((id) => delete next[id]);
       return next;
     });
-    const keptWithExtraCount = keptItems.filter((item) => (item.extraGroupIds?.length || 0) > 0).length;
     setSwipeReviewOpen(false);
-    message.success(
-      keptWithExtraCount > 0
-        ? `Đã giữ ${swipeReviewItems.length - rejectedIds.size} bài (${keptWithExtraCount} bài có đăng thêm nhóm khác) và bỏ ${rejectedIds.size} bài khỏi danh sách.`
-        : `Đã giữ ${swipeReviewItems.length - rejectedIds.size} bài và bỏ ${rejectedIds.size} bài khỏi danh sách.`
-    );
+    message.success(`Còn ${swipeReviewItems.length} bài · đã bỏ ${rejectedIds.size} bài`);
   };
 
   useEffect(() => {
@@ -1376,7 +1391,8 @@ const PlaywrightPoster = () => {
     const vals = Array.isArray(watchedTargetFanpageId) ? watchedTargetFanpageId : [watchedTargetFanpageId];
     return vals.map((v) => {
       const matched = postingIdentities.find((a) => accountTargetValue(a) === v);
-      return matched ? (matched.pageName || matched.platformAccountId) : v;
+      const name = matched ? (matched.pageName || matched.platformAccountId) : v;
+      return String(name).replace(/^👤\s*Nick Cá Nhân\s*\((.*)\)$/, '$1');
     }).filter(Boolean);
   }, [watchedTargetFanpageId, postingIdentities]);
 
@@ -1654,7 +1670,7 @@ const PlaywrightPoster = () => {
         label: (
           <div className="flex items-center justify-between w-full py-0.5">
             <span className={isExp ? 'text-red-500 font-bold' : 'text-emerald-300 font-semibold flex items-center gap-1.5'}>
-              <span>📄 {acc.pageName || acc.platformAccountId}</span>
+              <span className="truncate">{acc.pageName || acc.platformAccountId}</span>
               {isCoAdmin && (
                 <span className="px-1.5 py-0.5 rounded text-xs font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
                   ⚡ 2 Via
@@ -1663,9 +1679,9 @@ const PlaywrightPoster = () => {
               {viaName && <span className="text-xs font-normal text-slate-300">· {viaName}</span>}
             </span>
             <div className="flex items-center gap-1.5 shrink-0 ml-2">
-              <Tag color={needed > 0 ? 'orange' : 'success'} className="!rounded-full !text-xs !mr-0">
-                KPI: {currentCount}/{targetCount} {needed > 0 ? `(thiếu ${needed})` : '(đủ)'}
-              </Tag>
+              <span className={`text-xs ${needed > 0 ? 'text-amber-300' : 'text-emerald-300'}`} title={needed > 0 ? `Thiếu ${needed} bài hôm nay` : 'Đủ chỉ tiêu hôm nay'}>
+                {currentCount}/{targetCount}
+              </span>
               {isExp && (
                 <Tag color="error" className="!rounded-full !text-xs !mr-0 font-bold">Hết Cookie</Tag>
               )}
@@ -1689,23 +1705,19 @@ const PlaywrightPoster = () => {
         value: val,
         filterLabel: `${accountSearchLabel(acc)} ${managedPageCount > 0 ? `${managedPageCount} page` : ''}`,
         label: (
-          <div className="flex items-center justify-between w-full py-0.5">
-            <span className={isExp ? 'text-red-600 font-bold flex items-center gap-1.5' : 'text-indigo-400 font-semibold flex items-center gap-1.5'}>
-              <span>👤 {acc.pageName || acc.platformAccountId}</span>
+          <div className="flex items-center justify-between w-full py-0.5 gap-2">
+            <span className={`min-w-0 flex items-center gap-1.5 ${isExp ? 'text-red-500 font-bold' : 'text-slate-100 font-semibold'}`}>
+              <span className="truncate">{(acc.pageName || acc.platformAccountId).replace(/^👤\s*Nick Cá Nhân\s*\((.*)\)$/, '$1')}</span>
               {managedPageCount > 0 && (
-                <span className="text-xs font-normal text-sky-300 bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/20">
-                  {managedPageCount} Page quản trị
-                </span>
+                <span className="text-xs font-normal text-slate-400 whitespace-nowrap">· {managedPageCount} Page</span>
               )}
             </span>
             <div className="flex items-center gap-1.5 shrink-0 ml-2">
-              <Tag color={needed > 0 ? 'orange' : 'success'} className="!rounded-full !text-xs !mr-0">
-                KPI: {currentCount}/{targetCount} {needed > 0 ? `(thiếu ${needed})` : '(đủ)'}
-              </Tag>
-              {isExp ? (
+              <span className={`text-xs ${needed > 0 ? 'text-amber-300' : 'text-emerald-300'}`} title={needed > 0 ? `Thiếu ${needed} bài hôm nay` : 'Đủ chỉ tiêu hôm nay'}>
+                {currentCount}/{targetCount}
+              </span>
+              {isExp && (
                 <Tag color="error" className="!rounded-full !text-xs !mr-0 font-bold">Hết Cookie</Tag>
-              ) : (
-                <Tag color="purple" className="!rounded-full !text-xs !mr-0 font-bold">Cá nhân</Tag>
               )}
             </div>
           </div>
@@ -1716,13 +1728,13 @@ const PlaywrightPoster = () => {
     const groups = [];
     if (pageOptions.length > 0) {
       groups.push({
-        label: `📄 DANH SÁCH FANPAGE (${pageOptions.length})`,
+        label: `Fanpage (${pageOptions.length})`,
         options: pageOptions,
       });
     }
     if (personalOptions.length > 0) {
       groups.push({
-        label: `👤 NICK CÁ NHÂN / VIA (${personalOptions.length})`,
+        label: `Nick cá nhân (${personalOptions.length})`,
         options: personalOptions,
       });
     }
@@ -1730,7 +1742,7 @@ const PlaywrightPoster = () => {
   }, [playwrightAccounts, personalAccountTargets, todayTargets, viaNameOf, coAdminViasByPageName]);
 
   const unifiedGroupOptions = useMemo(() => {
-    return groupAccountsWithId.map((group, index) => {
+    return groupAccountsWithId.map((group) => {
       const isJoined = group.groupHealthStatus === 'JOINED';
       const isPending = group.groupHealthStatus === 'PENDING_APPROVAL';
       const isNotJoined = group.groupHealthStatus === 'KICKED_OR_NOT_JOINED';
@@ -1741,8 +1753,8 @@ const PlaywrightPoster = () => {
         filterLabel: `${cleanName} ${group.platformAccountId}`,
         label: (
           <div className="flex items-center justify-between w-full py-0.5">
-            <span className="truncate pr-2">
-              {cleanName} {index + 1} · ID {group.platformAccountId}
+            <span className="truncate pr-2" title={cleanName}>
+              {cleanName}
             </span>
             <div className="shrink-0">
               {isJoined && <Tag color="success" className="!rounded-full !text-xs !mr-0">Đã vào</Tag>}
@@ -2104,6 +2116,25 @@ const PlaywrightPoster = () => {
     };
   }, [bulkText, posts, filterHistoryDuplicates]);
 
+  // Tự bỏ các dòng link trùng trong ô dán (giữ lần xuất hiện đầu tiên)
+  useEffect(() => {
+    if (!bulkText) return;
+    const lines = bulkText.split(/\r?\n/);
+    const seen = new Set<string>();
+    let removed = 0;
+    const kept = lines.filter((line) => {
+      const t = line.trim();
+      if (!/^https?:\/\/\S+$/i.test(t)) return true;
+      const key = cleanSocialUrl(t.replace(/[),.;"'<>]+$/g, '')) || t;
+      if (seen.has(key)) { removed++; return false; }
+      seen.add(key);
+      return true;
+    });
+    if (removed === 0) return;
+    setBulkText(kept.join('\n'));
+    message.info({ content: `Đã bỏ ${removed} link trùng`, key: 'bulk-dup-removed' });
+  }, [bulkText]);
+
   // Mục tiêu KPI hôm nay của nhóm đang chọn (tính cả bài đã đăng và bài đang chờ đăng hôm nay)
   const currentKpiTarget = useMemo(() => {
     const targetId = smartGroupId || (postMode === 'GROUP_ONLY' ? form.getFieldValue('targetGroupId') : null);
@@ -2175,7 +2206,7 @@ const PlaywrightPoster = () => {
     }
     if (prevBulkLoadingCountRef.current !== null && prevBulkLoadingCountRef.current > 0 && bulkScrapeStats.loading === 0) {
       message.success({
-        content: `🎉 ĐÃ CÀO XONG TOÀN BỘ ${bulkScrapeStats.completed}/${bulkScrapeStats.total} BÀI VIẾT (100%)! Bạn có thể bấm Duyệt nhanh (Tinder) hoặc Áp dụng lịch ngay.`,
+        content: `Đã tải xong ${bulkScrapeStats.completed}/${bulkScrapeStats.total} bài`,
         duration: 6,
         key: 'bulk-scrape-done-toast',
       });
@@ -2222,6 +2253,7 @@ const PlaywrightPoster = () => {
             loading: false,
             caption: fetchedCaption,
             mediaUrls: urls,
+            originalMediaUrls: [...urls],
             mediaKinds: kinds,
             videoCount: Number(res.data.item.videoCount || 0),
             imageCount: Number(res.data.item.imageCount || 0),
@@ -2350,6 +2382,18 @@ const PlaywrightPoster = () => {
       return remaining.join('\n');
     });
   }, []);
+
+  // Link cào lỗi (riêng tư, hỏng, không lấy được nội dung) tự bỏ khỏi đợt dán
+  useEffect(() => {
+    if (!bulkModalVisible) return;
+    const failed = bulkPasteSummary.finalUrls.filter((u) => {
+      const p = bulkDrawerPreviews[u.trim()];
+      return !!p && !p.loading && !!p.error;
+    });
+    if (failed.length === 0) return;
+    failed.forEach((u) => removeUrlFromBulkText(u));
+    message.warning({ content: `Đã bỏ ${failed.length} link lỗi`, key: 'bulk-failed-removed' });
+  }, [bulkModalVisible, bulkPasteSummary.finalUrls, bulkDrawerPreviews, removeUrlFromBulkText]);
 
   const fetchAllDrawerPreviews = useCallback(() => {
     bulkPasteSummary.finalUrls.forEach((url, idx) => {
@@ -3311,7 +3355,7 @@ const PlaywrightPoster = () => {
       ? ` · ${duplicateInHistoryCount} link đã có lịch sử (vẫn giữ lại)`
       : '';
     const removedNote = totalRemoved > 0 ? ` · Lọc ${totalRemoved} link trùng nội bộ` : '';
-    message.success(`🎉 Đã nạp ${filteredUrls.length} bài viết! Tất cả hình ảnh & caption đã sẵn sàng.${removedNote}${historyNote}`, 6);
+    message.success(`Đã thêm ${filteredUrls.length} bài${removedNote}${historyNote}`, 4);
   };
 
   // Áp dụng đợt dán và mở ngay màn hình duyệt từng bài theo phong cách Tinder
@@ -4208,9 +4252,18 @@ const PlaywrightPoster = () => {
         if (record.status === 'PENDING') {
           const schedTime = record.scheduledAt || record.createdAt;
           return (
-            <div className="flex flex-col gap-0.5">
-              <div className="font-bold text-amber-300 font-mono text-sm leading-tight">
+            <button
+              type="button"
+              className="queue-time-edit flex flex-col gap-0.5 text-left"
+              title="Bấm để đổi giờ đăng"
+              onClick={() => {
+                setReschedulingPost(record);
+                setNewScheduleTime(record.scheduledAt ? dayjs(record.scheduledAt) : dayjs().add(15, 'minute'));
+              }}
+            >
+              <div className="font-bold text-amber-300 font-mono text-sm leading-tight flex items-center gap-1.5">
                 {schedTime ? dayjs(schedTime).format('HH:mm') : '-'}
+                <EditOutlined className="queue-time-edit-icon text-xs" />
               </div>
               <div className="text-xs text-slate-300 font-mono">
                 {schedTime ? dayjs(schedTime).format('DD/MM/YYYY') : ''}
@@ -4220,7 +4273,7 @@ const PlaywrightPoster = () => {
                   <ClockCircleOutlined className="text-xs" /> Hẹn đăng
                 </span>
               </div>
-            </div>
+            </button>
           );
         }
 
@@ -4524,10 +4577,10 @@ const PlaywrightPoster = () => {
                   ? `${activeSelectedFanpageIds.length} Page/Via`
                   : `${activeSelectedGroupIds.length} nhóm · ${activeSelectedFanpageIds.length} nick`)
               : 'Chọn Page & Nhóm';
-            const contentSub = hasContent ? `${validLinkCount} bài sẵn sàng` : 'Dán link / Cào bài';
+            const contentSub = hasContent ? `${validLinkCount} bài` : 'Chưa có bài';
             const submitSub = readyToPublish
-              ? (scheduleChoice.mode === 'QUEUE' ? 'Xếp vào lịch chung' : scheduleChoice.mode === 'NOW' ? 'Sẵn sàng đăng ngay' : 'Sẵn sàng hẹn giờ')
-              : 'Chờ bước 2 & 3';
+              ? (scheduleChoice.mode === 'QUEUE' ? 'Xếp lịch' : scheduleChoice.mode === 'NOW' ? 'Đăng ngay' : 'Hẹn giờ')
+              : 'Chưa sẵn sàng';
 
             const steps = [
               { id: 'poster-step-1', num: 1, title: 'Cách xuất bản', sub: modeShort, done: true, active: false, cta: false },
@@ -4568,7 +4621,6 @@ const PlaywrightPoster = () => {
             <span className="poster-step-number">1</span>
             <div>
               <h2>Chọn cách xuất bản</h2>
-              <p>Bạn muốn bài viết xuất hiện ở đâu?</p>
             </div>
           </div>
 
@@ -4585,7 +4637,7 @@ const PlaywrightPoster = () => {
               },
               {
                 id: 'FANPAGE_AND_GROUP',
-                title: 'Fanpage + Đăng vào Nhóm',
+                title: 'Fanpage + Nhóm',
                 sub: 'Lên tường Fanpage & tự động chia sẻ vào nhóm',
                 icon: <RocketOutlined className="text-base" />,
                 activeCard: 'from-purple-950/60 via-slate-900/95 to-slate-950/95 border-purple-500/70 shadow-lg shadow-purple-950/50 ring-1 ring-purple-400/40',
@@ -4594,7 +4646,7 @@ const PlaywrightPoster = () => {
               },
               {
                 id: 'GROUP_ONLY',
-                title: 'Chỉ đăng vào Nhóm',
+                title: 'Chỉ đăng Nhóm',
                 sub: 'Đăng trực tiếp vào Nhóm dưới tên Fanpage hoặc Nick cá nhân',
                 icon: <TeamOutlined className="text-base" />,
                 activeCard: 'from-emerald-950/60 via-slate-900/95 to-slate-950/95 border-emerald-500/70 shadow-lg shadow-emerald-950/50 ring-1 ring-emerald-400/40',
@@ -4626,31 +4678,28 @@ const PlaywrightPoster = () => {
                   }}
                   role="radio"
                   aria-checked={active}
-                  className={`relative flex items-start gap-3.5 p-4 rounded-2xl text-left transition-all duration-200 cursor-pointer select-none border group ${
+                  className={`relative flex items-center gap-3 p-3 rounded-2xl text-left transition-all duration-200 cursor-pointer select-none border group ${
                     active
                       ? `bg-gradient-to-br ${mode.activeCard} translate-y-[-1px]`
                       : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:bg-slate-800/80 hover:translate-y-[-1px]'
                   }`}
                 >
                   <div
-                    className={`w-10 h-10 rounded-xl shrink-0 flex items-center justify-center transition-all ${
+                    className={`w-9 h-9 rounded-xl shrink-0 flex items-center justify-center transition-all ${
                       active ? mode.activeIcon : 'bg-slate-800/80 border border-slate-700/60 text-slate-400 group-hover:text-slate-200'
                     }`}
                   >
                     {mode.icon}
                   </div>
                   <div className="min-w-0 flex-1 pr-6">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-bold text-sm leading-snug text-slate-100">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm leading-snug text-slate-100" title={mode.sub}>
                         {mode.title}
                       </span>
                     </div>
-                    <div className="text-xs text-slate-400 leading-relaxed font-normal">
-                      {mode.sub}
-                    </div>
                   </div>
                   {active && (
-                    <div className={`absolute top-3.5 right-3.5 w-5 h-5 rounded-full ${mode.badgeBg} text-white flex items-center justify-center text-xs shadow-md shadow-black/40`}>
+                    <div className={`absolute top-1/2 -translate-y-1/2 right-3 w-5 h-5 rounded-full ${mode.badgeBg} text-white flex items-center justify-center text-xs shadow-md shadow-black/40`}>
                       <CheckCircleOutlined className="text-xs" />
                     </div>
                   )}
@@ -4920,6 +4969,7 @@ const PlaywrightPoster = () => {
               )
             )}
 
+{validLinkCount > 0 && (
             <div className="poster-submit-bar flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="poster-submit-summary">
                 {validLinkCount ? (
@@ -4969,6 +5019,7 @@ const PlaywrightPoster = () => {
                 </Button>
               </div>
             </div>
+            )}
             </div>
           </Form>
         </Card>
@@ -4980,10 +5031,10 @@ const PlaywrightPoster = () => {
             <dl className="poster-summary-list">
               <div>
                 <dt>Cách đăng</dt>
-                <dd>{postMode === 'FANPAGE_ONLY' ? 'Chỉ đăng Fanpage' : postMode === 'GROUP_ONLY' ? 'Chỉ đăng vào Nhóm' : 'Fanpage + Nhóm'}</dd>
+                <dd>{postMode === 'FANPAGE_ONLY' ? 'Chỉ Fanpage' : postMode === 'GROUP_ONLY' ? 'Chỉ Nhóm' : 'Fanpage + Nhóm'}</dd>
               </div>
               <div>
-                <dt>{postMode === 'GROUP_ONLY' ? 'Đăng dưới tên' : 'Page / nick'}</dt>
+                <dt>Tài khoản</dt>
                 <dd className={selectedTargetAccountNames.length ? '' : 'is-missing'} title={selectedTargetAccountNames.join(', ')}>
                   {selectedTargetAccountNames.length
                     ? selectedTargetAccountNames.length > 3
@@ -4994,7 +5045,7 @@ const PlaywrightPoster = () => {
               </div>
               {postMode !== 'FANPAGE_ONLY' && (
                 <div>
-                  <dt>Nhóm nhận bài</dt>
+                  <dt>Nhóm</dt>
                   <dd className={selectedGroupDisplayNames.length ? '' : 'is-missing'} title={selectedGroupDisplayNames.join(', ')}>
                     {selectedGroupDisplayNames.length
                       ? selectedGroupDisplayNames.length > 3
@@ -5006,19 +5057,7 @@ const PlaywrightPoster = () => {
               )}
               <div>
                 <dt>Số bài</dt>
-                <dd className={validLinkCount ? '' : 'is-missing'}>{validLinkCount ? `${validLinkCount} bài` : 'Chưa có nội dung'}</dd>
-              </div>
-              <div>
-                <dt>Thời gian</dt>
-                <dd>
-                  {validLinkCount === 0
-                    ? '—'
-                    : scheduleChoice.mode === 'QUEUE'
-                      ? 'Xếp vào lịch đăng chung'
-                      : scheduleChoice.mode === 'NOW'
-                        ? 'Đăng ngay'
-                        : `Bắt đầu từ ${scheduleChoice.at ? scheduleChoice.at.format('HH:mm DD/MM') : '—'}`}
-                </dd>
+                <dd className={validLinkCount ? '' : 'is-missing'}>{validLinkCount ? `${validLinkCount} bài` : 'Chưa có'}</dd>
               </div>
             </dl>
             {queueModeControl}
@@ -5186,6 +5225,7 @@ const PlaywrightPoster = () => {
             groupAccountsWithId={groupAccountsWithId}
             primaryGroupIds={activeSelectedGroupIds}
             onExtraGroupIdsChange={updateLinkExtraGroupIds}
+            onRemoveMedia={removeMediaItem}
           />
         </Suspense>
       )}
@@ -5232,7 +5272,7 @@ const PlaywrightPoster = () => {
 
       {/* Modal Đổi giờ đăng cho 1 bài đang Chờ đăng trong Lịch sử */}
       <Modal
-        title="🗓️ Đổi Ngày Giờ Đăng Bài"
+        title="Đổi giờ đăng"
         open={!!reschedulingPost}
         onCancel={() => setReschedulingPost(null)}
         onOk={() => {
@@ -5246,12 +5286,12 @@ const PlaywrightPoster = () => {
         confirmLoading={rescheduleMutation.isPending}
         okText="Lưu giờ mới"
         cancelText="Huỷ"
-        width={680}
+        width={440}
         className="max-w-[calc(100vw-24px)]"
       >
         <div className="py-3 space-y-3">
-          <Text className="text-xs text-slate-600 block">
-            Chọn ngày giờ đăng mới cho bài <b>"{reschedulingPost?.title || `#${reschedulingPost?.id}`}"</b>:
+          <Text className="text-xs text-slate-400 block truncate" title={reschedulingPost?.title}>
+            {reschedulingPost?.title || `#${reschedulingPost?.id}`}
           </Text>
           <DatePicker
             showTime
@@ -5261,6 +5301,12 @@ const PlaywrightPoster = () => {
             className="w-full rounded-xl"
             size="large"
             disabledDate={(current) => current && current < dayjs().startOf('day')}
+            presets={[
+              { label: '+30 phút', value: dayjs().add(30, 'minute').second(0) },
+              { label: '+1 giờ', value: dayjs().add(1, 'hour').second(0) },
+              { label: '+3 giờ', value: dayjs().add(3, 'hour').second(0) },
+              { label: 'Ngày mai cùng giờ', value: (reschedulingPost?.scheduledAt ? dayjs(reschedulingPost.scheduledAt) : dayjs()).add(1, 'day').second(0) },
+            ]}
           />
         </div>
       </Modal>

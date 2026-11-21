@@ -1,5 +1,5 @@
 import { DatePicker, Segmented, InputNumber } from 'antd';
-import { ClockCircleOutlined, SettingOutlined } from '@ant-design/icons';
+import { SettingOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
   gapMinutesOf,
@@ -29,13 +29,12 @@ export default function ScheduleChoice({ value, onChange, modes = ['NOW', 'QUEUE
   const { data: plan } = usePostingPlan();
   const gap = gapMinutesOf(plan);
   const currentInterval = value.intervalMinutes || (gap > 0 ? gap : 20);
-  const windowText = plan?.enabled ? `trong khung ${plan.start}–${plan.end}` : 'không giới hạn khung giờ';
   const outside = value.mode === 'AT' && value.at && !isInsideWindow(value.at, plan);
 
   const hint = value.mode === 'NOW'
     ? 'Đăng ngay, không chờ lịch.'
     : value.mode === 'QUEUE'
-      ? `Tự động xếp lịch cách nhau ${currentInterval} phút/bài, ${windowText}.`
+      ? (plan?.enabled ? `Khung giờ ${plan.start}–${plan.end}` : 'Không giới hạn khung giờ')
       : outside
         ? `Giờ này nằm ngoài khung ${plan?.start}–${plan?.end}: bài sẽ chờ tới khi khung mở.`
         : `Bắt đầu từ ${value.at ? value.at.format('HH:mm DD/MM') : 'giờ hẹn'}, các bài sau tự động cách nhau ${currentInterval} phút.`;
@@ -72,42 +71,29 @@ export default function ScheduleChoice({ value, onChange, modes = ['NOW', 'QUEUE
 
       {/* Thanh chọn Giãn cách phút (Hiển thị khi Xếp vào lịch hoặc Hẹn giờ) */}
       {value.mode !== 'NOW' && (
-        <div className="mt-2.5 p-2.5 bg-slate-900/90 rounded-xl border border-sky-500/25 flex flex-wrap items-center justify-between gap-2 shadow-xs">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-xs font-bold text-sky-300 flex items-center gap-1 shrink-0">
-              <ClockCircleOutlined className="text-sky-400" /> Giãn cách bài:
-            </span>
-            {[10, 15, 20, 30, 60].map((mins) => {
-              const active = currentInterval === mins;
-              return (
-                <button
-                  key={mins}
-                  type="button"
-                  onClick={() => onChange({ ...value, intervalMinutes: mins })}
-                  className={`px-2 py-0.5 rounded-lg text-xs font-semibold transition-all border cursor-pointer ${
-                    active
-                      ? 'bg-sky-500/25 border-sky-400 text-sky-200 ring-1 ring-sky-500/40 shadow-sm font-bold'
-                      : 'bg-slate-800 text-slate-400 border-slate-700 hover:border-slate-600 hover:text-slate-200'
-                  }`}
-                  title={mins === 20 ? 'Khuyên dùng cho cùng 1 Nhóm/Page để tránh spam Facebook' : undefined}
-                >
-                  {mins}p {mins === 20 ? '⭐ Khuyên dùng' : ''}
-                </button>
-              );
-            })}
-            <InputNumber
-              size="small"
-              min={1}
-              max={360}
-              value={currentInterval}
-              onChange={(v) => onChange({ ...value, intervalMinutes: typeof v === 'number' ? v : 20 })}
-              addonAfter="phút/bài"
-              className="w-28 !text-xs"
-            />
-          </div>
-          <span className="text-[11px] text-slate-400 italic">
-            Mỗi bài đăng cách nhau <b>{currentInterval} phút</b>
-          </span>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <Segmented
+            size="small"
+            value={[1, 2, 5, 10, 20].includes(currentInterval) ? currentInterval : -1}
+            onChange={(v) => { if (typeof v === 'number' && v > 0) onChange({ ...value, intervalMinutes: v }); }}
+            options={[
+              { value: 1, label: '1p', title: '2 Worker song song, ~2 bài/phút' },
+              { value: 2, label: '2p', title: 'Nhanh, ~1 bài/phút' },
+              { value: 5, label: '5p', title: '5 phút/bài' },
+              { value: 10, label: '10p', title: '10 phút/bài' },
+              { value: 20, label: '20p', title: 'An toàn, tránh checkpoint' },
+            ]}
+          />
+          <InputNumber
+            size="small"
+            min={1}
+            max={360}
+            value={currentInterval}
+            onChange={(v) => onChange({ ...value, intervalMinutes: typeof v === 'number' ? v : 1 })}
+            addonAfter="phút"
+            className="w-28 !text-xs"
+            aria-label="Số phút giữa các bài"
+          />
         </div>
       )}
 
@@ -115,7 +101,7 @@ export default function ScheduleChoice({ value, onChange, modes = ['NOW', 'QUEUE
         <div className={`schedule-choice-hint${outside ? ' is-warn' : ''} flex items-center justify-between mt-1 text-xs text-slate-400`}>
           <span>{hint}</span>
           <button type="button" className="schedule-choice-edit hover:text-sky-400 flex items-center gap-1 cursor-pointer font-medium ml-2" onClick={openScheduleSettings}>
-            <SettingOutlined /> Cài đặt lịch chung
+            <SettingOutlined /> Cài đặt
           </button>
         </div>
       )}

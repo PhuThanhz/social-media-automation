@@ -86,6 +86,30 @@ public class SocialAccountController {
         return null;
     }
 
+    public static String sanitizeCookie(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        StringBuilder sb = new StringBuilder();
+        for (String part : raw.split(";")) {
+            String trimmed = part.trim();
+            int eq = trimmed.indexOf('=');
+            if (eq > 0) {
+                String name = trimmed.substring(0, eq).trim();
+                String val = trimmed.substring(eq + 1).trim();
+                if (name.matches("^[a-zA-Z0-9_\\-\\.]+$")
+                        && !name.equalsIgnoreCase("class")
+                        && !name.equalsIgnoreCase("style")
+                        && !name.startsWith("data-")
+                        && !val.contains("<")
+                        && !val.contains(">")
+                        && val.length() < 4096) {
+                    if (sb.length() > 0) sb.append("; ");
+                    sb.append(name).append("=").append(val);
+                }
+            }
+        }
+        return sb.length() > 0 ? sb.toString() : raw.trim();
+    }
+
     @PostMapping("/sync-via-cookie")
     public ResponseEntity<Map<String, Object>> syncViaCookie(@RequestBody Map<String, String> request, Authentication authentication) {
         User user = resolveUser(authentication);
@@ -207,9 +231,10 @@ public class SocialAccountController {
      */
     @PostMapping("/sync-fb-cookie")
     public ResponseEntity<Map<String, Object>> syncFacebookCookie(@RequestBody Map<String, Object> body, Authentication authentication) {
-        String cookie = body != null && body.get("cookieString") != null ? body.get("cookieString").toString().trim() : "";
+        String rawCookie = body != null && body.get("cookieString") != null ? body.get("cookieString").toString().trim() : "";
+        String cookie = sanitizeCookie(rawCookie);
         String cUser = extractCUser(cookie);
-        if (cUser == null || !cookie.contains("xs=")) {
+        if (cUser == null || cookie == null || !cookie.contains("xs=")) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Cookie không hợp lệ hoặc thiếu c_user/xs"));
         }
         User user = resolveUser(authentication);
@@ -267,7 +292,11 @@ public class SocialAccountController {
         SocialAccount existing = socialAccountService.getAccountsByUserId(user.getId()).stream().filter(a -> a.getId().equals(id)).findFirst().orElse(null);
         if (existing == null) return ResponseEntity.notFound().build();
         if (request.getAccessToken() != null) {
-            String newCookie = request.getAccessToken();
+            String newCookie = sanitizeCookie(request.getAccessToken());
+            if (newCookie == null || newCookie.isBlank() || !newCookie.contains("xs=")) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message",
+                        "Cookie không hợp lệ hoặc thiếu mã phiên xs. Vui lòng copy đúng chuỗi Cookie Facebook (dạng c_user=...; xs=...)."));
+            }
             // c_user luôn là UID nick cá nhân. Cookie có c_user = ID của chính Fanpage là cookie lai (xs của Via
             // ghép với ID Page) — Facebook từ chối, Page bị báo hết hạn và tách khỏi Via. Chặn từ đầu.
             String incomingCUser = extractCUser(newCookie);

@@ -2484,8 +2484,16 @@ export default function NewsCardStudio() {
                 </div>
               </div>
 
-              <Button type="primary" block icon={<RobotOutlined />} loading={active.headlineLoading} onClick={() => runPackage(active)}>
-                AI soạn bài (tiêu đề, caption, tóm tắt, nhãn)
+              <Button
+                type="primary"
+                block
+                loading={active.headlineLoading}
+                onClick={() => runPackage(active)}
+                className="!h-10 !rounded-xl !bg-gradient-to-r !from-blue-600 !via-indigo-600 !to-cyan-600 hover:!from-blue-500 hover:!to-cyan-500 !border-sky-400/30 !shadow-md !shadow-blue-600/20 font-bold text-xs sm:text-[13px] flex items-center justify-center gap-1.5 transition-all"
+                title="Tự động tạo tiêu đề, caption, tóm tắt và gợi ý nhãn"
+              >
+                <span className="text-sm">✨</span>
+                <span>AI Soạn bài tự động (Trọn gói)</span>
               </Button>
               {checkedItems.length > 1 && (
                 <Button
@@ -2494,7 +2502,7 @@ export default function NewsCardStudio() {
                   icon={<RobotOutlined />}
                   loading={batchCaptionLoading}
                   onClick={runPackageForAllChecked}
-                  className="mt-1 text-xs text-blue-300 border-blue-500/30 hover:border-blue-400"
+                  className="mt-1.5 !h-8 text-xs text-sky-300 !bg-sky-950/40 border-sky-500/30 hover:border-sky-400 !rounded-lg"
                 >
                   {batchCaptionProgress || `AI soạn bài cho tất cả ${checkedItems.length} bài chọn`}
                 </Button>
@@ -3014,7 +3022,7 @@ export default function NewsCardStudio() {
                     key: 'design',
                     label: (
                       <span className="flex items-center gap-1.5">
-                        <span>Thiết kế & Khung</span>
+                        <span>Thiết kế</span>
                         {s.useCustomFrame && s.customFrameUrl && (
                           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                         )}

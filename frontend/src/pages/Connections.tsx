@@ -56,6 +56,7 @@ import {
   ArrowRightOutlined,
   ReloadOutlined,
   LoginOutlined,
+  MoreOutlined,
   ClearOutlined,
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -254,7 +255,7 @@ const StatusBadge = ({ account, onQuickUpdate }: { account: SocialAccount; onQui
 
   if (status === 'EXPIRING_SOON' && !isCookie) {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/15 text-amber-300 border border-amber-500/30">
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/15 text-amber-300 border border-amber-500/30 whitespace-nowrap">
         <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
         Sắp hết hạn
       </span>
@@ -263,17 +264,17 @@ const StatusBadge = ({ account, onQuickUpdate }: { account: SocialAccount; onQui
 
   if (status === 'OK') {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
-        Hoạt động tốt
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 whitespace-nowrap">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+        Hoạt động
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800/80 text-slate-400 border border-slate-700/60">
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800/80 text-slate-400 border border-slate-700/60 whitespace-nowrap">
       <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
-      Chưa xác định
+      Chưa kiểm tra
     </span>
   );
 };
@@ -315,7 +316,7 @@ const Connections = () => {
   const [personalViaForm] = Form.useForm();
 
   // State & Watchers cho Modal Thêm Via phân tầng
-  const [viaInputMode, setViaInputMode] = useState<'structured' | 'quick'>('structured');
+  const [viaInputMode, setViaInputMode] = useState<'structured' | 'quick'>('quick');
   const watchedViaCUser = Form.useWatch('cUser', personalViaForm) || '';
   const watchedViaXs = Form.useWatch('xs', personalViaForm) || '';
   const watchedViaSecurity = Form.useWatch('securityCookies', personalViaForm) || '';
@@ -735,6 +736,8 @@ const Connections = () => {
     }));
   }, [publishableAccounts]);
 
+  const hasMixedMethods = publishableAccounts.some((a) => !isPersonalCookieType(a.accountType));
+
   // Cột hiển thị bảng Fanpage con
   const makePageColumns = (showViaColumn = false) => [
     {
@@ -765,9 +768,7 @@ const Connections = () => {
                 )}
               </div>
               <div className="flex items-center gap-1.5 mt-1">
-                <span className="font-mono text-xs text-slate-300 bg-slate-800/90 px-2 py-0.5 rounded border border-slate-700/60">
-                  ID: {record.platformAccountId}
-                </span>
+                <span className="font-mono text-xs text-slate-400">{record.platformAccountId}</span>
                 <Tooltip title="Sao chép ID">
                   <Button
                     type="text"
@@ -805,6 +806,7 @@ const Connections = () => {
           },
         ]
       : []),
+    ...(hasMixedMethods ? [
     {
       title: 'Phương thức',
       dataIndex: 'accountType',
@@ -825,6 +827,7 @@ const Connections = () => {
         );
       },
     },
+    ] : []),
     {
       title: 'Trạng thái',
       key: 'status',
@@ -840,41 +843,17 @@ const Connections = () => {
       ),
     },
     {
-      title: 'Giới hạn',
-      key: 'limit',
-      width: 130,
-      render: (_: any, record: SocialAccount) =>
-        record.maxPostsPerDay ? (
-          <span className="text-[13px] font-semibold text-sky-300 bg-sky-500/10 border border-sky-500/20 px-2.5 py-0.5 rounded whitespace-nowrap">
-            {record.maxPostsPerDay} bài/ngày
-          </span>
-        ) : (
-          <span className="text-[13px] text-slate-400">Mặc định</span>
-        ),
-    },
-    {
-      title: 'Dự phòng / Proxy',
-      key: 'backupAndProxy',
+      title: 'Tùy chỉnh',
+      key: 'custom',
       render: (_: any, record: SocialAccount) => {
         const backupAcc = publishableAccounts.find((a) => a.id === record.backupAccountId);
-        const hasProxy = Boolean(record.proxyUrl);
-
-        return (
-          <div className="flex flex-col gap-0.5 text-[13px]">
-            {backupAcc ? (
-              <span className="text-slate-200 truncate max-w-[170px]" title={`Dự phòng: ${backupAcc.pageName || backupAcc.platformAccountId}`}>
-                <span className="text-slate-400">Dự phòng:</span> {backupAcc.pageName || backupAcc.platformAccountId}
-              </span>
-            ) : null}
-            {hasProxy ? (
-              <span className="text-emerald-300 font-mono text-xs truncate max-w-[170px]" title={record.proxyUrl}>
-                <GlobalOutlined className="mr-1 text-xs" />
-                {record.proxyUrl}
-              </span>
-            ) : null}
-            {!backupAcc && !hasProxy && <span className="text-slate-400 text-[13px]">Mặc định</span>}
-          </div>
-        );
+        const parts: React.ReactNode[] = [];
+        if (record.maxPostsPerDay) parts.push(<span key="lim" className="text-sky-300">{record.maxPostsPerDay} bài/ngày</span>);
+        if (backupAcc) parts.push(<span key="bak" className="text-slate-200 truncate max-w-[170px]" title={backupAcc.pageName || backupAcc.platformAccountId}>Dự phòng: {backupAcc.pageName || backupAcc.platformAccountId}</span>);
+        if (record.proxyUrl) parts.push(<span key="px" className="text-emerald-300 font-mono text-xs truncate max-w-[170px]" title={record.proxyUrl}><GlobalOutlined className="mr-1 text-xs" />{record.proxyUrl}</span>);
+        return parts.length
+          ? <div className="flex flex-col gap-0.5 text-[13px] whitespace-nowrap">{parts}</div>
+          : <span className="text-[13px] text-slate-400 whitespace-nowrap">Mặc định</span>;
       },
     },
     {
@@ -997,13 +976,10 @@ const Connections = () => {
               <div className="w-8 h-8 rounded-lg bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400">
                 <ApiOutlined />
               </div>
-              <span>Quản lý kết nối Via & Fanpage</span>
+              <span className="whitespace-nowrap">Via & Fanpage</span>
             </Title>
-            <Text className="text-xs text-slate-300">
-              Xem rõ cấu trúc phân cấp: Via cá nhân nào đang nắm giữ những Fanpage nào, đồng bộ Cookie tức thì khi hết hạn
-            </Text>
           </div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center justify-end gap-2.5">
           {expiredAccounts.length > 0 && (
             <Button
               type="primary"
@@ -1194,9 +1170,7 @@ const Connections = () => {
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="font-bold text-slate-100 text-base">{viaName}</span>
-                            <span className="font-mono text-xs text-slate-300 bg-slate-800 px-2 py-0.5 rounded-md border border-slate-700/80">
-                              UID: {cUser}
-                            </span>
+                            <span className="font-mono text-xs text-slate-400">{cUser}</span>
                             <StatusBadge
                               account={viaAccount}
                               onQuickUpdate={() => {
@@ -1205,19 +1179,16 @@ const Connections = () => {
                               }}
                             />
                           </div>
-                          <div className="flex flex-wrap items-center gap-3 text-[13px] text-slate-300 mt-1">
-                            <span className="flex items-center gap-1.5">
-                              <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
-                              Quản trị: <b className="text-sky-300 font-semibold">{pages.length} Fanpage</b> trực thuộc
-                            </span>
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 mt-1">
+                            <span>{pages.length} Page</span>
                             {viaAccount.proxyUrl && (
                               <span className="flex items-center gap-1">
-                                · Proxy riêng: <span className="font-mono text-emerald-400">{viaAccount.proxyUrl}</span>
+                                · Proxy: <span className="font-mono text-emerald-400">{viaAccount.proxyUrl}</span>
                               </span>
                             )}
                             {viaAccount.tokenCheckedAt && (
                               <span className="text-slate-400">
-                                · Kiểm tra: {new Date(viaAccount.tokenCheckedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                                · kiểm tra {new Date(viaAccount.tokenCheckedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                               </span>
                             )}
                           </div>
@@ -1253,56 +1224,46 @@ const Connections = () => {
                           </Button>
                         )}
 
-                        <Button
-                          icon={<LoginOutlined />}
-                          size="small"
-                          onClick={() => setFbLoginModal({ account: viaAccount })}
-                          className="text-xs text-slate-300 bg-slate-800/80 border-slate-700 hover:bg-slate-700 rounded-lg transition-all"
-                        >
-                          Đăng nhập lại
-                        </Button>
+                        <Tooltip title="Kiểm tra cookie">
+                          <Button
+                            type="text"
+                            size="small"
+                            icon={<SafetyCertificateOutlined />}
+                            loading={checkingHealthId === viaAccount.id}
+                            onClick={() => checkHealthMutation.mutate(viaAccount.id)}
+                            className="text-slate-400 hover:text-emerald-400 rounded-lg"
+                            aria-label="Kiểm tra cookie"
+                          />
+                        </Tooltip>
 
-                        <Button
-                          icon={<SafetyCertificateOutlined spin={checkingHealthId === viaAccount.id} />}
-                          size="small"
-                          loading={checkingHealthId === viaAccount.id}
-                          onClick={() => checkHealthMutation.mutate(viaAccount.id)}
-                          className="text-xs text-emerald-400 bg-emerald-950/20 border-emerald-900/60 hover:bg-emerald-950/40 rounded-lg transition-all"
-                          title="Kiểm tra Cookie sống/chết tức thì qua Playwright"
-                        >
-                          Kiểm tra Cookie
-                        </Button>
-
-                        <Button
-                          type="default"
-                          size="small"
-                          icon={<SyncOutlined />}
-                          onClick={() => {
-                            setLatestPageScan(null);
-                            setPageAuditSource(viaAccount);
+                        <Dropdown
+                          trigger={['click']}
+                          menu={{
+                            items: [
+                              { key: 'login', icon: <LoginOutlined />, label: 'Đăng nhập lại' },
+                              { key: 'scan', icon: <SyncOutlined />, label: 'Quét & kiểm kê Page' },
+                              { key: 'add', icon: <PlusOutlined />, label: 'Thêm Page vào Via' },
+                            ],
+                            onClick: ({ key }) => {
+                              if (key === 'login') {
+                                setFbLoginModal({ account: viaAccount });
+                              } else if (key === 'scan') {
+                                setLatestPageScan(null);
+                                setPageAuditSource(viaAccount);
+                              } else if (key === 'add') {
+                                form.setFieldsValue({
+                                  platform: 'FACEBOOK_PAGE',
+                                  accountType: 'PERSONAL_COOKIE',
+                                  accessToken: viaAccount.accessToken,
+                                  postingIdentityAccountId: viaAccount.id,
+                                });
+                                setIsModalVisible(true);
+                              }
+                            },
                           }}
-                          className="text-xs text-blue-400 border-blue-900/60 bg-blue-950/20 hover:bg-blue-950/40 rounded-lg transition-all"
                         >
-                          Quét & Kiểm kê Page
-                        </Button>
-
-                        <Button
-                          type="default"
-                          size="small"
-                          icon={<PlusOutlined />}
-                          onClick={() => {
-                            form.setFieldsValue({
-                              platform: 'FACEBOOK_PAGE',
-                              accountType: 'PERSONAL_COOKIE',
-                              accessToken: viaAccount.accessToken,
-                              postingIdentityAccountId: viaAccount.id,
-                            });
-                            setIsModalVisible(true);
-                          }}
-                          className="text-xs text-emerald-400 border-emerald-900/60 bg-emerald-950/20 hover:bg-emerald-950/40 rounded-lg transition-all"
-                        >
-                          Thêm Page vào Via
-                        </Button>
+                          <Button type="text" size="small" icon={<MoreOutlined />} className="text-slate-400 hover:text-slate-200 rounded-lg" aria-label="Thêm thao tác" />
+                        </Dropdown>
 
                         <Button
                           type="text"
@@ -1352,12 +1313,13 @@ const Connections = () => {
                         </div>
                       ) : (
                         <Table
+                          className="conn-page-table sub-page-table"
                           columns={makePageColumns(false)}
                           dataSource={displayedPages}
                           rowKey="id"
                           pagination={false}
                           size="small"
-                          className="sub-page-table"
+                          scroll={{ x: 950 }}
                         />
                       )}
                     </div>
@@ -1377,11 +1339,13 @@ const Connections = () => {
                 <span className="text-xs text-slate-500">Các kết nối qua Graph API, Threads, TikTok không phụ thuộc nick Via</span>
               </div>
               <Table
+                className="conn-page-table"
                 columns={makePageColumns(false)}
                 dataSource={viaGroupedData.independentPages}
                 rowKey="id"
                 pagination={false}
                 size="small"
+                scroll={{ x: 950 }}
               />
             </div>
           )}
@@ -1394,6 +1358,7 @@ const Connections = () => {
       {viewMode === 'table' && (
         <Card variant="borderless" className="shadow-sm overflow-hidden p-0">
           <Table
+            className="conn-page-table"
             columns={makePageColumns(true)}
             dataSource={filteredAccounts}
             rowKey="id"
@@ -1635,7 +1600,6 @@ const Connections = () => {
                 <Button
                   size="small"
                   type="dashed"
-                  icon={<CopyOutlined />}
                   onClick={async () => {
                     try {
                       const text = await navigator.clipboard.readText();
@@ -2029,7 +1993,7 @@ const Connections = () => {
         title={
           <div className="flex items-center gap-2 text-slate-100 pb-2 border-b border-slate-800">
             <UserOutlined className="text-blue-500 text-lg" />
-            <span className="font-semibold text-base">Thêm Via Facebook Cá Nhân</span>
+            <span className="font-semibold text-base">Thêm Via cá nhân</span>
           </div>
         }
         open={personalViaModalOpen}
@@ -2038,11 +2002,11 @@ const Connections = () => {
             setPersonalViaModalOpen(false);
             personalViaForm.resetFields();
             setRawCookieVia('');
-            setViaInputMode('structured');
+            setViaInputMode('quick');
           }
         }}
         footer={null}
-        width={580}
+        width={880}
         centered
         className="dark-modal"
       >
@@ -2092,7 +2056,7 @@ const Connections = () => {
         >
           {/* Thanh đăng nhập tự động Chrome */}
           <div className="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-700/80 bg-slate-900/60">
-            <span className="text-xs text-slate-400">Không muốn copy cookie? Tự đăng nhập trong cửa sổ Chrome, hệ thống tự lấy cookie.</span>
+            <span className="text-xs text-slate-400">Hoặc đăng nhập trong Chrome để tự lấy cookie</span>
             <Button
               size="small"
               type="primary"
@@ -2116,21 +2080,15 @@ const Connections = () => {
               onChange={(val) => setViaInputMode(val as 'structured' | 'quick')}
               options={[
                 {
-                  value: 'structured',
+                  value: 'quick',
                   label: (
-                    <Flex align="center" gap={6} className="px-2 py-1">
-                      <SafetyCertificateOutlined className="text-blue-400" />
-                      <span className="font-semibold text-xs">📋 Nhập Từng Ô Phân Tầng (Khuyên dùng)</span>
-                    </Flex>
+                    <span className="px-2 text-xs font-semibold">Dán chuỗi</span>
                   ),
                 },
                 {
-                  value: 'quick',
+                  value: 'structured',
                   label: (
-                    <Flex align="center" gap={6} className="px-2 py-1">
-                      <ThunderboltOutlined className="text-amber-400" />
-                      <span className="font-semibold text-xs">⚡ Dán Nhanh Cookie (Tự Bóc Tách)</span>
-                    </Flex>
+                    <span className="px-2 text-xs font-semibold">Từng ô</span>
                   ),
                 },
               ]}
@@ -2162,7 +2120,7 @@ const Connections = () => {
                           vpd: parsed.cookies.vpd,
                           dpr: parsed.cookies.dpr,
                         });
-                        message.success(`Đã tự động điền ${parsed.count} cookie từ Clipboard vào các cột!`);
+                        message.success(`Đã điền ${parsed.count} cookie`);
                       }
                     } catch {
                       message.error('Không thể đọc Clipboard!');
@@ -2170,151 +2128,88 @@ const Connections = () => {
                   }}
                   className="text-xs"
                 >
-                  📋 Dán tự động điền tất cả các tầng
+                  Dán tự động
                 </Button>
               </div>
 
-              {/* TẦNG 1: ĐỊNH DANH VIA */}
-              <div className="p-3.5 rounded-2xl border border-blue-500/30 bg-blue-950/20 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[13px] font-bold text-blue-300 flex items-center gap-1.5">
-                    <span className="w-5 h-5 rounded-full bg-blue-500/30 text-blue-300 flex items-center justify-center text-xs font-bold">1</span>
-                    TẦNG 1: ĐỊNH DANH NICK / VIA
-                  </span>
-                  <Tag color="blue" className="!text-xs m-0 font-semibold">Bắt buộc</Tag>
-                </div>
-
+              <div className="grid grid-cols-3 gap-3">
                 <Form.Item
                   name="profileLabel"
-                  label={<span className="text-[13px] font-semibold text-slate-200">Tên gợi nhớ của Nick</span>}
-                  rules={[{ required: true, message: 'Vui lòng nhập Tên gợi nhớ!' }]}
-                  className="!mb-2"
+                  label={<span className="text-xs text-slate-300">Tên gợi nhớ</span>}
+                  rules={[{ required: true, message: 'Nhập tên gợi nhớ' }]}
+                  className="!mb-0"
                 >
-                  <Input
-                    placeholder="Ví dụ: Nick Chính 01, Nick Nuôi, Nick Đăng Phim..."
-                    className="rounded-xl bg-slate-900/90 border-slate-700/80"
-                  />
+                  <Input placeholder="Nick chính 01" className="rounded-lg bg-slate-900/90 border-slate-700" />
                 </Form.Item>
-
                 <Form.Item
                   name="cUser"
-                  label={<span className="text-[13px] font-semibold text-slate-200">UID Facebook cá nhân (c_user)</span>}
+                  label={<Tooltip title="UID Facebook cá nhân"><code>c_user</code></Tooltip>}
                   rules={[
-                    { required: true, message: 'Vui lòng nhập UID Facebook (c_user)!' },
-                    { pattern: /^\d{5,}$/, message: 'c_user phải là dãy số ID Facebook.' },
+                    { required: true, message: 'Nhập c_user' },
+                    { pattern: /^\d{5,}$/, message: 'c_user phải là dãy số' },
                   ]}
                   className="!mb-0"
                 >
-                  <Input
-                    placeholder="Ví dụ: 100023403136194 (dãy số c_user trong cookie hoặc ID trang cá nhân)"
-                    className="rounded-xl font-mono text-[13px] bg-slate-900/90 border-slate-700/80"
-                  />
+                  <Input placeholder="100023403136194" className="rounded-lg font-mono text-xs bg-slate-900/90 border-slate-700" />
                 </Form.Item>
-              </div>
-
-              {/* TẦNG 2: PHIÊN ĐĂNG NHẬP PLAYWRIGHT */}
-              <div className="p-3.5 rounded-2xl border border-indigo-500/30 bg-indigo-950/20 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[13px] font-bold text-indigo-300 flex items-center gap-1.5">
-                    <span className="w-5 h-5 rounded-full bg-indigo-500/30 text-indigo-300 flex items-center justify-center text-xs font-bold">2</span>
-                    TẦNG 2: KHÓA PHIÊN ĐĂNG NHẬP (xs)
-                  </span>
-                  <Tag color="blue" className="!text-xs m-0 font-semibold">Bắt buộc</Tag>
-                </div>
-
                 <Form.Item
                   name="xs"
-                  rules={[{ required: true, message: 'Vui lòng nhập mã phiên xs!' }]}
+                  label={<Tooltip title="Mã phiên đăng nhập"><code>xs</code></Tooltip>}
+                  rules={[{ required: true, message: 'Nhập xs' }]}
                   className="!mb-0"
                 >
-                  <Input.Password
-                    placeholder="Dán chuỗi xs... (Ví dụ: 49%3A8J7w...)"
-                    className="rounded-xl font-mono text-[13px] bg-slate-900/90 border-slate-700/80"
-                  />
+                  <Input.Password placeholder="49%3A8J7w..." className="rounded-lg font-mono text-xs bg-slate-900/90 border-slate-700" />
                 </Form.Item>
-                <div className="text-xs text-slate-300">
-                  🔑 Session token bí mật giúp bot Playwright tự động tương tác Facebook không cần nhập mật khẩu.
+              </div>
+
+
+              <div className="pt-1">
+                <div className="text-xs text-emerald-300 mb-2">Chống checkpoint (nên có)</div>
+                <div className="grid grid-cols-4 gap-3">
+                  <Form.Item name="datr" label={<Tooltip title="Nhận diện thiết bị quen thuộc"><code>datr</code></Tooltip>} className="!mb-0">
+                    <Input placeholder="imv2alUXVRr_..." className="rounded-lg font-mono text-xs bg-slate-900/90 border-slate-700" />
+                  </Form.Item>
+                  <Form.Item name="sb" label={<Tooltip title="Ràng buộc phiên với trình duyệt"><code>sb</code></Tooltip>} className="!mb-0">
+                    <Input placeholder="f1kNaidy..." className="rounded-lg font-mono text-xs bg-slate-900/90 border-slate-700" />
+                  </Form.Item>
+                  <Form.Item name="fr" label={<Tooltip title="Mã bảo mật phiên"><code>fr</code></Tooltip>} className="!mb-0">
+                    <Input.Password placeholder="1MB8n..." className="rounded-lg font-mono text-xs bg-slate-900/90 border-slate-700" />
+                  </Form.Item>
+                  <Form.Item name="wd" label={<Tooltip title="Kích thước màn hình"><code>wd</code></Tooltip>} className="!mb-0">
+                    <Input placeholder="1920x1080" className="rounded-lg font-mono text-xs bg-slate-900/90 border-slate-700" />
+                  </Form.Item>
                 </div>
               </div>
 
-              {/* TẦNG 3: KHÁNG CHECKPOINT & CHỐNG VĂNG NICK */}
-              <div className="p-3.5 rounded-2xl border border-emerald-500/30 bg-emerald-950/20 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[13px] font-bold text-emerald-300 flex items-center gap-1.5">
-                    <span className="w-5 h-5 rounded-full bg-emerald-500/30 text-emerald-300 flex items-center justify-center text-xs font-bold">3</span>
-                    TẦNG 3: COOKIE BẢO MẬT KHÁNG CHECKPOINT (datr, sb, fr, wd)
-                  </span>
-                  <Tag color="green" className="!text-xs m-0 font-semibold">Khuyên dùng (Kháng văng nick)</Tag>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2.5">
-                  <Form.Item name="datr" label={<span className="text-xs text-slate-300 font-semibold"><code>datr</code> (Thẻ căn cước thiết bị)</span>} className="!mb-0">
-                    <Input placeholder="VD: imv2alUXVRr_..." className="rounded-xl font-mono text-xs bg-slate-900/90 border-slate-700" />
-                  </Form.Item>
-                  <Form.Item name="sb" label={<span className="text-xs text-slate-300 font-semibold"><code>sb</code> (Ràng buộc trình duyệt)</span>} className="!mb-0">
-                    <Input placeholder="VD: f1kNaidy..." className="rounded-xl font-mono text-xs bg-slate-900/90 border-slate-700" />
-                  </Form.Item>
-                  <Form.Item name="fr" label={<span className="text-xs text-slate-300 font-semibold"><code>fr</code> (Mã bảo mật phiên)</span>} className="!mb-0">
-                    <Input.Password placeholder="VD: 1MB8n..." className="rounded-xl font-mono text-xs bg-slate-900/90 border-slate-700" />
-                  </Form.Item>
-                  <Form.Item name="wd" label={<span className="text-xs text-slate-300 font-semibold"><code>wd</code> (Kích thước màn hình)</span>} className="!mb-0">
-                    <Input placeholder="VD: 440x956 hoặc 1920x1080" className="rounded-xl font-mono text-xs bg-slate-900/90 border-slate-700" />
-                  </Form.Item>
-                </div>
-                <div className="text-xs text-slate-300">
-                  🛡️ Facebook dùng datr và sb để nhận diện thiết bị quen thuộc. Có 2 mã này bot Playwright sẽ không bị Facebook nghi ngờ checkpoint.
-                </div>
-              </div>
-
-              {/* TẦNG 4: THÔNG SỐ BỔ SUNG */}
               <Collapse
                 ghost
                 size="small"
-                className="border border-slate-800 rounded-2xl bg-slate-900/40"
                 items={[
                   {
                     key: 'extra',
-                    label: <span className="text-xs text-slate-300 font-semibold">⚙️ TẦNG 4: THÔNG SỐ DEVTOOLS BỔ SUNG (locale, vpd, dpr, khác...)</span>,
+                    label: <span className="text-xs text-slate-400">Thêm: locale, vpd, dpr, proxy · không bắt buộc</span>,
                     children: (
-                      <div className="grid grid-cols-2 gap-2.5 pt-1">
-                        <Form.Item name="locale" label={<span className="text-xs text-slate-400">locale</span>} className="!mb-1">
-                          <Input className="rounded-xl font-mono text-xs bg-slate-900 border-slate-700" placeholder="vi_VN" />
+                      <div className="grid grid-cols-2 gap-3">
+                        <Form.Item name="locale" label={<span className="text-xs text-slate-300">locale</span>} className="!mb-0">
+                          <Input className="rounded-lg font-mono text-xs bg-slate-900/90 border-slate-700" placeholder="vi_VN" />
                         </Form.Item>
-                        <Form.Item name="vpd" label={<span className="text-xs text-slate-400">vpd</span>} className="!mb-1">
-                          <Input className="rounded-xl font-mono text-xs bg-slate-900 border-slate-700" placeholder="v1%3B956x440x3" />
+                        <Form.Item name="vpd" label={<span className="text-xs text-slate-300">vpd</span>} className="!mb-0">
+                          <Input className="rounded-lg font-mono text-xs bg-slate-900/90 border-slate-700" placeholder="v1%3B956x440x3" />
                         </Form.Item>
-                        <Form.Item name="dpr" label={<span className="text-xs text-slate-400">dpr</span>} className="!mb-1">
-                          <Input className="rounded-xl font-mono text-xs bg-slate-900 border-slate-700" placeholder="2" />
+                        <Form.Item name="dpr" label={<span className="text-xs text-slate-300">dpr</span>} className="!mb-0">
+                          <Input className="rounded-lg font-mono text-xs bg-slate-900/90 border-slate-700" placeholder="2" />
                         </Form.Item>
-                        <Form.Item name="extraCookies" label={<span className="text-xs text-slate-400">Cookie khác</span>} className="!mb-1">
-                          <Input className="rounded-xl font-mono text-xs bg-slate-900 border-slate-700" placeholder="pas=...; wl_cbv=..." />
+                        <Form.Item name="extraCookies" label={<span className="text-xs text-slate-300">Cookie khác</span>} className="!mb-0">
+                          <Input className="rounded-lg font-mono text-xs bg-slate-900/90 border-slate-700" placeholder="pas=...; wl_cbv=..." />
+                        </Form.Item>
+                        <Form.Item name="proxyUrl" label={<Tooltip title="IP riêng cho nick, bỏ trống để dùng IP máy"><span className="text-xs text-slate-300">Proxy riêng</span></Tooltip>} className="!mb-0 col-span-2">
+                          <Input className="rounded-lg font-mono text-xs bg-slate-900/90 border-slate-700" placeholder="http://user:pass@103.152.x.x:8080" />
                         </Form.Item>
                       </div>
                     ),
                   },
                 ]}
               />
-
-              {/* TẦNG 5: PROXY RIÊNG CHO NICK */}
-              <div className="p-3.5 rounded-2xl border border-slate-700/80 bg-slate-900/60 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[13px] font-bold text-slate-200 flex items-center gap-1.5">
-                    <span className="w-5 h-5 rounded-full bg-slate-700 text-slate-200 flex items-center justify-center text-xs font-bold">5</span>
-                    TẦNG 5: PROXY RIÊNG CHO NICK (HTTP/SOCKS5)
-                  </span>
-                  <Tag className="!text-xs m-0">Tùy chọn</Tag>
-                </div>
-
-                <Form.Item name="proxyUrl" className="!mb-0">
-                  <Input
-                    placeholder="Ví dụ: http://user:pass@103.152.xxx.xxx:8080 (hoặc bỏ trống nếu dùng IP máy)"
-                    className="rounded-xl font-mono text-[13px] bg-slate-900/90 border-slate-700/80"
-                  />
-                </Form.Item>
-                <div className="text-xs text-slate-300">
-                  🌐 Dành cho bạn nuôi nhiều nick cần gán IP riêng cố định để chống checkpoint chùm.
-                </div>
-              </div>
             </div>
           )}
 
@@ -2324,8 +2219,7 @@ const Connections = () => {
               <div className="p-3.5 rounded-2xl border border-blue-500/30 bg-blue-950/20 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-blue-300 flex items-center gap-1.5">
-                    <ThunderboltOutlined className="text-amber-400" />
-                    Dán Chuỗi Cookie Hoặc JSON J2Team (Tự Động Bóc Tách)
+                    Chuỗi cookie hoặc JSON (J2Team, Cookie-Editor)
                   </span>
                   <Button
                     size="small"
@@ -2364,7 +2258,7 @@ const Connections = () => {
                 <Input.TextArea
                   rows={4}
                   value={rawCookieVia}
-                  placeholder="Dán toàn bộ chuỗi Cookie vào đây (ví dụ: sb=...; c_user=1000...; xs=... hoặc định dạng JSON từ J2Team / Cookie-Editor)..."
+                  placeholder="sb=...; c_user=1000...; xs=..."
                   className="rounded-xl font-mono text-[13px] bg-slate-900/90 border-slate-700/80"
                   onChange={(e) => {
                     const text = e.target.value;
@@ -2392,19 +2286,18 @@ const Connections = () => {
                         <div className="flex items-center justify-between">
                           <span className="flex items-center gap-1.5 font-semibold">
                             <CheckCircleOutlined className="text-emerald-400" />
-                            Đã bóc tách thành công UID: <span className="font-mono text-white underline">{parsed.cUser}</span>
+                            Đã nhận UID <span className="font-mono text-white">{parsed.cUser}</span>
                           </span>
-                          <Tag color="success" className="mr-0 font-mono">Đã lấy c_user + xs</Tag>
                         </div>
                         <div className="text-xs text-emerald-200/90 flex items-center justify-between pt-1 border-t border-emerald-500/20">
-                          <span>{parsed.hasDatrOrSb ? '🛡️ Đã có mã kháng checkpoint (sb/datr)!' : '⚠️ Chưa thấy sb/datr (Vẫn đăng được nhưng nên copy full cookie)'}</span>
+                          <span>{parsed.hasDatrOrSb ? 'Có datr/sb' : 'Thiếu datr/sb, nên dán đủ cookie'}</span>
                           <Button
                             type="link"
                             size="small"
                             onClick={() => setViaInputMode('structured')}
                             className="text-xs text-emerald-300 hover:text-white p-0 h-auto"
                           >
-                            Xem chi tiết các ô phân tầng →
+                            Xem từng ô
                           </Button>
                         </div>
                       </div>
@@ -2420,7 +2313,7 @@ const Connections = () => {
                   }
                   return (
                     <div className="text-xs text-slate-300 flex items-center gap-1">
-                      <span>💡 Hỗ trợ: Chuỗi Cookie thô, định dạng JSON J2Team, hoặc chuỗi có chứa c_user & xs.</span>
+                      <span>Nhận chuỗi cookie thô hoặc JSON</span>
                     </div>
                   );
                 })()}
@@ -2428,52 +2321,21 @@ const Connections = () => {
 
               <Form.Item
                 name="profileLabel"
-                label={<span className="font-medium text-slate-200 text-[13px]">Tên gợi nhớ Nick / Via</span>}
-                extra={<span className="text-xs text-slate-400">Ví dụ: Nick Chính 01, Nick Nuôi, Nick Phụ 1...</span>}
+                label={<span className="text-xs text-slate-300">Tên gợi nhớ</span>}
               >
                 <Input placeholder="Ví dụ: Nick Chính 01" className="rounded-xl" />
               </Form.Item>
             </div>
           )}
 
-          {/* THƯỚC ĐO ĐỘ ĐẦY ĐỦ THÔNG SỐ CỦA VIA (LUÔN HIỂN THỊ) */}
-          <div className={`p-3 rounded-xl border transition-all ${
-            viaCompletenessScore === 3
-              ? 'border-emerald-500/40 bg-emerald-950/30'
-              : viaCompletenessScore === 2
-              ? 'border-amber-500/40 bg-amber-950/30'
-              : 'border-slate-800 bg-slate-900/50'
-          }`}>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[13px] font-bold text-slate-200">KIỂM TRA ĐỘ ĐẦY ĐỦ THÔNG SỐ CỦA VIA:</span>
-              {viaCompletenessScore === 3 ? (
-                <Tag color="success" className="font-semibold m-0">🟢 100% HOÀN HẢO (ĐÃ ĐỦ)</Tag>
-              ) : viaCompletenessScore === 2 ? (
-                <Tag color="warning" className="font-semibold m-0">🟡 ĐỦ CƠ BẢN (70%)</Tag>
-              ) : (
-                <Tag color="error" className="font-semibold m-0">❌ CHƯA ĐỦ THÔNG SỐ</Tag>
-              )}
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 text-[13px] mb-1.5">
-              <div className={`p-1.5 rounded-lg border text-center ${hasViaCUser ? 'border-emerald-500/30 bg-emerald-950/40 text-emerald-300' : 'border-slate-800 bg-slate-900/60 text-slate-400'}`}>
-                👤 UID: {hasViaCUser ? '✅ Đã có' : '❌ Chưa có'}
-              </div>
-              <div className={`p-1.5 rounded-lg border text-center ${hasViaXs ? 'border-emerald-500/30 bg-emerald-950/40 text-emerald-300' : 'border-slate-800 bg-slate-900/60 text-slate-400'}`}>
-                🔑 Phiên xs: {hasViaXs ? '✅ Đã có' : '❌ Chưa có'}
-              </div>
-              <div className={`p-1.5 rounded-lg border text-center ${hasViaSecurity ? 'border-emerald-500/30 bg-emerald-950/40 text-emerald-300' : 'border-amber-500/30 bg-amber-950/40 text-amber-400'}`}>
-                🛡️ Kháng Checkpoint: {hasViaSecurity ? '✅ Đầy đủ' : '⚠️ Nên thêm'}
-              </div>
-            </div>
-
-            <div className="text-xs text-slate-200 leading-relaxed">
-              {viaCompletenessScore === 3
-                ? '🎉 Tuyệt vời! Nick đã có đủ toàn bộ thông số định danh, phiên làm việc và mã bảo mật (sb/datr) kháng checkpoint tối đa.'
-                : viaCompletenessScore === 2
-                ? '💡 Đã đủ điều kiện cơ bản để Playwright chạy đăng bài. Bạn nên bổ sung Cookie bảo mật ở Tầng 3 để nick không bị Facebook nghi ngờ checkpoint.'
-                : '⚠️ Bắt buộc phải có Tên gợi nhớ, UID (c_user) và Mã phiên (xs) thì hệ thống mới có thể tương tác tự động được.'}
-            </div>
+          {/* Tình trạng thông số Via */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Tag color={hasViaCUser ? 'blue' : 'default'} className="font-mono text-xs m-0">c_user {hasViaCUser ? 'OK' : 'thiếu'}</Tag>
+            <Tag color={hasViaXs ? 'blue' : 'default'} className="font-mono text-xs m-0">xs {hasViaXs ? 'OK' : 'thiếu'}</Tag>
+            <Tag color={hasViaSecurity ? 'green' : 'default'} className="font-mono text-xs m-0">datr/sb {hasViaSecurity ? 'OK' : 'nên có'}</Tag>
+            <span className={`ml-auto text-xs ${viaCompletenessScore === 3 ? 'text-emerald-300' : viaCompletenessScore === 2 ? 'text-amber-300' : 'text-slate-400'}`}>
+              {viaCompletenessScore === 3 ? 'Đủ chống checkpoint' : viaCompletenessScore === 2 ? 'Đủ để đăng' : 'Cần tên, c_user và xs'}
+            </span>
           </div>
 
           <div className="pt-3 flex justify-end gap-2.5 border-t border-slate-800">

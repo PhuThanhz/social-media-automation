@@ -18,9 +18,7 @@ import {
   CheckCircleOutlined,
   PlusOutlined,
   ThunderboltOutlined,
-  CopyOutlined,
   ScheduleOutlined,
-  RocketOutlined,
   MessageOutlined,
   StopOutlined,
   TeamOutlined,
@@ -41,7 +39,6 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
-import PostItemEditor from './PostItemEditor';
 import type { SocialAccount, PostLinkItem, ItemPreview, PostMode } from './types';
 
 const { Option } = Select;
@@ -185,105 +182,22 @@ export default function ComposeContentSection({
                 </Tag>
               )}
             </h2>
-            <p>Dán liên kết nguồn (TikTok, Threads, FB), cào báo AI, hoặc soạn bài thủ công kèm ảnh/video.</p>
-          </div>
-        </div>
-        <Button
-          type="primary"
-          size="middle"
-          icon={<PlusOutlined />}
-          onClick={addLinkItem}
-          className="rounded-xl font-semibold shrink-0"
-        >
-          Thêm bài thủ công
-        </Button>
-      </div>
-
-      {/* DÁN LINK HÀNG LOẠT — gọn: tiêu đề, ô dán, 1 hàng nút. Bảng chi tiết là nút chính. */}
-      <div className="bulk-paste-simple">
-        <div className="bulk-paste-simple-head">
-          <div>
-            <div className="bulk-paste-simple-title">Dán link hàng loạt</div>
-            <div className="bulk-paste-simple-sub">Mỗi dòng 1 link Facebook, Threads, TikTok, Reels/Shorts, Reddit. Tự lấy caption và ảnh/video.</div>
-          </div>
-          {bulkText && (
-            <button type="button" className="bulk-paste-simple-clear" onClick={() => setBulkText('')}>
-              <ClearOutlined /> Xóa
-            </button>
-          )}
-        </div>
-
-        <textarea
-          rows={5}
-          value={bulkText}
-          onChange={(e) => setBulkText(e.target.value)}
-          placeholder={'Dán danh sách link vào đây, mỗi dòng 1 link\nhttps://www.facebook.com/...\nhttps://www.threads.net/...\nhttps://www.tiktok.com/@user/video/...'}
-          className="bulk-paste-simple-input"
-        />
-
-        <div className="bulk-paste-simple-foot">
-          <div className="bulk-paste-simple-status">
-            {bulkPasteSummary.finalUrls.length > 0 ? (
-              <>
-                <span className="is-ok"><CheckCircleOutlined /> {bulkPasteSummary.finalUrls.length} link hợp lệ</span>
-                {bulkPasteSummary.duplicateInHistoryCount > 0 && (
-                  <span className="is-warn">{bulkPasteSummary.duplicateInHistoryCount} link đã từng đăng</span>
-                )}
-                {bulkPasteSummary.invalidLineCount > 0 && (
-                  <span>{bulkPasteSummary.invalidLineCount} dòng không phải link</span>
-                )}
-              </>
-            ) : (
-              <span>Chưa có link nào</span>
-            )}
-          </div>
-
-          <div className="bulk-paste-simple-actions">
-            <Button
-              size="large"
-              icon={<CopyOutlined />}
-              onClick={async () => {
-                try {
-                  const text = await navigator.clipboard.readText();
-                  if (text && text.trim()) {
-                    setBulkText((prev) => (prev ? prev + '\n' + text.trim() : text.trim()));
-                    message.success('Đã dán link từ Clipboard');
-                  } else {
-                    message.info('Bộ nhớ tạm đang trống');
-                  }
-                } catch {
-                  message.warning('Trình duyệt chặn đọc clipboard, hãy bấm Ctrl+V vào ô trên');
-                }
-              }}
-            >
-              Dán từ Clipboard
-            </Button>
-            {bulkPasteSummary.finalUrls.length > 0 && (
-              <Button
-                size="large"
-                icon={<RocketOutlined />}
-                onClick={() => {
-                  handleApplyBulkPaste();
-                  setBulkText('');
-                }}
-              >
-                Nạp nhanh {bulkPasteSummary.finalUrls.length} bài
-              </Button>
-            )}
-            <Button
-              type="primary"
-              size="large"
-              icon={<TableOutlined />}
-              onClick={() => setBulkModalVisible(true)}
-              className="bulk-paste-simple-primary"
-            >
-              {bulkPasteSummary.finalUrls.length > 0
-                ? `Mở bảng chi tiết (${bulkPasteSummary.finalUrls.length})`
-                : 'Mở bảng chi tiết'}
-            </Button>
           </div>
         </div>
       </div>
+
+      {/* Thêm bài: chỉ một lối vào là bảng dán link (dán, cào, xem trước, duyệt đều nằm trong đó) */}
+      <button type="button" className="add-links-tile" onClick={() => setBulkModalVisible(true)}>
+        <span className="add-links-tile-icon"><PlusOutlined /></span>
+        <span className="add-links-tile-text">
+          <strong>
+            {bulkPasteSummary.finalUrls.length > 0
+              ? `Dán link bài viết · ${bulkPasteSummary.finalUrls.length} link đang chờ`
+              : 'Dán link bài viết'}
+          </strong>
+          <small>Facebook, Threads, TikTok, Reels</small>
+        </span>
+      </button>
 
       {/* CÁC NGUỒN CÀO BÀI KHÁC - QUICK IMPORT TOOLBAR */}
       <div className="quick-sources-toolbar">
@@ -422,7 +336,6 @@ export default function ComposeContentSection({
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-sm font-bold text-slate-100">Thao tác hàng loạt</div>
-            <div className="text-[13px] text-slate-300">Credit, hashtag, bình luận cho toàn bộ danh sách. Giờ đăng chọn ở nút Đăng.</div>
           </div>
           <span className="text-xs font-semibold text-blue-300 shrink-0 px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20">{batchToolsOpen ? 'Thu gọn' : 'Mở công cụ'}</span>
         </button>
@@ -723,58 +636,20 @@ export default function ComposeContentSection({
         </div>
       )}
 
-      {/* Mỗi bài là một tác vụ độc lập; không dùng khung cuộn lồng nhau. */}
-      <div className="poster-post-list space-y-3.5">
-        {swipeReviewItems.length > 0 && (
-          <div className="poster-swipe-launcher">
-            <div>
-              <span className="poster-swipe-launcher-icon"><EyeFilled /></span>
-              <span>
-                <strong>Duyệt nhanh từng bài</strong>
-                <small>Xem toàn bộ ảnh/video và caption, sau đó chọn giữ hoặc bỏ.</small>
-              </span>
-            </div>
-            <Button type="primary" icon={<ThunderboltOutlined />} onClick={openSwipeReview}>
-              Duyệt kiểu Tinder · {swipeReviewItems.length} bài
-            </Button>
+      {/* Bài chỉ được thêm qua bảng dán link; ở đây chỉ còn lối vào màn duyệt. */}
+      {swipeReviewItems.length > 0 && (
+        <div className="poster-swipe-launcher">
+          <div>
+            <span className="poster-swipe-launcher-icon"><EyeFilled /></span>
+            <span>
+              <strong>{swipeReviewItems.length} bài đã thêm</strong>
+            </span>
           </div>
-        )}
-        {linkItems.map((item, index) => (
-          <PostItemEditor
-            key={item.id}
-            item={item}
-            index={index}
-            isOnlyItem={linkItems.length <= 1}
-            preview={previews[item.id]}
-            manualMediaUrlInput={manualMediaUrlInputs[item.id]}
-            customTarget={customItemTargets[item.id]}
-            distributionTargetValue={isMultiDistributeActive ? calculatedDistribution[item.id]?.targetValue : undefined}
-            draggedMedia={draggedMedia?.itemId === item.id ? draggedMedia : null}
-            dragOverMedia={dragOverMedia?.itemId === item.id ? dragOverMedia : null}
-            dragOverDropzone={dragOverDropzone === item.id ? dragOverDropzone : null}
-            postMode={postMode}
-            postingIdentities={postingIdentities}
-            groupAccountsWithId={groupAccountsWithId}
-            primaryGroupIds={primaryGroupIds}
-            targetOptions={postItemTargetOptions}
-            watchedTargetFanpageId={watchedTargetFanpageId}
-            defaultCommentPreview={defaultCommentPreview}
-            previewAuthorName={previewAuthorName}
-            firstAccountPageName={playwrightAccounts?.[0]?.pageName}
-            actions={postItemActions}
-          />
-        ))}
-      </div>
-
-      <Button
-        type="dashed"
-        block
-        icon={<PlusOutlined />}
-        onClick={addLinkItem}
-        className="poster-add-post mt-3.5 min-h-[54px] rounded-xl flex items-center justify-center"
-      >
-        <span className="font-bold">Thêm bài viết tiếp theo</span>
-      </Button>
+          <Button type="primary" icon={<CheckCircleOutlined />} onClick={openSwipeReview}>
+            Duyệt {swipeReviewItems.length} bài
+          </Button>
+        </div>
+      )}
     </section>
   );
 }
