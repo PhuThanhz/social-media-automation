@@ -55,7 +55,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
-          LICENSE_SERVER_URL: ${{ secrets.LICENSE_SERVER_URL || 'https://toolzutter-license.onrender.com' }}
+          LICENSE_SERVER_URL: ${{ secrets.LICENSE_SERVER_URL || 'https://social-media-automation-750a.onrender.com' }}
           LICENSE_PUBLIC_KEY: ${{ secrets.LICENSE_PUBLIC_KEY }}
         with:
           projectPath: './frontend'
