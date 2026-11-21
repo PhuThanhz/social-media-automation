@@ -179,48 +179,6 @@ const parseCookieString = (accessToken?: string) => {
   };
 };
 
-// Tag trạng thái quyền Page kiểm kê chuẩn Linear-tier
-const PageAccessStatusTag = ({ status }: { status: FacebookPageAccess['verificationStatus'] }) => {
-  if (status === 'VERIFIED') {
-    return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 whitespace-nowrap">
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-        Đã xác minh quyền
-      </span>
-    );
-  }
-  if (status === 'NO_ACCESS') {
-    return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium bg-red-500/10 text-red-300 border border-red-500/20 whitespace-nowrap">
-        <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-        Mất quyền quản trị
-      </span>
-    );
-  }
-  if (status === 'SESSION_INVALID') {
-    return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium bg-rose-500/10 text-rose-300 border border-rose-500/20 whitespace-nowrap">
-        <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-        Phiên đăng nhập hết hạn
-      </span>
-    );
-  }
-  if (status === 'NOT_SEEN') {
-    return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium bg-amber-500/10 text-amber-300 border border-amber-500/20 whitespace-nowrap">
-        <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-        Chưa tìm thấy
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium bg-blue-500/10 text-blue-300 border border-blue-500/20 whitespace-nowrap">
-      <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-      Đã phát hiện
-    </span>
-  );
-};
-
 // Huy hiệu trạng thái Cookie/Token thiết kế cao cấp
 const StatusBadge = ({ account, onQuickUpdate }: { account: SocialAccount; onQuickUpdate?: () => void }) => {
   const isCookie = isPersonalCookieType(account.accountType);
@@ -303,11 +261,6 @@ const Connections = () => {
   const [fbLoginModal, setFbLoginModal] = useState<{ account?: SocialAccount } | null>(null);
   const [extensionModalOpen, setExtensionModalOpen] = useState(false);
 
-  // Page Audit state
-  const [pageAuditSource, setPageAuditSource] = useState<SocialAccount | null>(null);
-  const [latestPageScan, setLatestPageScan] = useState<FacebookPageScanResult | null>(null);
-  const [manualPageName, setManualPageName] = useState('');
-  const [manualPageId, setManualPageId] = useState('');
   const [checkingHealthId, setCheckingHealthId] = useState<number | null>(null);
 
   // Forms
@@ -498,84 +451,7 @@ const Connections = () => {
     });
   }, [publishableAccounts, searchText, statusFilter, viaFilter, viaNameMap, viaCUserOf]);
 
-  // Query danh sách Managed Pages của Via (chỉ fetch khi Drawer mở)
-  const managedPagesQuery = useQuery({
-    queryKey: ['managedFacebookPages', pageAuditSource?.id],
-    queryFn: async () => {
-      const response = await api.get(`/connections/${pageAuditSource!.id}/managed-pages`);
-      return response.data as FacebookPageAccess[];
-    },
-    enabled: !!pageAuditSource,
-    staleTime: 30_000,
-  });
-
-  const auditedPages = useMemo(() => {
-    const raw = latestPageScan?.pages || managedPagesQuery.data || [];
-    const invalidNames = /^(?:thông báo|tin nhắn|bảng feed|trang chủ|home|notifications|inbox|messages|bảng tin|reels|stories|quản lý trang|xem tất cả|cài đặt|chọn trang|menu)$/i;
-    return raw.filter((item) => {
-      const pageId = (item.pageId || '').trim();
-      if (!pageId || !/^\d+$/.test(pageId)) return false;
-      const name = (item.pageName || '').trim();
-      if (invalidNames.test(name)) return false;
-      if (item.pageUrl && (item.pageUrl.includes('/latest/inbox') || item.pageUrl.includes('/reel/'))) return false;
-      return true;
-    });
-  }, [latestPageScan, managedPagesQuery.data]);
-
   // Mutations
-  const scanManagedPagesMutation = useMutation({
-    mutationFn: async (sourceAccountId: number) => {
-      const response = await api.post(`/connections/${sourceAccountId}/scan-managed-pages`, { verifyEachPage: true });
-      return response.data as FacebookPageScanResult;
-    },
-    onSuccess: (result) => {
-      setLatestPageScan(result);
-      queryClient.setQueryData(['managedFacebookPages', pageAuditSource?.id], result.pages);
-      queryClient.invalidateQueries({ queryKey: ['managedFacebookPages'] });
-      queryClient.invalidateQueries({ queryKey: ['socialAccounts'] });
-      if (result.verifiedCount === result.totalFound) {
-        message.success(`Đã quét và xác minh toàn bộ ${result.verifiedCount}/${result.totalFound} Fanpage.`);
-      } else {
-        message.warning(`Tìm thấy ${result.totalFound} Page, xác minh được ${result.verifiedCount} Page.`);
-      }
-    },
-    onError: (error: any) => {
-      const detail = error?.response?.data?.detail || error?.response?.data?.message || error?.message;
-      message.error(detail || 'Không thể quét danh sách Page của Via này.');
-    },
-  });
-
-  const addManualPageMutation = useMutation({
-    mutationFn: async ({ accountId, pageId, pageName }: { accountId: number; pageId: string; pageName: string }) => {
-      const response = await api.post(`/connections/${accountId}/managed-pages`, { pageId, pageName });
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['managedFacebookPages', pageAuditSource?.id] });
-      setManualPageName('');
-      setManualPageId('');
-      message.success('Đã thêm Fanpage thành công!');
-    },
-    onError: (error: any) => {
-      const detail = error?.response?.data?.message || error?.message;
-      message.error(detail || 'Không thể thêm Page này.');
-    },
-  });
-
-  const deleteManualPageMutation = useMutation({
-    mutationFn: async ({ accountId, pageId }: { accountId: number; pageId: string }) => {
-      await api.delete(`/connections/${accountId}/managed-pages/${pageId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['managedFacebookPages', pageAuditSource?.id] });
-      message.success('Đã xóa Page khỏi danh sách kiểm kê!');
-    },
-    onError: (error: any) => {
-      const detail = error?.response?.data?.message || error?.message;
-      message.error(detail || 'Không thể xóa Page này.');
-    },
-  });
-
   const addPersonalViaMutation = useMutation({
     mutationFn: async (values: { profileLabel?: string; cUser: string; xs: string; fullCookie?: string; proxyUrl?: string }) => {
       const cUser = values.cUser.trim();
@@ -594,13 +470,10 @@ const Connections = () => {
       });
       return response.data as SocialAccount;
     },
-    onSuccess: (account) => {
-      message.success('Đã lưu Via cá nhân thành công! Đang tự động quét danh sách Fanpage...');
+    onSuccess: () => {
+      message.success('Đã lưu Via cá nhân thành công!');
       personalViaForm.resetFields();
       setPersonalViaModalOpen(false);
-      setLatestPageScan(null);
-      setPageAuditSource(account);
-      scanManagedPagesMutation.mutate(account.id);
       queryClient.invalidateQueries({ queryKey: ['socialAccounts'] });
     },
     onError: (error: any) => {
@@ -674,22 +547,6 @@ const Connections = () => {
     onError: (err: any) => {
       setCheckingHealthId(null);
       message.error(err?.response?.data?.message || 'Không thể kiểm tra cookie lúc này.');
-    },
-  });
-
-  // Mutation đồng bộ nhanh các Page từ danh sách kiểm kê vào kết nối xuất bản
-  const importPagesMutation = useMutation({
-    mutationFn: async ({ accountId, pageIds }: { accountId: number; pageIds?: string[] }) => {
-      const res = await api.post(`/connections/${accountId}/import-managed-pages`, pageIds ? { pageIds } : {});
-      return res.data;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['socialAccounts'] });
-      queryClient.invalidateQueries({ queryKey: ['managedFacebookPages'] });
-      message.success(data?.message || 'Đã đồng bộ Fanpage vào hệ thống thành công!');
-    },
-    onError: (err: any) => {
-      message.error(err?.response?.data?.message || 'Không thể đồng bộ Fanpage.');
     },
   });
 
@@ -1241,15 +1098,11 @@ const Connections = () => {
                           menu={{
                             items: [
                               { key: 'login', icon: <LoginOutlined />, label: 'Đăng nhập lại' },
-                              { key: 'scan', icon: <SyncOutlined />, label: 'Quét & kiểm kê Page' },
                               { key: 'add', icon: <PlusOutlined />, label: 'Thêm Page vào Via' },
                             ],
                             onClick: ({ key }) => {
                               if (key === 'login') {
                                 setFbLoginModal({ account: viaAccount });
-                              } else if (key === 'scan') {
-                                setLatestPageScan(null);
-                                setPageAuditSource(viaAccount);
                               } else if (key === 'add') {
                                 form.setFieldsValue({
                                   platform: 'FACEBOOK_PAGE',
@@ -1302,14 +1155,19 @@ const Connections = () => {
                           Chưa có Fanpage nào được liên kết với Via này. Hãy bấm{' '}
                           <a
                             onClick={() => {
-                              setLatestPageScan(null);
-                              setPageAuditSource(viaAccount);
+                              form.setFieldsValue({
+                                platform: 'FACEBOOK_PAGE',
+                                accountType: 'PERSONAL_COOKIE',
+                                accessToken: viaAccount.accessToken,
+                                postingIdentityAccountId: viaAccount.id,
+                              });
+                              setIsModalVisible(true);
                             }}
                             className="text-blue-400 underline font-medium cursor-pointer hover:text-blue-300"
                           >
-                            Quét & Kiểm kê Page
+                            + Thêm Page vào Via
                           </a>{' '}
-                          để hệ thống tự tìm thấy tất cả các Page nick này đang làm Admin.
+                          để bắt đầu lên lịch và đăng bài tự động.
                         </div>
                       ) : (
                         <Table
@@ -2524,233 +2382,6 @@ const Connections = () => {
           </div>
         )}
       </Modal>
-
-      {/* DRAWER: Kiểm kê toàn bộ Page của 1 nick cá nhân */}
-      <Drawer
-        title={
-          <div className="flex items-center justify-between gap-3 pr-2">
-            <div className="flex items-center gap-3">
-              <Avatar icon={<FacebookOutlined />} className="bg-blue-600 text-white shrink-0" size={36} />
-              <div>
-                <div className="font-semibold text-sm text-slate-100">
-                  {latestPageScan?.profileName ||
-                    auditedPages.find((p) => p.profileName)?.profileName ||
-                    viaNameMap.get(parseCookieString(pageAuditSource?.accessToken).cUser) ||
-                    `Via #${parseCookieString(pageAuditSource?.accessToken).cUser}`}
-                </div>
-                <div className="text-[11px] text-slate-400">Kiểm kê danh sách Fanpage và xác minh quyền chuyển đổi danh tính</div>
-              </div>
-            </div>
-            <Button
-              type="primary"
-              icon={<SyncOutlined spin={scanManagedPagesMutation.isPending} />}
-              loading={scanManagedPagesMutation.isPending}
-              onClick={() => pageAuditSource && scanManagedPagesMutation.mutate(pageAuditSource.id)}
-              className="font-medium text-xs bg-blue-600 rounded-xl"
-            >
-              {scanManagedPagesMutation.isPending ? 'Đang quét...' : 'Quét lại toàn bộ'}
-            </Button>
-          </div>
-        }
-        open={!!pageAuditSource}
-        onClose={() => {
-          if (!scanManagedPagesMutation.isPending) {
-            setPageAuditSource(null);
-            setLatestPageScan(null);
-          }
-        }}
-        width={720}
-        destroyOnHidden
-        styles={{
-          header: { borderBottom: '1px solid #1e293b' },
-          body: { backgroundColor: '#0b111a', padding: '16px', color: '#e2e8f0' },
-        }}
-      >
-        <div className="space-y-4">
-          {scanManagedPagesMutation.isPending && (
-            <div className="p-3.5 rounded-xl border border-blue-500/30 bg-blue-950/20 text-blue-300 text-xs flex items-center gap-2">
-              <SyncOutlined spin className="text-blue-400" />
-              <span>Đang kiểm tra và xác minh quyền chuyển đổi danh tính từng Page qua Playwright Engine...</span>
-            </div>
-          )}
-
-          {/* Form thêm Page thủ công */}
-          <div className="bg-slate-900/80 border border-slate-800 p-3.5 rounded-2xl space-y-2">
-            <div className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-              <PlusOutlined className="text-blue-400" /> Nhập Page thủ công
-            </div>
-            <div className="flex items-center gap-2">
-              <Input
-                placeholder="Tên Page (tùy chọn)"
-                value={manualPageName}
-                onChange={(e) => setManualPageName(e.target.value)}
-                size="small"
-                className="w-1/3 rounded-lg"
-              />
-              <Input
-                placeholder="Page ID (bắt buộc)"
-                value={manualPageId}
-                onChange={(e) => setManualPageId(e.target.value.trim())}
-                size="small"
-                className="flex-1 rounded-lg font-mono"
-              />
-              <Button
-                type="primary"
-                size="small"
-                loading={addManualPageMutation.isPending}
-                disabled={!manualPageId.trim()}
-                onClick={() => {
-                  if (manualPageId && pageAuditSource) {
-                    addManualPageMutation.mutate({
-                      accountId: pageAuditSource.id,
-                      pageId: manualPageId,
-                      pageName: manualPageName.trim() || `Page ${manualPageId.slice(-4)}`,
-                    });
-                  }
-                }}
-                className="bg-blue-600 rounded-lg shrink-0 font-medium"
-              >
-                Thêm
-              </Button>
-            </div>
-          </div>
-
-          {/* Stat counters */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="bg-slate-900/60 border border-slate-800 p-3.5 rounded-2xl">
-              <div className="text-xs text-slate-300">Tổng Page hợp lệ</div>
-              <div className="text-xl font-bold text-slate-100 mt-0.5">{auditedPages.length}</div>
-            </div>
-            <div className="bg-slate-900/60 border border-slate-800 p-3.5 rounded-2xl">
-              <div className="text-xs text-emerald-400">Đã xác minh quyền</div>
-              <div className="text-xl font-bold text-emerald-400 mt-0.5">
-                {auditedPages.filter((p) => p.verificationStatus === 'VERIFIED').length}
-              </div>
-            </div>
-            <div className="bg-slate-900/60 border border-slate-800 p-3.5 rounded-2xl">
-              <div className="text-xs text-slate-300">Trạng thái Via</div>
-              <div className="mt-1">
-                <StatusBadge account={pageAuditSource!} />
-              </div>
-            </div>
-          </div>
-
-          {/* Quick sync all verified pages action bar */}
-          <div className="flex items-center justify-between p-3 rounded-2xl bg-gradient-to-r from-blue-950/40 via-indigo-950/30 to-purple-950/40 border border-blue-500/30">
-            <div>
-              <div className="font-semibold text-[13px] text-blue-200 flex items-center gap-1.5">
-                <ThunderboltOutlined className="text-amber-400" />
-                Đồng bộ vào danh sách kênh xuất bản
-              </div>
-              <div className="text-xs text-slate-300 mt-0.5">
-                Thêm ngay toàn bộ Fanpage đã kiểm kê vào hệ thống để bắt đầu lên lịch và đăng bài.
-              </div>
-            </div>
-            <Button
-              type="primary"
-              icon={<ThunderboltOutlined className="text-amber-300" />}
-              loading={importPagesMutation.isPending}
-              disabled={auditedPages.length === 0}
-              onClick={() => {
-                if (pageAuditSource) {
-                  importPagesMutation.mutate({ accountId: pageAuditSource.id });
-                }
-              }}
-              className="bg-emerald-600 hover:bg-emerald-500 font-semibold text-[13px] rounded-xl shadow-md shrink-0"
-            >
-              Đồng bộ tất cả vào Tool
-            </Button>
-          </div>
-
-          {/* Bảng danh sách Pages đã quét */}
-          <Table<FacebookPageAccess>
-            rowKey={(r) => r.id || r.pageId}
-            dataSource={auditedPages}
-            loading={managedPagesQuery.isLoading || scanManagedPagesMutation.isPending}
-            pagination={{ pageSize: 8 }}
-            size="middle"
-            columns={[
-              {
-                title: 'Fanpage',
-                key: 'page',
-                render: (_, r) => (
-                  <div className="flex items-center gap-2.5 py-0.5">
-                    <Avatar src={r.avatarUrl} icon={<FacebookOutlined />} size={28} className="bg-blue-600 text-white shrink-0" />
-                    <div className="min-w-0">
-                      <div className="font-semibold text-slate-100 text-[13px] truncate max-w-[200px]">{r.pageName}</div>
-                      <div className="font-mono text-xs text-slate-400">ID: {r.pageId}</div>
-                    </div>
-                  </div>
-                ),
-              },
-              {
-                title: 'Quyền quản trị',
-                dataIndex: 'verificationStatus',
-                key: 'verificationStatus',
-                width: 170,
-                render: (st: FacebookPageAccess['verificationStatus']) => <PageAccessStatusTag status={st} />,
-              },
-              {
-                title: 'Hành động',
-                key: 'action',
-                width: 145,
-                render: (_, r) => {
-                  const isConnected = publishableAccounts.some((a) => String(a.platformAccountId) === String(r.pageId));
-                  return (
-                    <div className="flex items-center justify-end gap-1.5">
-                      {isConnected ? (
-                        <span className="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                          Đã kết nối
-                        </span>
-                      ) : (
-                        <Button
-                          type="primary"
-                          size="small"
-                          icon={<PlusOutlined />}
-                          loading={importPagesMutation.isPending}
-                          onClick={() => {
-                            if (pageAuditSource) {
-                              importPagesMutation.mutate({ accountId: pageAuditSource.id, pageIds: [r.pageId] });
-                            }
-                          }}
-                          className="text-xs !h-7 px-2.5 bg-blue-600 rounded-md font-medium"
-                        >
-                          Thêm
-                        </Button>
-                      )}
-                      {r.pageUrl && (
-                        <Button
-                          type="link"
-                          href={r.pageUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          icon={<LinkOutlined />}
-                          className="text-blue-400 p-0 text-xs"
-                          title="Xem trên Facebook"
-                        />
-                      )}
-                      <Button
-                        type="text"
-                        danger
-                        size="small"
-                        icon={<DeleteOutlined />}
-                        loading={deleteManualPageMutation.isPending}
-                        onClick={() => {
-                          if (pageAuditSource) {
-                            deleteManualPageMutation.mutate({ accountId: pageAuditSource.id, pageId: r.pageId });
-                          }
-                        }}
-                        className="text-slate-500 hover:text-red-400 p-0 h-6 w-6"
-                        title="Xóa khỏi kiểm kê"
-                      />
-                    </div>
-                  );
-                },
-              },
-            ]}
-          />
-        </div>
-      </Drawer>
 
       <FacebookBrowserLoginModal
         open={!!fbLoginModal}
