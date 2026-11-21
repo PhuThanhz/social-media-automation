@@ -30,76 +30,57 @@ Trình tự khi mở app: kiểm tra bản quyền → **chỉ khi hợp lệ** 
 
 ---
 
-## 🚀 1. Trang Quản Trị (License Server)
+## 🚀 1. Trang Quản Trị Bản Quyền (License Server Online 24/7)
 
-```bash
-cd license-server
-npm start
-```
-Mở **http://localhost:5050/admin**.
+Hệ thống quản lý bản quyền và khóa từ xa đã được triển khai **chính thức trên Render.com** (miễn phí, hoạt động 24/24):
 
-Cấu hình trong `license-server/.env` (không commit):
-```env
-ADMIN_SECRET=chuoi_ngau_nhien_it_nhat_12_ky_tu   # bắt buộc, thiếu là server không chạy
-CORS_ORIGINS=http://localhost:5173                # origin được gọi Admin API từ trình duyệt
-TOKEN_TTL_HOURS=72                                # thời gian dùng offline tối đa
-TRUST_PROXY=1                                     # chỉ bật khi chạy sau nginx/Cloudflare
-```
+* **Đường dẫn Admin Dashboard:** **[https://social-media-automation-750a.onrender.com/admin](https://social-media-automation-750a.onrender.com/admin)**
+* **Đăng nhập bằng Admin Secret:**
+  ```text
+  75cd16ff7b44f3563a57ff8eea43890b903cbca6
+  ```
+* **Public Key Ed25519 nhúng trong app:**
+  ```text
+  011W-RpKxTyzSe0BDHcMR7y64ag30hpdwwruRHYBf8o
+  ```
 
-Lần chạy đầu server tự sinh `keys/private.pem` (khóa ký, **tuyệt đối giữ bí mật + sao lưu**; mất file này thì mọi bản app đã phát hành không xác thực được nữa) và `keys/public.b64` (public key nhúng vào app). Khi đưa lên VPS, copy cả thư mục `keys/` theo, hoặc đặt PEM vào biến `LICENSE_PRIVATE_KEY`.
-
-### Đăng nhập & phân quyền
-- Lần đầu: chọn "Đăng nhập bằng Admin Secret" (quyền Chủ) → tab **Tài khoản admin** → tạo tài khoản cho bạn và nhân viên. Từ đó đăng nhập bằng tên đăng nhập + mật khẩu.
-- **Chủ:** toàn quyền, xóa key/khách, quản lý admin · **Nhân viên:** tạo / gia hạn / khóa key, đổi máy, quản lý khách · **Chỉ xem:** không sửa được gì.
-- Nhật ký ghi rõ ai làm gì. Khóa hoặc đổi mật khẩu một admin → phiên đang mở của người đó bị đăng xuất ngay. Phiên đăng nhập hết hạn sau 12 giờ.
-
-### Key bản quyền
-- **+ Tạo Key Mới:** chọn khách có sẵn hoặc nhập khách mới, thời hạn, *số tài khoản tối đa* (Via + Fanpage + TikTok + Threads; Nhóm FB không tính), *số người dùng trong app*, số tiền đã thu. Key tự copy vào bộ nhớ tạm.
-- **Gia hạn:** +1 tháng / +3 tháng / +1 năm / vĩnh viễn hoặc tự nhập ngày, kèm số tiền + ghi chú. Cộng từ hạn hiện tại (đã hết hạn thì tính từ hôm nay và tự mở lại). App khách đang mở nhận hạn mới trong 3 phút.
-- **Gói:** nâng/hạ số tài khoản, số người dùng, chuyển key sang khách khác.
-- **Khóa / Mở khóa** (kill-switch: app khách tự đóng trong ≤ 3 phút), **Đổi máy** (Reset HWID), **Xóa** (chỉ Chủ).
-- Bảng hiện: online hay lần cuối, IP, mã máy, hệ điều hành + phiên bản app. Lọc nhanh: Đang online · Sắp hết hạn (7 ngày) · Bị khóa / Hết hạn.
-
-### Khách hàng
-- Hồ sơ: tên, SĐT, Zalo, email, ghi chú. Key cũ được tự gom theo tên khách ở lần chạy đầu.
-- Bấm tên khách: danh sách key, **lịch sử thanh toán + tổng đã trả**, hoạt động gần đây, tạo thêm key cho khách.
-
-### Trong app khách (bản Desktop)
-- Lần đầu mở app: tạo **tài khoản Chủ** (không còn tài khoản mặc định `admin@gmail.com / 123456`). Sau đó mọi người phải đăng nhập.
-- Chủ vào menu **Người dùng** để thêm / khóa / xóa / đặt lại mật khẩu trong giới hạn gói; xem gói đang dùng (x/y người dùng, x/y tài khoản). Mỗi người có dữ liệu riêng.
-- Thêm tài khoản vượt gói → bị chặn, báo liên hệ nâng gói. Backend tự kiểm chữ ký token để áp giới hạn, không tin frontend.
+*(Nếu muốn chạy test local trên máy tính: `cd license-server && npm start` ➔ mở `http://localhost:5050/admin`)*
 
 ---
 
-## ☁️ 2. Triển khai License Server
+## 💻 2. Cách Đóng Gói (Build) Bộ Cài Đặt (.exe cho Windows và .dmg cho Mac)
 
-Đưa `license-server/` lên một VPS (Node 22+), chạy sau nginx có HTTPS, ví dụ `https://license.tenmien.com`. Bản Cloudflare Worker hiện **chưa dùng được** (không ký token).
+### 👉 CÁCH 1: Tự động 100% qua GitHub Actions (Khuyên dùng nhất - Không cần mượn máy Windows)
+
+Hệ thống đã cấu hình sẵn GitHub Workflow (`.github/workflows/build-tauri.yml`) tự động cài đặt JDK 21, build backend sidecar, và đóng gói cho cả 2 hệ điều hành:
+
+1. Truy cập: **[https://github.com/PhuThanhz/social-media-automation/actions](https://github.com/PhuThanhz/social-media-automation/actions)**
+2. Nhìn cột bên trái, bấm vào: **Build Desktop App (.exe & .dmg)**
+3. Bấm nút **Run workflow** (màu xanh bên phải).
+4. Đợi GitHub chạy xong: Tải 2 file cài đặt tại mục **Releases** trên GitHub:
+   * **Bản Windows:** File `ToolZutter-Setup.exe` (hoặc `.msi`)
+   * **Bản macOS:** File `ToolZutter.dmg`
 
 ---
 
-## 💻 3. Cách Đóng Gói (Build) Ứng Dụng Desktop Cho Khách Hàng
+### 👉 CÁCH 2: Đóng gói thủ công trên máy cục bộ
 
-### Bước 1: Chuẩn bị backend + worker (sidecar)
+#### Trên macOS (build file .dmg):
 ```bash
 cd frontend
-JAVA_HOME=/đường/dẫn/jdk-21 npm run sidecar:prepare
+npm run sidecar:prepare
+LICENSE_SERVER_URL=https://social-media-automation-750a.onrender.com npx tauri build
 ```
-Script build jar trong thư mục tạm (không đụng `backend/target` đang chạy), tạo JRE bằng jlink, chép mã nguồn worker (**không chép dữ liệu của bạn**: cookie, browser_profiles, file .json trạng thái) và `npm ci` mới, rồi chép Node. Node của Homebrew không mang đi được; script sẽ báo lỗi, khi đó tải Node từ nodejs.org và đặt `NODE_BINARY=<đường dẫn>`. Build lại nhanh chỉ backend: `SKIP_JRE=1 SKIP_WORKER=1 npm run sidecar:prepare`.
+*Kết quả xuất ra:* `frontend/src-tauri/target/release/bundle/dmg/ToolZutter.dmg`
 
-**Phải build trên đúng hệ điều hành của bản cài** (JRE, Node, ffmpeg là binary theo nền tảng): bản Windows build trên máy Windows.
-
-### Bước 2: Build bộ cài
+#### Trên Windows (build file .exe):
+Cần kéo code sang máy Windows có JDK 21 và Node 22, sau đó chạy:
 ```bash
 cd frontend
-LICENSE_SERVER_URL=https://license.tenmien.com LICENSE_PUBLIC_KEY=$(cat ../license-server/keys/public.b64) npx tauri build
+npm run sidecar:prepare
+set LICENSE_SERVER_URL=https://social-media-automation-750a.onrender.com
+npx tauri build
 ```
-Build release sẽ **báo lỗi và dừng** nếu thiếu `LICENSE_SERVER_URL` hoặc URL không phải https. `LICENSE_PUBLIC_KEY` bỏ trống thì tự đọc `license-server/keys/public.b64`.
-
-Trang "Quản lý bản quyền" tự ẩn trong bản Desktop; bạn quản lý key qua `/admin` của License Server hoặc bản web.
-*(Hoặc dùng lệnh Rust: `cargo tauri build` bên trong thư mục `frontend/src-tauri`)*
-
-### Kết quả xuất ra:
-- **Trên máy macOS:** File `.dmg` hoặc `.app` trong thư mục `src-tauri/target/release/bundle/dmg/`
-- **Trên máy Windows:** File `.msi` hoặc `.exe` cài đặt tự động trong thư mục `src-tauri/target/release/bundle/msi/`
+*Kết quả xuất ra:* `frontend\src-tauri\target\release\bundle\msi\` hoặc `bundle\nsis\ToolZutter-Setup.exe`
 
 Lưu ý: macOS cần ký + notarize bằng Apple Developer ID, nếu không khách sẽ bị Gatekeeper chặn mở app; Windows nên có chứng chỉ ký code để tránh cảnh báo SmartScreen.
