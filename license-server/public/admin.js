@@ -352,7 +352,16 @@ $('dialog-form').addEventListener('submit', async (e) => {
     $('dialog-submit').disabled = false;
   }
 });
-document.addEventListener('click', (e) => { if (e.target.closest('[data-dialog-close]')) closeDialog(); });
+document.addEventListener('click', (e) => {
+  if (e.target.closest('[data-dialog-close]') || e.target.id === 'dialog') {
+    closeDialog();
+  }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeDialog();
+  }
+});
 
 const num = (v) => (v === '' || v === undefined ? undefined : Number(v));
 
