@@ -1927,27 +1927,24 @@ export default function ViralHunter() {
       <section className="group-hunter-setup">
         <div className="group-hunter-section-head">
           <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="group-hunter-kicker tracking-widest text-xs font-black">
-                ✨ AI VIRAL RADAR 2026
-              </span>
-              <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-300 font-extrabold border border-amber-500/25 flex items-center gap-1 shadow-sm">
-                <FireOutlined className="text-amber-400" /> Toàn Nền Tảng
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[11px] font-bold tracking-wider uppercase text-blue-400 bg-blue-500/10 border border-blue-500/25 px-2 py-0.5 rounded-md">
+                Săn Bài Viral
               </span>
             </div>
-            <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+            <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">
               {hunterMode === 'DISCOVER_GROUPS'
-                ? 'Tìm Kiếm Group & Cộng Đồng Facebook Chất Lượng'
+                ? 'Khám phá cộng đồng Facebook'
                 : hunterMode === 'TARGET_SOURCES'
-                ? 'Cào Bài Mới Nhất Từ Nguồn Chỉ Định (Group / Fanpage)'
-                : 'Săn Bài Viết Triệu Tương Tác'}
+                ? 'Cào bài theo nguồn chỉ định'
+                : 'Săn bài viết theo chủ đề'}
             </h3>
-            <p className="text-slate-300 text-xs sm:text-sm max-w-3xl leading-relaxed mt-1">
+            <p className="text-slate-400 text-xs sm:text-sm max-w-2xl leading-normal mt-0.5">
               {hunterMode === 'DISCOVER_GROUPS'
-                ? 'Tự động xếp hạng các Group Facebook từ 100K đến 700K+ thành viên, bóc tách tỷ lệ hoạt động và loại bỏ nhóm rác/thanh lý.'
+                ? 'Tìm kiếm và chọn lọc các nhóm Facebook chất lượng cao theo chủ đề.'
                 : hunterMode === 'TARGET_SOURCES'
-                ? 'Chỉ định trực tiếp link Facebook Group hoặc Fanpage mục tiêu để cào các bài viết mới nhất, sẵn sàng đưa vào Lịch đăng hoặc xào lại bằng AI.'
-                : 'Cào bài viết có tương tác khủng theo từ khoá hoặc từ group cụ thể, dùng Gemini AI thẩm định và xào lại hook.'}
+                ? 'Trích xuất bài viết mới nhất trực tiếp từ link Group hoặc Fanpage mục tiêu.'
+                : 'Tìm kiếm bài viết có tương tác cao từ Facebook, Threads và TikTok.'}
             </p>
           </div>
 
@@ -1959,138 +1956,71 @@ export default function ViralHunter() {
           )}
         </div>
 
-        {/* Chuyển đổi 3 Chế Độ: Tab Capsule Sang Trọng (Agency-tier Glass Switcher) */}
-        <div className="px-6 pt-5 pb-1">
-          <div className="inline-flex p-1.5 rounded-2xl bg-slate-950/70 border border-slate-700/60 backdrop-blur-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.5)] gap-1.5 flex-wrap">
+        {/* Chuyển đổi 3 Chế Độ: Tab Pill Tinh Gọn */}
+        <div className="px-6 pt-4 pb-1">
+          <div className="inline-flex p-1 rounded-xl bg-slate-950/80 border border-slate-800/80 backdrop-blur-md gap-1 flex-wrap">
             <button
               type="button"
               onClick={() => setHunterMode('DISCOVER_GROUPS')}
-              className={`group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-150 cursor-pointer ${
                 hunterMode === 'DISCOVER_GROUPS'
-                  ? 'bg-gradient-to-r from-amber-500/15 via-slate-800/95 to-slate-800/90 text-white shadow-[0_4px_16px_rgba(0,0,0,0.4),0_0_20px_rgba(245,158,11,0.12)] border border-amber-500/35'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04] border border-transparent'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.05]'
               }`}
             >
-              <span
-                className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs transition-all ${
-                  hunterMode === 'DISCOVER_GROUPS'
-                    ? 'bg-amber-500/25 border border-amber-500/40 text-amber-300 shadow-[0_0_10px_rgba(245,158,11,0.3)]'
-                    : 'bg-white/[0.05] border border-white/[0.08] text-slate-400 group-hover:text-white'
-                }`}
-              >
-                <CompassOutlined />
-              </span>
-              <span className="font-bold tracking-tight">Khám phá Group chất lượng</span>
-              <span
-                className={`text-xs font-extrabold px-2.5 py-0.5 rounded-full border transition-all ${
-                  hunterMode === 'DISCOVER_GROUPS'
-                    ? 'bg-amber-400/20 text-amber-300 border-amber-400/35 shadow-[0_0_8px_rgba(245,158,11,0.2)]'
-                    : 'bg-white/[0.04] text-slate-300 border-white/10'
-                }`}
-              >
-                Khuyên dùng
-              </span>
+              <CompassOutlined className={hunterMode === 'DISCOVER_GROUPS' ? 'text-white' : 'text-slate-400'} />
+              <span>Khám phá Group</span>
             </button>
 
             <button
               type="button"
               onClick={() => setHunterMode('HUNT_POSTS')}
-              className={`group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-150 cursor-pointer ${
                 hunterMode === 'HUNT_POSTS'
-                  ? 'bg-gradient-to-r from-blue-500/15 via-slate-800/95 to-slate-800/90 text-white shadow-[0_4px_16px_rgba(0,0,0,0.4),0_0_20px_rgba(59,130,246,0.12)] border border-blue-500/35'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04] border border-transparent'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.05]'
               }`}
             >
-              <span
-                className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs transition-all ${
-                  hunterMode === 'HUNT_POSTS'
-                    ? 'bg-blue-500/25 border border-blue-500/40 text-blue-300 shadow-[0_0_10px_rgba(59,130,246,0.3)]'
-                    : 'bg-white/[0.05] border border-white/[0.08] text-slate-400 group-hover:text-white'
-                }`}
-              >
-                <FireOutlined />
-              </span>
-              <span className="font-bold tracking-tight">Săn bài viết theo từ khoá</span>
-              <span
-                className={`text-xs font-extrabold px-2.5 py-0.5 rounded-full border transition-all ${
-                  hunterMode === 'HUNT_POSTS'
-                    ? 'bg-blue-400/20 text-blue-300 border-blue-400/35 shadow-[0_0_8px_rgba(59,130,246,0.2)]'
-                    : 'bg-white/[0.04] text-slate-300 border-white/10'
-                }`}
-              >
-                Toàn sàn
-              </span>
+              <FireOutlined className={hunterMode === 'HUNT_POSTS' ? 'text-white' : 'text-slate-400'} />
+              <span>Săn bài viết</span>
             </button>
 
             <button
               type="button"
               onClick={() => setHunterMode('TARGET_SOURCES')}
-              className={`group flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-150 cursor-pointer ${
                 hunterMode === 'TARGET_SOURCES'
-                  ? 'bg-gradient-to-r from-purple-500/15 via-slate-800/95 to-slate-800/90 text-white shadow-[0_4px_16px_rgba(0,0,0,0.4),0_0_20px_rgba(168,85,247,0.12)] border border-purple-500/35'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.04] border border-transparent'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.05]'
               }`}
             >
-              <span
-                className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs transition-all ${
-                  hunterMode === 'TARGET_SOURCES'
-                    ? 'bg-purple-500/25 border border-purple-500/40 text-purple-300 shadow-[0_0_10px_rgba(168,85,247,0.3)]'
-                    : 'bg-white/[0.05] border border-white/[0.08] text-slate-400 group-hover:text-white'
-                }`}
-              >
-                <AimOutlined />
-              </span>
-              <span className="font-bold tracking-tight">Cào theo nguồn chỉ định</span>
-              <span
-                className={`text-xs font-extrabold px-2.5 py-0.5 rounded-full border transition-all ${
-                  hunterMode === 'TARGET_SOURCES'
-                    ? 'bg-purple-400/20 text-purple-300 border-purple-400/35 shadow-[0_0_8px_rgba(168,85,247,0.2)]'
-                    : 'bg-white/[0.04] text-slate-300 border-white/10'
-                }`}
-              >
-                Mới nhất
-              </span>
+              <AimOutlined className={hunterMode === 'TARGET_SOURCES' ? 'text-white' : 'text-slate-400'} />
+              <span>Nguồn chỉ định</span>
             </button>
           </div>
         </div>
 
         {/* ────────── CHẾ ĐỘ 1: TÌM KIẾM GROUP THEO KEYWORD ────────── */}
         {hunterMode === 'DISCOVER_GROUPS' && (
-          <div className="p-6 space-y-5">
-            {/* GỢI Ý KHO NGUỒN CÀO CHẤT LƯỢNG (CLEAN DARK SLATE) */}
-            <div className="p-3.5 sm:p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-2.5">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-slate-200 font-bold text-[13px] flex items-center gap-1.5 tracking-tight">
-                    💡 Kho nguồn mẫu theo chủ đề:
-                  </span>
-                  <span className="text-xs text-slate-300 hidden sm:inline">
-                    (Đã phân loại sẵn nguồn phim & giải trí chất lượng, bấm để tra cứu ngay)
-                  </span>
-                </div>
-                <span className="text-xs text-slate-300">
-                  Bộ lọc: <span className="text-blue-400 font-semibold">{categoryFilter === 'PHIM' ? '🎬 Phim & Điện Ảnh' : categoryFilter === 'PETS' ? '🐱 Thú Cưng' : 'Toàn Bộ Nguồn'}</span>
-                </span>
-              </div>
-
+          <div className="p-5 sm:p-6 space-y-4">
+            {/* GỢI Ý CHỦ ĐỀ MẪU */}
+            <div className="flex items-center justify-between flex-wrap gap-2 p-2.5 sm:p-3 rounded-xl bg-slate-900/50 border border-slate-800/80">
               <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-slate-400 text-xs font-semibold">Chủ đề mẫu:</span>
                 <button
                   type="button"
                   onClick={() => {
                     setCategoryFilter('PHIM');
                     setGroupKeyword('Review phim');
                   }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                  className={`px-3 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer border ${
                     categoryFilter === 'PHIM'
                       ? 'bg-blue-600/20 text-blue-300 border-blue-500/40'
-                      : 'bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-800 border-slate-700/80'
+                      : 'bg-slate-800/60 text-slate-400 hover:text-white border-slate-700/60'
                   }`}
                 >
-                  <span>🎬</span>
-                  <span>Nhóm Phim & Điện Ảnh</span>
-                  <span className="text-xs px-1.5 py-0.5 rounded bg-slate-700 text-slate-200 font-medium">
-                    11 nguồn
-                  </span>
+                  <span>🎬 Phim ảnh</span>
+                  <span className="text-[11px] opacity-75">(11)</span>
                 </button>
 
                 <button
@@ -2099,39 +2029,36 @@ export default function ViralHunter() {
                     setCategoryFilter('PETS');
                     setGroupKeyword('Yêu chó mèo');
                   }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                  className={`px-3 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer border ${
                     categoryFilter === 'PETS'
                       ? 'bg-emerald-600/20 text-emerald-300 border-emerald-500/40'
-                      : 'bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-800 border-slate-700/80'
+                      : 'bg-slate-800/60 text-slate-400 hover:text-white border-slate-700/60'
                   }`}
                 >
-                  <span>🐱</span>
-                  <span>Chó Mèo & Thú Cưng</span>
-                  <span className="text-xs px-1.5 py-0.5 rounded bg-slate-700 text-slate-200 font-medium">
-                    2 nguồn
-                  </span>
+                  <span>🐱 Thú cưng</span>
+                  <span className="text-[11px] opacity-75">(2)</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setCategoryFilter('ALL')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer border ${
+                  className={`px-3 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer border ${
                     categoryFilter === 'ALL'
                       ? 'bg-slate-800 text-white border-slate-600'
-                      : 'bg-slate-900/40 text-slate-400 hover:text-slate-200 border-slate-800'
+                      : 'bg-slate-900/40 text-slate-500 hover:text-slate-300 border-slate-800'
                   }`}
                 >
-                  Xem tất cả ({discoveredGroups.length})
+                  Tất cả ({discoveredGroups.length})
                 </button>
               </div>
             </div>
 
-            {/* Ô TÌM KIẾM + CHỌN SỐ LƯỢNG QUÉT (25 / 50 / 80 / 100) */}
+            {/* Ô TÌM KIẾM + CHỌN SỐ LƯỢNG QUÉT */}
             <div className="flex flex-col sm:flex-row items-stretch gap-2.5">
               <div className="flex-1 relative">
                 <Input
                   size="large"
-                  placeholder="Nhập chủ đề cộng đồng (ví dụ: review phim, chó mèo, ẩm thực, khởi nghiệp, tâm sự...)"
+                  placeholder="Nhập từ khóa tìm group (review phim, thú cưng, ẩm thực, khởi nghiệp...)"
                   value={groupKeyword}
                   onChange={(e) => setGroupKeyword(e.target.value)}
                   onPressEnter={() => handleSearchGroups()}
@@ -2141,7 +2068,7 @@ export default function ViralHunter() {
                 />
               </div>
 
-              {/* Lựa chọn số lượng group muốn quét: 25, 50, 80, 100 */}
+              {/* Lựa chọn số lượng group muốn quét */}
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1.5 px-3 h-11 bg-slate-900/80 border border-slate-700/80 rounded-xl">
                   <span className="text-xs text-slate-400 shrink-0">Quét:</span>
@@ -2150,11 +2077,11 @@ export default function ViralHunter() {
                     value={groupSearchLimit}
                     onChange={(val) => setGroupSearchLimit(val)}
                     variant="borderless"
-                    className="w-36 text-xs text-slate-200 font-semibold"
+                    className="w-32 text-xs text-slate-200 font-semibold"
                     options={[
                       { value: 25, label: '25 nhóm' },
                       { value: 50, label: '50 nhóm' },
-                      { value: 80, label: '80 nhóm (Khuyên dùng)' },
+                      { value: 80, label: '80 nhóm' },
                       { value: 100, label: '100 nhóm' },
                     ]}
                   />
@@ -2167,17 +2094,17 @@ export default function ViralHunter() {
                   onClick={() => handleSearchGroups()}
                   className="!h-11 px-6 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shrink-0 bg-blue-600 hover:bg-blue-500 border-none shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all"
                 >
-                  <SearchOutlined className="text-base" /> Tìm Kiếm Nhóm
+                  <SearchOutlined className="text-base" /> Tìm nhóm
                 </Button>
               </div>
             </div>
 
             {/* Gợi ý từ khoá nhóm */}
             <div className="flex items-center gap-1.5 flex-wrap text-xs">
-              <span className="text-slate-400 text-xs flex items-center gap-1 mr-1">
-                Gợi ý nhanh:
+              <span className="text-slate-400 text-xs shrink-0 mr-1">
+                Gợi ý:
               </span>
-              {TRENDING_GROUP_KEYWORDS.map((k) => (
+              {['Review phim', 'Yêu chó mèo', 'Review đồ ăn', 'Bất động sản', 'Tâm sự gen z', 'Khởi nghiệp', 'Nghiện nhà đẹp', 'Mẹo vặt'].map((k) => (
                 <button
                   key={k}
                   type="button"
@@ -2194,20 +2121,20 @@ export default function ViralHunter() {
             </div>
 
             {/* Thanh Bộ Lọc Chất Lượng Nhóm */}
-            <div className="pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="pt-2.5 border-t border-slate-800/70 flex flex-wrap items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-4 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <span className="text-slate-400">Quy mô tối thiểu:</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-400">Quy mô:</span>
                   <Select
                     size="small"
                     value={groupMinMembers}
                     onChange={setGroupMinMembers}
-                    className="w-48 text-xs"
+                    className="w-40 text-xs"
                     options={[
                       { value: 0, label: 'Tất cả quy mô' },
-                      { value: 50000, label: 'Trên 50K thành viên' },
-                      { value: 100000, label: 'Trên 100K TV (Khuyên dùng)' },
-                      { value: 300000, label: 'Trên 300K TV (Siêu lớn)' },
+                      { value: 50000, label: '> 50K thành viên' },
+                      { value: 100000, label: '> 100K thành viên' },
+                      { value: 300000, label: '> 300K thành viên' },
                     ]}
                   />
                 </div>
@@ -2217,7 +2144,7 @@ export default function ViralHunter() {
                   onChange={(e) => setFilterSpamGroups(e.target.checked)}
                   className="text-xs text-slate-300"
                 >
-                  Lọc bỏ nhóm rác / cứu trợ / thanh lý
+                  Lọc nhóm rác / thanh lý
                 </Checkbox>
 
                 <Checkbox
@@ -2225,11 +2152,11 @@ export default function ViralHunter() {
                   onChange={(e) => setPublicOnly(e.target.checked)}
                   className="text-xs text-slate-300"
                 >
-                  Chỉ nhóm Công khai
+                  Nhóm công khai
                 </Checkbox>
               </div>
 
-              <div className="text-xs text-slate-400 font-mono">
+              <div className="text-xs text-slate-400">
                 Hiển thị <span className="text-blue-400 font-bold">{filteredGroups.length}</span> / {discoveredGroups.length} nhóm
               </div>
             </div>
@@ -2272,65 +2199,45 @@ export default function ViralHunter() {
 
         {/* ────────── CHẾ ĐỘ 3: CÀO BÀI THEO NGUỒN MỤC TIÊU CHỈ ĐỊNH (GROUP / PAGE) ────────── */}
         {hunterMode === 'TARGET_SOURCES' && (
-          <div className="p-5 sm:p-6 space-y-6">
-            {/* Banner giới thiệu ngắn & trạng thái */}
-            <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-950/40 via-slate-900 to-indigo-950/40 border border-purple-500/30 flex items-center justify-between gap-4 flex-wrap">
-              <div className="flex items-center gap-3">
-                <span className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/40 text-purple-300 flex items-center justify-center text-lg shrink-0">
-                  <AimOutlined />
-                </span>
-                <div>
-                  <h4 className="text-white font-extrabold text-sm sm:text-base flex items-center gap-2">
-                    Cào Bài Mới Nhất Theo Nguồn Chỉ Định
-                    <Tag color="purple" className="font-bold !text-xs !m-0">
-                      Group & Fanpage
-                    </Tag>
-                  </h4>
-                  <p className="text-[13px] text-slate-300 mt-0.5">
-                    Hệ thống sẽ kết nối trực tiếp vào feed của nguồn chỉ định và bóc tách các bài viết mới nhất (kèm ảnh, video, lượt like).
-                  </p>
-                </div>
+          <div className="p-5 sm:p-6 space-y-4">
+            {/* Chọn nhanh Fanpage đã kết nối nếu có */}
+            {connections.length > 0 && (
+              <div className="flex items-center justify-between flex-wrap gap-2 p-2.5 sm:p-3 rounded-xl bg-slate-900/50 border border-slate-800/80">
+                <span className="text-xs text-slate-400 font-semibold">Chọn nhanh Fanpage đã kết nối:</span>
+                <Select
+                  size="small"
+                  placeholder="Chọn từ Fanpage đã kết nối..."
+                  className="w-56 text-xs"
+                  onChange={(val) => {
+                    const selectedConn = connections.find((c: any) => c.platformAccountId === val || c.id === val);
+                    if (selectedConn) {
+                      const targetUrl = selectedConn.platformAccountId && !selectedConn.platformAccountId.startsWith('http')
+                        ? `https://www.facebook.com/${selectedConn.platformAccountId}`
+                        : selectedConn.platformAccountId;
+                      setTargetSourceUrl(targetUrl);
+                      setTargetSourceName(selectedConn.pageName || 'Fanpage của tôi');
+                    }
+                  }}
+                  options={connections
+                    .filter((c: any) => c.platform !== 'FACEBOOK_GROUP')
+                    .map((c: any) => ({
+                      label: `📘 ${c.pageName || c.platformAccountId}`,
+                      value: c.platformAccountId || c.id,
+                    }))}
+                />
               </div>
-
-              {/* Nút chọn nhanh từ Fanpage của bạn trong hệ thống */}
-              {connections.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400 hidden md:inline">Chọn từ tài khoản kết nối:</span>
-                  <Select
-                    size="small"
-                    placeholder="Chọn từ Fanpage đã kết nối..."
-                    className="w-48 text-xs"
-                    onChange={(val) => {
-                      const selectedConn = connections.find((c: any) => c.platformAccountId === val || c.id === val);
-                      if (selectedConn) {
-                        const targetUrl = selectedConn.platformAccountId && !selectedConn.platformAccountId.startsWith('http')
-                          ? `https://www.facebook.com/${selectedConn.platformAccountId}`
-                          : selectedConn.platformAccountId;
-                        setTargetSourceUrl(targetUrl);
-                        setTargetSourceName(selectedConn.pageName || 'Fanpage của tôi');
-                      }
-                    }}
-                    options={connections
-                      .filter((c: any) => c.platform !== 'FACEBOOK_GROUP')
-                      .map((c: any) => ({
-                        label: `📘 ${c.pageName || c.platformAccountId}`,
-                        value: c.platformAccountId || c.id,
-                      }))}
-                  />
-                </div>
-              )}
-            </div>
+            )}
 
             {/* Khung nhập URL & Tên nguồn mục tiêu */}
-            <div className="p-4 sm:p-5 rounded-2xl bg-black/40 border border-slate-700/60 backdrop-blur-md space-y-4">
+            <div className="p-4 sm:p-5 rounded-2xl bg-black/40 border border-slate-700/60 backdrop-blur-md space-y-3.5">
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
                 <div className="lg:col-span-8">
-                  <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center justify-between gap-2">
+                  <div className="text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between gap-2">
                     <span className="flex items-center gap-1.5">
-                      <LinkOutlined className="text-purple-400" />
+                      <LinkOutlined className="text-blue-400" />
                       {targetPlatform === 'REDDIT'
-                        ? 'Subreddit, từ khóa hoặc link 1 bài Reddit:'
-                        : 'Link Facebook Group hoặc Fanpage mục tiêu:'}
+                        ? 'Link subreddit hoặc bài Reddit:'
+                        : 'Link Group hoặc Fanpage mục tiêu:'}
                     </span>
                     <Segmented
                       size="small"
@@ -2341,14 +2248,14 @@ export default function ViralHunter() {
                         { label: 'Reddit', value: 'REDDIT' },
                       ]}
                     />
-                  </label>
+                  </div>
                   <Input
                     size="large"
                     prefix={targetPlatform === 'REDDIT' ? undefined : <FacebookFilled className="text-blue-400 mr-1" />}
                     onPressEnter={() => targetPlatform === 'REDDIT' && handleScanTargetSource()}
                     placeholder={targetPlatform === 'REDDIT'
-                      ? 'VD: r/cats · r/cats funny · cute cats (tìm toàn Reddit) · hoặc dán link 1 bài https://www.reddit.com/r/.../comments/...'
-                      : 'Dán link Facebook Group hoặc Fanpage (VD: https://facebook.com/groups/chikhenphimhay hoặc https://facebook.com/pagename)...'}
+                      ? 'VD: r/cats hoặc dán link bài Reddit...'
+                      : 'Dán link Facebook Group hoặc Fanpage (VD: https://facebook.com/groups/...)'}
                     value={targetSourceUrl}
                     onChange={(e) => setTargetSourceUrl(e.target.value)}
                     allowClear
@@ -2357,18 +2264,18 @@ export default function ViralHunter() {
                 </div>
 
                 <div className="lg:col-span-4">
-                  <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center justify-between">
-                    <span>Tên gợi nhớ (Tùy chọn):</span>
+                  <div className="text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+                    <span>Tên gợi nhớ:</span>
                     {targetSourceUrl.trim() && (
                       <button
                         type="button"
                         onClick={handleSaveTargetSource}
                         className="text-xs text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1 cursor-pointer"
                       >
-                        <StarOutlined /> Lưu nguồn này
+                        <StarOutlined /> Lưu nguồn
                       </button>
                     )}
-                  </label>
+                  </div>
                   <Input
                     size="large"
                     placeholder="VD: Khen Phim Hay, Page Điện Ảnh..."
@@ -2379,87 +2286,83 @@ export default function ViralHunter() {
                 </div>
               </div>
 
-              {/* Bảng tùy chọn bộ lọc lấy bài (Đặc biệt: Chế độ bài Mới Nhất) */}
-              <div className="pt-3 border-t border-slate-800/80 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                {/* 1. Thứ tự cào bài */}
-                <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1.5">
-                  <span className="text-xs font-bold text-slate-300 block">Thứ tự lấy bài:</span>
-                  <Segmented
-                    size="middle"
-                    value={targetSortOrder}
-                    onChange={(val) => setTargetSortOrder(val as 'NEWEST' | 'VIRAL')}
-                    options={[
-                      { label: <span className="text-xs px-1 font-semibold text-emerald-400">🆕 Mới nhất</span>, value: 'NEWEST' },
-                      { label: <span className="text-xs px-1 font-semibold text-amber-400">🔥 Viral nhất</span>, value: 'VIRAL' },
-                    ]}
-                    className="w-full bg-[#0b1017] border border-slate-700"
-                  />
-                </div>
+              {/* Tùy chọn bộ lọc lấy bài */}
+              <div className="pt-2.5 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-slate-400">Thứ tự:</span>
+                    <Segmented
+                      size="small"
+                      value={targetSortOrder}
+                      onChange={(val) => setTargetSortOrder(val as 'NEWEST' | 'VIRAL')}
+                      options={[
+                        { label: 'Mới nhất', value: 'NEWEST' },
+                        { label: 'Viral nhất', value: 'VIRAL' },
+                      ]}
+                      className="bg-[#0b1017] border border-slate-700 text-xs"
+                    />
+                  </div>
 
-                {/* 2. Khoảng thời gian bài đăng */}
-                <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1.5">
-                  <span className="text-xs font-bold text-slate-300 block flex items-center gap-1">
-                    <ClockCircleOutlined className="text-purple-400" /> Thời gian đăng:
-                  </span>
-                  <Select
-                    size="middle"
-                    value={targetTimeRange}
-                    onChange={setTargetTimeRange}
-                    className="w-full text-xs"
-                    options={[
-                      { label: 'Tất cả bài mới nhất', value: 'ALL' },
-                      { label: 'Hôm nay (24 giờ qua)', value: 'TODAY' },
-                      { label: '3 ngày gần đây', value: '3_DAYS' },
-                      { label: '7 ngày gần đây', value: '7_DAYS' },
-                    ]}
-                  />
-                </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-slate-400">Thời gian:</span>
+                    <Select
+                      size="small"
+                      value={targetTimeRange}
+                      onChange={setTargetTimeRange}
+                      className="w-36 text-xs"
+                      options={[
+                        { label: 'Tất cả bài', value: 'ALL' },
+                        { label: '24 giờ qua', value: 'TODAY' },
+                        { label: '3 ngày gần đây', value: '3_DAYS' },
+                        { label: '7 ngày gần đây', value: '7_DAYS' },
+                      ]}
+                    />
+                  </div>
 
-                {/* 3. Số lượng bài cần cào */}
-                <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1.5">
-                  <span className="text-xs font-bold text-slate-300 block">Số lượng bài cần lấy:</span>
-                  <Select
-                    size="middle"
-                    value={targetLimit}
-                    onChange={setTargetLimit}
-                    className="w-full text-xs"
-                    options={[
-                      { label: '10 bài', value: 10 },
-                      { label: '20 bài (Khuyên dùng)', value: 20 },
-                      { label: '30 bài', value: 30 },
-                      { label: '50 bài', value: 50 },
-                    ]}
-                  />
-                </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-slate-400">Số bài:</span>
+                    <Select
+                      size="small"
+                      value={targetLimit}
+                      onChange={setTargetLimit}
+                      className="w-24 text-xs"
+                      options={[
+                        { label: '10 bài', value: 10 },
+                        { label: '20 bài', value: 20 },
+                        { label: '30 bài', value: 30 },
+                        { label: '50 bài', value: 50 },
+                      ]}
+                    />
+                  </div>
 
-                {/* 4. Tương tác tối thiểu */}
-                <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1.5">
-                  <span className="text-xs font-bold text-slate-300 block">Lọc tương tác tối thiểu:</span>
-                  <Select
-                    size="middle"
-                    value={targetMinReactions}
-                    onChange={setTargetMinReactions}
-                    className="w-full text-xs"
-                    options={[
-                      { label: 'Tất cả bài (>= 0 Like)', value: 0 },
-                      { label: 'Tối thiểu 10 Like', value: 10 },
-                      { label: 'Tối thiểu 30 Like', value: 30 },
-                      { label: 'Tối thiểu 50 Like', value: 50 },
-                    ]}
-                  />
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-slate-400">Lọc like:</span>
+                    <Select
+                      size="small"
+                      value={targetMinReactions}
+                      onChange={setTargetMinReactions}
+                      className="w-32 text-xs"
+                      options={[
+                        { label: 'Tất cả (>= 0)', value: 0 },
+                        { label: '>= 10 Like', value: 10 },
+                        { label: '>= 30 Like', value: 30 },
+                        { label: '>= 50 Like', value: 50 },
+                      ]}
+                    />
+                  </div>
                 </div>
               </div>
 
-              {/* Lọc từ khóa trong nguồn (Tùy chọn) & Nút Cào chính */}
+              {/* Lọc từ khóa trong nguồn & Nút Cào chính */}
               <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
                 <div className="w-full sm:max-w-md">
                   <Input
                     size="middle"
-                    placeholder="Lọc từ khóa trong bài (Tùy chọn, để trống để lấy hết)..."
+                    placeholder="Lọc từ khóa trong bài (tùy chọn, để trống để lấy hết)..."
                     value={targetKeywordFilter}
                     onChange={(e) => setTargetKeywordFilter(e.target.value)}
                     allowClear
-                    className="bg-[#0b1017] border-slate-700 text-slate-200 text-xs rounded-xl"
+                    className="bg-[#0b1017] border-slate-700 text-slate-200 text-xs rounded-xl h-10"
                   />
                 </div>
 
@@ -2471,9 +2374,9 @@ export default function ViralHunter() {
                     loading={loading}
                     onClick={() => handleScanTargetSource()}
                     disabled={!targetSourceUrl.trim()}
-                    className="bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 font-black text-xs sm:text-sm px-6 h-11 rounded-xl border-none shadow-lg shadow-purple-950/60 flex items-center gap-2"
+                    className="bg-blue-600 hover:bg-blue-500 font-bold text-xs sm:text-sm px-6 h-10 rounded-xl border-none shadow-md shadow-blue-600/20 flex items-center gap-2"
                   >
-                    🚀 Bắt Đầu Cào Bài Mới Nhất
+                    Bắt đầu cào bài
                   </Button>
                 </div>
               </div>
@@ -2548,16 +2451,13 @@ export default function ViralHunter() {
               </div>
             </div>
 
-            {/* Danh sách các nguồn mục tiêu thường cào (Đã lưu & Đề xuất) */}
+            {/* Danh sách các nguồn mục tiêu */}
             <div className="space-y-3">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2">
                   <StarFilled className="text-amber-400 text-sm" />
-                  <span className="text-[13px] font-bold text-white uppercase tracking-wider">
-                    Kho Nguồn Mục Tiêu Của Bạn ({targetSources.length}):
-                  </span>
-                  <span className="text-xs text-slate-300 hidden sm:inline">
-                    (Bấm vào bất kỳ nguồn nào để cào bài mới nhất ngay lập tức)
+                  <span className="text-xs font-bold text-white uppercase tracking-wider">
+                    Kho nguồn đã lưu ({targetSources.length})
                   </span>
                 </div>
 
@@ -2570,12 +2470,12 @@ export default function ViralHunter() {
                     value={targetTimeRange}
                     onChange={setTargetTimeRange}
                     variant="borderless"
-                    className="text-xs font-bold text-amber-300 min-w-[140px] !p-0"
+                    className="text-xs font-bold text-amber-300 min-w-[130px] !p-0"
                     options={[
-                      { label: '🌐 Tất cả bài mới nhất', value: 'ALL' },
-                      { label: '⚡ Hôm nay (24h qua)', value: 'TODAY' },
-                      { label: '📅 3 ngày gần đây', value: '3_DAYS' },
-                      { label: '📅 7 ngày gần đây', value: '7_DAYS' },
+                      { label: 'Tất cả bài mới nhất', value: 'ALL' },
+                      { label: 'Hôm nay (24h qua)', value: 'TODAY' },
+                      { label: '3 ngày gần đây', value: '3_DAYS' },
+                      { label: '7 ngày gần đây', value: '7_DAYS' },
                     ]}
                   />
                 </div>
@@ -2698,22 +2598,22 @@ export default function ViralHunter() {
               </div>
             )}
 
-            <div className="flex flex-col md:flex-row items-stretch gap-3">
+            <div className="flex flex-col md:flex-row items-stretch gap-2.5">
               {/* Chọn nền tảng */}
-              <div className="shrink-0 flex items-center p-1 rounded-2xl bg-black/40 border border-white/10 backdrop-blur-md gap-1">
+              <div className="shrink-0 flex items-center p-1 rounded-xl bg-slate-900/80 border border-slate-800 gap-1">
                 {[
-                  { label: '🌐 Đa nền tảng', value: 'ALL' },
-                  { label: '🧵 Threads', value: 'THREADS' },
-                  { label: '📘 Facebook', value: 'FACEBOOK' },
-                  { label: '🎵 TikTok', value: 'TIKTOK' },
+                  { label: 'Tất cả', value: 'ALL' },
+                  { label: 'Threads', value: 'THREADS' },
+                  { label: 'Facebook', value: 'FACEBOOK' },
+                  { label: 'TikTok', value: 'TIKTOK' },
                 ].map((item) => (
                   <button
                     key={item.value}
                     type="button"
                     onClick={() => setPlatformFilter(item.value as any)}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                       platformFilter === item.value
-                        ? 'bg-slate-800 text-white shadow border border-white/10 font-bold'
+                        ? 'bg-blue-600 text-white shadow-sm'
                         : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
                     }`}
                   >
@@ -2726,13 +2626,13 @@ export default function ViralHunter() {
               <div className="flex-1 relative">
                 <Input
                   size="large"
-                  placeholder="Nhập từ khoá muốn săn bài (ví dụ: review đồ ăn, mẹo vặt, bất động sản, giảm cân, tâm sự...)"
+                  placeholder="Nhập từ khoá săn bài (review phim, mẹo vặt, ẩm thực, khởi nghiệp...)"
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
                   onPressEnter={handleHunt}
-                  prefix={<SearchOutlined className="text-amber-400 text-lg mr-2" />}
+                  prefix={<SearchOutlined className="text-slate-400 text-base mr-2" />}
                   allowClear
-                  className="!h-13 rounded-2xl bg-black/40 border-white/10 hover:border-blue-500/50 focus:border-blue-500 text-sm sm:text-base font-semibold text-white placeholder:text-slate-500 shadow-inner px-4"
+                  className="!h-11 rounded-xl bg-slate-900/80 border-slate-700/80 hover:border-slate-600 focus:border-blue-500 text-sm font-medium text-white placeholder:text-slate-500 px-3.5"
                 />
               </div>
 
@@ -2742,27 +2642,27 @@ export default function ViralHunter() {
                 size="large"
                 loading={loading}
                 onClick={handleHunt}
-                className="!h-13 !w-auto px-8 rounded-2xl text-xs sm:text-sm font-extrabold flex items-center justify-center gap-2 shrink-0 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 hover:from-blue-500 hover:to-indigo-500 border-none shadow-xl shadow-blue-600/30 active:scale-[0.98] transition-all"
+                className="!h-11 px-7 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shrink-0 bg-blue-600 hover:bg-blue-500 border-none shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all"
               >
-                <FireOutlined className="text-amber-300" /> Săn Bài Viral
+                <FireOutlined /> Săn bài
               </Button>
             </div>
 
             {/* Thanh Bộ Lọc Tinh Chỉnh */}
-            <div className="pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="pt-2.5 border-t border-slate-800/70 flex flex-wrap items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-3 flex-wrap">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-slate-400">Lọc tương tác:</span>
+                  <span className="text-slate-400">Tương tác:</span>
                   <Select
                     size="small"
                     value={minReactionsFilter}
                     onChange={setMinReactionsFilter}
-                    className="w-44 text-xs"
+                    className="w-36 text-xs"
                     options={[
-                      { value: 0, label: '🌟 Tất cả bài' },
-                      { value: 20, label: '⚡ Like > 20 (Lọc rác)' },
-                      { value: 50, label: '🔥 Like > 50 (Viral)' },
-                      { value: 150, label: '👑 Like > 150 (Siêu Hot)' },
+                      { value: 0, label: 'Tất cả bài' },
+                      { value: 20, label: 'Like > 20' },
+                      { value: 50, label: 'Like > 50' },
+                      { value: 150, label: 'Like > 150' },
                     ]}
                   />
                 </div>
@@ -2773,12 +2673,12 @@ export default function ViralHunter() {
                     size="small"
                     value={mediaFilter}
                     onChange={setMediaFilter}
-                    className="w-36 text-xs"
+                    className="w-32 text-xs"
                     options={[
-                      { value: 'ALL', label: '📋 Tất cả bài' },
-                      { value: 'MEDIA_ONLY', label: '🖼️ Có Ảnh/Video' },
-                      { value: 'IMAGE_ONLY', label: '📷 Chỉ bài có Ảnh' },
-                      { value: 'VIDEO_ONLY', label: '🎬 Chỉ bài có Video' },
+                      { value: 'ALL', label: 'Tất cả bài' },
+                      { value: 'MEDIA_ONLY', label: 'Có Ảnh/Video' },
+                      { value: 'IMAGE_ONLY', label: 'Chỉ bài Ảnh' },
+                      { value: 'VIDEO_ONLY', label: 'Chỉ bài Video' },
                     ]}
                   />
                 </div>
@@ -2799,13 +2699,13 @@ export default function ViralHunter() {
                   />
                 </div>
 
-                <div className="flex items-center gap-1.5 pl-2 border-l border-slate-700">
+                <div className="flex items-center gap-1.5 pl-2 border-l border-slate-700/80">
                   <Checkbox
                     checked={autoGeminiCurate}
                     onChange={(e) => setAutoGeminiCurate(e.target.checked)}
-                    className="text-amber-300 font-semibold text-xs flex items-center"
+                    className="text-amber-300 font-medium text-xs flex items-center"
                   >
-                    💎 Dùng Gemini thẩm định &amp; chấm điểm (1-100)
+                    Chấm điểm AI (Gemini)
                   </Checkbox>
                 </div>
               </div>
@@ -2814,9 +2714,9 @@ export default function ViralHunter() {
                 <button
                   type="button"
                   onClick={() => setHunterMode('DISCOVER_GROUPS')}
-                  className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 font-semibold"
+                  className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 font-medium"
                 >
-                  <ArrowLeftOutlined /> Quay lại Tìm Nhóm Hay
+                  <ArrowLeftOutlined /> Quay lại Tìm nhóm
                 </button>
               </div>
             </div>
@@ -2827,8 +2727,8 @@ export default function ViralHunter() {
       {/* ────────── HIỂN THỊ KẾT QUẢ TÌM NHÓM CHẤT LƯỢNG (TRA CỨU NHANH) ────────── */}
       {hunterMode === 'DISCOVER_GROUPS' && (
         <section className="space-y-4 mt-6">
-          {/* Thanh công cụ kết quả: Chuyển chế độ xem & Nút Sao chép nhanh (FROSTED GLASS PREMIUM) */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3.5 sm:p-4 rounded-2xl bg-slate-900/80 backdrop-blur-xl border border-white/10 shadow-lg">
+          {/* Thanh công cụ kết quả */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3 sm:p-3.5 rounded-2xl bg-slate-900/80 backdrop-blur-xl border border-white/10 shadow-lg">
             <div className="flex items-center gap-3 flex-wrap">
               <span className="text-sm font-bold text-white flex items-center gap-2">
                 <TrophyOutlined className="text-amber-400 text-base" />
@@ -2838,73 +2738,73 @@ export default function ViralHunter() {
                 {filteredGroups.length} nhóm
               </span>
 
-              {/* Chế độ xem: Bảng tra cứu vs Thẻ lưới */}
-              <div className="flex items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-white/10">
+              {/* Chế độ xem: Bảng vs Thẻ */}
+              <div className="flex items-center gap-1 bg-slate-950/80 p-0.5 rounded-xl border border-white/10">
                 <button
                   type="button"
                   onClick={() => setGroupViewMode('TABLE')}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
                     groupViewMode === 'TABLE'
                       ? 'bg-blue-600 text-white shadow-sm'
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  <UnorderedListOutlined /> Bảng tra cứu
+                  <UnorderedListOutlined /> Bảng
                 </button>
                 <button
                   type="button"
                   onClick={() => setGroupViewMode('GRID')}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
                     groupViewMode === 'GRID'
                       ? 'bg-blue-600 text-white shadow-sm'
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  <AppstoreOutlined /> Thẻ lưới
+                  <AppstoreOutlined /> Thẻ
                 </button>
               </div>
             </div>
 
-            {/* Các tiện ích tra cứu & Xuất file theo yêu cầu người dùng */}
+            {/* Các tiện ích tra cứu & Xuất file */}
             <div className="flex items-center gap-2 flex-wrap">
               <Button
                 size="middle"
                 icon={<FileExcelOutlined className="text-emerald-400" />}
                 onClick={handleExportExcelFile}
-                className="bg-emerald-950/60 text-emerald-300 border-emerald-700/60 hover:bg-emerald-900/60 hover:border-emerald-500 hover:text-white text-xs h-9 rounded-xl font-semibold shadow-sm"
-                title="Tải về file Excel (.xlsx) chứa đầy đủ link, tên, số member các nhóm"
+                className="bg-emerald-950/60 text-emerald-300 border-emerald-700/60 hover:bg-emerald-900/60 hover:border-emerald-500 hover:text-white text-xs h-8.5 rounded-xl font-medium shadow-sm"
+                title="Tải về file Excel (.xlsx)"
               >
-                Xuất file Excel (.xlsx)
+                Xuất Excel
               </Button>
 
               <Button
                 size="middle"
                 icon={<CopyOutlined />}
                 onClick={handleCopyGroupsList}
-                className="bg-slate-800/80 hover:bg-slate-800 text-slate-200 border-slate-700 hover:border-slate-500 hover:text-white text-xs h-9 rounded-xl font-medium"
-                title="Sao chép toàn bộ danh sách: [STT]. [Link] - [Tên] - [Member]"
+                className="bg-slate-800/80 hover:bg-slate-800 text-slate-200 border-slate-700 hover:border-slate-500 hover:text-white text-xs h-8.5 rounded-xl font-medium"
+                title="Sao chép toàn bộ link và tên nhóm"
               >
-                Copy {filteredGroups.length} link - tên - member
+                Copy link
               </Button>
 
               <Button
                 size="middle"
                 icon={<ShareAltOutlined />}
                 onClick={handleCopyGroupsExcel}
-                className="bg-slate-800/80 hover:bg-slate-800 text-slate-200 border-slate-700 hover:border-slate-500 hover:text-white text-xs h-9 rounded-xl font-medium"
-                title="Sao chép dạng bảng Tab để dán thẳng (Ctrl+V) vào Google Sheets hoặc Excel"
+                className="bg-slate-800/80 hover:bg-slate-800 text-slate-200 border-slate-700 hover:border-slate-500 hover:text-white text-xs h-8.5 rounded-xl font-medium"
+                title="Sao chép dạng bảng để dán vào Sheets/Excel"
               >
-                Dán Excel / Sheets
+                Dán Sheets
               </Button>
 
               <Button
                 size="middle"
                 icon={<FileTextOutlined />}
                 onClick={() => setQuickTextModalOpen(true)}
-                className="bg-slate-800/80 hover:bg-slate-800 text-slate-200 border-slate-700 hover:border-slate-500 hover:text-white text-xs h-9 rounded-xl font-medium"
-                title="Mở hộp thoại xem danh sách văn bản và sao chép"
+                className="bg-slate-800/80 hover:bg-slate-800 text-slate-200 border-slate-700 hover:border-slate-500 hover:text-white text-xs h-8.5 rounded-xl font-medium"
+                title="Mở hộp thoại xem danh sách văn bản"
               >
-                Xem dạng text
+                Xem text
               </Button>
             </div>
           </div>
