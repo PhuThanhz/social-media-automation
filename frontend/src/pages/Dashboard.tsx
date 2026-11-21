@@ -377,14 +377,6 @@ const Dashboard = () => {
             Đăng Story
           </Button>
           <Button
-            type="dashed"
-            size="middle"
-            icon={<span className="font-extrabold text-blue-400">@</span>}
-            onClick={() => navigate('/dashboard/threads')}
-          >
-            Đăng Threads
-          </Button>
-          <Button
             type="link"
             size="middle"
             icon={<GlobalOutlined className="text-emerald-400" />}

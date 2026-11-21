@@ -61,7 +61,6 @@ const navigation = [
       { key: '/dashboard/viral-hunter', icon: <FireOutlined className="app-nav-icon-amber" />, label: 'Săn bài Viral' },
       { key: '/dashboard/playwright', icon: <PlayCircleOutlined />, label: 'Đăng tự động' },
       { key: '/dashboard/post-story', icon: <PictureOutlined />, label: 'Đăng story' },
-      { key: '/dashboard/threads', icon: <span className="app-nav-icon-at">@</span>, label: 'Đăng Threads' },
     ]
   },
   {
@@ -89,7 +88,6 @@ const pageMeta: Record<string, { title: string; description: string }> = {
   '/dashboard/playwright': { title: 'Đăng tự động', description: '' },
   '/dashboard/connections': { title: 'Quản lý kết nối', description: '' },
   '/dashboard/post-story': { title: 'Đăng story', description: 'Tạo và đăng Facebook Story nhanh chóng' },
-  '/dashboard/threads': { title: 'Đăng Threads', description: 'Đăng và hẹn giờ bài lên một hoặc nhiều nick Threads' },
   '/dashboard/license': { title: 'Quản lý bản quyền', description: 'Kiểm soát ai đang dùng phần mềm, tạo key và khóa tức thì từ xa (Kill-Switch)' },
   '/dashboard/users': { title: 'Người dùng', description: 'Tài khoản đăng nhập trên máy này và giới hạn gói bản quyền' },
   '/dashboard/logs': { title: 'Nhật ký hệ thống', description: 'Theo dõi Worker, Backend và Frontend theo thời gian thực' },
@@ -714,7 +712,7 @@ const DashboardLayout = () => {
           { path: '/dashboard', icon: <DashboardOutlined />, label: 'Tổng quan' },
           { path: '/dashboard/playwright', icon: <PlayCircleOutlined />, label: 'Đăng bài' },
           { path: '/dashboard/post-story', icon: <PictureOutlined />, label: 'Story' },
-          { path: '/dashboard/threads', icon: <span className="app-nav-icon-at">@</span>, label: 'Threads' },
+          { path: '/dashboard/news-studio', icon: <PictureOutlined />, label: 'Ảnh tin' },
           { path: '/dashboard/connections', icon: <FacebookFilled />, label: 'Fanpage' },
         ].map(({ path, icon, label }) => (
           <button
