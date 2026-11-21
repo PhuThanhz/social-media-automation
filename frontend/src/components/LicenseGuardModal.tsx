@@ -32,7 +32,6 @@ const DesktopLicenseGuard: React.FC<LicenseGuardModalProps> = ({ onAuthorized })
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
-    let intervalId: any;
 
     (async () => {
       setHwid(await licenseService.getHWID());
@@ -45,33 +44,25 @@ const DesktopLicenseGuard: React.FC<LicenseGuardModalProps> = ({ onAuthorized })
         setIsOpen(true);
       }
       const fresh = await licenseService.refresh();
-      if (!fresh.valid) {
+      if (fresh.revoked) {
         setIsOpen(true);
-        if (local.valid || fresh.revoked) setRevokedReason(fresh.reason);
-      } else if (!local.valid && fresh.info) {
+        setRevokedReason(fresh.reason || 'Bản quyền đã bị khóa hoặc thu hồi từ xa!');
+      } else if (fresh.valid && fresh.info) {
         setIsOpen(false);
         onAuthorized?.(fresh.info);
       }
 
-      // Rust kiểm tra định kỳ; key bị khóa thì báo ở đây rồi tự đóng app sau vài giây
+      // Rust kiểm tra định kỳ mỗi 30s; chỉ khi Admin chủ động bấm Khóa (revoked = true) mới đóng app
       unlisten = await licenseService.onInvalid((state) => {
-        setRevokedReason(`${state.reason || 'Bản quyền không còn hiệu lực.'}`);
-        setIsOpen(true);
-      });
-
-      // Frontend cũng kiểm tra song song mỗi 15 giây để phản hồi ngay lập tức khi Admin bấm Khóa
-      intervalId = setInterval(async () => {
-        const check = await licenseService.refresh();
-        if (!check.valid) {
-          setRevokedReason(check.reason || 'Bản quyền đã bị khóa hoặc thu hồi từ xa!');
+        if (state.revoked) {
+          setRevokedReason(`${state.reason || 'Bản quyền đã bị khóa hoặc thu hồi từ xa!'}`);
           setIsOpen(true);
         }
-      }, 15000);
+      });
     })();
 
     return () => {
       unlisten?.();
-      if (intervalId) clearInterval(intervalId);
     };
   }, []);
 

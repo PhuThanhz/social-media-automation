@@ -11,7 +11,7 @@ const SERVER_URL: &str = env!("LICENSE_SERVER_URL");
 pub const PUBLIC_KEY: &str = env!("LICENSE_PUBLIC_KEY");
 /// Cho phép lệch đồng hồ tối đa 5 phút so với server
 const CLOCK_SKEW_SECS: i64 = 300;
-const HEARTBEAT: Duration = Duration::from_secs(15);
+const HEARTBEAT: Duration = Duration::from_secs(30);
 
 /// Nội dung token do license server ký
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -161,7 +161,7 @@ pub async fn refresh(app: &AppHandle) -> LicenseState {
     });
     let resp = match client() {
         Ok(c) => c.post(format!("{SERVER_URL}/api/license/ping")).json(&body).send().await,
-        Err(e) => return LicenseState::invalid(e, Some(hwid)),
+        Err(_) => return local_status(app),
     };
 
     let reply = match resp {
@@ -255,8 +255,8 @@ pub fn spawn_guard(app: AppHandle) {
                 continue;
             }
             let state = refresh(&app).await;
-            if !state.valid {
-                eprintln!("[License Guard] {}", state.reason.clone().unwrap_or_default());
+            if state.revoked {
+                eprintln!("[License Guard] Bản quyền đã bị khóa từ xa: {:?}", state.reason);
                 let _ = app.emit("license-invalid", &state);
                 tokio::time::sleep(Duration::from_secs(5)).await;
                 app.state::<crate::sidecar::Services>().stop_all();
