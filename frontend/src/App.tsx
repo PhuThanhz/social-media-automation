@@ -13,7 +13,6 @@ const Home = lazy(() => import('./pages/Home'));
 const About = lazy(() => import('./pages/About'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Connections = lazy(() => import('./pages/Connections'));
-const PostStory = lazy(() => import('./pages/PostStory'));
 const PlaywrightPoster = lazy(() => import('./pages/PlaywrightPoster'));
 const NewsCardStudio = lazy(() => import('./pages/NewsCardStudio'));
 const SystemLogs = lazy(() => import('./pages/SystemLogs'));
@@ -181,7 +180,7 @@ function App() {
               <Route path="playwright" element={<PlaywrightPoster />} />
               <Route path="download-video" element={<Navigate to="/dashboard" replace />} />
               <Route path="video-library" element={<Navigate to="/dashboard" replace />} />
-              <Route path="post-story" element={<PostStory />} />
+              <Route path="post-story" element={<Navigate to="/dashboard" replace />} />
               <Route path="threads" element={<Navigate to="/dashboard" replace />} />
               <Route path="buff" element={<Navigate to="/dashboard" replace />} />
               <Route path="news-radar" element={<Navigate to="/dashboard/playwright" replace />} />

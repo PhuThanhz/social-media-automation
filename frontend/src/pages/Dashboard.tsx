@@ -369,14 +369,6 @@ const Dashboard = () => {
             Radar tin tức
           </Button>
           <Button
-            type="dashed"
-            size="middle"
-            icon={<PictureOutlined className="text-purple-400" />}
-            onClick={() => navigate('/dashboard/post-story')}
-          >
-            Đăng Story
-          </Button>
-          <Button
             type="link"
             size="middle"
             icon={<GlobalOutlined className="text-emerald-400" />}
