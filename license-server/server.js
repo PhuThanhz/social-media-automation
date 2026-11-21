@@ -253,11 +253,11 @@ app.post('/api/license/activate', rateLimit(20, 10 * 60 * 1000), (req, res) => {
 });
 
 /**
- * Heartbeat định kỳ (Ping mỗi 2-3 phút)
+ * Heartbeat định kỳ (Ping kiểm tra bản quyền & khóa từ xa)
  * POST /api/license/ping
  * Body: { licenseKey, hwid }
  */
-app.post('/api/license/ping', rateLimit(60, 10 * 60 * 1000), (req, res) => {
+app.post('/api/license/ping', rateLimit(180, 10 * 60 * 1000), (req, res) => {
   const licenseKey = req.body.licenseKey || req.body.key;
   const { hwid, clientInfo } = req.body;
   const ip = req.ip || 'unknown';

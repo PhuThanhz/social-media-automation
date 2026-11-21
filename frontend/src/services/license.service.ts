@@ -70,6 +70,10 @@ class LicenseService {
   logout(): Promise<void> {
     return invoke('license_logout');
   }
+
+  kill(): Promise<void> {
+    return invoke('kill_application');
+  }
 }
 
 export const licenseService = new LicenseService();

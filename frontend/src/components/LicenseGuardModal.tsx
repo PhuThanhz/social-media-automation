@@ -26,11 +26,13 @@ const DesktopLicenseGuard: React.FC<LicenseGuardModalProps> = ({ onAuthorized })
   const [keyInput, setKeyInput] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [revokedReason, setRevokedReason] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState<number | null>(null);
   // Chỉ mở khi đã biết bản quyền chưa hợp lệ (tránh chớp hộp thoại mỗi lần mở app)
   const [isOpen, setIsOpen] = useState<boolean>(false);
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
+    let intervalId: any;
 
     (async () => {
       setHwid(await licenseService.getHWID());
@@ -53,13 +55,43 @@ const DesktopLicenseGuard: React.FC<LicenseGuardModalProps> = ({ onAuthorized })
 
       // Rust kiểm tra định kỳ; key bị khóa thì báo ở đây rồi tự đóng app sau vài giây
       unlisten = await licenseService.onInvalid((state) => {
-        setRevokedReason(`${state.reason || 'Bản quyền không còn hiệu lực.'} Ứng dụng sẽ tự đóng.`);
+        setRevokedReason(`${state.reason || 'Bản quyền không còn hiệu lực.'}`);
         setIsOpen(true);
       });
+
+      // Frontend cũng kiểm tra song song mỗi 15 giây để phản hồi ngay lập tức khi Admin bấm Khóa
+      intervalId = setInterval(async () => {
+        const check = await licenseService.refresh();
+        if (!check.valid) {
+          setRevokedReason(check.reason || 'Bản quyền đã bị khóa hoặc thu hồi từ xa!');
+          setIsOpen(true);
+        }
+      }, 15000);
     })();
 
-    return () => unlisten?.();
+    return () => {
+      unlisten?.();
+      if (intervalId) clearInterval(intervalId);
+    };
   }, []);
+
+  // Đếm ngược 5 giây rồi tắt hẳn ứng dụng khi bị khóa bản quyền
+  useEffect(() => {
+    if (revokedReason) {
+      setCountdown(5);
+      const timer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev === null || prev <= 1) {
+            clearInterval(timer);
+            licenseService.kill();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [revokedReason]);
 
   const handleActivate = async () => {
     if (!keyInput.trim()) {
@@ -114,18 +146,27 @@ const DesktopLicenseGuard: React.FC<LicenseGuardModalProps> = ({ onAuthorized })
         <div>
           <h2 className="text-xl font-bold text-white tracking-tight">Xác Thực Bản Quyền Phần Mềm</h2>
           <p className="text-[13px] text-slate-300 mt-1">
-            Ứng dụng Desktop tự động hóa ToolZutter
+            Ứng dụng Desktop tự động hóa PhuSocial
           </p>
         </div>
 
         {revokedReason && (
-          <Alert
-            type="error"
-            showIcon
-            message="Bản quyền không còn hiệu lực"
-            description={revokedReason}
-            className="!bg-rose-950/60 !border-rose-600/40 !text-rose-200 text-left rounded-xl"
-          />
+          <div className="bg-rose-950/90 border-2 border-rose-500/70 rounded-xl p-4 text-left flex items-start gap-3.5 shadow-2xl shadow-rose-950/80">
+            <CloseCircleFilled className="text-rose-400 text-xl mt-0.5 shrink-0" />
+            <div className="space-y-1.5 flex-1">
+              <div className="text-sm font-bold text-white tracking-wide flex items-center justify-between">
+                <span>Bản quyền không còn hiệu lực</span>
+                {countdown !== null && (
+                  <span className="text-xs bg-rose-600/50 text-rose-100 font-mono px-2 py-0.5 rounded-full border border-rose-400/50 animate-pulse">
+                    Đóng sau {countdown}s
+                  </span>
+                )}
+              </div>
+              <div className="text-xs text-rose-100 font-medium leading-relaxed">
+                {revokedReason}
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Khối hiển thị mã HWID */}

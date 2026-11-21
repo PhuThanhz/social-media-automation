@@ -8,7 +8,8 @@ use tauri::Manager;
 #[tauri::command]
 fn kill_application(app: tauri::AppHandle) {
     eprintln!("⚠️ [License Guard] Bản quyền đã bị thu hồi hoặc tài khoản bị khóa! Đang đóng ứng dụng...");
-    app.exit(0);
+    app.state::<sidecar::Services>().stop_all();
+    std::process::exit(1);
 }
 
 #[tauri::command]

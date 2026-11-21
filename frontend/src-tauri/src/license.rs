@@ -11,7 +11,7 @@ const SERVER_URL: &str = env!("LICENSE_SERVER_URL");
 pub const PUBLIC_KEY: &str = env!("LICENSE_PUBLIC_KEY");
 /// Cho phép lệch đồng hồ tối đa 5 phút so với server
 const CLOCK_SKEW_SECS: i64 = 300;
-const HEARTBEAT: Duration = Duration::from_secs(180);
+const HEARTBEAT: Duration = Duration::from_secs(15);
 
 /// Nội dung token do license server ký
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -258,9 +258,9 @@ pub fn spawn_guard(app: AppHandle) {
             if !state.valid {
                 eprintln!("[License Guard] {}", state.reason.clone().unwrap_or_default());
                 let _ = app.emit("license-invalid", &state);
-                tokio::time::sleep(Duration::from_secs(8)).await;
-                app.exit(0);
-                break;
+                tokio::time::sleep(Duration::from_secs(5)).await;
+                app.state::<crate::sidecar::Services>().stop_all();
+                std::process::exit(1);
             }
         }
     });
