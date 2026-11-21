@@ -105,7 +105,7 @@ const DesktopBoot: React.FC<{ onReady: (cfg: DesktopServices, warning: string | 
             <Form.Item
               name="login"
               label={<span className="text-slate-300">Tên đăng nhập</span>}
-              rules={[{ required: true, pattern: /^[a-z0-9._-]{3,50}$/, message: '3-50 ký tự: chữ thường, số, . _ -' }]}
+              rules={[{ required: true, pattern: /^[a-zA-Z0-9._-]{3,50}$/, message: '3-50 ký tự: chữ cái, số, . _ -' }]}
             >
               <Input autoComplete="username" />
             </Form.Item>

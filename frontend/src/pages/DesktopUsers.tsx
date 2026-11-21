@@ -253,7 +253,7 @@ const DesktopUsers = () => {
           <Form.Item
             name="login"
             label="Tên đăng nhập"
-            rules={[{ required: true, pattern: /^[a-z0-9._-]{3,50}$/, message: '3-50 ký tự: chữ thường, số, . _ -' }]}
+            rules={[{ required: true, pattern: /^[a-zA-Z0-9._-]{3,50}$/, message: '3-50 ký tự: chữ cái, số, . _ -' }]}
           >
             <Input autoComplete="off" />
           </Form.Item>
