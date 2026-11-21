@@ -57,7 +57,6 @@ const navigation = [
   {
     type: 'group' as const, label: 'NỘI DUNG', children: [
       { key: '/dashboard/news-studio', icon: <PictureOutlined />, label: 'Studio Ảnh Tin' },
-      { key: '/dashboard/video-studio', icon: <VideoCameraOutlined />, label: 'Studio Video Tin' },
       { key: '/dashboard/viral-hunter', icon: <FireOutlined className="app-nav-icon-amber" />, label: 'Săn bài Viral' },
       { key: '/dashboard/playwright', icon: <PlayCircleOutlined />, label: 'Đăng tự động' },
       { key: '/dashboard/post-story', icon: <PictureOutlined />, label: 'Đăng story' },
@@ -82,7 +81,6 @@ const navigation = [
 const pageMeta: Record<string, { title: string; description: string }> = {
   '/dashboard': { title: 'Tổng quan', description: 'Theo dõi hoạt động đăng bài và tình trạng hệ thống' },
   '/dashboard/news-studio': { title: 'Studio Ảnh Tin', description: 'Cào full bài báo, AI viết tiêu đề, ghép ảnh kiểu page tin tức rồi lên lịch đăng' },
-  '/dashboard/video-studio': { title: 'Studio Video Tin', description: 'Dán link video, thêm khung tiêu đề + giọng AI đọc vài giây đầu, trộn nhạc nền rồi xuất hoặc lên lịch đăng' },
   '/dashboard/viral-hunter': { title: 'Săn Bài Viral (FB & Threads)', description: 'Cào bài Facebook Group & Threads theo từ khoá, lọc tương tác khủng và tích hợp Gemini AI viết lại' },
   '/dashboard/queue': { title: 'Quản lý bài đăng', description: 'Lập lịch, kiểm tra trạng thái và xử lý bài đăng' },
   '/dashboard/playwright': { title: 'Đăng tự động', description: '' },

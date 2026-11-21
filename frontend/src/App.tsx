@@ -16,7 +16,6 @@ const Connections = lazy(() => import('./pages/Connections'));
 const PostStory = lazy(() => import('./pages/PostStory'));
 const PlaywrightPoster = lazy(() => import('./pages/PlaywrightPoster'));
 const NewsCardStudio = lazy(() => import('./pages/NewsCardStudio'));
-const VideoNewsStudio = lazy(() => import('./pages/VideoNewsStudio'));
 const SystemLogs = lazy(() => import('./pages/SystemLogs'));
 const ViralHunter = lazy(() => import('./pages/ViralHunter'));
 const LicenseManager = lazy(() => import('./pages/LicenseManager'));
@@ -187,7 +186,7 @@ function App() {
               <Route path="buff" element={<Navigate to="/dashboard" replace />} />
               <Route path="news-radar" element={<Navigate to="/dashboard/playwright" replace />} />
               <Route path="news-studio" element={<NewsCardStudio />} />
-              <Route path="video-studio" element={<VideoNewsStudio />} />
+              <Route path="video-studio" element={<Navigate to="/dashboard" replace />} />
               <Route path="viral-hunter" element={<ViralHunter />} />
               <Route path="license" element={isTauri() ? <Navigate to="/dashboard" replace /> : <LicenseManager />} />
               <Route path="logs" element={<SystemLogs />} />
