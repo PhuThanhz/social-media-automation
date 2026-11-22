@@ -1648,6 +1648,7 @@ const PlaywrightPoster = () => {
     groupDistributionMode,
     isAnonymous,
     playwrightAccounts,
+    groupAccountsWithId,
   });
 
   // Memoized unified options for Ant Design Select (tối ưu hiệu năng, virtual scrolling mượt mà)

@@ -2,6 +2,7 @@ import type React from 'react';
 import { useState, useEffect, useCallback } from 'react';
 import { type FormInstance, App } from 'antd';
 import type { SocialAccount, PostMode } from './types';
+import { stripEmojiPrefix } from './shared';
 
 interface PresetHubParams {
   DEFAULT_HUYNH_THANH_PHU_PRESET?: any;
@@ -19,10 +20,11 @@ interface PresetHubParams {
   groupDistributionMode: "PAGE_PER_GROUP" | "ROUND_ROBIN_POSTS" | "CROSS_ALL";
   isAnonymous: boolean;
   playwrightAccounts: SocialAccount[];
+  groupAccountsWithId?: SocialAccount[];
 }
 
 // Cấu hình thường dùng (preset): lưu, áp dụng, cập nhật, xoá — tách từ PlaywrightPoster (state và hàm giữ nguyên, chỉ chuyển chỗ)
-export function usePresetHub({ DEFAULT_HUYNH_THANH_PHU_PRESET, setPostMode, setGroupDistributionMode, setIsAnonymous, postingIdentities, accountTargetValue, setIsMultiDistributeActive, setMultiSelectedTargets, form, activeSelectedGroupIds, activeSelectedFanpageIds, postMode, groupDistributionMode, isAnonymous, playwrightAccounts }: PresetHubParams) {
+export function usePresetHub({ DEFAULT_HUYNH_THANH_PHU_PRESET, setPostMode, setGroupDistributionMode, setIsAnonymous, postingIdentities, accountTargetValue, setIsMultiDistributeActive, setMultiSelectedTargets, form, activeSelectedGroupIds, activeSelectedFanpageIds, postMode, groupDistributionMode, isAnonymous, playwrightAccounts, groupAccountsWithId = [] }: PresetHubParams) {
   const { message } = App.useApp();
   // --- HỆ THỐNG COMBO THƯỜNG DÙNG (PRESET HUB) ---
   const [savedPresets, setSavedPresets] = useState<Array<{
@@ -81,24 +83,44 @@ export function usePresetHub({ DEFAULT_HUYNH_THANH_PHU_PRESET, setPostMode, setG
     setIsMultiDistributeActive(resolvedFanpageIds.length > 1);
     setMultiSelectedTargets(resolvedFanpageIds);
 
-    // Nếu cấu hình có sẵn nhóm thì ghi đè, nếu rỗng thì giữ nguyên nhóm user đã tích (nếu có)
-    const currentGroups = form.getFieldValue('targetGroupId') || [];
-    const newGroups = (preset.selectedGroupIds && preset.selectedGroupIds.length > 0)
-      ? preset.selectedGroupIds
-      : currentGroups;
-
-    form.setFieldsValue({
-      targetFanpageId: resolvedFanpageIds.length === 1 ? resolvedFanpageIds[0] : resolvedFanpageIds,
-      targetGroupId: newGroups,
-      groupNames: newGroups,
+    // Chuẩn hóa và ánh xạ selectedGroupIds khớp chính xác với groupAccountsWithId đang active
+    const resolvedGroupIds = (preset.selectedGroupIds || []).map((target) => {
+      const match = (groupAccountsWithId || []).find(
+        (g) =>
+          g.platformAccountId === target ||
+          String(g.id) === target ||
+          (g.platformAccountId && String(g.platformAccountId) === String(target)) ||
+          stripEmojiPrefix(g.pageName) === target
+      );
+      return match ? match.platformAccountId : String(target);
     });
+
+    // Nếu cấu hình có sẵn nhóm thì ghi đè, nếu rỗng thì giữ nguyên nhóm user đã tích (nếu có)
+    const currentGroups = form.getFieldValue('targetGroupId') || form.getFieldValue('groupNames') || [];
+    const newGroups = resolvedGroupIds.length > 0
+      ? resolvedGroupIds
+      : (Array.isArray(currentGroups) ? currentGroups : (currentGroups ? [currentGroups] : []));
+
+    const applyFields = () => {
+      form.setFieldsValue({
+        targetFanpageId: resolvedFanpageIds.length === 1 ? resolvedFanpageIds[0] : resolvedFanpageIds,
+        targetGroupId: newGroups,
+        groupNames: newGroups,
+      });
+    };
+
+    applyFields();
+    // Bổ sung timeout để khi DOM Form.Item nhóm mount xong (do postMode đổi từ FANPAGE_ONLY sang GROUP_ONLY),
+    // giá trị nhóm được điền lại chuẩn xác 100%, không bao giờ bị rớt về 0 nhóm
+    setTimeout(applyFields, 50);
+    setTimeout(applyFields, 150);
 
     if (newGroups.length === 0) {
       message.success(`⭐ Đã chọn cấu hình "${preset.name}" (${resolvedFanpageIds.length} page)! Bạn hãy chọn nhóm yêu thích để đăng nhé.`);
     } else {
       message.success(`⭐ Đã kích hoạt Combo "${preset.name}" (${newGroups.length} nhóm • ${resolvedFanpageIds.length} page)!`);
     }
-  }, [postingIdentities, form, message]);
+  }, [postingIdentities, groupAccountsWithId, form, message]);
 
   const handleUpdatePresetWithCurrent = useCallback((presetId: string) => {
     const groupIds = activeSelectedGroupIds;
@@ -114,8 +136,9 @@ export function usePresetHub({ DEFAULT_HUYNH_THANH_PHU_PRESET, setPostMode, setG
             ...p,
             postMode,
             groupDistributionMode,
-            selectedGroupIds: groupIds,
-            selectedFanpageIds: fanpageIds,
+            // Giữ nguyên nhóm cũ nếu user chưa tick nhóm mới, tránh bị xóa mất nhóm ngoài ý muốn
+            selectedGroupIds: groupIds.length > 0 ? groupIds : p.selectedGroupIds,
+            selectedFanpageIds: fanpageIds.length > 0 ? fanpageIds : p.selectedFanpageIds,
             isAnonymous,
           };
         }
