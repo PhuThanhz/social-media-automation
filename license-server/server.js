@@ -96,6 +96,41 @@ function rateLimit(max, windowMs) {
     next();
   };
 }
+
+// Chế độ Proxy Gateway: Nếu chạy trên Render (hoặc có FORWARD_TARGET), chuyển tiếp toàn bộ /api sang VPS cố định
+const FORWARD_TARGET = process.env.FORWARD_TARGET || (process.env.RENDER ? 'http://42.96.18.219:5050' : '');
+if (FORWARD_TARGET) {
+  const target = FORWARD_TARGET.replace(/\/+$/, '');
+  console.log(`[License Server] Chế độ Gateway: Chuyển tiếp /api tới VPS cố định: ${target}`);
+  app.use('/api', async (req, res) => {
+    try {
+      const url = `${target}${req.originalUrl}`;
+      const headers = { ...req.headers };
+      delete headers.host;
+      const opts = {
+        method: req.method,
+        headers,
+      };
+      if (['POST', 'PUT', 'PATCH'].includes(req.method) && req.body && Object.keys(req.body).length > 0) {
+        opts.body = JSON.stringify(req.body);
+        headers['content-type'] = 'application/json';
+      }
+      const upstream = await fetch(url, opts);
+      res.status(upstream.status);
+      upstream.headers.forEach((val, key) => {
+        if (!['transfer-encoding', 'content-encoding'].includes(key.toLowerCase())) {
+          res.setHeader(key, val);
+        }
+      });
+      const data = await upstream.arrayBuffer();
+      res.send(Buffer.from(data));
+    } catch (err) {
+      console.error('[Forward Error]', err);
+      res.status(502).json({ success: false, message: 'Lỗi kết nối tới VPS License Server' });
+    }
+  });
+}
+
 app.use('/admin', express.static(path.join(__dirname, 'public')));
 
 // Chẩn đoán: người gọi xem IP server nhận được của chính mình (kiểm tra cấu hình proxy)
