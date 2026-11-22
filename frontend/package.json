@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "sidecar:prepare": "node scripts/prepare-sidecar.mjs"
+    "sidecar:prepare": "node scripts/prepare-sidecar.mjs",
+    "tauri": "tauri"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",
