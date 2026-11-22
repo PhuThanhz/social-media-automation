@@ -3,11 +3,20 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const { DatabaseSync } = require('node:sqlite');
+const { openDb } = require('./db');
 
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
+
+// Express 4 không tự bắt lỗi của handler async → bọc để lỗi DB trả 500 thay vì treo request
+for (const method of ['get', 'post', 'patch', 'put', 'delete']) {
+  const original = app[method].bind(app);
+  app[method] = (route, ...handlers) => (handlers.length === 0 ? original(route) : original(route, ...handlers.map((h) =>
+    typeof h === 'function' && h.length < 4
+      ? (req, res, next) => { try { Promise.resolve(h(req, res, next)).catch(next); } catch (e) { next(e); } }
+      : h)));
+}
 const PORT = process.env.PORT || 5050;
 const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
 if (ADMIN_SECRET.length < 12) {
@@ -102,52 +111,54 @@ app.get('/api/client-ip', (req, res) => {
   });
 });
 
-// SQLite Database Setup
-const dbPath = process.env.DB_PATH || path.join(__dirname, 'licenses.db');
-const db = new DatabaseSync(dbPath);
+// Database: Turso khi có TURSO_DATABASE_URL, không thì file SQLite cục bộ (xem db.js)
+const db = openDb();
 
-// Initialize Tables & Performance Tuning
-db.exec(`
-  PRAGMA journal_mode = WAL;
-  PRAGMA synchronous = NORMAL;
-  PRAGMA cache_size = -64000;
+async function initDb() {
+  if (!db.remote) {
+    await db.exec(`
+      PRAGMA journal_mode = WAL;
+      PRAGMA synchronous = NORMAL;
+    `);
+  }
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS licenses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      license_key TEXT UNIQUE NOT NULL,
+      client_name TEXT NOT NULL,
+      hwid TEXT,
+      status TEXT DEFAULT 'ACTIVE', -- ACTIVE, LOCKED, EXPIRED
+      duration_days INTEGER DEFAULT 30,
+      max_accounts INTEGER DEFAULT 10,
+      notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      expires_at DATETIME,
+      last_ping_at DATETIME,
+      last_ip TEXT
+    );
 
-  CREATE TABLE IF NOT EXISTS licenses (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    license_key TEXT UNIQUE NOT NULL,
-    client_name TEXT NOT NULL,
-    hwid TEXT,
-    status TEXT DEFAULT 'ACTIVE', -- ACTIVE, LOCKED, EXPIRED
-    duration_days INTEGER DEFAULT 30,
-    max_accounts INTEGER DEFAULT 10,
-    notes TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    expires_at DATETIME,
-    last_ping_at DATETIME,
-    last_ip TEXT
-  );
+    CREATE INDEX IF NOT EXISTS idx_licenses_key ON licenses(license_key);
+    CREATE INDEX IF NOT EXISTS idx_licenses_hwid ON licenses(hwid);
+    CREATE INDEX IF NOT EXISTS idx_licenses_status ON licenses(status);
 
-  CREATE INDEX IF NOT EXISTS idx_licenses_key ON licenses(license_key);
-  CREATE INDEX IF NOT EXISTS idx_licenses_hwid ON licenses(hwid);
-  CREATE INDEX IF NOT EXISTS idx_licenses_status ON licenses(status);
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      license_key TEXT,
+      action TEXT,
+      hwid TEXT,
+      ip TEXT,
+      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+      details TEXT
+    );
 
-  CREATE TABLE IF NOT EXISTS audit_logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    license_key TEXT,
-    action TEXT,
-    hwid TEXT,
-    ip TEXT,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-    details TEXT
-  );
+    CREATE INDEX IF NOT EXISTS idx_audit_key ON audit_logs(license_key);
+  `);
 
-  CREATE INDEX IF NOT EXISTS idx_audit_key ON audit_logs(license_key);
-`);
-
-// Cột thêm sau: hệ điều hành + phiên bản app của khách (DB cũ tự được bổ sung)
-const licenseColumns = db.prepare('PRAGMA table_info(licenses)').all().map((c) => c.name);
-for (const [col, type] of [['client_os', 'TEXT'], ['app_version', 'TEXT']]) {
-  if (!licenseColumns.includes(col)) db.exec(`ALTER TABLE licenses ADD COLUMN ${col} ${type}`);
+  // Cột thêm sau: hệ điều hành + phiên bản app của khách (DB cũ tự được bổ sung)
+  const licenseColumns = (await db.prepare('PRAGMA table_info(licenses)').all()).map((c) => c.name);
+  for (const [col, type] of [['client_os', 'TEXT'], ['app_version', 'TEXT']]) {
+    if (!licenseColumns.includes(col)) await db.exec(`ALTER TABLE licenses ADD COLUMN ${col} ${type}`);
+  }
 }
 
 // clientInfo do app khách tự gửi → chỉ nhận chuỗi ngắn, ký tự an toàn
@@ -157,13 +168,12 @@ function clientField(value) {
 
 // Helper to log audit events
 // actor: tài khoản admin thực hiện (null = do app khách gửi lên)
-function logAudit(licenseKey, action, hwid, ip, details = '', actor = null) {
+async function logAudit(licenseKey, action, hwid, ip, details = '', actor = null) {
   try {
-    const stmt = db.prepare(`
+    await db.prepare(`
       INSERT INTO audit_logs (license_key, action, hwid, ip, details, actor)
       VALUES (?, ?, ?, ?, ?, ?)
-    `);
-    stmt.run(licenseKey, action, hwid, ip, details, actor);
+    `).run(licenseKey, action, hwid, ip, details, actor);
   } catch (err) {
     console.error('Audit log error:', err.message);
   }
@@ -187,7 +197,7 @@ function generateLicenseKey(prefix = 'ZTR') {
  * POST /api/license/activate
  * Body: { licenseKey, hwid, clientInfo }
  */
-app.post('/api/license/activate', rateLimit(20, 10 * 60 * 1000), (req, res) => {
+app.post('/api/license/activate', rateLimit(20, 10 * 60 * 1000), async (req, res) => {
   const licenseKey = req.body.licenseKey || req.body.key;
   const { hwid, clientInfo } = req.body;
   const ip = req.ip || 'unknown';
@@ -197,7 +207,7 @@ app.post('/api/license/activate', rateLimit(20, 10 * 60 * 1000), (req, res) => {
   }
 
   const findStmt = db.prepare('SELECT * FROM licenses WHERE license_key = ?');
-  const license = findStmt.get(licenseKey.trim().toUpperCase());
+  const license = await findStmt.get(licenseKey.trim().toUpperCase());
 
   if (!license) {
     logAudit(licenseKey, 'ACTIVATE_FAIL_NOT_FOUND', hwid, ip);
@@ -213,7 +223,7 @@ app.post('/api/license/activate', rateLimit(20, 10 * 60 * 1000), (req, res) => {
   if (license.expires_at) {
     const expireTime = new Date(license.expires_at).getTime();
     if (Date.now() > expireTime) {
-      db.prepare("UPDATE licenses SET status = 'EXPIRED' WHERE id = ?").run(license.id);
+      await db.prepare("UPDATE licenses SET status = 'EXPIRED' WHERE id = ?").run(license.id);
       logAudit(licenseKey, 'ACTIVATE_EXPIRED', hwid, ip);
       return res.status(403).json({ success: false, message: 'Mã License Key đã hết hạn sử dụng' });
     }
@@ -227,7 +237,7 @@ app.post('/api/license/activate', rateLimit(20, 10 * 60 * 1000), (req, res) => {
       SET hwid = ?, last_ping_at = CURRENT_TIMESTAMP, last_ip = ?, client_os = ?, app_version = ?
       WHERE id = ?
     `);
-    updateStmt.run(hwid.trim(), ip, clientField(clientInfo?.os), clientField(clientInfo?.app), license.id);
+    await updateStmt.run(hwid.trim(), ip, clientField(clientInfo?.os), clientField(clientInfo?.app), license.id);
     logAudit(licenseKey, 'ACTIVATE_BIND_HWID', hwid, ip, `Bound to machine: ${JSON.stringify(clientInfo || {})}`);
     
     return res.json({
@@ -252,7 +262,7 @@ app.post('/api/license/activate', rateLimit(20, 10 * 60 * 1000), (req, res) => {
   }
 
   // Cùng máy kích hoạt lại
-  db.prepare('UPDATE licenses SET last_ping_at = CURRENT_TIMESTAMP, last_ip = ?, client_os = ?, app_version = ? WHERE id = ?')
+  await db.prepare('UPDATE licenses SET last_ping_at = CURRENT_TIMESTAMP, last_ip = ?, client_os = ?, app_version = ? WHERE id = ?')
     .run(ip, clientField(clientInfo?.os), clientField(clientInfo?.app), license.id);
   logAudit(licenseKey, 'ACTIVATE_REBIND_OK', hwid, ip);
 
@@ -273,7 +283,7 @@ app.post('/api/license/activate', rateLimit(20, 10 * 60 * 1000), (req, res) => {
  * POST /api/license/ping
  * Body: { licenseKey, hwid }
  */
-app.post('/api/license/ping', rateLimit(180, 10 * 60 * 1000), (req, res) => {
+app.post('/api/license/ping', rateLimit(180, 10 * 60 * 1000), async (req, res) => {
   const licenseKey = req.body.licenseKey || req.body.key;
   const { hwid, clientInfo } = req.body;
   const ip = req.ip || 'unknown';
@@ -283,7 +293,7 @@ app.post('/api/license/ping', rateLimit(180, 10 * 60 * 1000), (req, res) => {
   }
 
   const findStmt = db.prepare('SELECT * FROM licenses WHERE license_key = ?');
-  const license = findStmt.get(licenseKey.trim().toUpperCase());
+  const license = await findStmt.get(licenseKey.trim().toUpperCase());
 
   if (!license) {
     return res.status(404).json({ valid: false, status: 'NOT_FOUND', message: 'License không tồn tại' });
@@ -301,7 +311,7 @@ app.post('/api/license/ping', rateLimit(180, 10 * 60 * 1000), (req, res) => {
 
   // Kiểm tra hạn sử dụng
   if (license.expires_at && Date.now() > new Date(license.expires_at).getTime()) {
-    db.prepare("UPDATE licenses SET status = 'EXPIRED' WHERE id = ?").run(license.id);
+    await db.prepare("UPDATE licenses SET status = 'EXPIRED' WHERE id = ?").run(license.id);
     return res.json({
       valid: false,
       status: 'EXPIRED',
@@ -326,7 +336,7 @@ app.post('/api/license/ping', rateLimit(180, 10 * 60 * 1000), (req, res) => {
   }
 
   // Cập nhật trạng thái sống (Alive); app cũ chưa gửi clientInfo thì giữ giá trị đã có
-  db.prepare(`UPDATE licenses SET last_ping_at = CURRENT_TIMESTAMP, last_ip = ?,
+  await db.prepare(`UPDATE licenses SET last_ping_at = CURRENT_TIMESTAMP, last_ip = ?,
     client_os = COALESCE(?, client_os), app_version = COALESCE(?, app_version) WHERE id = ?`)
     .run(ip, clientField(clientInfo?.os), clientField(clientInfo?.app), license.id);
 
@@ -354,12 +364,27 @@ app.get('/', (req, res) => {
   res.redirect('/admin');
 });
 
-// Khởi động server
-app.listen(PORT, () => {
-  console.log(`\n======================================================`);
-  console.log(`🚀 [ToolZutter License Server] Đang chạy tại:`);
-  console.log(`   👉 Admin Dashboard: http://localhost:${PORT}/admin`);
-  console.log(`   👉 Public key:      ${PUBLIC_KEY_B64URL}`);
-  console.log(`   👉 Client API:      http://localhost:${PORT}/api/license/activate`);
-  console.log(`======================================================\n`);
+// Lỗi không lường trước (vd mất kết nối DB) → 500, không lộ chi tiết
+app.use((err, req, res, next) => {
+  console.error('[License Server] Lỗi:', err);
+  if (res.headersSent) return next(err);
+  res.status(500).json({ success: false, valid: undefined, message: 'Lỗi máy chủ, thử lại sau.' });
+});
+
+// Khởi động server: tạo bảng trước rồi mới nhận request
+(async () => {
+  await initDb();
+  await require('./admin-api').migrate(db);
+  app.listen(PORT, () => {
+    console.log(`\n======================================================`);
+    console.log(`🚀 [ToolZutter License Server] Đang chạy tại:`);
+    console.log(`   👉 Admin Dashboard: http://localhost:${PORT}/admin`);
+    console.log(`   👉 Database:        ${db.url}`);
+    console.log(`   👉 Public key:      ${PUBLIC_KEY_B64URL}`);
+    console.log(`   👉 Client API:      http://localhost:${PORT}/api/license/activate`);
+    console.log(`======================================================\n`);
+  });
+})().catch((err) => {
+  console.error('[License Server] Không khởi động được database:', err);
+  process.exit(1);
 });
