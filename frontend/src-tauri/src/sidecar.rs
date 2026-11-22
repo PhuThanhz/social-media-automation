@@ -255,9 +255,23 @@ fn ensure_chromium(p: &Paths, node: &Path, force: bool, services: &Services) -> 
     Ok(())
 }
 
+/// Tauri canonicalize đường dẫn app → trên Windows ra dạng `\\?\C:\...`.
+/// Java (-jar) không nạp được class từ đường dẫn này (ClassNotFoundException JarLauncher),
+/// nên bỏ tiền tố `\\?\` khi đường dẫn là ổ đĩa thường (giữ nguyên `\\?\UNC\...`).
+fn plain_path(p: PathBuf) -> PathBuf {
+    if cfg!(windows) {
+        if let Some(rest) = p.to_str().and_then(|s| s.strip_prefix(r"\\?\")) {
+            if !rest.starts_with(r"UNC\") {
+                return PathBuf::from(rest);
+            }
+        }
+    }
+    p
+}
+
 fn boot(app: &AppHandle, services: &Services) -> Result<(), String> {
-    let res = app.path().resource_dir().map_err(|e| e.to_string())?.join("sidecar");
-    let data = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let res = plain_path(app.path().resource_dir().map_err(|e| e.to_string())?.join("sidecar"));
+    let data = plain_path(app.path().app_data_dir().map_err(|e| e.to_string())?);
 
     // Bản dev chưa đóng gói sidecar: dùng backend/worker dev đang chạy, không token
     if !res.join("backend.jar").exists() {
