@@ -97,6 +97,16 @@ function rateLimit(max, windowMs) {
   };
 }
 
+// Hàm lấy IP thật của client (hỗ trợ cả qua Cloudflare, reverse proxy, gateway và kết nối trực tiếp)
+function getClientIp(req) {
+  const forwarded = req.get('cf-connecting-ip') || req.get('x-real-ip') || req.get('x-forwarded-for');
+  if (forwarded) {
+    const first = forwarded.split(',')[0].trim();
+    if (first && first !== 'unknown') return first;
+  }
+  return req.ip || req.socket?.remoteAddress || 'unknown';
+}
+
 // Chế độ Proxy Gateway: Nếu chạy trên Render (hoặc có FORWARD_TARGET), chuyển tiếp toàn bộ /api sang VPS cố định
 const FORWARD_TARGET = process.env.FORWARD_TARGET || (process.env.RENDER ? 'http://42.96.18.219:5050' : '');
 if (FORWARD_TARGET) {
@@ -107,6 +117,9 @@ if (FORWARD_TARGET) {
       const url = `${target}${req.originalUrl}`;
       const headers = { ...req.headers };
       delete headers.host;
+      const clientIp = getClientIp(req);
+      headers['x-forwarded-for'] = clientIp;
+      headers['x-real-ip'] = clientIp;
       const opts = {
         method: req.method,
         headers,
@@ -235,7 +248,7 @@ function generateLicenseKey(prefix = 'ZTR') {
 app.post('/api/license/activate', rateLimit(20, 10 * 60 * 1000), async (req, res) => {
   const licenseKey = req.body.licenseKey || req.body.key;
   const { hwid, clientInfo } = req.body;
-  const ip = req.ip || 'unknown';
+  const ip = getClientIp(req);
 
   if (typeof licenseKey !== 'string' || typeof hwid !== 'string' || !licenseKey.trim() || !hwid.trim() || hwid.length > 64) {
     return res.status(400).json({ success: false, message: 'Thiếu mã License Key hoặc mã HWID thiết bị' });
@@ -321,7 +334,7 @@ app.post('/api/license/activate', rateLimit(20, 10 * 60 * 1000), async (req, res
 app.post('/api/license/ping', rateLimit(180, 10 * 60 * 1000), async (req, res) => {
   const licenseKey = req.body.licenseKey || req.body.key;
   const { hwid, clientInfo } = req.body;
-  const ip = req.ip || 'unknown';
+  const ip = getClientIp(req);
 
   if (typeof licenseKey !== 'string' || typeof hwid !== 'string' || !licenseKey.trim() || !hwid.trim()) {
     return res.status(400).json({ valid: false, message: 'Thiếu thông tin licenseKey hoặc hwid' });
