@@ -193,10 +193,14 @@
     <!-- Hộp thoại dùng chung (nội dung do admin.js dựng) -->
     <div id="dialog" class="modal-overlay hidden">
       <div class="modal glass-card" id="dialog-box">
-        <button type="button" class="modal-close-btn" data-dialog-close aria-label="Đóng">&times;</button>
         <div class="modal-header">
-          <h2 id="dialog-title"></h2>
-          <p class="subtitle" id="dialog-subtitle"></p>
+          <div>
+            <h2 id="dialog-title"></h2>
+            <p class="subtitle" id="dialog-subtitle"></p>
+          </div>
+          <button type="button" class="modal-close-btn" data-dialog-close aria-label="Đóng">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+          </button>
         </div>
         <form id="dialog-form">
           <div id="dialog-body"></div>
@@ -207,6 +211,21 @@
         </form>
       </div>
     </div>
+
+    <!-- Hộp xác nhận (thay confirm() của trình duyệt) -->
+    <div id="confirm" class="modal-overlay hidden">
+      <div class="modal glass-card confirm-box" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title">
+        <h2 id="confirm-title"></h2>
+        <p id="confirm-message"></p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" id="confirm-cancel">Hủy</button>
+          <button type="button" class="btn btn-primary" id="confirm-ok">Đồng ý</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Menu thao tác của từng dòng -->
+    <div id="row-menu" class="row-menu hidden" role="menu"></div>
 
     <div id="toast" class="toast hidden"></div>
   </div>

@@ -14,6 +14,7 @@ let activeTab = 'licenses';
 localStorage.removeItem('zutter_admin_secret'); // bản cũ lưu secret vĩnh viễn
 
 const $ = (id) => document.getElementById(id);
+const DOTS_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>';
 
 // Dữ liệu từ server có thể chứa chuỗi do người ngoài gửi lên (key nhập sai, thông tin máy) → luôn escape
 function esc(value) {
@@ -208,12 +209,8 @@ function renderLicenses() {
       </td>
       <td style="text-align:right">
         <div class="row-actions">
-          ${can('STAFF') ? `
-            <button class="btn btn-sm btn-action-renew" data-action="extend" data-id="${l.id}">Gia hạn</button>
-            <button class="btn btn-sm btn-action-plan" data-action="plan" data-id="${l.id}">Gói</button>
-            <button class="btn btn-sm ${l.status === 'ACTIVE' ? 'btn-action-lock' : 'btn-action-unlock'}" data-action="toggle" data-id="${l.id}">${l.status === 'ACTIVE' ? 'Khóa' : 'Mở khóa'}</button>
-            ${l.hwid ? `<button class="btn btn-sm btn-action-reset" data-action="reset" data-id="${l.id}">Đổi máy</button>` : ''}` : ''}
-          ${can('OWNER') ? `<button class="btn btn-sm btn-action-delete" data-action="delete-license" data-id="${l.id}" title="Xóa key">Xóa</button>` : ''}
+          ${can('STAFF') ? `<button class="btn btn-sm btn-secondary" data-action="extend" data-id="${l.id}">Gia hạn</button>` : ''}
+          ${can('STAFF') ? `<button class="btn btn-sm btn-icon" data-action="menu" data-kind="license" data-id="${l.id}" aria-label="Thao tác khác" title="Thao tác khác">${DOTS_ICON}</button>` : ''}
         </div>
       </td>
     </tr>`).join('');
@@ -245,8 +242,7 @@ function renderCustomers() {
       <td>${money(c.total_paid)}</td>
       <td style="text-align:right"><div class="row-actions">
         <button class="btn btn-sm btn-secondary" data-action="customer" data-id="${c.id}">Xem</button>
-        ${can('STAFF') ? `<button class="btn btn-sm btn-secondary" data-action="edit-customer" data-id="${c.id}">Sửa</button>` : ''}
-        ${can('OWNER') ? `<button class="btn btn-sm btn-action-delete" data-action="delete-customer" data-id="${c.id}">Xóa</button>` : ''}
+        ${can('STAFF') ? `<button class="btn btn-sm btn-icon" data-action="menu" data-kind="customer" data-id="${c.id}" aria-label="Thao tác khác" title="Thao tác khác">${DOTS_ICON}</button>` : ''}
       </div></td>
     </tr>`).join('');
 }
@@ -263,8 +259,7 @@ function renderAdmins(admins) {
       <td>${a.last_login_at ? esc(ago(a.last_login_at)) : '<span class="muted">Chưa đăng nhập</span>'}</td>
       <td style="text-align:right"><div class="row-actions">
         <button class="btn btn-sm btn-secondary" data-action="edit-admin" data-id="${a.id}">Sửa</button>
-        <button class="btn btn-sm ${a.active ? 'btn-action-lock' : 'btn-action-unlock'}" data-action="toggle-admin" data-id="${a.id}" data-active="${a.active ? 1 : 0}">${a.active ? 'Khóa' : 'Mở khóa'}</button>
-        <button class="btn btn-sm btn-action-delete" data-action="delete-admin" data-id="${a.id}" data-name="${esc(a.username)}">Xóa</button>
+        <button class="btn btn-sm btn-icon" data-action="menu" data-kind="admin" data-id="${a.id}" data-active="${a.active ? 1 : 0}" data-name="${esc(a.username)}" aria-label="Thao tác khác" title="Thao tác khác">${DOTS_ICON}</button>
       </div></td>
     </tr>`).join('')
     : '<tr><td colspan="6" class="loading-state">Chưa có tài khoản nào. Đang đăng nhập bằng Admin Secret — hãy tạo tài khoản cho bạn và nhân viên.</td></tr>';
@@ -335,6 +330,10 @@ function openDialog({ title, subtitle = '', fields = [], html = '', submitLabel 
       $(`f-${group.dataset.target}`).value = btn.dataset.value;
       onChange?.();
     });
+    // Gõ tay số ngày → nút chọn nhanh tương ứng sáng theo
+    $(`f-${group.dataset.target}`)?.addEventListener('input', (e) => {
+      group.querySelectorAll('.preset-pill').forEach((p) => p.classList.toggle('active', p.dataset.value === e.target.value.trim()));
+    });
   });
   if (onChange) {
     $('dialog-body').addEventListener('input', onChange);
@@ -372,10 +371,85 @@ document.addEventListener('click', (e) => {
   }
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') {
-    closeDialog();
-  }
+  if (e.key !== 'Escape') return;
+  if (!$('row-menu').classList.contains('hidden')) closeMenu();
+  else if (!$('confirm').classList.contains('hidden')) settleConfirm(false);
+  else closeDialog();
 });
+
+// ===== Hộp xác nhận =====
+let confirmResolve = null;
+function confirmBox({ title, message, okLabel = 'Đồng ý', danger = false }) {
+  $('confirm-title').textContent = title;
+  $('confirm-message').textContent = message;
+  $('confirm-ok').textContent = okLabel;
+  $('confirm-ok').className = `btn ${danger ? 'btn-danger' : 'btn-primary'}`;
+  $('confirm').classList.remove('hidden');
+  $('confirm-cancel').focus();
+  return new Promise((resolve) => { confirmResolve = resolve; });
+}
+function settleConfirm(ok) {
+  $('confirm').classList.add('hidden');
+  confirmResolve?.(ok);
+  confirmResolve = null;
+}
+$('confirm-ok').addEventListener('click', () => settleConfirm(true));
+$('confirm-cancel').addEventListener('click', () => settleConfirm(false));
+$('confirm').addEventListener('click', (e) => { if (e.target.id === 'confirm') settleConfirm(false); });
+
+// ===== Menu "⋯" của từng dòng =====
+function menuItems(kind, el) {
+  const id = el.dataset.id;
+  const item = (action, label, extra = '') => `<button type="button" class="row-menu-item ${extra}" role="menuitem" data-action="${action}" data-id="${id}">${label}</button>`;
+  const sep = '<div class="row-menu-sep"></div>';
+  if (kind === 'license') {
+    const l = licenses.find((x) => x.id === Number(id));
+    if (!l) return '';
+    return [
+      item('plan', 'Đổi gói / ghi chú'),
+      item('copy-key', 'Copy mã key'),
+      l.hwid ? item('reset', 'Đổi máy (xóa HWID)') : '',
+      sep,
+      item('toggle', l.status === 'ACTIVE' ? 'Khóa key' : 'Mở khóa key', l.status === 'ACTIVE' ? 'danger' : ''),
+      can('OWNER') ? item('delete-license', 'Xóa key', 'danger') : '',
+    ].join('');
+  }
+  if (kind === 'customer') {
+    return [
+      item('edit-customer', 'Sửa thông tin'),
+      item('create-for', 'Tạo key cho khách'),
+      can('OWNER') ? sep + item('delete-customer', 'Xóa khách', 'danger') : '',
+    ].join('');
+  }
+  if (kind === 'admin') {
+    const active = el.dataset.active === '1';
+    return `<button type="button" class="row-menu-item ${active ? 'danger' : ''}" data-action="toggle-admin" data-id="${id}" data-active="${el.dataset.active}">${active ? 'Khóa tài khoản' : 'Mở khóa tài khoản'}</button>
+      ${sep}<button type="button" class="row-menu-item danger" data-action="delete-admin" data-id="${id}" data-name="${esc(el.dataset.name)}">Xóa tài khoản</button>`;
+  }
+  return '';
+}
+function openMenu(el) {
+  const menu = $('row-menu');
+  if (menu.dataset.owner === `${el.dataset.kind}-${el.dataset.id}` && !menu.classList.contains('hidden')) { closeMenu(); return; }
+  menu.innerHTML = menuItems(el.dataset.kind, el);
+  menu.dataset.owner = `${el.dataset.kind}-${el.dataset.id}`;
+  menu.classList.remove('hidden');
+  const r = el.getBoundingClientRect();
+  const w = menu.offsetWidth;
+  const h = menu.offsetHeight;
+  const top = r.bottom + 6 + h > window.innerHeight ? r.top - h - 6 : r.bottom + 6;
+  menu.style.top = `${Math.max(8, top)}px`;
+  menu.style.left = `${Math.max(8, r.right - w)}px`;
+}
+function closeMenu() {
+  $('row-menu').classList.add('hidden');
+  $('row-menu').dataset.owner = '';
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#row-menu, [data-action="menu"]')) closeMenu();
+});
+window.addEventListener('scroll', closeMenu, true);
+window.addEventListener('resize', closeMenu);
 
 const num = (v) => (v === '' || v === undefined ? undefined : Number(v));
 
@@ -396,8 +470,8 @@ function openCreateLicense(customerId = '') {
       { name: 'phone', label: 'SĐT', placeholder: 'Không bắt buộc' },
       { name: 'zalo', label: 'Zalo', placeholder: 'Không bắt buộc' },
       { name: 'durationPreset', label: 'Thời hạn', type: 'presets', target: 'durationDays', value: 90, options: DURATION_PRESETS },
-      { name: 'durationDays', label: 'Số ngày (9999 = vĩnh viễn)', type: 'number', value: 90, min: 1, max: 9999, required: true },
-      { name: 'maxAccounts', label: 'Số tài khoản tối đa (Via + Fanpage + TikTok + Threads)', type: 'number', value: 20, min: 1, max: 1000, required: true },
+      { name: 'durationDays', label: 'Số ngày', type: 'number', value: 90, min: 1, max: 9999, required: true, hint: '9999 = vĩnh viễn' },
+      { name: 'maxAccounts', label: 'Số tài khoản tối đa', type: 'number', value: 20, min: 1, max: 1000, required: true, hint: 'Tính chung Via + Fanpage + TikTok + Threads' },
       { name: 'maxUsers', label: 'Số người dùng trong app', type: 'number', value: 1, min: 1, max: 100, required: true },
       { name: 'amount', label: 'Số tiền đã thu (đ)', type: 'number', value: 0, min: 0 },
       { name: 'notes', label: 'Ghi chú', placeholder: 'VD: CK Vietcombank' },
@@ -538,28 +612,48 @@ document.addEventListener('click', async (e) => {
   const id = Number(el.dataset.id);
   const l = licenses.find((x) => x.id === id);
   const c = customers.find((x) => x.id === id);
+  if (el.dataset.action === 'menu') { openMenu(el); return; }
+  if (el.closest('#row-menu')) closeMenu();
+  const who = l ? (l.customer_name || l.client_name) : '';
   switch (el.dataset.action) {
     case 'copy':
       navigator.clipboard?.writeText(el.dataset.value).then(() => showToast(`Đã copy ${el.dataset.value}`));
       break;
+    case 'copy-key':
+      navigator.clipboard?.writeText(l.license_key).then(() => showToast(`Đã copy ${l.license_key}`));
+      break;
     case 'extend': openExtend(l); break;
     case 'plan': openPlan(l); break;
     case 'toggle':
-      if (l.status === 'ACTIVE' && !confirm(`Khóa key của "${l.customer_name || l.client_name}"? App của khách sẽ tự đóng trong vòng 3 phút.`)) return;
+      if (l.status === 'ACTIVE' && !(await confirmBox({
+        title: `Khóa key của ${who}?`,
+        message: 'App của khách sẽ tự đóng trong vòng 3 phút. Bạn có thể mở khóa lại bất cứ lúc nào.',
+        okLabel: 'Khóa key', danger: true,
+      }))) return;
       act('POST', `/api/admin/licenses/${id}/toggle`).catch(() => {});
       break;
     case 'reset':
-      if (confirm(`Xóa mã máy của "${l.customer_name || l.client_name}"? Khách kích hoạt lại được trên máy mới, máy cũ mất quyền.`)) {
-        act('POST', `/api/admin/licenses/${id}/reset-hwid`).catch(() => {});
-      }
+      if (await confirmBox({
+        title: `Đổi máy cho ${who}?`,
+        message: 'Mã máy hiện tại sẽ bị xóa. Máy cũ mất quyền, khách nhập lại key trên máy mới để kích hoạt.',
+        okLabel: 'Đổi máy',
+      })) act('POST', `/api/admin/licenses/${id}/reset-hwid`).catch(() => {});
       break;
     case 'delete-license':
-      if (confirm(`Xóa vĩnh viễn key ${l.license_key}?`)) act('DELETE', `/api/admin/licenses/${id}`).catch(() => {});
+      if (await confirmBox({
+        title: 'Xóa vĩnh viễn key này?',
+        message: `Key ${l.license_key} của ${who} sẽ bị xóa và không khôi phục được. App của khách sẽ ngừng hoạt động.`,
+        okLabel: 'Xóa key', danger: true,
+      })) act('DELETE', `/api/admin/licenses/${id}`).catch(() => {});
       break;
     case 'customer': openCustomerDetail(id); break;
     case 'edit-customer': openCustomerForm(c); break;
     case 'delete-customer':
-      if (confirm(`Xóa khách "${c.name}"?`)) act('DELETE', `/api/admin/customers/${id}`).catch(() => {});
+      if (await confirmBox({
+        title: `Xóa khách ${c.name}?`,
+        message: 'Thông tin khách hàng sẽ bị xóa và không khôi phục được.',
+        okLabel: 'Xóa khách', danger: true,
+      })) act('DELETE', `/api/admin/customers/${id}`).catch(() => {});
       break;
     case 'create-for': closeDialog(); openCreateLicense(id); break;
     case 'edit-admin': {
@@ -568,16 +662,28 @@ document.addEventListener('click', async (e) => {
       break;
     }
     case 'toggle-admin':
+      if (el.dataset.active === '1' && !(await confirmBox({
+        title: 'Khóa tài khoản admin này?',
+        message: 'Tài khoản sẽ bị đăng xuất và không đăng nhập được cho tới khi mở khóa.',
+        okLabel: 'Khóa tài khoản', danger: true,
+      }))) return;
       act('PATCH', `/api/admin/admins/${id}`, { active: el.dataset.active !== '1' }).catch(() => {});
       break;
     case 'delete-admin':
-      if (confirm(`Xóa tài khoản ${el.dataset.name}?`)) act('DELETE', `/api/admin/admins/${id}`).catch(() => {});
+      if (await confirmBox({
+        title: `Xóa tài khoản ${el.dataset.name}?`,
+        message: 'Tài khoản sẽ bị xóa vĩnh viễn và không khôi phục được.',
+        okLabel: 'Xóa tài khoản', danger: true,
+      })) act('DELETE', `/api/admin/admins/${id}`).catch(() => {});
       break;
     default:
   }
 });
 
 // Tự làm mới để thấy khách online
-setInterval(() => { if (auth && $('dialog').classList.contains('hidden')) reloadAll(); }, 30000);
+setInterval(() => {
+  const idle = $('dialog').classList.contains('hidden') && $('confirm').classList.contains('hidden') && $('row-menu').classList.contains('hidden');
+  if (auth && idle) reloadAll();
+}, 30000);
 
 if (auth) enterDashboard();
