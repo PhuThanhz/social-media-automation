@@ -2199,95 +2199,108 @@ export default function ViralHunter() {
 
         {/* ────────── CHẾ ĐỘ 3: CÀO BÀI THEO NGUỒN MỤC TIÊU CHỈ ĐỊNH (GROUP / PAGE) ────────── */}
         {hunterMode === 'TARGET_SOURCES' && (
-          <div className="p-5 sm:p-6 space-y-4">
-            {/* Chọn nhanh Fanpage đã kết nối nếu có */}
-            {connections.length > 0 && (
-              <div className="flex items-center justify-between flex-wrap gap-2 p-2.5 sm:p-3 rounded-xl bg-slate-900/50 border border-slate-800/80">
-                <span className="text-xs text-slate-400 font-semibold">Chọn nhanh Fanpage đã kết nối:</span>
-                <Select
-                  size="small"
-                  placeholder="Chọn từ Fanpage đã kết nối..."
-                  className="w-56 text-xs"
-                  onChange={(val) => {
-                    const selectedConn = connections.find((c: any) => c.platformAccountId === val || c.id === val);
-                    if (selectedConn) {
-                      const targetUrl = selectedConn.platformAccountId && !selectedConn.platformAccountId.startsWith('http')
-                        ? `https://www.facebook.com/${selectedConn.platformAccountId}`
-                        : selectedConn.platformAccountId;
-                      setTargetSourceUrl(targetUrl);
-                      setTargetSourceName(selectedConn.pageName || 'Fanpage của tôi');
-                    }
-                  }}
-                  options={connections
-                    .filter((c: any) => c.platform !== 'FACEBOOK_GROUP')
-                    .map((c: any) => ({
-                      label: `📘 ${c.pageName || c.platformAccountId}`,
-                      value: c.platformAccountId || c.id,
-                    }))}
-                />
-              </div>
-            )}
+          <div className="p-5 sm:p-6 space-y-5">
+            {/* 1. KHỐI CÀO BÀI TRỰC TIẾP TỪ LINK */}
+            <div className="p-4 sm:p-4.5 rounded-2xl bg-black/40 border border-slate-700/60 backdrop-blur-md space-y-3">
+              {/* Header của khối cào: Tiêu đề + Nền tảng + Chọn Fanpage */}
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <LinkOutlined className="text-blue-400" />
+                  {targetPlatform === 'REDDIT'
+                    ? 'Nhập subreddit, từ khóa hoặc link Reddit:'
+                    : 'Nhập link Facebook Group hoặc Fanpage:'}
+                </span>
 
-            {/* Khung nhập URL & Tên nguồn mục tiêu */}
-            <div className="p-4 sm:p-5 rounded-2xl bg-black/40 border border-slate-700/60 backdrop-blur-md space-y-3.5">
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
-                <div className="lg:col-span-8">
-                  <div className="text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-1.5">
-                      <LinkOutlined className="text-blue-400" />
-                      {targetPlatform === 'REDDIT'
-                        ? 'Link subreddit hoặc bài Reddit:'
-                        : 'Link Group hoặc Fanpage mục tiêu:'}
-                    </span>
-                    <Segmented
+                <div className="flex items-center gap-2 flex-wrap">
+                  {connections.length > 0 && (
+                    <Select
                       size="small"
-                      value={targetPlatform}
-                      onChange={(v) => setTargetPlatform(v as 'FACEBOOK' | 'REDDIT')}
-                      options={[
-                        { label: 'Facebook', value: 'FACEBOOK' },
-                        { label: 'Reddit', value: 'REDDIT' },
-                      ]}
+                      placeholder="Chọn Fanpage đã kết nối..."
+                      className="w-48 text-xs"
+                      onChange={(val) => {
+                        const selectedConn = connections.find((c: any) => c.platformAccountId === val || c.id === val);
+                        if (selectedConn) {
+                          const targetUrl = selectedConn.platformAccountId && !selectedConn.platformAccountId.startsWith('http')
+                            ? `https://www.facebook.com/${selectedConn.platformAccountId}`
+                            : selectedConn.platformAccountId;
+                          setTargetSourceUrl(targetUrl);
+                          setTargetSourceName(selectedConn.pageName || 'Fanpage của tôi');
+                        }
+                      }}
+                      options={connections
+                        .filter((c: any) => c.platform !== 'FACEBOOK_GROUP')
+                        .map((c: any) => ({
+                          label: `📘 ${c.pageName || c.platformAccountId}`,
+                          value: c.platformAccountId || c.id,
+                        }))}
                     />
-                  </div>
+                  )}
+
+                  <Segmented
+                    size="small"
+                    value={targetPlatform}
+                    onChange={(v) => setTargetPlatform(v as 'FACEBOOK' | 'REDDIT')}
+                    options={[
+                      { label: 'Facebook', value: 'FACEBOOK' },
+                      { label: 'Reddit', value: 'REDDIT' },
+                    ]}
+                  />
+                </div>
+              </div>
+
+              {/* Hàng nhập liệu chính + Nút Cào bài đồng bộ */}
+              <div className="flex flex-col md:flex-row items-stretch gap-2.5">
+                <div className="flex-1 relative">
                   <Input
                     size="large"
                     prefix={targetPlatform === 'REDDIT' ? undefined : <FacebookFilled className="text-blue-400 mr-1" />}
-                    onPressEnter={() => targetPlatform === 'REDDIT' && handleScanTargetSource()}
+                    onPressEnter={() => handleScanTargetSource()}
                     placeholder={targetPlatform === 'REDDIT'
-                      ? 'VD: r/cats hoặc dán link bài Reddit...'
-                      : 'Dán link Facebook Group hoặc Fanpage (VD: https://facebook.com/groups/...)'}
+                      ? 'VD: r/cats · cute cats · hoặc dán link bài Reddit...'
+                      : 'Dán link Group hoặc Fanpage (VD: https://facebook.com/groups/...)'}
                     value={targetSourceUrl}
                     onChange={(e) => setTargetSourceUrl(e.target.value)}
                     allowClear
-                    className="bg-[#0b1017] border-slate-700 text-slate-100 rounded-xl text-xs sm:text-sm h-11"
+                    className="!h-11 rounded-xl bg-slate-900/80 border-slate-700/80 hover:border-slate-600 focus:border-blue-500 text-sm font-medium text-white placeholder:text-slate-500 px-3.5"
                   />
                 </div>
 
-                <div className="lg:col-span-4">
-                  <div className="text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
-                    <span>Tên gợi nhớ:</span>
-                    {targetSourceUrl.trim() && (
-                      <button
-                        type="button"
-                        onClick={handleSaveTargetSource}
-                        className="text-xs text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1 cursor-pointer"
-                      >
-                        <StarOutlined /> Lưu nguồn
-                      </button>
-                    )}
-                  </div>
+                <div className="w-full md:w-56">
                   <Input
                     size="large"
-                    placeholder="VD: Khen Phim Hay, Page Điện Ảnh..."
+                    placeholder="Tên gợi nhớ (tùy chọn)..."
                     value={targetSourceName}
                     onChange={(e) => setTargetSourceName(e.target.value)}
-                    className="bg-[#0b1017] border-slate-700 text-slate-100 rounded-xl text-xs sm:text-sm h-11"
+                    className="!h-11 rounded-xl bg-slate-900/80 border-slate-700/80 hover:border-slate-600 focus:border-blue-500 text-sm font-medium text-white placeholder:text-slate-500 px-3"
                   />
                 </div>
+
+                {targetSourceUrl.trim() && (
+                  <Tooltip title="Lưu nguồn này vào kho mục tiêu bên dưới">
+                    <Button
+                      size="large"
+                      icon={<StarOutlined className="text-amber-400 text-base" />}
+                      onClick={handleSaveTargetSource}
+                      className="!h-11 px-3.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-amber-300 border-slate-700 hover:border-amber-500/50 cursor-pointer"
+                    />
+                  </Tooltip>
+                )}
+
+                <Button
+                  type="primary"
+                  size="large"
+                  icon={<RocketOutlined />}
+                  loading={loading}
+                  onClick={() => handleScanTargetSource()}
+                  disabled={!targetSourceUrl.trim()}
+                  className="!h-11 px-6 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shrink-0 bg-blue-600 hover:bg-blue-500 border-none shadow-md shadow-blue-600/20 active:scale-[0.99] transition-all"
+                >
+                  Cào bài
+                </Button>
               </div>
 
-              {/* Tùy chọn bộ lọc lấy bài */}
-              <div className="pt-2.5 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+              {/* Hàng bộ lọc trích xuất */}
+              <div className="pt-2.5 border-t border-slate-800/70 flex flex-wrap items-center justify-between gap-3 text-xs">
                 <div className="flex items-center gap-3 flex-wrap">
                   <div className="flex items-center gap-1.5">
                     <span className="text-slate-400">Thứ tự:</span>
@@ -2299,7 +2312,7 @@ export default function ViralHunter() {
                         { label: 'Mới nhất', value: 'NEWEST' },
                         { label: 'Viral nhất', value: 'VIRAL' },
                       ]}
-                      className="bg-[#0b1017] border border-slate-700 text-xs"
+                      className="bg-slate-900 border border-slate-700/80 text-xs"
                     />
                   </div>
 
@@ -2309,7 +2322,7 @@ export default function ViralHunter() {
                       size="small"
                       value={targetTimeRange}
                       onChange={setTargetTimeRange}
-                      className="w-36 text-xs"
+                      className="w-32 text-xs"
                       options={[
                         { label: 'Tất cả bài', value: 'ALL' },
                         { label: '24 giờ qua', value: 'TODAY' },
@@ -2341,7 +2354,7 @@ export default function ViralHunter() {
                       size="small"
                       value={targetMinReactions}
                       onChange={setTargetMinReactions}
-                      className="w-32 text-xs"
+                      className="w-28 text-xs"
                       options={[
                         { label: 'Tất cả (>= 0)', value: 0 },
                         { label: '>= 10 Like', value: 10 },
@@ -2351,103 +2364,89 @@ export default function ViralHunter() {
                     />
                   </div>
                 </div>
-              </div>
 
-              {/* Lọc từ khóa trong nguồn & Nút Cào chính */}
-              <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                <div className="w-full sm:max-w-md">
+                <div className="w-full sm:w-60">
                   <Input
-                    size="middle"
-                    placeholder="Lọc từ khóa trong bài (tùy chọn, để trống để lấy hết)..."
+                    size="small"
+                    placeholder="Lọc từ khóa trong bài..."
                     value={targetKeywordFilter}
                     onChange={(e) => setTargetKeywordFilter(e.target.value)}
                     allowClear
-                    className="bg-[#0b1017] border-slate-700 text-slate-200 text-xs rounded-xl h-10"
+                    className="bg-slate-900/80 border-slate-700 text-slate-200 text-xs rounded-lg h-7.5"
                   />
                 </div>
+              </div>
+            </div>
 
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="primary"
-                    size="large"
-                    icon={<RocketOutlined />}
-                    loading={loading}
-                    onClick={() => handleScanTargetSource()}
-                    disabled={!targetSourceUrl.trim()}
-                    className="bg-blue-600 hover:bg-blue-500 font-bold text-xs sm:text-sm px-6 h-10 rounded-xl border-none shadow-md shadow-blue-600/20 flex items-center gap-2"
-                  >
-                    Bắt đầu cào bài
-                  </Button>
-                </div>
+            {/* 2. THANH QUÉT TỰ ĐỘNG ĐỊNH KỲ (TÁCH BIỆT RÕ RÀNG) */}
+            <div className="p-3 sm:p-3.5 rounded-xl bg-slate-900/50 border border-slate-800/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-3 flex-wrap">
+                <Checkbox
+                  checked={Boolean(autoScan?.enabled)}
+                  disabled={!autoScan}
+                  onChange={(e) => handleUpdateAutoScan({ enabled: e.target.checked })}
+                  className="text-xs text-slate-200 font-semibold"
+                >
+                  Tự động quét kho nguồn mỗi:
+                </Checkbox>
+
+                <Select
+                  size="small"
+                  value={autoScan?.intervalHours ?? 3}
+                  disabled={!autoScan?.enabled}
+                  onChange={(val) => handleUpdateAutoScan({ intervalHours: val })}
+                  className="w-24 text-xs"
+                  options={[
+                    { label: '1 giờ', value: 1 },
+                    { label: '2 giờ', value: 2 },
+                    { label: '3 giờ', value: 3 },
+                    { label: '6 giờ', value: 6 },
+                    { label: '12 giờ', value: 12 },
+                    { label: '24 giờ', value: 24 },
+                  ]}
+                />
+
+                <span className="text-xs text-slate-400 font-mono">
+                  {autoScan?.running
+                    ? `⚡ Đang quét: ${autoScan.currentSource || '...'}`
+                    : autoScan?.enabled && autoScan?.nextRunAt
+                      ? `⏰ Lần quét tiếp: ${formatScanTime(autoScan.nextRunAt)}`
+                      : autoScan?.lastRunAt
+                        ? `Lần gần nhất: ${formatScanTime(autoScan.lastRunAt)}`
+                        : ''}
+                </span>
               </div>
 
-              {/* Quét tự động toàn bộ Kho Nguồn ở máy chủ (chạy cả khi đóng trình duyệt) */}
-              <div className="pt-3 border-t border-slate-800/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <Checkbox
-                    checked={Boolean(autoScan?.enabled)}
-                    disabled={!autoScan}
-                    onChange={(e) => handleUpdateAutoScan({ enabled: e.target.checked })}
-                    className="text-xs text-slate-200 font-bold"
-                  >
-                    Tự động quét tất cả nguồn trong kho mỗi:
-                  </Checkbox>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  size="small"
+                  onClick={handleScanAllNow}
+                  loading={Boolean(autoScan?.running)}
+                  disabled={targetSources.length === 0}
+                  className="text-xs h-7.5 rounded-lg"
+                >
+                  Quét tất cả ngay
+                </Button>
 
-                  <Select
+                {redditConfig?.configured && (
+                  <Button
                     size="small"
-                    value={autoScan?.intervalHours ?? 3}
-                    disabled={!autoScan?.enabled}
-                    onChange={(val) => handleUpdateAutoScan({ intervalHours: val })}
-                    className="w-28 text-xs"
-                    options={[
-                      { label: '1 giờ', value: 1 },
-                      { label: '2 giờ', value: 2 },
-                      { label: '3 giờ', value: 3 },
-                      { label: '6 giờ', value: 6 },
-                      { label: '12 giờ', value: 12 },
-                      { label: '24 giờ', value: 24 },
-                    ]}
-                  />
-
-                  <span className="text-xs text-slate-300">
-                    {autoScan?.running
-                      ? `Đang quét: ${autoScan.currentSource || '...'}`
-                      : autoScan?.enabled && autoScan?.nextRunAt
-                        ? `Lần quét tiếp: ${formatScanTime(autoScan.nextRunAt)}`
-                        : autoScan?.lastRunAt
-                          ? `Lần quét gần nhất: ${formatScanTime(autoScan.lastRunAt)}`
-                          : ''}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Button
-                    size="middle"
-                    onClick={handleScanAllNow}
-                    loading={Boolean(autoScan?.running)}
-                    disabled={targetSources.length === 0}
+                    onClick={() => openRedditModal()}
+                    className="text-xs h-7.5 rounded-lg text-slate-400"
                   >
-                    Quét tất cả ngay
+                    Reddit: Đã kết nối
                   </Button>
-                  {redditConfig?.configured && (
-                    <Checkbox
-                      checked={redditConfig.includeVideo !== false}
-                      onChange={(e) => handleToggleRedditVideo(e.target.checked)}
-                      className="text-xs text-slate-200"
-                    >
-                      Lấy bài video Reddit
-                    </Checkbox>
-                  )}
-                  <Button size="middle" onClick={() => openRedditModal()}>
-                    {redditConfig?.configured ? 'Reddit: đã kết nối' : 'Kết nối Reddit'}
-                  </Button>
-                  <Button size="middle" type="primary" onClick={handleOpenInbox} loading={inboxLoading}>
-                    Bài mới chờ duyệt ({autoScan?.newCount ?? 0})
-                  </Button>
-                </div>
-              </div>
-              <div className="text-xs text-slate-300">
-                Máy chủ tự quét kể cả khi đóng trình duyệt. Bài đã có trong lịch đăng sẽ tự bỏ qua; bài mới chỉ được gom vào "Bài mới chờ duyệt", không tự đăng.
+                )}
+
+                <Button
+                  size="small"
+                  type="primary"
+                  onClick={handleOpenInbox}
+                  loading={inboxLoading}
+                  className="text-xs h-7.5 rounded-lg font-bold bg-blue-600 hover:bg-blue-500 text-white border-none shadow-sm"
+                >
+                  📥 Bài mới chờ duyệt ({autoScan?.newCount ?? 0})
+                </Button>
               </div>
             </div>
 
