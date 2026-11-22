@@ -86,6 +86,19 @@ function rateLimit(max, windowMs) {
 }
 app.use('/admin', express.static(path.join(__dirname, 'public')));
 
+// Chẩn đoán: người gọi xem IP server nhận được của chính mình (kiểm tra cấu hình proxy)
+app.get('/api/client-ip', (req, res) => {
+  res.json({
+    ip: req.ip,
+    ips: req.ips,
+    socket: req.socket.remoteAddress,
+    xff: req.get('x-forwarded-for') || null,
+    cfConnectingIp: req.get('cf-connecting-ip') || null,
+    trueClientIp: req.get('true-client-ip') || null,
+    xRealIp: req.get('x-real-ip') || null,
+  });
+});
+
 // SQLite Database Setup
 const dbPath = process.env.DB_PATH || path.join(__dirname, 'licenses.db');
 const db = new DatabaseSync(dbPath);
