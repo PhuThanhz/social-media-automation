@@ -42,6 +42,7 @@ public class DesktopUsersController {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final DesktopLicense license;
+    private final DesktopDefaultGroups defaultGroups;
 
     private static ResponseEntity<Map<String, Object>> error(HttpStatus status, String message) {
         return ResponseEntity.status(status).body(Map.of("success", false, "message", message));
@@ -114,6 +115,7 @@ public class DesktopUsersController {
         owner.setPassword(passwordEncoder.encode(password));
         owner.setRole(OWNER);
         userRepository.save(owner);
+        defaultGroups.seedFor(owner);
         return ResponseEntity.ok(Map.of("success", true, "accessToken", tokenFor(owner)));
     }
 
@@ -150,6 +152,7 @@ public class DesktopUsersController {
         u.setPassword(passwordEncoder.encode(password));
         u.setRole(MEMBER);
         userRepository.save(u);
+        defaultGroups.seedFor(u);
         return ResponseEntity.ok(Map.of("success", true, "message", "Đã thêm người dùng " + login));
     }
 
