@@ -37,7 +37,7 @@ Hệ thống quản lý bản quyền và khóa từ xa đã được triển kh
 * **Đường dẫn Admin Dashboard:** **[https://social-media-automation-750a.onrender.com/admin](https://social-media-automation-750a.onrender.com/admin)**
 * **Đăng nhập bằng Admin Secret:**
   ```text
-  75cd16ff7b44f3563a57ff8eea43890b903cbca6
+  (xem biến ADMIN_SECRET trên Render — không ghi vào repo)
   ```
 * **Public Key Ed25519 nhúng trong app:**
   ```text
