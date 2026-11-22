@@ -59,8 +59,11 @@ function issueToken(license, hwid) {
   return `${b64url(payload)}.${b64url(crypto.sign(null, payload, signingKey))}`;
 }
 
-// Chỉ tin X-Forwarded-For khi chạy sau reverse proxy (TRUST_PROXY=1)
-if (process.env.TRUST_PROXY) app.set('trust proxy', 1);
+// Chỉ tin X-Forwarded-For khi chạy sau reverse proxy. TRUST_PROXY = số lớp proxy.
+// Render: client → Cloudflare → load balancer 10.x → proxy cục bộ ::1 = 3 lớp
+// (đo bằng /api/client-ip). Tin đúng 3 lớp → lấy IP thật, khách không giả được qua X-Forwarded-For.
+const trustProxy = process.env.TRUST_PROXY || (process.env.RENDER ? '3' : '');
+if (trustProxy) app.set('trust proxy', /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy);
 
 // Client API được gọi từ Rust (không qua trình duyệt) nên không cần CORS; chỉ mở cho trang admin
 const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173')
