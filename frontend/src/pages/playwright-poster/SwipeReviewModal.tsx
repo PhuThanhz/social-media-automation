@@ -92,6 +92,7 @@ function SwipeReviewModal({
 
   // Local state cho caption để gõ phím cực nhạy, cách ly re-render khỏi trang cha
   const [localCaption, setLocalCaption] = useState(activeSwipeCaption || '');
+  const [videoErrors, setVideoErrors] = useState<Record<string, boolean>>({});
   const activeItemIdRef = useRef(activeSwipeItem?.id);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -382,6 +383,7 @@ function SwipeReviewModal({
                   >
                     {activeSwipeMediaUrls.map((mediaUrl, mediaIndex) => {
                       const isVid = isMediaVideo(mediaUrl, activeSwipeMediaKinds[mediaIndex]);
+                      const hasErr = videoErrors[mediaUrl];
                       return (
                         <div
                           key={`${mediaUrl}-${mediaIndex}`}
@@ -390,16 +392,27 @@ function SwipeReviewModal({
                           onClick={() => !isVid && setMediaViewer({ url: mediaUrl, kind: 'image', title: `Bài ${swipeReviewIndex + 1} - Media ${mediaIndex + 1}` })}
                         >
                           {isVid ? (
-                            <video
-                              src={mediaUrl.includes('#t=') ? mediaUrl : `${mediaUrl}#t=0.001`}
-                              controls
-                              playsInline
-                              preload="auto"
-                              onClick={(e) => e.stopPropagation()}
-                              onPointerDown={(e) => e.stopPropagation()}
-                            />
+                            hasErr ? (
+                              <div className="flex flex-col items-center justify-center h-full w-full bg-slate-900/90 text-center p-2 text-slate-400 select-none">
+                                <VideoCameraOutlined className="text-xl text-blue-400 mb-1" />
+                                <span className="text-[11px] font-medium text-slate-300">Video Facebook</span>
+                                <span className="text-[10px] text-emerald-400 mt-0.5">Sẽ tải khi đăng bài</span>
+                              </div>
+                            ) : (
+                              <video
+                                // @ts-ignore
+                                referrerPolicy="no-referrer"
+                                src={mediaUrl.includes('#t=') ? mediaUrl : `${mediaUrl}#t=0.001`}
+                                controls
+                                playsInline
+                                preload="auto"
+                                onError={() => setVideoErrors((prev) => ({ ...prev, [mediaUrl]: true }))}
+                                onClick={(e) => e.stopPropagation()}
+                                onPointerDown={(e) => e.stopPropagation()}
+                              />
+                            )
                           ) : (
-                            <img src={mediaUrl} alt={`Media ${mediaIndex + 1}`} loading="eager" decoding="async" />
+                            <img referrerPolicy="no-referrer" src={mediaUrl} alt={`Media ${mediaIndex + 1}`} loading="eager" decoding="async" />
                           )}
                           <span className="swipe-media-tile-num">{mediaIndex + 1}</span>
                           {onRemoveMedia && (
@@ -463,20 +476,61 @@ function SwipeReviewModal({
                 )}
                 {activeSwipeMediaUrls.length > 0 ? (
                   isMediaVideo(activeSwipeMediaUrls[swipeMediaIndex] || activeSwipeMediaUrls[0], activeSwipeMediaKinds[swipeMediaIndex]) ? (
-                    <video
-                      key={activeSwipeMediaUrls[swipeMediaIndex] || activeSwipeMediaUrls[0]}
-                      src={(() => {
-                        const u = activeSwipeMediaUrls[swipeMediaIndex] || activeSwipeMediaUrls[0];
-                        return u.includes('#t=') ? u : `${u}#t=0.001`;
-                      })()}
-                      controls
-                      playsInline
-                      preload="auto"
-                      onClick={(e) => e.stopPropagation()}
-                      onPointerDown={(e) => e.stopPropagation()}
-                    />
+                    (() => {
+                      const curUrl = activeSwipeMediaUrls[swipeMediaIndex] || activeSwipeMediaUrls[0];
+                      if (videoErrors[curUrl]) {
+                        return (
+                          <div
+                            className="flex flex-col items-center justify-center p-6 text-center bg-slate-900/95 rounded-2xl border border-slate-700/60 max-w-sm mx-auto my-auto shadow-2xl select-none"
+                            onClick={(e) => e.stopPropagation()}
+                            onPointerDown={(e) => e.stopPropagation()}
+                          >
+                            <div className="w-14 h-14 rounded-2xl bg-blue-500/15 border border-blue-500/30 text-blue-400 flex items-center justify-center text-2xl mb-3 shadow-inner">
+                              <VideoCameraOutlined />
+                            </div>
+                            <h4 className="text-slate-100 font-bold text-base mb-1.5">Video được bảo vệ bởi Facebook</h4>
+                            <p className="text-slate-300 text-xs leading-relaxed mb-4">
+                              Facebook chặn phát video trực tiếp trên trình duyệt (chống hotlink).<br />
+                              <span className="text-emerald-400 font-medium block mt-2 p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+                                ✓ Yên tâm: Khi bấm <b>"Giữ (D)"</b>, hệ thống sẽ tự động tải video gốc về máy để đăng bài bình thường.
+                              </span>
+                            </p>
+                            {activeSwipeItem?.url && (
+                              <a
+                                href={activeSwipeItem.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-medium transition-all shadow-md hover:shadow-blue-500/20"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <LinkOutlined /> Mở bài gốc trên Facebook
+                              </a>
+                            )}
+                          </div>
+                        );
+                      }
+                      return (
+                        <video
+                          key={curUrl}
+                          // @ts-ignore
+                          referrerPolicy="no-referrer"
+                          src={curUrl.includes('#t=') ? curUrl : `${curUrl}#t=0.001`}
+                          controls
+                          playsInline
+                          preload="auto"
+                          onError={() => {
+                            if (curUrl) {
+                              setVideoErrors((prev) => ({ ...prev, [curUrl]: true }));
+                            }
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          onPointerDown={(e) => e.stopPropagation()}
+                        />
+                      );
+                    })()
                   ) : (
                     <img
+                      referrerPolicy="no-referrer"
                       src={activeSwipeMediaUrls[swipeMediaIndex] || activeSwipeMediaUrls[0]}
                       alt={`Media bài ${swipeReviewIndex + 1}`}
                       loading="eager"

@@ -521,7 +521,14 @@ function BulkPasteDrawer({
                               const mediaIdx = rawMedia.indexOf(vUrl);
                               return (
                                 <div key={vIdx} className="relative rounded-xl overflow-hidden bg-black border border-slate-800">
-                                  <video controls src={vUrl} className="bpd-video" preload="metadata" />
+                                  <video
+                                    // @ts-ignore
+                                    referrerPolicy="no-referrer"
+                                    controls
+                                    src={vUrl}
+                                    className="bpd-video"
+                                    preload="metadata"
+                                  />
                                   <Button
                                     size="small"
                                     danger
