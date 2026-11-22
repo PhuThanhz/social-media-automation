@@ -371,6 +371,19 @@ const INITIAL_GROUPS: DiscoveredGroup[] = [
   },
   // ── KHU VỰC CHUYÊN ĐỀ: THÚ CƯNG / CHÓ MÈO ──
   {
+    id: 'daomeo_official',
+    name: 'ĐẢO MÈO 🐱 (Cộng đồng Đảo Mèo lớn nhất)',
+    url: 'https://www.facebook.com/groups/daomeo/',
+    memberLine: '2.5M thành viên',
+    postFreqLine: 'Hàng trăm bài viết hot/ngày',
+    privacy: 'Công khai',
+    memberCount: 2500000,
+    postsPerDay: 150,
+    qualityBadge: '👑 Siêu Group Triệu Member',
+    qualityScore: 100,
+    category: 'PETS',
+  },
+  {
     id: 'yeuchomeovn',
     name: 'Đảo Mèo 🐈 Đảo Chó 🐶 (Cộng đồng thú cưng lớn nhất)',
     url: 'https://www.facebook.com/groups/yeuchomeovn/',
@@ -379,8 +392,8 @@ const INITIAL_GROUPS: DiscoveredGroup[] = [
     privacy: 'Công khai',
     memberCount: 706000,
     postsPerDay: 70,
-    qualityBadge: '👑 Siêu Group Khủng',
-    qualityScore: 100,
+    qualityBadge: '🔥 Top Cộng Đồng Lớn',
+    qualityScore: 99,
     category: 'PETS',
   },
   {
@@ -455,10 +468,11 @@ export default function ViralHunter() {
   const [targetKeywordFilter, setTargetKeywordFilter] = useState('');
   const [targetSources, setTargetSources] = useState<TargetSourceItem[]>(() => {
     const defaultList: TargetSourceItem[] = [
-      { id: 'cuongphimreview', name: 'Cuồng Phim Review (Fanpage)', url: 'https://www.facebook.com/cuongphimreview', type: 'PAGE', description: 'Review phim hot & điện ảnh chiếu rạp', category: 'PHIM' },
+      { id: 'daomeo_official', name: 'ĐẢO MÈO 🐱 (Cộng đồng lớn nhất)', url: 'https://www.facebook.com/groups/daomeo/', type: 'GROUP', description: 'Cộng đồng Đảo Mèo 2.5M thành viên lớn nhất Việt Nam', category: 'PETS' },
+      { id: 'yeuchomeovn', name: 'Đảo Mèo 🐈 Đảo Chó 🐶', url: 'https://www.facebook.com/groups/yeuchomeovn/', type: 'GROUP', description: 'Cộng đồng thú cưng vui nhộn', category: 'PETS' },
       { id: 'chikhenphimhay', name: 'Khen Phim Hay - Chê Phim Dở', url: 'https://www.facebook.com/groups/chikhenphimhay', type: 'GROUP', description: 'Review phim & điện ảnh', category: 'PHIM' },
+      { id: 'cuongphimreview', name: 'Cuồng Phim Review (Fanpage)', url: 'https://www.facebook.com/cuongphimreview', type: 'PAGE', description: 'Review phim hot & điện ảnh chiếu rạp', category: 'PHIM' },
       { id: 'xemphimgixemvoi', name: 'Xem phim gì? Xem với!', url: 'https://www.facebook.com/groups/xemphimgixemvoi/', type: 'GROUP', description: 'Cộng đồng mọt phim', category: 'PHIM' },
-      { id: 'daomeodaocho', name: 'Đảo Mèo 🐱 Đảo Chó 🐶', url: 'https://www.facebook.com/groups/1004128549646467', type: 'GROUP', description: 'Cộng đồng thú cưng vui nhộn', category: 'PETS' },
       { id: 'truyenhaymoingay', name: 'Truyện Hay Mỗi Ngày', url: 'https://www.facebook.com/groups/1572019446274472', type: 'GROUP', description: 'Tâm sự & truyện đời' },
     ];
     try {
@@ -466,10 +480,9 @@ export default function ViralHunter() {
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          if (!parsed.some((it: any) => it.url?.includes('cuongphimreview'))) {
-            parsed.unshift(defaultList[0]);
-          }
-          return parsed;
+          const existingUrls = new Set(parsed.map((it: any) => it.url));
+          const missingDefaults = defaultList.filter((d) => !existingUrls.has(d.url));
+          return [...missingDefaults, ...parsed];
         }
       }
     } catch {}
@@ -1311,8 +1324,32 @@ export default function ViralHunter() {
       const list: any[] = Array.isArray(res.data) ? res.data : [];
       if (list.length > 0) {
         const mapped = list.map(mapDbSource);
-        setTargetSources(mapped);
-        persistLocalSources(mapped);
+        const existingUrls = new Set(mapped.map((it) => it.url));
+        const missingHardcoded = [
+          { id: 'daomeo_official', name: 'ĐẢO MÈO 🐱 (Cộng đồng lớn nhất)', url: 'https://www.facebook.com/groups/daomeo/', type: 'GROUP' as const, description: 'Cộng đồng Đảo Mèo 2.5M thành viên lớn nhất Việt Nam', category: 'PETS' },
+          { id: 'yeuchomeovn', name: 'Đảo Mèo 🐈 Đảo Chó 🐶', url: 'https://www.facebook.com/groups/yeuchomeovn/', type: 'GROUP' as const, description: 'Cộng đồng thú cưng vui nhộn', category: 'PETS' },
+        ].filter((d) => !existingUrls.has(d.url));
+
+        const finalMerged = [...missingHardcoded, ...mapped];
+        setTargetSources(finalMerged);
+        persistLocalSources(finalMerged);
+
+        if (missingHardcoded.length > 0) {
+          api.post('/viral-sources/import', missingHardcoded.map(({ name, url, type, description, category }) => ({ name, url, type, description, category }))).catch(() => {});
+        }
+      } else {
+        const defaults = [
+          { name: 'ĐẢO MÈO 🐱 (Cộng đồng lớn nhất)', url: 'https://www.facebook.com/groups/daomeo/', type: 'GROUP', description: 'Cộng đồng Đảo Mèo 2.5M thành viên lớn nhất Việt Nam', category: 'PETS' },
+          { name: 'Đảo Mèo 🐈 Đảo Chó 🐶', url: 'https://www.facebook.com/groups/yeuchomeovn/', type: 'GROUP', description: 'Cộng đồng thú cưng vui nhộn', category: 'PETS' },
+          { name: 'Cuồng Phim Review (Fanpage)', url: 'https://www.facebook.com/cuongphimreview', type: 'PAGE', description: 'Review phim hot & điện ảnh chiếu rạp', category: 'PHIM' },
+        ];
+        await api.post('/viral-sources/import', defaults).catch(() => {});
+        const resReload = await api.get('/viral-sources').catch(() => null);
+        if (resReload && Array.isArray(resReload.data) && resReload.data.length > 0) {
+          const mapped = resReload.data.map(mapDbSource);
+          setTargetSources(mapped);
+          persistLocalSources(mapped);
+        }
       }
     } catch (err) {
       console.warn('Không tải được Kho Nguồn từ máy chủ, dùng bản lưu trong trình duyệt', err);
@@ -2020,7 +2057,7 @@ export default function ViralHunter() {
                   }`}
                 >
                   <span>🎬 Phim ảnh</span>
-                  <span className="text-[11px] opacity-75">(11)</span>
+                  <span className="text-[11px] opacity-75">({INITIAL_GROUPS.filter(g => g.category === 'PHIM').length})</span>
                 </button>
 
                 <button
@@ -2036,7 +2073,7 @@ export default function ViralHunter() {
                   }`}
                 >
                   <span>🐱 Thú cưng</span>
-                  <span className="text-[11px] opacity-75">(2)</span>
+                  <span className="text-[11px] opacity-75">({INITIAL_GROUPS.filter(g => g.category === 'PETS').length})</span>
                 </button>
 
                 <button
