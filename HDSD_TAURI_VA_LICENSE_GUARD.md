@@ -11,7 +11,7 @@ Tài liệu này hướng dẫn chi tiết cách bạn (chủ phần mềm) vậ
 3. Rust kiểm tra chữ ký bằng public key nhúng lúc build, lưu token trong thư mục dữ liệu app (không phải localStorage). Sửa token → chữ ký sai → bị từ chối.
 4. Cứ 3 phút Rust ping server lấy token mới. Admin khóa key → app báo và tự đóng.
 5. Mất mạng: app chạy tiếp tới hết hạn offline (`TOKEN_TTL_HOURS`, mặc định 72h), sau đó bắt buộc online lại. Chặn domain server không còn là cách dùng chùa.
-6. HWID = SHA-256 của UUID máy do hệ điều hành cấp (macOS IOPlatformUUID, Windows MachineGuid, Linux machine-id). Cài lại Windows sẽ đổi HWID → dùng nút Reset HWID.
+6. HWID = SHA-256 của UUID máy do hệ điều hành cấp (macOS IOPlatformUUID, Windows MachineGuid, Linux machine-id).cha Cài lại Windows sẽ đổi HWID → dùng nút Reset HWID.
 
 ### Backend + Worker đi kèm app
 

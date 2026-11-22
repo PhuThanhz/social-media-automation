@@ -136,8 +136,8 @@ jobs:
           printf '%s\n' "$RCLONE_CONFIG_DATA" > ~/.config/rclone/rclone.conf
           EXE=$(ls dl/*-setup.exe | head -1)
           DMG=$(ls dl/*.dmg | head -1)
-          rclone copyto "$EXE" gdrive:ToolZutter-Setup.exe --drive-root-folder-id "$WIN_FOLDER" -v
-          rclone copyto "$DMG" gdrive:ToolZutter.dmg --drive-root-folder-id "$MAC_FOLDER" -v
+          rclone copyto "$EXE" gdrive:PhuSocial-Pro-Setup.exe --drive-root-folder-id "$WIN_FOLDER" -v
+          rclone copyto "$DMG" gdrive:PhuSocial-Pro.dmg --drive-root-folder-id "$MAC_FOLDER" -v
           printf 'Phiên bản: %s\nCommit: %s\n' "$VERSION" "$GITHUB_SHA" > version.txt
           rclone copyto version.txt gdrive:version.txt --drive-root-folder-id "$WIN_FOLDER"
           rclone copyto version.txt gdrive:version.txt --drive-root-folder-id "$MAC_FOLDER"

@@ -138,7 +138,7 @@ const DesktopBoot: React.FC<{ onReady: (cfg: DesktopServices, warning: string | 
       <LicenseGuardModal onAuthorized={() => start()} />
       {error ? (
         <div className="max-w-xl w-full space-y-3">
-          <div className="text-base font-semibold text-white">Không khởi động được ToolZutter</div>
+          <div className="text-base font-semibold text-white">Không khởi động được PhuSocial Pro</div>
           <pre className="text-xs text-slate-300 bg-slate-900 border border-slate-800 rounded-lg p-3 whitespace-pre-wrap max-h-80 overflow-auto">{error}</pre>
           <div className="text-xs text-slate-500">Nhật ký chi tiết nằm trong thư mục dữ liệu của ứng dụng, mục logs/.</div>
           <Button type="primary" onClick={() => start()}>Thử lại</Button>

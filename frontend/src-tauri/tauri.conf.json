@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "ToolZutter",
+  "productName": "PhuSocial Pro",
   "version": "1.0.0",
   "identifier": "com.phusocial.autopost",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "ToolZutter Pro — Social Automation Studio",
+        "title": "PhuSocial Pro — Social Automation Studio",
         "width": 1400,
         "height": 900,
         "minWidth": 1024,

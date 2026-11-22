@@ -161,7 +161,7 @@ fn wait_port_free(port: u16) -> Result<(), String> {
     let deadline = Instant::now() + Duration::from_secs(15);
     while !port_free(port) {
         if Instant::now() > deadline {
-            return Err(format!("Cổng {port} đang bị ứng dụng khác sử dụng. Hãy tắt ứng dụng đó rồi mở lại ToolZutter."));
+            return Err(format!("Cổng {port} đang bị ứng dụng khác sử dụng. Hãy tắt ứng dụng đó rồi mở lại PhuSocial Pro."));
         }
         std::thread::sleep(Duration::from_millis(500));
     }

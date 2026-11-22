@@ -33,7 +33,7 @@ const Login = () => {
 
   return (
     <AuthLayout
-      title={desktop ? "Đăng nhập ToolZutter" : "Đăng nhập"}
+      title={desktop ? "Đăng nhập PhuSocial Pro" : "Đăng nhập"}
     >
       <Form<LoginFormValues>
         name="login_form"

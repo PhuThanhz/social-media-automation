@@ -146,7 +146,7 @@ export const AutoUpdateModal: React.FC = () => {
           <Text style={{ color: '#94a3b8', fontSize: 13 }}>
             {isReadyToRestart
               ? 'Bản cập nhật đã được cài đặt thành công. Khởi động lại để trải nghiệm ngay.'
-              : 'ToolZutter đã có phiên bản mới với nhiều cải tiến và giao diện tối ưu.'}
+              : 'PhuSocial Pro đã có phiên bản mới với nhiều cải tiến và giao diện tối ưu.'}
           </Text>
         </Space>
       </div>
