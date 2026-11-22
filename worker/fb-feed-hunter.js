@@ -1186,7 +1186,7 @@ async function huntFacebookFeed(params, deps = {}) {
 
       if (collectedItemsMap.size === prevSize) {
         stagnantCount++;
-        const maxStagnant = isPage ? 5 : 4;
+        const maxStagnant = isPage ? 6 : 7;
         if (stagnantCount >= maxStagnant) {
           stopReason = 'NO_MORE_POSTS';
           console.log(`[FB_Group_Hunter] ℹ️ Dừng cuộn sau ${stagnantCount} vòng không có bài viết mới để trả kết quả ngay.`);
@@ -1200,24 +1200,18 @@ async function huntFacebookFeed(params, deps = {}) {
         // Fanpage ảo hoá bài đã cuộn qua → cuộn từng đoạn ngắn để kịp đọc từng bài trước khi bị làm rỗng
         await page.mouse.move(760, 520).catch(() => { });
         await page.mouse.wheel(0, 1400).catch(() => { });
-        await page.evaluate(() => window.scrollBy(0, 200)).catch(() => { });
-        await page.waitForTimeout(stagnantCount > 0 ? 1200 : 700);
+        await page.evaluate(() => window.scrollBy(0, 400)).catch(() => { });
+        await page.waitForTimeout(stagnantCount > 0 ? 1500 : 700);
         continue;
-      }
-
-      // Khi tạm thời chững ở đáy trang, nhích lên rồi kéo xuống lại để kích hoạt IntersectionObserver nạp batch mới
-      if (stagnantCount > 0) {
-        await page.evaluate(() => window.scrollBy(0, -650)).catch(() => { });
-        await page.waitForTimeout(150);
       }
 
       // Cuộn nhịp nhàng theo bước để Facebook virtualized list mount đầy đủ từng bài, không bị nhảy cóc
       await page.mouse.move(640, 480).catch(() => { });
-      await page.mouse.wheel(0, 1400).catch(() => { });
-      await page.evaluate(() => window.scrollBy(0, 500)).catch(() => { });
+      await page.mouse.wheel(0, 1600).catch(() => { });
+      await page.evaluate(() => window.scrollBy(0, 800)).catch(() => { });
       await page.keyboard.press('PageDown').catch(() => { });
-      // Chờ Facebook query GraphQL batch tiếp theo (được tối ưu từ 1600ms xuống 750ms để tăng tốc gấp đôi)
-      await page.waitForTimeout(stagnantCount > 0 ? 1200 : 750);
+      // Chờ Facebook query GraphQL batch tiếp theo
+      await page.waitForTimeout(stagnantCount > 0 ? 1800 : 900);
     }
 
     if (isPage && (!groupTitle || /^(?:Facebook|Facebook Group|Thông báo)$/i.test(groupTitle))) {
