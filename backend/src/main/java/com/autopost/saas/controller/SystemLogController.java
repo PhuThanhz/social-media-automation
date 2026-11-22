@@ -46,35 +46,59 @@ public class SystemLogController {
         this.storageCleanupService = storageCleanupService;
         Path projectRoot = resolveProjectRoot();
         Path homeDir = Paths.get(System.getProperty("user.home", ""));
+        String envAppData = System.getenv("APP_DATA_DIR");
+        Path appDataDir = (envAppData != null && !envAppData.isBlank()) ? Paths.get(envAppData).toAbsolutePath().normalize() : null;
+
+        List<Path> workerCandidates = new ArrayList<>();
+        if (appDataDir != null) {
+            workerCandidates.add(appDataDir.resolve("logs/worker.log"));
+            workerCandidates.add(appDataDir.resolve("worker/worker.log"));
+        }
+        workerCandidates.add(projectRoot.resolve("logs/worker.log"));
+        workerCandidates.add(projectRoot.resolve("worker/worker.log"));
+        workerCandidates.add(projectRoot.resolve("worker/server.log"));
+        workerCandidates.add(homeDir.resolve("Library/Logs/autopost-worker.log"));
+        workerCandidates.add(homeDir.resolve("AppData/Roaming/com.phusocial.autopost/logs/worker.log"));
+        workerCandidates.add(homeDir.resolve("AppData/Local/com.phusocial.autopost/logs/worker.log"));
+
+        List<Path> backendCandidates = new ArrayList<>();
+        if (appDataDir != null) {
+            backendCandidates.add(appDataDir.resolve("logs/backend.log"));
+            backendCandidates.add(appDataDir.resolve("backend/backend.log"));
+        }
+        backendCandidates.add(projectRoot.resolve("logs/backend.log"));
+        backendCandidates.add(projectRoot.resolve("backend/backend_stable.log"));
+        backendCandidates.add(projectRoot.resolve("backend/backend.log"));
+        backendCandidates.add(homeDir.resolve("Library/Logs/autopost-backend.log"));
+        backendCandidates.add(homeDir.resolve("AppData/Roaming/com.phusocial.autopost/logs/backend.log"));
+        backendCandidates.add(homeDir.resolve("AppData/Local/com.phusocial.autopost/logs/backend.log"));
+
+        List<Path> frontendCandidates = new ArrayList<>();
+        if (appDataDir != null) {
+            frontendCandidates.add(appDataDir.resolve("logs/frontend.log"));
+        }
+        frontendCandidates.add(projectRoot.resolve("logs/frontend.log"));
+        frontendCandidates.add(projectRoot.resolve("frontend/vite.log"));
+        frontendCandidates.add(projectRoot.resolve("frontend/frontend.log"));
+
         Map<String, LogFile> sources = new LinkedHashMap<>();
         sources.put("worker", new LogFile(
                 "worker",
                 "Worker",
                 "Playwright & tiến trình đăng bài",
-                List.of(
-                        homeDir.resolve("Library/Logs/autopost-worker.log"),
-                        projectRoot.resolve("worker/worker.log"),
-                        projectRoot.resolve("worker/server.log")
-                )
+                workerCandidates
         ));
         sources.put("backend", new LogFile(
                 "backend",
                 "Backend",
                 "Spring Boot API",
-                List.of(
-                        homeDir.resolve("Library/Logs/autopost-backend.log"),
-                        projectRoot.resolve("backend/backend_stable.log"),
-                        projectRoot.resolve("backend/backend.log")
-                )
+                backendCandidates
         ));
         sources.put("frontend", new LogFile(
                 "frontend",
                 "Frontend",
                 "Vite development server",
-                List.of(
-                        projectRoot.resolve("frontend/vite.log"),
-                        projectRoot.resolve("frontend/frontend.log")
-                )
+                frontendCandidates
         ));
         this.logFiles = Collections.unmodifiableMap(sources);
     }
