@@ -212,6 +212,15 @@ function extractFbPostId(url) {
   return '';
 }
 
+function normalizeContentForDedup(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(/[\p{P}\p{S}\p{C}]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
 function isPostInExcludeList(url, caption = '', excludeUrls = [], excludeIds = [], excludeSnippets = []) {
   const targetId = extractFbPostId(url);
   if (targetId) {
@@ -238,13 +247,12 @@ function isPostInExcludeList(url, caption = '', excludeUrls = [], excludeIds = [
     }
   }
   if (caption && excludeSnippets) {
-    const normCap = caption.replace(/\s+/g, ' ').toLowerCase().trim();
+    const normCap = normalizeContentForDedup(caption);
     if (normCap.length >= 25) {
       const snips = Array.isArray(excludeSnippets) ? excludeSnippets : Array.from(excludeSnippets);
-      for (const snip of snips) {
-        if (!snip) continue;
-        const normSnip = String(snip).replace(/\s+/g, ' ').toLowerCase().trim();
-        if (normSnip.length >= 25 && (normCap.includes(normSnip) || normSnip.includes(normCap.slice(0, 60)))) {
+      for (const normSnip of snips) {
+        if (!normSnip || normSnip.length < 25) continue;
+        if (normCap.includes(normSnip) || normSnip.includes(normCap.slice(0, 60)) || (normCap.length >= 40 && normSnip.length >= 40 && normCap.slice(0, 40) === normSnip.slice(0, 40))) {
           return true;
         }
       }
@@ -281,8 +289,8 @@ async function huntFacebookFeed(params, deps = {}) {
   }
   const cleanExcludeSnippets = (Array.isArray(excludeSnippets) ? excludeSnippets : [])
     .filter(s => s && String(s).trim().length >= 25)
-    .slice(0, 500)
-    .map(s => String(s).replace(/\s+/g, ' ').toLowerCase().trim());
+    .slice(0, 1500)
+    .map(s => normalizeContentForDedup(s));
 
   if (!groupUrl && !trimmedKeyword) {
     return { status: 400, body: { success: false, error: 'Vui lòng cung cấp từ khoá tìm kiếm hoặc link Facebook Group' } };
@@ -1163,9 +1171,9 @@ async function huntFacebookFeed(params, deps = {}) {
       console.log(`[FB_Group_Hunter] 🔁 Vòng cuộn ${round + 1}/${maxScrollRounds} — Đã tìm được ${countTowardsLimit()}/${maxItems} bài MỚI CHƯA ĐĂNG (Tổng đã quét: ${collectedItemsMap.size} bài)`);
 
       if (countTowardsLimit() >= maxItems) break;
-      // Nếu đã quét được nhiều hơn 2.5 lần maxItems (ví dụ cần 20 bài mà đã quét 35-50 bài gần nhất của nhóm)
+      // Nếu đã quét được nhiều hơn 3.5 lần maxItems (hoặc tối thiểu 60 bài gần nhất)
       // thì dừng sớm để trả kết quả ngay, tránh cuộn vô tận vào các bài cũ tốn thời gian
-      if (!dateMode && collectedItemsMap.size >= Math.max(maxItems * 2.5, 35)) {
+      if (!dateMode && collectedItemsMap.size >= Math.max(maxItems * 3.5, 60)) {
         stopReason = 'ENOUGH_SCANNED';
         console.log(`[FB_Group_Hunter] ℹ️ Đã quét đủ ${collectedItemsMap.size} bài gần nhất của feed, dừng cuộn để trả kết quả nhanh.`);
         break;
