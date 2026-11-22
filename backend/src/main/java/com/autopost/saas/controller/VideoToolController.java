@@ -498,7 +498,7 @@ public class VideoToolController {
             java.util.List<String> existingSnippets = new java.util.ArrayList<>();
             List<com.autopost.saas.entity.PostQueue> allPosts = java.util.Collections.emptyList();
             try {
-                allPosts = postQueueRepository.findAll();
+                allPosts = postQueueRepository.findTop1000ByOrderByIdDesc();
                 for (com.autopost.saas.entity.PostQueue pq : allPosts) {
                     if (pq.getOriginalUrl() != null && !pq.getOriginalUrl().isBlank()) {
                         String orig = pq.getOriginalUrl().trim();

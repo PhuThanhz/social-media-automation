@@ -74,7 +74,7 @@ async function expandAllSeeMore(page) {
     return c;
   }).catch(() => 0);
   if (count > 0) {
-    await page.waitForTimeout(400);
+    await page.waitForTimeout(150);
   }
   return count;
 }
@@ -162,9 +162,9 @@ async function revealPagePermalinks(page, target, onUnitDone) {
       const h = (await a.getAttribute('href').catch(() => '')) || '';
       const hidden = !h || h.startsWith('#') || /^(?:https:\/\/www\.facebook\.com)?\/?\?__cft__/.test(h);
       if (!hidden && !postHref.test(h)) continue;
-      await a.scrollIntoViewIfNeeded({ timeout: 800 }).catch(() => { });
-      await a.hover({ timeout: 1000 }).catch(() => { });
-      await page.waitForTimeout(250);
+      await a.scrollIntoViewIfNeeded({ timeout: 400 }).catch(() => { });
+      await a.hover({ timeout: 500 }).catch(() => { });
+      await page.waitForTimeout(100);
       const revealed = await a.evaluate((el) => el.href).catch(() => '');
       if (!revealed || !postHref.test(revealed) || (!isGroup && !isOwnedByPage(revealed, target))) continue;
       tries++;
@@ -172,7 +172,7 @@ async function revealPagePermalinks(page, target, onUnitDone) {
       let tip = await readTip();
       if (!looksLikeDate(tip) || tip === lastTip) {
         // Tooltip đôi khi hiện chậm hơn link → chờ thêm chút rồi đọc lại
-        await page.waitForTimeout(350);
+        await page.waitForTimeout(150);
         tip = await readTip();
       }
       if (looksLikeDate(tip) && tip !== lastTip) {
@@ -214,25 +214,34 @@ function extractFbPostId(url) {
 
 function isPostInExcludeList(url, caption = '', excludeUrls = [], excludeIds = [], excludeSnippets = []) {
   const targetId = extractFbPostId(url);
-  if (targetId && Array.isArray(excludeIds) && excludeIds.includes(targetId)) {
-    return true;
+  if (targetId) {
+    if (excludeIds instanceof Set) {
+      if (excludeIds.has(targetId)) return true;
+    } else if (Array.isArray(excludeIds) && excludeIds.includes(targetId)) {
+      return true;
+    }
   }
-  if (url && Array.isArray(excludeUrls) && excludeUrls.length > 0) {
+  if (url) {
     const cleanUrl = url.split('?')[0].replace(/\/+$/, '');
-    for (const ex of excludeUrls) {
-      if (!ex) continue;
-      const cleanEx = String(ex).trim().split('?')[0].replace(/\/+$/, '');
-      if (cleanEx === cleanUrl || cleanEx.includes(cleanUrl) || cleanUrl.includes(cleanEx)) return true;
-      if (targetId) {
-        const exId = extractFbPostId(ex);
-        if (exId && exId === targetId) return true;
+    if (excludeUrls instanceof Set) {
+      if (excludeUrls.has(cleanUrl)) return true;
+    } else if (Array.isArray(excludeUrls) && excludeUrls.length > 0) {
+      for (const ex of excludeUrls) {
+        if (!ex) continue;
+        const cleanEx = String(ex).trim().split('?')[0].replace(/\/+$/, '');
+        if (cleanEx === cleanUrl || cleanEx.includes(cleanUrl) || cleanUrl.includes(cleanEx)) return true;
+        if (targetId) {
+          const exId = extractFbPostId(ex);
+          if (exId && exId === targetId) return true;
+        }
       }
     }
   }
-  if (caption && Array.isArray(excludeSnippets) && excludeSnippets.length > 0) {
+  if (caption && excludeSnippets) {
     const normCap = caption.replace(/\s+/g, ' ').toLowerCase().trim();
     if (normCap.length >= 25) {
-      for (const snip of excludeSnippets) {
+      const snips = Array.isArray(excludeSnippets) ? excludeSnippets : Array.from(excludeSnippets);
+      for (const snip of snips) {
         if (!snip) continue;
         const normSnip = String(snip).replace(/\s+/g, ' ').toLowerCase().trim();
         if (normSnip.length >= 25 && (normCap.includes(normSnip) || normSnip.includes(normCap.slice(0, 60)))) {
@@ -254,6 +263,26 @@ async function huntFacebookFeed(params, deps = {}) {
   const removeFacebookLoginOverlays = deps.removeFacebookLoginOverlays || (async () => { });
   const { groupUrl, limit = 20, cookieString, dateFrom, dateTo, keyword, sortViral, minReactions = 0, excludeUrls = [], excludeIds = [], excludeSnippets = [] } = params || {};
   const trimmedKeyword = keyword ? String(keyword).trim() : '';
+
+  // Chuyển danh sách bài trùng sang Set O(1) để tra cứu siêu tốc, không bị lag event loop khi có hàng nghìn bài cũ
+  const excludeIdSet = new Set();
+  if (Array.isArray(excludeIds)) {
+    for (const id of excludeIds) if (id) excludeIdSet.add(String(id).trim());
+  }
+  const excludeUrlSet = new Set();
+  if (Array.isArray(excludeUrls)) {
+    for (const u of excludeUrls) {
+      if (!u) continue;
+      const clean = String(u).trim().split('?')[0].replace(/\/+$/, '');
+      if (clean) excludeUrlSet.add(clean);
+      const exId = extractFbPostId(u);
+      if (exId) excludeIdSet.add(exId);
+    }
+  }
+  const cleanExcludeSnippets = (Array.isArray(excludeSnippets) ? excludeSnippets : [])
+    .filter(s => s && String(s).trim().length >= 25)
+    .slice(0, 500)
+    .map(s => String(s).replace(/\s+/g, ' ').toLowerCase().trim());
 
   if (!groupUrl && !trimmedKeyword) {
     return { status: 400, body: { success: false, error: 'Vui lòng cung cấp từ khoá tìm kiếm hoặc link Facebook Group' } };
@@ -288,8 +317,8 @@ async function huntFacebookFeed(params, deps = {}) {
 
   const requestedLimit = parseInt(limit, 10) || 20;
   const maxItems = Math.min(Math.max(requestedLimit, 1), dateMode ? 200 : 100);
-  // Backend chờ tối đa 300 giây — dừng cuộn trước đó để còn kịp trả kết quả
-  const scanDeadline = Date.now() + (dateMode ? 230 : 280) * 1000;
+  // Backend chờ tối đa 180 giây — dừng cuộn trước đó để kịp trả kết quả nhanh chóng
+  const scanDeadline = Date.now() + (dateMode ? 180 : 80) * 1000;
 
   let navUrl = normalizedGroupUrl;
   if (isGlobalSearch) {
@@ -395,13 +424,16 @@ async function huntFacebookFeed(params, deps = {}) {
     const isLoginRequired = await page.evaluate(() => {
       const url = window.location.href;
       if (/facebook\.com\/(login|checkpoint)/i.test(url)) return true;
+      // Nếu đã thấy bài viết / feed hiển thị thì trang vẫn đọc được công khai (kể cả khi Facebook hiện thanh gợi ý đăng nhập ở đầu trang)
+      const hasArticles = document.querySelectorAll('[role="article"], div[data-pagelet*="FeedUnit"], a[href*="/posts/"], a[href*="/permalink/"]').length > 0;
+      if (hasArticles) return false;
       const hasLoginInput = !!document.querySelector('input#email, input#pass, input[name="email"], input[name="pass"]');
       const hasLoginForm = !!document.querySelector('form#login_form, form#loginform, div#login_form, form[action*="/login"]');
       const hasNav = !!document.querySelector('div[role="navigation"], a[aria-label*="Trang cá nhân"], a[href*="/me/"]');
       const bodyText = (document.body && document.body.innerText) || '';
-      const hasLoginPrompt = /đăng nhập vào facebook|log in to facebook|hãy đăng nhập hoặc đăng ký/i.test(bodyText);
-      if (hasLoginInput && (hasLoginForm || !hasNav)) return true;
-      if (hasLoginPrompt && !hasNav) return true;
+      const hasHardLoginWall = /đăng nhập để tiếp tục|bạn phải đăng nhập|log in to continue/i.test(bodyText);
+      if (hasHardLoginWall && !hasNav) return true;
+      if (hasLoginInput && hasLoginForm && !hasNav && bodyText.length < 600) return true;
       return false;
     }).catch(() => false);
 
@@ -509,7 +541,7 @@ async function huntFacebookFeed(params, deps = {}) {
     }).catch(() => 'Facebook Group');
 
     const collectedItemsMap = new Map();
-    const maxScrollRounds = dateMode ? 150 : Math.min(Math.max(maxItems * 4, 60), 160);
+    const maxScrollRounds = dateMode ? 120 : Math.min(Math.max(maxItems * 3, 25), 70);
     let stagnantCount = 0;
     let stopReason = '';
 
@@ -900,8 +932,8 @@ async function huntFacebookFeed(params, deps = {}) {
             const videoPoster = videoEl ? (videoEl.getAttribute('poster') || '') : '';
             // Ảnh bài đang tải lười (chưa có kích thước) vẫn tính là bài có ảnh nếu nằm trong link ảnh của bài
             const hasPhoto = imgs.length > 0 || !!art.querySelector('a[href*="/photo"] img, a[href*="set=a."] img, a[href*="set=pcb."] img, a[href*="set=gm."] img, div[data-visualcompletion="media-vc-image"] img');
-            // Bắt buộc bài viết phải có Ảnh hoặc Video kèm nội dung Text (Bỏ hoàn toàn bài chỉ có chữ text không)
-            if (!hasVideo && !hasPhoto) continue;
+            // Bắt buộc bài viết phải có Ảnh/Video HOẶC có nội dung Text dài có ý nghĩa (bài viết thảo luận)
+            if (!hasVideo && !hasPhoto && (!caption || caption.trim().length < 25)) continue;
             // Không lấy bài rỗng không có chữ / caption quá ngắn dưới 5 ký tự
             if (!caption || caption.trim().length < 5) continue;
             // Lớp phủ "+N" chỉ nằm trên ô ảnh cuối của lưới ảnh — không dò trong caption ("+84…", "+18")
@@ -1102,7 +1134,7 @@ async function huntFacebookFeed(params, deps = {}) {
           if (postedAt === null) postedAt = parseFbPostedTime(it.postedTime, scanNow);
           if (postedAt === null && postedTimeLabel) postedAt = parseFbPostedTime(postedTimeLabel, scanNow);
           const publishedAt = it.publishedAt || (postedAt ? new Date(postedAt).toISOString() : undefined);
-          const isAlreadyImported = isPostInExcludeList(it.url, it.caption, excludeUrls, excludeIds, excludeSnippets);
+          const isAlreadyImported = isPostInExcludeList(it.url, it.caption, excludeUrlSet, excludeIdSet, cleanExcludeSnippets);
           collectedItemsMap.set(it.url, { ...rest, postedAt, publishedAt, isAlreadyImported });
           if (process.env.FEED_HUNTER_DEBUG) console.log('[FB_Group_Hunter][debug] +', it.url, isAlreadyImported ? 'ALREADY-POSTED' : 'NEW');
         }
@@ -1131,6 +1163,13 @@ async function huntFacebookFeed(params, deps = {}) {
       console.log(`[FB_Group_Hunter] 🔁 Vòng cuộn ${round + 1}/${maxScrollRounds} — Đã tìm được ${countTowardsLimit()}/${maxItems} bài MỚI CHƯA ĐĂNG (Tổng đã quét: ${collectedItemsMap.size} bài)`);
 
       if (countTowardsLimit() >= maxItems) break;
+      // Nếu đã quét được nhiều hơn 2.5 lần maxItems (ví dụ cần 20 bài mà đã quét 35-50 bài gần nhất của nhóm)
+      // thì dừng sớm để trả kết quả ngay, tránh cuộn vô tận vào các bài cũ tốn thời gian
+      if (!dateMode && collectedItemsMap.size >= Math.max(maxItems * 2.5, 35)) {
+        stopReason = 'ENOUGH_SCANNED';
+        console.log(`[FB_Group_Hunter] ℹ️ Đã quét đủ ${collectedItemsMap.size} bài gần nhất của feed, dừng cuộn để trả kết quả nhanh.`);
+        break;
+      }
       if (dateMode && passedStartDate()) {
         stopReason = 'REACHED_START_DATE';
         console.log('[FB_Group_Hunter] 📅 Đã cuộn qua ngày bắt đầu, dừng quét.');
@@ -1139,7 +1178,7 @@ async function huntFacebookFeed(params, deps = {}) {
 
       if (collectedItemsMap.size === prevSize) {
         stagnantCount++;
-        const maxStagnant = isPage ? 8 : 16;
+        const maxStagnant = isPage ? 5 : 4;
         if (stagnantCount >= maxStagnant) {
           stopReason = 'NO_MORE_POSTS';
           console.log(`[FB_Group_Hunter] ℹ️ Dừng cuộn sau ${stagnantCount} vòng không có bài viết mới để trả kết quả ngay.`);
@@ -1154,23 +1193,14 @@ async function huntFacebookFeed(params, deps = {}) {
         await page.mouse.move(760, 520).catch(() => { });
         await page.mouse.wheel(0, 1400).catch(() => { });
         await page.evaluate(() => window.scrollBy(0, 200)).catch(() => { });
-        await page.waitForTimeout(stagnantCount > 0 ? 2000 : 1200);
-        continue;
-      }
-
-      // Nếu bị kẹt ở đầu feed (<= 2 bài sau 6 vòng) → tải lại trang Group mặc định 1 lần để thoát kẹt GraphQL
-      if (stagnantCount === 6 && collectedItemsMap.size <= 2 && !cookieFallbackDone && !trimmedKeyword) {
-        cookieFallbackDone = true;
-        console.log('[FB_Group_Hunter] 🔄 Feed bị chững sớm (<= 2 bài), thử tải lại trang Group để nạp tiếp...');
-        await page.goto(normalizedGroupUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => { });
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(stagnantCount > 0 ? 1200 : 700);
         continue;
       }
 
       // Khi tạm thời chững ở đáy trang, nhích lên rồi kéo xuống lại để kích hoạt IntersectionObserver nạp batch mới
       if (stagnantCount > 0) {
         await page.evaluate(() => window.scrollBy(0, -650)).catch(() => { });
-        await page.waitForTimeout(250);
+        await page.waitForTimeout(150);
       }
 
       // Cuộn nhịp nhàng theo bước để Facebook virtualized list mount đầy đủ từng bài, không bị nhảy cóc
@@ -1178,8 +1208,8 @@ async function huntFacebookFeed(params, deps = {}) {
       await page.mouse.wheel(0, 1400).catch(() => { });
       await page.evaluate(() => window.scrollBy(0, 500)).catch(() => { });
       await page.keyboard.press('PageDown').catch(() => { });
-      // Khi tạm thời chưa nạp bài mới, chờ thêm một chút để Facebook query GraphQL batch tiếp theo
-      await page.waitForTimeout(stagnantCount > 0 ? 2500 : 1600);
+      // Chờ Facebook query GraphQL batch tiếp theo (được tối ưu từ 1600ms xuống 750ms để tăng tốc gấp đôi)
+      await page.waitForTimeout(stagnantCount > 0 ? 1200 : 750);
     }
 
     if (isPage && (!groupTitle || /^(?:Facebook|Facebook Group|Thông báo)$/i.test(groupTitle))) {

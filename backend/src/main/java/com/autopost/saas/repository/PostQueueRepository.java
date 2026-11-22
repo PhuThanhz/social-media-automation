@@ -20,6 +20,9 @@ public interface PostQueueRepository extends JpaRepository<PostQueue, Long> {
     // Bài của Threads Studio: targetFanpageId dạng "username:THREADS_COOKIE:connectionId".
     List<PostQueue> findTop500ByTargetFanpageIdContainingOrderByIdDesc(String marker);
 
+    /** Lấy 1000 bài gần nhất để dedup nhanh mà không tải toàn bộ CSDL 10,000+ bài */
+    List<PostQueue> findTop1000ByOrderByIdDesc();
+
     /** Bản phân trang của findByCampaignId, dùng cho các endpoint/lời gọi mới cần giới hạn kích thước lịch sử trả về. */
     Page<PostQueue> findByCampaignId(Long campaignId, Pageable pageable);
     @Query("SELECT p FROM PostQueue p LEFT JOIN FETCH p.campaign c LEFT JOIN FETCH c.user u WHERE p.status = :status AND p.scheduledAt < :time ORDER BY p.scheduledAt ASC, p.id ASC")
