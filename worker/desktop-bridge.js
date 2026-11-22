@@ -125,6 +125,12 @@ db.exec(`
     message TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS app_settings (
+    setting_key TEXT PRIMARY KEY,
+    setting_value TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 // Seed default user and quick posts campaign if empty
@@ -565,6 +571,33 @@ app.put('/api/post-targets', (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
+// 5.1 APP SETTINGS / PRESETS API (Lưu vĩnh viễn vào SQLite)
+// ==========================================
+app.get('/api/settings/:key', (req, res) => {
+  try {
+    const row = db.prepare('SELECT setting_value FROM app_settings WHERE setting_key = ?').get(req.params.key);
+    res.json({ success: true, value: row ? row.setting_value : null });
+  } catch (err) {
+    res.json({ success: false, value: null });
+  }
+});
+
+app.post('/api/settings/:key', (req, res) => {
+  try {
+    const { value } = req.body;
+    const strVal = typeof value === 'string' ? value : JSON.stringify(value);
+    db.prepare(`
+      INSERT INTO app_settings (setting_key, setting_value, updated_at)
+      VALUES (?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value, updated_at = CURRENT_TIMESTAMP
+    `).run(req.params.key, strVal);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { type FormInstance, App } from 'antd';
 import type { SocialAccount, PostMode } from './types';
 import { stripEmojiPrefix } from './shared';
+import api from '../../config/axios';
 
 interface PresetHubParams {
   DEFAULT_HUYNH_THANH_PHU_PRESET?: any;
@@ -53,6 +54,43 @@ export function usePresetHub({ DEFAULT_HUYNH_THANH_PHU_PRESET, setPostMode, setG
   const [managePresetsModalOpen, setManagePresetsModalOpen] = useState(false);
   const [editingPreset, setEditingPreset] = useState<{ id: string; name: string } | null>(null);
   const [editingPresetName, setEditingPresetName] = useState('');
+
+  // Hàm đồng bộ vĩnh viễn cấu hình vào cả LocalStorage và Database (SQLite / Postgres)
+  const persistPresets = (nextPresets: any[]) => {
+    try {
+      localStorage.setItem('autopost_preset_combos', JSON.stringify(nextPresets));
+    } catch { }
+    api.post('/settings/autopost_preset_combos', { value: JSON.stringify(nextPresets) }).catch(() => {});
+  };
+
+  // Tự động tải cấu hình vĩnh viễn từ Database khi mở app, đồng thời sao lưu nếu DB chưa có
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await api.get('/settings/autopost_preset_combos');
+        const dbVal = res.data?.value;
+        if (active && dbVal) {
+          try {
+            const parsed = typeof dbVal === 'string' ? JSON.parse(dbVal) : dbVal;
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              const clean = parsed.filter((p: any) => !p.id?.includes('huynh-thanh-phu'));
+              setSavedPresets(clean);
+              try {
+                localStorage.setItem('autopost_preset_combos', JSON.stringify(clean));
+              } catch { }
+              return;
+            }
+          } catch { }
+        }
+        const localRaw = localStorage.getItem('autopost_preset_combos');
+        if (localRaw) {
+          api.post('/settings/autopost_preset_combos', { value: localRaw }).catch(() => {});
+        }
+      } catch { }
+    })();
+    return () => { active = false; };
+  }, []);
 
   const applyPreset = useCallback((preset: {
     id: string;
@@ -144,9 +182,7 @@ export function usePresetHub({ DEFAULT_HUYNH_THANH_PHU_PRESET, setPostMode, setG
         }
         return p;
       });
-      try {
-        localStorage.setItem('autopost_preset_combos', JSON.stringify(next));
-      } catch { }
+      persistPresets(next);
       return next;
     });
     message.success('✅ Đã cập nhật cấu hình bằng danh sách Nhóm & Page đang chọn hiện tại!');
@@ -160,9 +196,7 @@ export function usePresetHub({ DEFAULT_HUYNH_THANH_PHU_PRESET, setPostMode, setG
     }
     setSavedPresets((prev) => {
       const next = prev.map((p) => (p.id === presetId ? { ...p, name: trimmed } : p));
-      try {
-        localStorage.setItem('autopost_preset_combos', JSON.stringify(next));
-      } catch { }
+      persistPresets(next);
       return next;
     });
     setEditingPreset(null);
@@ -174,9 +208,7 @@ export function usePresetHub({ DEFAULT_HUYNH_THANH_PHU_PRESET, setPostMode, setG
     if (e) e.stopPropagation();
     setSavedPresets((prev) => {
       const next = prev.filter((p) => p.id !== presetId);
-      try {
-        localStorage.setItem('autopost_preset_combos', JSON.stringify(next));
-      } catch { }
+      persistPresets(next);
       return next;
     });
     if (selectedPresetId === presetId) {
@@ -204,9 +236,7 @@ export function usePresetHub({ DEFAULT_HUYNH_THANH_PHU_PRESET, setPostMode, setG
     };
     setSavedPresets((prev) => {
       const next = [...prev, newPreset];
-      try {
-        localStorage.setItem('autopost_preset_combos', JSON.stringify(next));
-      } catch { }
+      persistPresets(next);
       return next;
     });
     setSavePresetModalOpen(false);
