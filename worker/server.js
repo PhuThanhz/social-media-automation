@@ -5305,6 +5305,7 @@ app.post('/api/post-facebook-group', async (req, res) => {
 
     let isComposerVisible = (await findVisibleCreatePostButton()) !== null;
     let isContentBlocked = await page.locator('text="Bạn hiện không xem được nội dung này", text="Content Not Found"').first().isVisible().catch(() => false);
+    let fellBackToPersonal = false;
 
     // Nếu danh tính chưa thể xem/đăng bài trong Group (Group riêng tư hoặc chưa gia nhập Group):
     if (!isComposerVisible || isContentBlocked) {
@@ -5337,6 +5338,9 @@ app.post('/api/post-facebook-group', async (req, res) => {
 
         // Kiểm tra xem Nick cá nhân có thấy ô đăng bài không
         isComposerVisible = (await findVisibleCreatePostButton()) !== null;
+        if (isComposerVisible) {
+          fellBackToPersonal = true;
+        }
 
         // Nếu Nick cá nhân cũng chưa thấy ô đăng bài, thử bấm Tham gia nhóm cho Nick cá nhân
         if (!isComposerVisible) {
@@ -5348,6 +5352,9 @@ app.post('/api/post-facebook-group', async (req, res) => {
           await page.evaluate(() => window.scrollBy(0, -350)).catch(() => {});
 
           isComposerVisible = (await findVisibleCreatePostButton()) !== null;
+          if (isComposerVisible) {
+            fellBackToPersonal = true;
+          }
         }
       }
     }
@@ -5449,8 +5456,8 @@ app.post('/api/post-facebook-group', async (req, res) => {
     await assertNoFacebookSpamBlock(page, postQueueId, 'Group: vừa mở modal');
 
     // Kiểm tra & Ép chuyển đổi danh tính bên trong Modal "Tạo bài viết"
-    // CHỈ áp dụng nếu KHÔNG phải ẩn danh và KHÔNG phải cá nhân (đăng bằng Fanpage)
-    if (!isAnonReq && !isPersonal && effectivePageName && !effectivePageName.toLowerCase().includes('cá nhân')) {
+    // CHỈ áp dụng nếu KHÔNG phải ẩn danh, KHÔNG phải cá nhân và CHƯA fallback sang cá nhân
+    if (!isAnonReq && !isPersonal && !fellBackToPersonal && effectivePageName && !effectivePageName.toLowerCase().includes('cá nhân')) {
       const targetProfileName = effectivePageName.replace(/^[^\w\s\u00C0-\u024F\u1E00-\u1EFF]+/, '').replace(/\s*\([^)]*\)\s*$/, '').trim();
       const modalFullText = await dialog.first().innerText().catch(() => '');
       console.log(`[Playwright][Group] 👤 Text trong Modal: "${modalFullText.slice(0, 150)}" (targetProfile="${targetProfileName}")`);
@@ -5458,35 +5465,56 @@ app.post('/api/post-facebook-group', async (req, res) => {
       if (targetProfileName && !modalFullText.toLowerCase().includes(targetProfileName.toLowerCase())) {
         console.log(`[Playwright][Group] 🔄 Modal chưa hiển thị danh tính "${targetProfileName}". Đang đổi danh tính trong Modal...`);
         
-        // Bấm nút danh tính trong Modal (bỏ qua nút Đóng 'X')
-        const modalPosterBtn = dialog.first().locator('div[role="button"]')
-          .filter({ hasNotText: 'Đóng' })
-          .filter({ hasNotText: 'Close' })
-          .filter({ hasNot: page.locator('[aria-label*="Đóng"], [aria-label*="Close"]') })
-          .first();
+        // Bấm nút danh tính trong Modal (tìm dropdown/switcher danh tính, loại trừ tuyệt đối nút Đóng)
+        const modalPosterBtn = dialog.first().locator([
+          'div[role="dialog"] div[aria-haspopup="menu"]',
+          'div[role="dialog"] [aria-haspopup="dialog"]',
+          'div[role="dialog"] div[role="combobox"]',
+          'div[role="dialog"] div[role="button"]:not([aria-label*="Đóng"]):not([aria-label*="Close"]):not([aria-label*="close"]):not([aria-label*="đóng"])'
+        ].join(', ')).first();
 
+        let optionSelected = false;
         if (await modalPosterBtn.isVisible().catch(() => false)) {
-          await modalPosterBtn.click({ force: true }).catch(() => {});
-          await page.waitForTimeout(2000);
+          const btnLabel = (await modalPosterBtn.getAttribute('aria-label').catch(() => '')) || '';
+          if (!btnLabel.toLowerCase().includes('đóng') && !btnLabel.toLowerCase().includes('close')) {
+            await modalPosterBtn.click({ force: true }).catch(() => {});
+            await page.waitForTimeout(2000);
 
-          const escProfile = targetProfileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const profileRegex = new RegExp(escProfile, 'i');
-          const profileOption = page.locator('div[role="dialog"] div[role="button"], div[role="dialog"] div[role="option"], div[role="dialog"] span')
-            .filter({ hasText: profileRegex }).first();
-          if (await profileOption.isVisible().catch(() => false)) {
-            console.log(`[Playwright][Group] 🎯 Click chọn option "${targetProfileName}" trong Modal menu...`);
-            await profileOption.click({ force: true }).catch(() => {});
-            await page.waitForTimeout(3000);
-          } else {
-            console.warn(`[Playwright][Group] ⚠️ Không tìm thấy option "${targetProfileName}" trong menu danh tính của Nhóm.`);
-            if (req.body.allowPersonalFallback === true) {
-              console.log(`[Playwright][Group] ℹ️ Cho phép fallback cá nhân: tiếp tục đăng bài bằng tài khoản hiện tại.`);
-              await page.mouse.click(10, 10).catch(() => {});
-            } else {
-              throw new Error(`Trang "${targetProfileName}" chưa gia nhập Nhóm hoặc không có quyền đăng bài trong Nhóm này. Vui lòng duyệt Trang vào Nhóm hoặc chọn tài khoản khác.`);
+            const escProfile = targetProfileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const profileRegex = new RegExp(escProfile, 'i');
+            const profileOption = page.locator('div[role="dialog"] div[role="button"], div[role="dialog"] div[role="option"], div[role="dialog"] span')
+              .filter({ hasText: profileRegex }).first();
+            if (await profileOption.isVisible().catch(() => false)) {
+              console.log(`[Playwright][Group] 🎯 Click chọn option "${targetProfileName}" trong Modal menu...`);
+              await profileOption.click({ force: true }).catch(() => {});
+              await page.waitForTimeout(3000);
+              optionSelected = true;
             }
           }
         }
+
+        if (!optionSelected) {
+          console.warn(`[Playwright][Group] ⚠️ Không tìm thấy option "${targetProfileName}" trong menu danh tính của Nhóm.`);
+          if (req.body.allowPersonalFallback !== false) {
+            console.log(`[Playwright][Group] ℹ️ Cho phép fallback cá nhân: tiếp tục đăng bài bằng tài khoản hiện tại.`);
+            // Đóng menu chọn danh tính (nếu đang mở) bằng Escape, KHÔNG click vào backdrop (10, 10) vì sẽ làm tắt Modal!
+            await page.keyboard.press('Escape').catch(() => {});
+            await page.waitForTimeout(600);
+          } else {
+            throw new Error(`Trang "${targetProfileName}" chưa gia nhập Nhóm hoặc không có quyền đăng bài trong Nhóm này. Vui lòng duyệt Trang vào Nhóm hoặc chọn tài khoản khác.`);
+          }
+        }
+      }
+    }
+
+    // Đảm bảo Modal soạn thảo vẫn đang mở trước khi sang bước tiếp theo
+    const isComposerModalOpen = await dialog.first().locator('div[role="textbox"], [contenteditable="true"]').first().isVisible().catch(() => false);
+    if (!isComposerModalOpen) {
+      console.warn('[Playwright][Group] ⚠️ Modal chưa hiển thị ô nhập nội dung, thử click mở lại Composer...');
+      const reOpenBtn = await findVisibleCreatePostButton();
+      if (reOpenBtn) {
+        await reOpenBtn.click({ force: true }).catch(() => {});
+        await page.waitForTimeout(2500);
       }
     }
 
