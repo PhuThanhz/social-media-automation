@@ -12434,8 +12434,34 @@ body .lookup-groups-table .ant-pagination .ant-pagination-item-active a {
   border-top: 1px solid rgba(148, 163, 184, 0.15);
 }
 .aik-row {
-  padding: 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
   border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+}
+.aik-note {
+  width: 130px;
+  flex-shrink: 0;
+  margin: 0 !important;
+  color: rgb(226, 232, 240) !important;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.aik-note-empty {
+  color: rgb(100, 116, 139) !important;
+}
+.aik-note .ant-typography-edit {
+  color: rgb(100, 116, 139) !important;
+}
+.aik-add .aik-note-input {
+  width: 150px;
+  flex-shrink: 0;
+}
+.aik-get-link {
+  font-size: 12px;
+  color: rgb(96, 165, 250);
 }
 .aik-row-main {
   display: flex;
@@ -12448,7 +12474,7 @@ body .lookup-groups-table .ant-pagination .ant-pagination-item-active a {
   font-variant-numeric: tabular-nums;
 }
 .aik-status {
-  min-width: 130px;
+  min-width: 90px;
 }
 .aik-status .ant-badge-status-text {
   color: rgb(203, 213, 225);

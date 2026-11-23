@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Modal, Input, Button, Badge, Popconfirm, message } from 'antd';
+import { Modal, Input, Button, Badge, Popconfirm, Tooltip, Typography, message } from 'antd';
 import { ThunderboltOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons';
 import api from '../../config/axios';
 
@@ -43,6 +43,17 @@ export const saveStoredGeminiKeys = (val: string) => {
   window.dispatchEvent(new CustomEvent('gemini-keys-changed', { detail: trimmed }));
 };
 
+// Tên gợi nhớ của từng key — lưu riêng (không trộn vào chuỗi key mà các trang khác đọc qua getStoredGeminiKeys).
+const NOTES_STORAGE_KEY = 'gemini_key_notes';
+const loadNotes = (): Record<string, string> => {
+  try {
+    return JSON.parse(localStorage.getItem(NOTES_STORAGE_KEY) || '{}') || {};
+  } catch {
+    return {};
+  }
+};
+const saveNotes = (notes: Record<string, string>) => localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(notes));
+
 /** Tách chuỗi key (mỗi dòng / dấu phẩy / chấm phẩy 1 key), bỏ trùng — cùng quy tắc với backend parseKeys. */
 const splitKeys = (raw: string): string[] =>
   Array.from(new Set(raw.split(/[\n\r,;\s]+/).map((k) => k.trim()).filter(Boolean)));
@@ -59,10 +70,10 @@ const statusView = (item: KeyHealthItem | undefined, checking: boolean) => {
     case 'HEALTHY':
       return { badge: 'success' as const, text: 'Hoạt động', bad: false };
     case 'RATE_LIMITED':
-      return { badge: 'warning' as const, text: 'Hết lượt hôm nay', bad: false };
+      return { badge: 'warning' as const, text: 'Hết lượt', bad: false };
     case 'INVALID':
     case 'ERROR':
-      return { badge: 'error' as const, text: 'Không dùng được', bad: true };
+      return { badge: 'error' as const, text: 'Key lỗi', bad: true };
     default:
       return { badge: 'default' as const, text: 'Chưa kiểm tra', bad: false };
   }
@@ -71,6 +82,8 @@ const statusView = (item: KeyHealthItem | undefined, checking: boolean) => {
 const AiSettingsModal: React.FC<AiSettingsModalProps> = ({ open, onClose }) => {
   const [keys, setKeys] = useState<string[]>([]);
   const [draft, setDraft] = useState('');
+  const [draftNote, setDraftNote] = useState('');
+  const [notes, setNotes] = useState<Record<string, string>>({});
   const [keyHealthList, setKeyHealthList] = useState<KeyHealthItem[]>([]);
   const [checking, setChecking] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -97,7 +110,9 @@ const AiSettingsModal: React.FC<AiSettingsModalProps> = ({ open, onClose }) => {
     if (open) {
       const stored = splitKeys(getStoredGeminiKeys());
       setKeys(stored);
+      setNotes(loadNotes());
       setDraft('');
+      setDraftNote('');
       setTestResult(null);
       setKeyHealthList([]);
       fetchHealthCheck(stored);
@@ -126,12 +141,32 @@ const AiSettingsModal: React.FC<AiSettingsModalProps> = ({ open, onClose }) => {
       message.info('Key này đã có trong danh sách.');
       return;
     }
+    const note = draftNote.trim();
+    if (note) {
+      const nextNotes = { ...notes };
+      fresh.forEach((k, i) => { nextNotes[k] = fresh.length > 1 ? `${note} ${i + 1}` : note; });
+      setNotes(nextNotes);
+      saveNotes(nextNotes);
+    }
     persist([...keys, ...fresh]);
     setDraft('');
+    setDraftNote('');
     message.success(fresh.length > 1 ? `Đã thêm ${fresh.length} key.` : 'Đã thêm key.');
   };
 
+  const updateNote = (key: string, value: string) => {
+    const nextNotes = { ...notes };
+    if (value.trim()) nextNotes[key] = value.trim();
+    else delete nextNotes[key];
+    setNotes(nextNotes);
+    saveNotes(nextNotes);
+  };
+
   const handleRemove = (key: string) => {
+    const nextNotes = { ...notes };
+    delete nextNotes[key];
+    setNotes(nextNotes);
+    saveNotes(nextNotes);
     persist(keys.filter((k) => k !== key));
     message.success('Đã xoá key.');
   };
@@ -187,27 +222,21 @@ const AiSettingsModal: React.FC<AiSettingsModalProps> = ({ open, onClose }) => {
       ]}
     >
       <div className="aik">
-        <p className="aik-intro">
-          Key dùng chung cho mọi tính năng AI (viết lại bài, Studio Ảnh Tin, chấm điểm bài viral). Nên thêm 2–3 key:
-          khi một key hết lượt trong ngày, hệ thống tự chuyển sang key khác.
-        </p>
-
         <section className="aik-section">
-          <h4 className="aik-heading">Thêm key mới</h4>
-          <ol className="aik-steps">
-            <li>
-              Mở{' '}
-              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer">
-                aistudio.google.com/app/apikey
-              </a>{' '}
-              và đăng nhập tài khoản Google.
-            </li>
-            <li>
-              Bấm <b>Create API key</b>, chọn <b>Create API key in new project</b>.
-            </li>
-            <li>Sao chép key (bắt đầu bằng <code>AIza</code>), dán vào ô dưới rồi bấm <b>Thêm key</b>.</li>
-          </ol>
+          <div className="aik-heading-row">
+            <h4 className="aik-heading">Thêm key</h4>
+            <a className="aik-get-link" href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer">
+              Lấy key miễn phí
+            </a>
+          </div>
           <div className="aik-add">
+            <Input
+              value={draftNote}
+              onChange={(e) => setDraftNote(e.target.value)}
+              placeholder="Tên gợi nhớ"
+              maxLength={40}
+              className="aik-note-input"
+            />
             <Input.TextArea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
@@ -218,13 +247,13 @@ const AiSettingsModal: React.FC<AiSettingsModalProps> = ({ open, onClose }) => {
                 }
               }}
               autoSize={{ minRows: 1, maxRows: 4 }}
-              placeholder="Dán key vào đây (nhiều key thì mỗi dòng 1 key)"
+              placeholder="Dán key AIza…"
               autoComplete="off"
               spellCheck={false}
               className="aik-input"
             />
             <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} disabled={draftKeys.length === 0}>
-              {draftKeys.length > 1 ? `Thêm ${draftKeys.length} key` : 'Thêm key'}
+              {draftKeys.length > 1 ? `Thêm ${draftKeys.length}` : 'Thêm'}
             </Button>
           </div>
         </section>
@@ -234,13 +263,13 @@ const AiSettingsModal: React.FC<AiSettingsModalProps> = ({ open, onClose }) => {
             <h4 className="aik-heading">Key đang dùng ({keys.length})</h4>
             {keyHealthList.length > 0 && (
               <span className="aik-summary">
-                {workingCount}/{keys.length} hoạt động · hôm nay đã gọi {usedToday.toLocaleString('vi-VN')} lượt
+                {workingCount}/{keys.length} hoạt động · {usedToday.toLocaleString('vi-VN')} lượt hôm nay
               </span>
             )}
           </div>
 
           {keys.length === 0 ? (
-            <div className="aik-empty">Chưa có key nào. Thêm key ở trên để dùng các tính năng AI.</div>
+            <div className="aik-empty">Chưa có key nào.</div>
           ) : (
             <ul className="aik-list">
               {keys.map((k, idx) => {
@@ -250,41 +279,43 @@ const AiSettingsModal: React.FC<AiSettingsModalProps> = ({ open, onClose }) => {
                 const limit = item?.dailyLimitEstimate || DAILY_LIMIT;
                 return (
                   <li key={k} className="aik-row">
-                    <div className="aik-row-main">
-                      <span className="aik-index">{idx + 1}</span>
-                      <code className="aik-key">{item?.masked || maskKey(k)}</code>
+                    <Typography.Text
+                      className={`aik-note ${notes[k] ? '' : 'aik-note-empty'}`}
+                      editable={{
+                        text: notes[k] || '',
+                        onChange: (v) => updateNote(k, v),
+                        // Bôi đen sẵn tên cũ để gõ là thay luôn
+                        onStart: () => setTimeout(() => (document.activeElement as HTMLTextAreaElement | null)?.select?.(), 0),
+                        maxLength: 40,
+                        triggerType: ['text', 'icon'],
+                        tooltip: 'Đặt tên',
+                      }}
+                    >
+                      {notes[k] || `Key ${idx + 1}`}
+                    </Typography.Text>
+                    <code className="aik-key">{item?.masked || maskKey(k)}</code>
+                    <Tooltip title={view.bad || item?.status === 'RATE_LIMITED' ? item?.message : undefined}>
                       <Badge status={view.badge} text={view.text} className="aik-status" />
-                      <span className="aik-usage">
-                        {used.toLocaleString('vi-VN')}/{limit.toLocaleString('vi-VN')} lượt
-                      </span>
-                      <Popconfirm
-                        title="Xoá key này?"
-                        okText="Xoá"
-                        cancelText="Huỷ"
-                        okButtonProps={{ danger: true }}
-                        onConfirm={() => handleRemove(k)}
-                      >
-                        <Button type="text" size="small" danger>
-                          Xoá
-                        </Button>
-                      </Popconfirm>
-                    </div>
-                    {view.bad && (
-                      <div className="aik-row-note">
-                        {(item?.message || 'Key không hợp lệ').replace(/[.\s]+$/, '')}. Nên xoá key này và thêm key khác.
-                      </div>
-                    )}
-                    {item?.status === 'RATE_LIMITED' && (
-                      <div className="aik-row-note aik-row-note-warn">
-                        Đã hết lượt hôm nay, hệ thống đang dùng key khác. Lượt dùng được làm mới lúc 07:00 sáng.
-                      </div>
-                    )}
+                    </Tooltip>
+                    <span className="aik-usage" title="Lượt đã dùng hôm nay / hạn mức ngày (làm mới lúc 07:00)">
+                      {used.toLocaleString('vi-VN')}/{limit.toLocaleString('vi-VN')}
+                    </span>
+                    <Popconfirm
+                      title="Xoá key này?"
+                      okText="Xoá"
+                      cancelText="Huỷ"
+                      okButtonProps={{ danger: true }}
+                      onConfirm={() => handleRemove(k)}
+                    >
+                      <Button type="text" size="small" danger>
+                        Xoá
+                      </Button>
+                    </Popconfirm>
                   </li>
                 );
               })}
             </ul>
           )}
-          <div className="aik-foot-note">Google làm mới lượt dùng miễn phí mỗi ngày lúc 07:00 sáng (khoảng 1.500 lượt/key).</div>
         </section>
 
         {testResult && (
