@@ -12358,3 +12358,138 @@ body .lookup-groups-table .ant-pagination .ant-pagination-item-active a {
 .queue-time-edit:hover { background: rgba(245, 158, 11, .08); }
 .queue-time-edit-icon { opacity: .45; }
 .queue-time-edit:hover .queue-time-edit-icon { opacity: 1; }
+
+/* ───────────────────────────────────────────────────────────────────────── */
+/* Gemini API key modal (AiSettingsModal) — 1 màn, dòng phẳng, không lồng khung */
+/* ───────────────────────────────────────────────────────────────────────── */
+.aik {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  color: rgb(203, 213, 225);
+  font-size: 13px;
+}
+.aik-intro {
+  margin: 0;
+  color: rgb(148, 163, 184);
+  line-height: 1.55;
+}
+.aik-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.aik-heading {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgb(241, 245, 249);
+}
+.aik-heading-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.aik-summary {
+  font-size: 12px;
+  color: rgb(148, 163, 184);
+}
+.aik-steps {
+  margin: 0;
+  padding-left: 18px;
+  color: rgb(148, 163, 184);
+  line-height: 1.7;
+}
+.aik-steps b {
+  color: rgb(226, 232, 240);
+  font-weight: 600;
+}
+.aik-steps code,
+.aik-key {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: rgb(165, 243, 252);
+  background: rgba(148, 163, 184, 0.1);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.aik-steps a {
+  color: rgb(96, 165, 250);
+}
+.aik-add {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.aik-add .aik-input {
+  flex: 1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+.aik-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+}
+.aik-row {
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+}
+.aik-row-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.aik-index {
+  width: 18px;
+  color: rgb(100, 116, 139);
+  font-variant-numeric: tabular-nums;
+}
+.aik-status {
+  min-width: 130px;
+}
+.aik-status .ant-badge-status-text {
+  color: rgb(203, 213, 225);
+  font-size: 13px;
+}
+.aik-usage {
+  margin-left: auto;
+  color: rgb(148, 163, 184);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.aik-row-note {
+  margin: 6px 0 0 30px;
+  font-size: 12px;
+  color: rgb(248, 113, 113);
+}
+.aik-row-note-warn {
+  color: rgb(251, 191, 36);
+}
+.aik-empty {
+  padding: 14px 0;
+  color: rgb(148, 163, 184);
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+}
+.aik-foot-note {
+  font-size: 12px;
+  color: rgb(100, 116, 139);
+}
+.aik-result {
+  font-size: 12px;
+  padding: 8px 10px;
+  border-left: 2px solid;
+}
+.aik-result-ok {
+  color: rgb(110, 231, 183);
+  border-color: rgb(16, 185, 129);
+  background: rgba(16, 185, 129, 0.08);
+}
+.aik-result-bad {
+  color: rgb(252, 165, 165);
+  border-color: rgb(239, 68, 68);
+  background: rgba(239, 68, 68, 0.08);
+}

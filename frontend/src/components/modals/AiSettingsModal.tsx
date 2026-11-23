@@ -1,15 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Modal, Input, Button, Tag, Progress, Tabs, Spin, Alert, Tooltip, message, Flex } from 'antd';
-import {
-  RobotOutlined,
-  CheckCircleOutlined,
-  ThunderboltOutlined,
-  ReloadOutlined,
-  KeyOutlined,
-  ExclamationCircleOutlined,
-  CloseCircleOutlined,
-  DashboardOutlined,
-} from '@ant-design/icons';
+import { Modal, Input, Button, Badge, Popconfirm, message } from 'antd';
+import { ThunderboltOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons';
 import api from '../../config/axios';
 
 interface AiSettingsModalProps {
@@ -52,25 +43,46 @@ export const saveStoredGeminiKeys = (val: string) => {
   window.dispatchEvent(new CustomEvent('gemini-keys-changed', { detail: trimmed }));
 };
 
+/** Tách chuỗi key (mỗi dòng / dấu phẩy / chấm phẩy 1 key), bỏ trùng — cùng quy tắc với backend parseKeys. */
+const splitKeys = (raw: string): string[] =>
+  Array.from(new Set(raw.split(/[\n\r,;\s]+/).map((k) => k.trim()).filter(Boolean)));
+
+const maskKey = (k: string) => (k.length > 12 ? `${k.slice(0, 6)}…${k.slice(-4)}` : k);
+
+const DAILY_LIMIT = 1500;
+
+const statusView = (item: KeyHealthItem | undefined, checking: boolean) => {
+  if (!item) {
+    return { badge: 'default' as const, text: checking ? 'Đang kiểm tra…' : 'Chưa kiểm tra', bad: false };
+  }
+  switch (item.status) {
+    case 'HEALTHY':
+      return { badge: 'success' as const, text: 'Hoạt động', bad: false };
+    case 'RATE_LIMITED':
+      return { badge: 'warning' as const, text: 'Hết lượt hôm nay', bad: false };
+    case 'INVALID':
+    case 'ERROR':
+      return { badge: 'error' as const, text: 'Không dùng được', bad: true };
+    default:
+      return { badge: 'default' as const, text: 'Chưa kiểm tra', bad: false };
+  }
+};
+
 const AiSettingsModal: React.FC<AiSettingsModalProps> = ({ open, onClose }) => {
-  const [keysText, setKeysText] = useState('');
-  const [activeTab, setActiveTab] = useState<'monitor' | 'edit'>('monitor');
+  const [keys, setKeys] = useState<string[]>([]);
+  const [draft, setDraft] = useState('');
   const [keyHealthList, setKeyHealthList] = useState<KeyHealthItem[]>([]);
   const [checking, setChecking] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
-  const parsedKeys = useMemo(() => {
-    return keysText
-      .split(/[\n,;]+/)
-      .map((k) => k.trim())
-      .filter(Boolean);
-  }, [keysText]);
-
-  const fetchHealthCheck = async (keysToTest?: string) => {
-    const rawKeys = keysToTest !== undefined ? keysToTest : getStoredGeminiKeys();
+  const fetchHealthCheck = async (list: string[]) => {
+    if (list.length === 0) {
+      setKeyHealthList([]);
+      return;
+    }
     setChecking(true);
     try {
-      const res = await api.post('/news-card/check-keys', { apiKey: rawKeys });
+      const res = await api.post('/news-card/check-keys', { apiKey: list.join('\n') });
       if (res.data?.success && Array.isArray(res.data.results)) {
         setKeyHealthList(res.data.results);
       }
@@ -83,38 +95,50 @@ const AiSettingsModal: React.FC<AiSettingsModalProps> = ({ open, onClose }) => {
 
   useEffect(() => {
     if (open) {
-      const stored = getStoredGeminiKeys();
-      setKeysText(stored);
+      const stored = splitKeys(getStoredGeminiKeys());
+      setKeys(stored);
+      setDraft('');
       setTestResult(null);
-      // Mặc định tab Giám sát nếu đã có key, ngược lại mở tab Nhập key
-      if (stored.trim()) {
-        setActiveTab('monitor');
-      } else {
-        setActiveTab('edit');
-      }
+      setKeyHealthList([]);
       fetchHealthCheck(stored);
     }
   }, [open]);
 
-  const handleSave = () => {
-    saveStoredGeminiKeys(keysText);
-    const count = parsedKeys.length;
-    if (count > 0) {
-      message.success(
-        count > 1
-          ? `Đã lưu ${count} Gemini API keys! Hệ thống sẽ tự động dùng chung và xoay vòng khi hết Quota.`
-          : 'Đã lưu Gemini API key dùng chung cho toàn bộ hệ thống!'
-      );
-    } else {
-      message.info('Đã xóa key riêng. Hệ thống sẽ sử dụng key mặc định của máy chủ.');
+  const persist = (next: string[]) => {
+    setKeys(next);
+    saveStoredGeminiKeys(next.join('\n'));
+    setTestResult(null);
+    setKeyHealthList([]);
+    fetchHealthCheck(next);
+  };
+
+  const draftKeys = useMemo(() => splitKeys(draft), [draft]);
+
+  const handleAdd = () => {
+    if (draftKeys.length === 0) return;
+    const tooShort = draftKeys.filter((k) => k.length < 20);
+    if (tooShort.length > 0) {
+      message.warning('Key có vẻ chưa đầy đủ. Key Gemini thường bắt đầu bằng "AIza" và dài khoảng 39 ký tự.');
+      return;
     }
-    fetchHealthCheck(keysText);
-    setActiveTab('monitor');
+    const fresh = draftKeys.filter((k) => !keys.includes(k));
+    if (fresh.length === 0) {
+      message.info('Key này đã có trong danh sách.');
+      return;
+    }
+    persist([...keys, ...fresh]);
+    setDraft('');
+    message.success(fresh.length > 1 ? `Đã thêm ${fresh.length} key.` : 'Đã thêm key.');
+  };
+
+  const handleRemove = (key: string) => {
+    persist(keys.filter((k) => k !== key));
+    message.success('Đã xoá key.');
   };
 
   const handleTestQuickPrompt = async () => {
-    if (parsedKeys.length === 0) {
-      message.warning('Vui lòng nhập ít nhất 1 API key để kiểm tra kết nối.');
+    if (keys.length === 0) {
+      message.warning('Thêm ít nhất 1 key trước khi gọi thử.');
       return;
     }
     setChecking(true);
@@ -123,283 +147,148 @@ const AiSettingsModal: React.FC<AiSettingsModalProps> = ({ open, onClose }) => {
       const res = await api.post('/news-card/headline', {
         title: 'Kiểm tra kết nối hệ thống',
         content: 'Đây là bài kiểm tra phản hồi từ Google Gemini AI.',
-        apiKey: keysText,
+        apiKey: keys.join('\n'),
       });
       if (res.data?.success && res.data?.headline) {
-        setTestResult({
-          success: true,
-          message: `Kết nối thành công! Gemini phản hồi: "${res.data.headline.slice(0, 70)}..."`,
-        });
-        fetchHealthCheck(keysText);
+        setTestResult({ success: true, message: `AI trả lời được: "${res.data.headline.slice(0, 70)}"` });
+        fetchHealthCheck(keys);
       } else {
         throw new Error(res.data?.error || 'AI không trả về kết quả');
       }
     } catch (e: any) {
       const errMsg = e.response?.data?.error || e.message || 'Lỗi không xác định';
-      setTestResult({
-        success: false,
-        message: `Kiểm tra thất bại: ${errMsg}`,
-      });
+      setTestResult({ success: false, message: `Gọi thử thất bại: ${errMsg}` });
     } finally {
       setChecking(false);
     }
   };
 
-  const totalUsedToday = keyHealthList.reduce((acc, k) => acc + (k.callsToday || 0), 0);
-  const totalLimitToday = Math.max(1, keyHealthList.length) * 1500;
-  const overallPct = Math.min(100, Math.round((totalUsedToday / totalLimitToday) * 100));
+  // Kết quả check-keys trả về đúng thứ tự danh sách key (backend tách + bỏ trùng giống splitKeys).
+  const healthOf = (idx: number) => keyHealthList[idx];
+  const workingCount = keyHealthList.filter((k) => k.status === 'HEALTHY').length;
+  const usedToday = keyHealthList.reduce((acc, k) => acc + (k.callsToday || 0), 0);
 
   return (
     <Modal
-      title={
-        <Flex align="center" justify="space-between" className="ai-title-row">
-          <Flex align="center" gap={8}>
-            <RobotOutlined className="ai-title-ic" />
-            <span className="ai-bold">Cấu hình & Giám sát Hạn mức AI (Gemini)</span>
-          </Flex>
-          <Tag color="cyan" className="ai-mono-xs">
-            {parsedKeys.length} {parsedKeys.length > 1 ? 'Keys xoay vòng' : 'Key'}
-          </Tag>
-        </Flex>
-      }
+      title="Gemini API key"
       open={open}
       onCancel={onClose}
-      width={680}
+      width={620}
       footer={[
-        <Button
-          key="refresh"
-          icon={<ReloadOutlined spin={checking} />}
-          loading={checking}
-          onClick={() => fetchHealthCheck(keysText)}
-        >
-          Làm mới trạng thái
+        <Button key="test" icon={<ThunderboltOutlined />} loading={checking} onClick={handleTestQuickPrompt} disabled={keys.length === 0}>
+          Gọi thử AI
+        </Button>,
+        <Button key="refresh" icon={<ReloadOutlined />} loading={checking} onClick={() => fetchHealthCheck(keys)} disabled={keys.length === 0}>
+          Kiểm tra lại
         </Button>,
         <Button key="close" onClick={onClose}>
           Đóng
         </Button>,
-        activeTab === 'edit' && (
-          <Button key="save" type="primary" onClick={handleSave}>
-            Lưu cấu hình
-          </Button>
-        ),
       ]}
     >
-      <div className="ai-body">
-        {/* Dashboard tóm tắt hạn ngạch */}
-        <div className="ai-stats">
-          <div className="ai-stat">
-            <div className="ai-stat-label">Đã gọi hôm nay</div>
-            <div className="ai-stat-value-cyan">
-              {totalUsedToday.toLocaleString()} <span className="ai-stat-unit">/ {totalLimitToday.toLocaleString()}</span>
-            </div>
-            <div className="ai-stat-note">Ước tính theo mốc 1.500/key</div>
+      <div className="aik">
+        <p className="aik-intro">
+          Key dùng chung cho mọi tính năng AI (viết lại bài, Studio Ảnh Tin, chấm điểm bài viral). Nên thêm 2–3 key:
+          khi một key hết lượt trong ngày, hệ thống tự chuyển sang key khác.
+        </p>
+
+        <section className="aik-section">
+          <h4 className="aik-heading">Thêm key mới</h4>
+          <ol className="aik-steps">
+            <li>
+              Mở{' '}
+              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer">
+                aistudio.google.com/app/apikey
+              </a>{' '}
+              và đăng nhập tài khoản Google.
+            </li>
+            <li>
+              Bấm <b>Create API key</b>, chọn <b>Create API key in new project</b>.
+            </li>
+            <li>Sao chép key (bắt đầu bằng <code>AIza</code>), dán vào ô dưới rồi bấm <b>Thêm key</b>.</li>
+          </ol>
+          <div className="aik-add">
+            <Input.TextArea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onPressEnter={(e) => {
+                if (!e.shiftKey) {
+                  e.preventDefault();
+                  handleAdd();
+                }
+              }}
+              autoSize={{ minRows: 1, maxRows: 4 }}
+              placeholder="Dán key vào đây (nhiều key thì mỗi dòng 1 key)"
+              autoComplete="off"
+              spellCheck={false}
+              className="aik-input"
+            />
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} disabled={draftKeys.length === 0}>
+              {draftKeys.length > 1 ? `Thêm ${draftKeys.length} key` : 'Thêm key'}
+            </Button>
+          </div>
+        </section>
+
+        <section className="aik-section">
+          <div className="aik-heading-row">
+            <h4 className="aik-heading">Key đang dùng ({keys.length})</h4>
+            {keyHealthList.length > 0 && (
+              <span className="aik-summary">
+                {workingCount}/{keys.length} hoạt động · hôm nay đã gọi {usedToday.toLocaleString('vi-VN')} lượt
+              </span>
+            )}
           </div>
 
-          <div className="ai-stat">
-            <div className="ai-stat-label">Trạng thái Pool Keys</div>
-            <div className="ai-stat-value-emerald">
-              <span>{keyHealthList.filter((k) => k.status === 'HEALTHY').length}</span>
-              <span className="ai-stat-unit">/ {Math.max(keyHealthList.length, parsedKeys.length)} online</span>
-            </div>
-            <div className="ai-stat-note">Tự động failover khi 429</div>
-          </div>
-
-          <div className="ai-stat">
-            <div className="ai-stat-label">Thời gian Reset Quota</div>
-            <div className="ai-stat-value-amber">
-              07:00 Sáng
-            </div>
-            <div className="ai-stat-note">Google reset hạn mức ngày</div>
-          </div>
-        </div>
-
-        {/* Tabs chuyển đổi giữa Giám sát và Chỉnh sửa */}
-        <Tabs
-          activeKey={activeTab}
-          onChange={(k) => setActiveTab(k as any)}
-          items={[
-            {
-              key: 'monitor',
-              label: (
-                <span className="ai-tab-label">
-                  <DashboardOutlined /> Giám sát & Hạn ngạch từng Key
-                </span>
-              ),
-              children: (
-                <div className="ai-monitor">
-                  {checking && keyHealthList.length === 0 ? (
-                    <div className="ai-loading">
-                      <Spin size="small" />
-                      <div>Đang kiểm tra tình trạng từng API Key...</div>
-                    </div>
-                  ) : keyHealthList.length === 0 ? (
-                    <div className="ai-empty">
-                      Chưa có API key nào được cấu hình.{' '}
-                      <Button type="link" size="small" onClick={() => setActiveTab('edit')}>
-                        Chuyển sang tab Thêm Key →
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="ai-key-list">
-                      {keyHealthList.map((item, idx) => {
-                        const pct = Math.min(100, Math.round(((item.callsToday || 0) / (item.dailyLimitEstimate || 1500)) * 100));
-                        const isExhausted = item.status === 'RATE_LIMITED' || pct >= 100;
-                        const isWarning = pct >= 80 && !isExhausted;
-                        const isInvalid = item.status === 'INVALID' || item.status === 'ERROR';
-
-                        let statusBadge = <Tag color="success" className="ai-m0">🟢 Hoạt động tốt</Tag>;
-                        if (item.status === 'RATE_LIMITED') {
-                          statusBadge = <Tag color="warning" className="ai-m0">🟡 Hết hạn ngạch (429)</Tag>;
-                        } else if (isInvalid) {
-                          statusBadge = <Tag color="error" className="ai-m0">🔴 Key lỗi / Không hợp lệ</Tag>;
-                        }
-
-                        let progressColor = '#06b6d4'; // cyan
-                        if (isExhausted) progressColor = '#ef4444'; // red
-                        else if (isWarning) progressColor = '#f59e0b'; // amber
-
-                        return (
-                          <div
-                            key={idx}
-                            className={`ai-key-card ${
-                              isExhausted
-                                ? 'ai-key-card-exhausted'
-                                : isInvalid
-                                ? 'ai-key-card-invalid'
-                                : 'ai-key-card-ok'
-                            }`}
-                          >
-                            <Flex align="center" justify="space-between" className="ai-key-head">
-                              <Flex align="center" gap={8}>
-                                <span className="ai-key-name">
-                                  Key #{idx + 1}:
-                                </span>
-                                <span className="ai-key-mask">
-                                  {item.masked}
-                                </span>
-                              </Flex>
-                              <div>{statusBadge}</div>
-                            </Flex>
-
-                            {/* Hạn mức gọi trong ngày */}
-                            <div className="ai-stack-1">
-                              <div className="ai-quota-row">
-                                <span>Đã dùng hôm nay: <b className="ai-text-strong">{item.callsToday} / {item.dailyLimitEstimate}</b> lượt</span>
-                                <span className="ai-mono-semibold" style={{ color: progressColor }}>
-                                  {pct}%
-                                </span>
-                              </div>
-                              <Progress
-                                percent={pct}
-                                showInfo={false}
-                                strokeColor={progressColor}
-                                size={[undefined, 6]}
-                              />
-                            </div>
-
-                            {/* Lời nhắc trạng thái */}
-                            <div className="ai-key-foot">
-                              <span className="ai-muted">{item.message}</span>
-                              {isExhausted && (
-                                <span className="ai-warn">
-                                  ⚠️ Hệ thống đang chuyển sang Key khác
-                                </span>
-                              )}
-                              {isWarning && (
-                                <span className="ai-warn-light">
-                                  ⚠️ Sắp chạm trần (còn ~{item.dailyLimitEstimate - item.callsToday} lượt)
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  <div className="ai-monitor-foot">
-                    <span className="ai-stat-label">
-                      💡 Cần thêm key dự phòng? Bấm tab <b>"Quản lý danh sách Key"</b>.
-                    </span>
-                    <Button
-                      size="small"
-                      icon={<ThunderboltOutlined />}
-                      loading={checking}
-                      onClick={handleTestQuickPrompt}
-                    >
-                      Gọi thử 1 lệnh test
-                    </Button>
-                  </div>
-                </div>
-              ),
-            },
-            {
-              key: 'edit',
-              label: (
-                <span className="ai-tab-label">
-                  <KeyOutlined /> Quản lý danh sách Key ({parsedKeys.length})
-                </span>
-              ),
-              children: (
-                <div className="ai-monitor">
-                  <div>
-                    <div className="ai-edit-head">
-                      <span className="ai-edit-title">Dán danh sách API Keys (mỗi dòng 1 key):</span>
-                      <Tag color="cyan" className="ai-m0">
-                        {parsedKeys.length} key được nhận diện
-                      </Tag>
-                    </div>
-                    <Input.TextArea
-                      rows={6}
-                      value={keysText}
-                      onChange={(e) => {
-                        setKeysText(e.target.value);
-                        setTestResult(null);
-                      }}
-                      placeholder={
-                        "Dán các Gemini API key vào đây, mỗi dòng 1 key:\nAIzaSyA_abcdef123456...\nAQ.Ab8RN6KMnIOVi...\nAIzaSyB_abcdef123456..."
-                      }
-                      className="ai-textarea"
-                      autoComplete="off"
-                      spellCheck={false}
-                    />
-                  </div>
-
-                  <div className="ai-help">
-                    <div>
-                      🔗 <b>Lấy API Key miễn phí tại:</b>{' '}
-                      <a
-                        href="https://aistudio.google.com/app/apikey"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="ai-help-link"
+          {keys.length === 0 ? (
+            <div className="aik-empty">Chưa có key nào. Thêm key ở trên để dùng các tính năng AI.</div>
+          ) : (
+            <ul className="aik-list">
+              {keys.map((k, idx) => {
+                const item = healthOf(idx);
+                const view = statusView(item, checking);
+                const used = item?.callsToday || 0;
+                const limit = item?.dailyLimitEstimate || DAILY_LIMIT;
+                return (
+                  <li key={k} className="aik-row">
+                    <div className="aik-row-main">
+                      <span className="aik-index">{idx + 1}</span>
+                      <code className="aik-key">{item?.masked || maskKey(k)}</code>
+                      <Badge status={view.badge} text={view.text} className="aik-status" />
+                      <span className="aik-usage">
+                        {used.toLocaleString('vi-VN')}/{limit.toLocaleString('vi-VN')} lượt
+                      </span>
+                      <Popconfirm
+                        title="Xoá key này?"
+                        okText="Xoá"
+                        cancelText="Huỷ"
+                        okButtonProps={{ danger: true }}
+                        onConfirm={() => handleRemove(k)}
                       >
-                        aistudio.google.com/app/apikey
-                      </a>
+                        <Button type="text" size="small" danger>
+                          Xoá
+                        </Button>
+                      </Popconfirm>
                     </div>
-                    <div>
-                      💡 <b>Lưu ý quan trọng:</b> Khi bấm <i>Create API key</i>, hãy chọn <b>"Create API key in new project"</b> (Tạo trong dự án mới) để Google tự động kích hoạt sẵn Generative Language API.
-                    </div>
-                    <div>• Bạn có thể tạo nhiều key hoặc gom key từ nhiều tài khoản Google khác nhau để xoay vòng hạn ngạch.</div>
-                    <div>• Hệ thống tự động lưu vào trình duyệt và đồng bộ cho mọi trang (Studio Ảnh Tin, Radar Tin Tức, Đăng Playwright...).</div>
-                  </div>
-                </div>
-              ),
-            },
-          ]}
-        />
+                    {view.bad && (
+                      <div className="aik-row-note">
+                        {(item?.message || 'Key không hợp lệ').replace(/[.\s]+$/, '')}. Nên xoá key này và thêm key khác.
+                      </div>
+                    )}
+                    {item?.status === 'RATE_LIMITED' && (
+                      <div className="aik-row-note aik-row-note-warn">
+                        Đã hết lượt hôm nay, hệ thống đang dùng key khác. Lượt dùng được làm mới lúc 07:00 sáng.
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <div className="aik-foot-note">Google làm mới lượt dùng miễn phí mỗi ngày lúc 07:00 sáng (khoảng 1.500 lượt/key).</div>
+        </section>
 
         {testResult && (
-          <div
-            className={`ai-result ${testResult.success ? 'ai-result-ok' : 'ai-result-bad'}`}
-          >
-            {testResult.success ? (
-              <CheckCircleOutlined className="ai-result-ic-ok" />
-            ) : (
-              <ExclamationCircleOutlined className="ai-result-ic-bad" />
-            )}
-            <span className="ai-break">{testResult.message}</span>
-          </div>
+          <div className={`aik-result ${testResult.success ? 'aik-result-ok' : 'aik-result-bad'}`}>{testResult.message}</div>
         )}
       </div>
     </Modal>
