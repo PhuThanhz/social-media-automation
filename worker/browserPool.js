@@ -18,7 +18,7 @@ const LOW_MEMORY_BROWSER_ARGS = [
   '--disable-extensions',
   '--disable-translate',
   '--disable-sync',
-  '--js-flags=--max-old-space-size=256',
+  '--js-flags=--max-old-space-size=768',
   // Ẩn navigator.webdriver — các luồng scrape/hunt/buff Facebook trước đây đều tự launch với cờ này.
   '--disable-blink-features=AutomationControlled',
 ];

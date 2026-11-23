@@ -16,7 +16,7 @@ const CHROMIUM_OPTIMIZED_ARGS = [
   '--disable-extensions',
   '--disable-translate',
   '--disable-sync',
-  '--js-flags=--max-old-space-size=256'
+  '--js-flags=--max-old-space-size=768'
 ];
 
 const _origChromiumLaunch = chromium.launch.bind(chromium);

@@ -405,6 +405,24 @@ async function huntFacebookFeed(params, deps = {}) {
 
     const page = await context.newPage();
 
+    // Chống treo: trang Facebook nặng (Fanpage nhiều video) có thể làm renderer crash. Khi đó các lệnh
+    // page.evaluate() đang chờ có thể KHÔNG bao giờ trả về → request treo tới khi backend hết 5 phút chờ,
+    // context không được trả lại pool. (2026-11-23: Cuồng Phim Review treo ở vòng 5, renderer đã chết.)
+    // → Bắt sự kiện crash + watchdog cứng: đóng trang để mọi lệnh đang chờ bị huỷ, trả về bài đã quét được.
+    let pageCrashed = false;
+    page.on('crash', () => {
+      pageCrashed = true;
+      console.warn('[FB_Group_Hunter] 💥 Trang quét bị crash — dừng cuộn, trả về các bài đã thu được.');
+      page.close().catch(() => { });
+    });
+    var huntWatchdog = setTimeout(() => {
+      if (page.isClosed()) return;
+      console.warn('[FB_Group_Hunter] ⏱️ Watchdog: quét quá hạn chót + 60s (trang bị treo) — đóng trang, trả về các bài đã thu được.');
+      page.close().catch(() => { });
+    }, Math.max(10_000, scanDeadline - Date.now() + 60_000));
+    const pageGone = () => pageCrashed || page.isClosed();
+    const safeWait = (ms) => (pageGone() ? Promise.resolve() : page.waitForTimeout(ms).catch(() => { }));
+
     // Tăng tốc: Chặn nạp các tài nguyên nặng (video streaming chunks, fonts, tracking pixels) để lướt siêu tốc
     await page.route('**/*', (route) => {
       const resourceType = route.request().resourceType();
@@ -581,7 +599,12 @@ async function huntFacebookFeed(params, deps = {}) {
     let cookieFallbackDone = false;
 
     for (let round = 0; round < maxScrollRounds && countTowardsLimit() < maxItems; round++) {
+      try {
       const prevSize = collectedItemsMap.size;
+      if (pageGone()) {
+        stopReason = 'PAGE_CRASHED';
+        break;
+      }
       if (Date.now() > scanDeadline) {
         stopReason = 'TIMEOUT';
         console.log('[FB_Group_Hunter] ⏱️ Hết thời gian quét, trả về kết quả đã thu được.');
@@ -1201,7 +1224,7 @@ async function huntFacebookFeed(params, deps = {}) {
         await page.mouse.move(760, 520).catch(() => { });
         await page.mouse.wheel(0, 1400).catch(() => { });
         await page.evaluate(() => window.scrollBy(0, 400)).catch(() => { });
-        await page.waitForTimeout(stagnantCount > 0 ? 1500 : 700);
+        await safeWait(stagnantCount > 0 ? 1500 : 700);
         continue;
       }
 
@@ -1211,7 +1234,16 @@ async function huntFacebookFeed(params, deps = {}) {
       await page.evaluate(() => window.scrollBy(0, 800)).catch(() => { });
       await page.keyboard.press('PageDown').catch(() => { });
       // Chờ Facebook query GraphQL batch tiếp theo
-      await page.waitForTimeout(stagnantCount > 0 ? 1800 : 900);
+      await safeWait(stagnantCount > 0 ? 1800 : 900);
+      } catch (roundErr) {
+        // Trang crash / bị watchdog đóng giữa vòng → giữ các bài đã thu được thay vì báo lỗi toàn bộ.
+        if (pageGone() || /crash|closed|Target page/i.test(roundErr?.message || '')) {
+          stopReason = 'PAGE_CRASHED';
+          console.warn(`[FB_Group_Hunter] ⚠️ Dừng quét ở vòng ${round + 1} (${roundErr?.message || 'trang đã đóng'}) — trả về ${collectedItemsMap.size} bài đã thu được.`);
+          break;
+        }
+        throw roundErr;
+      }
     }
 
     if (isPage && (!groupTitle || /^(?:Facebook|Facebook Group|Thông báo)$/i.test(groupTitle))) {
@@ -1315,6 +1347,7 @@ async function huntFacebookFeed(params, deps = {}) {
     console.error('[FB_Group_Hunter] ❌ Lỗi quét Group:', err.message);
     return { status: 500, body: { success: false, error: `Lỗi khi quét Facebook: ${err.message}` } };
   } finally {
+    if (typeof huntWatchdog !== 'undefined') clearTimeout(huntWatchdog);
     await releaseContext?.();
   }
 }

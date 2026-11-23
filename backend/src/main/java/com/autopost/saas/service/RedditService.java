@@ -249,7 +249,15 @@ public class RedditService {
         return item;
     }
 
-    /** GET JSON Reddit: dùng cookie qua old.reddit.com nếu có, không thì OAuth qua oauth.reddit.com. */
+    private HttpResponse<String> sendOAuth(String pathAndQuery) throws Exception {
+        return http.send(HttpRequest.newBuilder(URI.create("https://oauth.reddit.com" + pathAndQuery))
+                .timeout(Duration.ofSeconds(20))
+                .header("Authorization", "Bearer " + getToken())
+                .header("User-Agent", userAgent())
+                .GET().build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    /** GET JSON Reddit: dùng cookie qua old.reddit.com nếu có, bị chặn 403 thì OAuth (nếu có khoá), không thì OAuth qua oauth.reddit.com. */
     private JsonNode getJson(String pathAndQuery, String label) throws Exception {
         String cookie = cookieHeader();
         HttpResponse<String> resp;
@@ -267,15 +275,16 @@ public class RedditService {
             if ((resp.statusCode() == 302 || resp.statusCode() == 301) && location.contains("/login")) {
                 throw new IllegalStateException("Cookie Reddit hết hạn hoặc chưa đăng nhập — chép lại cookie mới (nút \"Kết nối Reddit\").");
             }
-            if (resp.statusCode() == 403 && resp.body().contains("network policy")) {
-                throw new IllegalStateException("Reddit chặn request dù có cookie (403 network policy) — cookie có thể thiếu reddit_session/token_v2.");
+            if (resp.statusCode() == 403 && hasOAuthKeys()) {
+                // Reddit chặn đường cookie (old.reddit.com) nhưng đã có Client ID/Secret → dùng API chính thức.
+                resp = sendOAuth(pathAndQuery);
+            } else if (resp.statusCode() == 403) {
+                // 2026-11: cả 2 nguồn Reddit lỗi 403 liên tục qua đường cookie. Chỉ rõ cách khắc phục.
+                throw new IllegalStateException("Reddit chặn đọc qua cookie (HTTP 403) khi quét " + label
+                        + ". Nhập Client ID/Secret ứng dụng Reddit (reddit.com/prefs/apps, loại \"script\") trong \"Kết nối Reddit\" để quét qua API chính thức.");
             }
         } else {
-            resp = http.send(HttpRequest.newBuilder(URI.create("https://oauth.reddit.com" + pathAndQuery))
-                    .timeout(Duration.ofSeconds(20))
-                    .header("Authorization", "Bearer " + getToken())
-                    .header("User-Agent", userAgent())
-                    .GET().build(), HttpResponse.BodyHandlers.ofString());
+            resp = sendOAuth(pathAndQuery);
         }
         if (resp.statusCode() == 401) {
             cachedToken = null;
