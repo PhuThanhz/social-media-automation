@@ -24,6 +24,8 @@ export interface PostLinkItem {
   manualMediaKinds?: ('image' | 'video')[];
   isNow: boolean;
   scheduledAt: Dayjs;
+  /** Hẹn giờ: người dùng đã đặt giờ riêng cho bài này (scheduledAt) qua "Đặt giờ từng bài". */
+  customTime?: boolean;
   affiliateLink?: string;
   showCommentBox?: boolean;
   includeCredit?: boolean;

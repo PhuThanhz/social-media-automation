@@ -80,6 +80,7 @@ import { distributeGroupTasks, type GroupScheduleTask } from '../utils/groupSche
 // Modal/drawer lớn: tách chunk riêng, chỉ tải khi mở lần đầu
 const ArticleBatchModal = lazy(() => import('./playwright-poster/ArticleBatchModal'));
 const BulkPasteDrawer = lazy(() => import('./playwright-poster/BulkPasteDrawer'));
+import PerPostTimesModal, { isComposableItem, autoTimeOf } from './playwright-poster/PerPostTimesModal';
 const DistributeModal = lazy(() => import('./playwright-poster/DistributeModal'));
 const GroupHunterDrawer = lazy(() => import('./playwright-poster/GroupHunterDrawer'));
 const SwipeReviewModal = lazy(() => import('./playwright-poster/SwipeReviewModal'));
@@ -843,6 +844,8 @@ const PlaywrightPoster = () => {
   };
   // Giãn cách phút giữa các bài (lấy trực tiếp từ lựa chọn người dùng, mặc định 20 phút)
   const batchInterval = scheduleChoice.intervalMinutes || 20;
+  // "Đặt giờ từng bài" (chỉ Hẹn giờ + Chỉ đăng Fanpage): bài có customTime gửi đúng giờ đó, bài còn lại = mốc + idx × giãn cách
+  const [perPostTimesOpen, setPerPostTimesOpen] = useState(false);
   const [batchToolsOpen, setBatchToolsOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
@@ -3603,12 +3606,18 @@ const PlaywrightPoster = () => {
           ? validItems.map((i) => (i.extraGroupIds && i.extraGroupIds.length > 0 ? i.extraGroupIds.join(',') : null))
           : undefined;
 
+        const atStart = scheduleChoice.at || dayjs();
+        const perPostScheduledTimes = scheduleChoice.mode === 'AT' && validItems.some((i) => i.customTime)
+          ? validItems.map((i, idx) => (i.customTime && i.scheduledAt ? i.scheduledAt : autoTimeOf(atStart, batchInterval, idx)).format('YYYY-MM-DDTHH:mm:ss'))
+          : undefined;
+
         const payload = {
           urls,
           scheduledTimes: effectiveScheduledTimes,
           intervalMinutes: batchInterval,
           publishNow: isFirstImmediate,
           ...scheduleBody,
+          ...(perPostScheduledTimes ? { scheduledTimes: perPostScheduledTimes } : {}),
           targetFanpageId: (effectiveTargetFanpageIds && effectiveTargetFanpageIds.length > 0) ? effectiveTargetFanpageIds[0] : (Array.isArray(values.targetFanpageId) ? values.targetFanpageId[0] : values.targetFanpageId),
           targetFanpageIds: effectiveTargetFanpageIds,
           affiliateLink: effectiveDefaultComment,
@@ -4431,8 +4440,18 @@ const PlaywrightPoster = () => {
     }
   ];
 
+  const composableItems = linkItems.filter(isComposableItem);
+  const customTimeCount = composableItems.filter((i) => i.customTime).length;
+  const canSetPerPostTimes = scheduleChoice.mode === 'AT' && postMode === 'FANPAGE_ONLY' && composableItems.length > 0;
   const queueModeControl = (
-    <ScheduleChoice value={scheduleChoice} onChange={setScheduleChoice} size="small" />
+    <>
+      <ScheduleChoice value={scheduleChoice} onChange={setScheduleChoice} size="small" />
+      {canSetPerPostTimes && (
+        <Button type="link" size="small" className="per-post-times-link" onClick={() => setPerPostTimesOpen(true)}>
+          Đặt giờ từng bài ({composableItems.length}){customTimeCount > 0 ? ` · đã đặt ${customTimeCount}` : ''}
+        </Button>
+      )}
+    </>
   );
 
   // Options chọn nơi đăng cho từng bài; viaNameOf đọc socialAccounts + viaNameByCUser nên dùng chúng làm deps
@@ -5230,6 +5249,23 @@ const PlaywrightPoster = () => {
           />
         </Suspense>
       )}
+
+      {/* GIỜ ĐĂNG TỪNG BÀI (Hẹn giờ) */}
+      <PerPostTimesModal
+        open={perPostTimesOpen}
+        onClose={() => setPerPostTimesOpen(false)}
+        items={composableItems}
+        previews={previews}
+        start={scheduleChoice.at || dayjs().add(30, 'minute').second(0)}
+        intervalMinutes={batchInterval}
+        onSave={(times) => {
+          setLinkItems((prev) => prev.map((it) => (times[it.id]
+            ? { ...it, isNow: false, customTime: true, scheduledAt: times[it.id] }
+            : (it.customTime ? { ...it, customTime: false } : it))));
+          const n = Object.keys(times).length;
+          message.success(n > 0 ? `Đã đặt giờ riêng cho ${n} bài.` : 'Đã về giờ tự động.');
+        }}
+      />
 
       {/* DRAWER DÁN NHANH NHIỀU LINK */}
       {bulkPasteDrawerOpened && (
