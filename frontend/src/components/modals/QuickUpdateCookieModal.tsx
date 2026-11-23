@@ -111,14 +111,29 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
     return ownCUser && ownCUser !== currentAccount.platformAccountId ? ownCUser : '';
   }, [currentAccount, allAccounts]);
 
-  // Load existing cookies of account if available
+  // Load existing cookies of account if available (tự động xóa trống khi cookie hết hạn để người dùng dán ngay)
   useEffect(() => {
-    if (open && currentAccount?.accessToken) {
+    if (!open) return;
+    if (!currentAccount) {
+      setCookies({ ...INITIAL_FACEBOOK_COOKIES, extraPairs: {} });
+      setRawCookieInput('');
+      return;
+    }
+
+    if (currentAccount.tokenStatus === 'EXPIRED') {
+      // Khi cookie đã hết hạn: xóa sạch input và chuyển sang tab Dán chuỗi để người dùng không cần xóa thủ công
+      setCookies({ ...INITIAL_FACEBOOK_COOKIES, extraPairs: {} });
+      setRawCookieInput('');
+      setInputMode('RAW');
+    } else if (currentAccount.accessToken) {
       const parsed = parseAllFacebookCookies(currentAccount.accessToken, existingCUser);
       setCookies(parsed.cookies);
       setRawCookieInput(currentAccount.accessToken);
+    } else {
+      setCookies({ ...INITIAL_FACEBOOK_COOKIES, extraPairs: {} });
+      setRawCookieInput('');
     }
-  }, [open, currentAccount?.id]);
+  }, [open, currentAccount?.id, currentAccount?.tokenStatus]);
 
   // Khởi tạo account khi mở modal
   useEffect(() => {
@@ -127,6 +142,7 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
         setSelectedAccountId(targetAccountId);
       } else if (expiredAccounts.length > 0) {
         setSelectedAccountId(expiredAccounts[0].id);
+        setInputMode('RAW');
       } else if (cookieAccounts.length > 0) {
         setSelectedAccountId(cookieAccounts[0].id);
       }
@@ -143,6 +159,15 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
   // Tính toán chuỗi đầy đủ và tính hợp lệ theo thời gian thực
   const parsedData = useMemo(() => {
     if (inputMode === 'RAW') {
+      if (!rawCookieInput.trim()) {
+        return {
+          cookies: { ...INITIAL_FACEBOOK_COOKIES, extraPairs: {} },
+          isValid: false,
+          fullCookie: '',
+          count: 0,
+          hasSecuritySuite: false,
+        };
+      }
       return parseAllFacebookCookies(rawCookieInput, existingCUser);
     } else {
       const full = buildCookieString(cookies);
@@ -555,15 +580,27 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
           <div className="qcm-stack-2">
             <Flex align="center" justify="space-between">
               <span className="qcm-field-label">Dán toàn bộ chuỗi Cookie Facebook vào đây:</span>
-              <Button
-                type="dashed"
-                size="small"
-                icon={<CopyOutlined />}
-                onClick={handlePasteClipboardToColumns}
-                className="qcm-paste-btn"
-              >
-                📋 Dán từ Clipboard
-              </Button>
+              <Flex gap={8}>
+                <Button
+                  type="dashed"
+                  size="small"
+                  icon={<CopyOutlined />}
+                  onClick={handlePasteClipboardToColumns}
+                  className="qcm-paste-btn"
+                >
+                  📋 Dán từ Clipboard
+                </Button>
+                {rawCookieInput && (
+                  <Button
+                    size="small"
+                    icon={<ClearOutlined />}
+                    onClick={handleClearAll}
+                    danger
+                  >
+                    Xóa
+                  </Button>
+                )}
+              </Flex>
             </Flex>
             <TextArea
               rows={5}
@@ -583,9 +620,13 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
         <div className="qcm-preview p-3 rounded-xl bg-slate-900/80 border border-slate-800">
           <Flex align="center" justify="space-between" className="qcm-preview-head mb-2">
             <span className="qcm-preview-title text-xs font-semibold text-slate-300">
-              <Tag color="blue">{parsedData.count} cookie</Tag>
+              <Tag color={parsedData.count > 0 ? 'blue' : 'default'}>{parsedData.count} cookie</Tag>
             </span>
-            {parsedData.hasSecuritySuite ? (
+            {parsedData.count === 0 ? (
+              <Tag color="default" className="qcm-pill-bold">
+                Chờ dán Cookie mới...
+              </Tag>
+            ) : parsedData.hasSecuritySuite ? (
               <Tag icon={<CheckCircleOutlined />} color="success" className="qcm-pill-bold">
                 Đủ chống checkpoint
               </Tag>
@@ -600,35 +641,41 @@ export const QuickUpdateCookieModal: React.FC<QuickUpdateCookieModalProps> = ({
             )}
           </Flex>
 
-          <div className="flex flex-wrap gap-1.5 pt-1">
-            <Tag color={parsedData.cookies.cUser ? 'blue' : 'default'} className="font-mono text-xs">
-              c_user: {parsedData.cookies.cUser ? `${parsedData.cookies.cUser}` : 'Chưa có'}
-            </Tag>
-            <Tag color={parsedData.cookies.xs ? 'blue' : 'default'} className="font-mono text-xs">
-              xs: {parsedData.cookies.xs ? 'OK' : 'Chưa có'}
-            </Tag>
-            <Tag color={parsedData.cookies.datr ? 'green' : 'default'} className="font-mono text-xs">
-              datr: {parsedData.cookies.datr ? 'OK' : 'Chưa có'}
-            </Tag>
-            <Tag color={parsedData.cookies.sb ? 'green' : 'default'} className="font-mono text-xs">
-              sb: {parsedData.cookies.sb ? 'OK' : 'Chưa có'}
-            </Tag>
-            <Tag color={parsedData.cookies.fr ? 'cyan' : 'default'} className="font-mono text-xs">
-              fr: {parsedData.cookies.fr ? 'OK' : 'Chưa có'}
-            </Tag>
-            <Tag color={parsedData.cookies.wd ? 'cyan' : 'default'} className="font-mono text-xs">
-              wd: {parsedData.cookies.wd ? `${parsedData.cookies.wd}` : 'Chưa có'}
-            </Tag>
-            {parsedData.cookies.locale && (
-              <Tag color="purple" className="font-mono text-xs">locale: {parsedData.cookies.locale}</Tag>
-            )}
-            {parsedData.cookies.vpd && (
-              <Tag color="purple" className="font-mono text-xs">vpd: OK</Tag>
-            )}
-            {parsedData.cookies.dpr && (
-              <Tag color="purple" className="font-mono text-xs">dpr: {parsedData.cookies.dpr}</Tag>
-            )}
-          </div>
+          {parsedData.count === 0 ? (
+            <div className="text-xs text-slate-400 py-1.5 italic">
+              💡 Ô nhập đang để trống. Bạn chỉ cần dán chuỗi Cookie mới vào (nhấn Ctrl+V hoặc bấm nút &quot;Dán từ Clipboard&quot;).
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              <Tag color={parsedData.cookies.cUser ? 'blue' : 'default'} className="font-mono text-xs">
+                c_user: {parsedData.cookies.cUser ? `${parsedData.cookies.cUser}` : 'Chưa có'}
+              </Tag>
+              <Tag color={parsedData.cookies.xs ? 'blue' : 'default'} className="font-mono text-xs">
+                xs: {parsedData.cookies.xs ? 'OK' : 'Chưa có'}
+              </Tag>
+              <Tag color={parsedData.cookies.datr ? 'green' : 'default'} className="font-mono text-xs">
+                datr: {parsedData.cookies.datr ? 'OK' : 'Chưa có'}
+              </Tag>
+              <Tag color={parsedData.cookies.sb ? 'green' : 'default'} className="font-mono text-xs">
+                sb: {parsedData.cookies.sb ? 'OK' : 'Chưa có'}
+              </Tag>
+              <Tag color={parsedData.cookies.fr ? 'cyan' : 'default'} className="font-mono text-xs">
+                fr: {parsedData.cookies.fr ? 'OK' : 'Chưa có'}
+              </Tag>
+              <Tag color={parsedData.cookies.wd ? 'cyan' : 'default'} className="font-mono text-xs">
+                wd: {parsedData.cookies.wd ? `${parsedData.cookies.wd}` : 'Chưa có'}
+              </Tag>
+              {parsedData.cookies.locale && (
+                <Tag color="purple" className="font-mono text-xs">locale: {parsedData.cookies.locale}</Tag>
+              )}
+              {parsedData.cookies.vpd && (
+                <Tag color="purple" className="font-mono text-xs">vpd: OK</Tag>
+              )}
+              {parsedData.cookies.dpr && (
+                <Tag color="purple" className="font-mono text-xs">dpr: {parsedData.cookies.dpr}</Tag>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Nút hành động */}
