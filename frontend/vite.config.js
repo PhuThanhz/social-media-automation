@@ -1,7 +1,15 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
-export default defineConfig({
+import { readFileSync } from "fs";
+// Số phiên bản + giờ build hiện ở cuối menu (để kiểm tra máy người dùng đã cập nhật chưa).
+// CI đặt APP_VERSION = 1.0.<run_number> và ghi vào tauri.conf.json trước khi build.
+const tauriConf = JSON.parse(readFileSync(path.resolve(__dirname, "src-tauri/tauri.conf.json"), "utf-8"));
+export default defineConfig(({ command }) => ({
+    define: {
+        __APP_VERSION__: JSON.stringify(process.env.APP_VERSION || (command === "build" ? tauriConf.version : "dev")),
+        __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+    },
     plugins: [react()],
     resolve: {
         alias: {
@@ -32,4 +40,4 @@ export default defineConfig({
             },
         },
     },
-});
+}));

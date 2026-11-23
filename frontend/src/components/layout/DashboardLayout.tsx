@@ -80,7 +80,7 @@ const navigation = [
 const pageMeta: Record<string, { title: string; description: string }> = {
   '/dashboard': { title: 'Tổng quan', description: 'Theo dõi hoạt động đăng bài và tình trạng hệ thống' },
   '/dashboard/news-studio': { title: 'Studio Ảnh Tin', description: 'Cào full bài báo, AI viết tiêu đề, ghép ảnh kiểu page tin tức rồi lên lịch đăng' },
-  '/dashboard/viral-hunter': { title: 'Săn Bài Viral (FB & Threads)', description: 'Cào bài Facebook Group & Threads theo từ khoá, lọc tương tác khủng và tích hợp Gemini AI viết lại' },
+  '/dashboard/viral-hunter': { title: 'Săn bài viral', description: '' },
   '/dashboard/queue': { title: 'Quản lý bài đăng', description: 'Lập lịch, kiểm tra trạng thái và xử lý bài đăng' },
   '/dashboard/playwright': { title: 'Đăng tự động', description: '' },
   '/dashboard/connections': { title: 'Quản lý kết nối', description: '' },
@@ -90,6 +90,7 @@ const pageMeta: Record<string, { title: string; description: string }> = {
 };
 
 import { isTauri } from '../../services/license.service';
+import AppVersion from './AppVersion';
 import QuickUpdateCookieModal from '../modals/QuickUpdateCookieModal';
 import AiSettingsModal from '../modals/AiSettingsModal';
 
@@ -228,117 +229,52 @@ const DashboardLayout = () => {
   const profileName = isTauri() ? desktopMe?.displayName || desktopMe?.login || '' : 'Phú Admin';
   const profileInitials = profileName.split(/\s+/).filter(Boolean).slice(-2).map((w) => w[0]).join('').toUpperCase() || 'U';
 
+  // Menu tài khoản: danh sách phẳng (không vòng sáng blur — WebKit của app desktop vẽ thành cục xanh đè avatar)
+  const closeMenuThen = (fn: () => void) => () => {
+    setProfileDropdownOpen(false);
+    fn();
+  };
   const renderUserDropdownCard = () => (
-    <div className="w-[300px] rounded-2xl bg-gradient-to-b from-[#14213d]/98 via-[#0e172a]/98 to-[#090f1d]/98 backdrop-blur-2xl border border-white/12 shadow-2xl shadow-black/70 p-4 text-slate-100 relative overflow-hidden select-none">
-      {/* Ambient background glow accents */}
-      <div className="absolute -top-10 -right-10 w-28 h-28 bg-sky-500/20 rounded-full blur-2xl pointer-events-none" />
-      <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-blue-600/15 rounded-full blur-2xl pointer-events-none" />
-
-      {/* User Header Profile Card */}
-      <div className="relative flex items-center gap-3.5 pb-3.5 border-b border-white/10">
-        <div className="relative shrink-0">
-          <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-sky-400 via-blue-600 to-indigo-600 flex items-center justify-center font-black text-white text-base shadow-lg shadow-sky-500/25 ring-2 ring-white/20">
-            {profileInitials}
-          </div>
-          <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-[#0b1222]" title="Hệ thống trực tuyến" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h4 className="font-extrabold text-[15px] text-white truncate m-0">{profileName}</h4>
-            <span className="inline-flex items-center text-[11px] font-bold px-2 py-0.5 text-sky-200 bg-sky-500/20 border border-sky-400/35 rounded-md">
-              ADMIN
-            </span>
-          </div>
-          <p className="text-[13px] text-slate-300 truncate mt-0.5 m-0 font-medium">
-            {isTauri() ? 'Bản quyền Desktop v2.0' : 'Hệ thống Quản trị Tối cao'}
-          </p>
+    <div className="udm">
+      <div className="udm-head">
+        <span className="udm-avatar">{profileInitials}</span>
+        <div className="udm-who">
+          <div className="udm-name">{profileName}</div>
+          <div className="udm-role">{isTauri() ? 'Bản quyền Desktop' : 'Quản trị viên'}</div>
         </div>
       </div>
 
-      {/* Action Links */}
-      <div className="py-2 space-y-1">
+      <div className="udm-list">
         {!isTauri() && (
-          <button
-            type="button"
-            onClick={() => {
-              setProfileDropdownOpen(false);
-              navigate('/');
-            }}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-semibold text-slate-200 hover:text-white hover:bg-white/8 transition-all text-left cursor-pointer group"
-          >
-            <div className="w-8 h-8 rounded-lg bg-sky-500/15 text-sky-400 flex items-center justify-center border border-sky-500/20 group-hover:scale-105 transition-transform shrink-0">
-              <DashboardOutlined />
-            </div>
-            <span className="flex-1">Trang chủ PhuSocial</span>
+          <button type="button" className="udm-item" onClick={closeMenuThen(() => navigate('/'))}>
+            <DashboardOutlined /> Trang chủ
           </button>
         )}
-
-        <button
-          type="button"
-          onClick={() => {
-            setProfileDropdownOpen(false);
-            setBgPickerOpen(true);
-          }}
-          className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-[13.5px] font-semibold text-slate-200 hover:text-white hover:bg-white/8 transition-all text-left cursor-pointer group"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-purple-500/15 text-purple-400 flex items-center justify-center border border-purple-500/20 group-hover:scale-105 transition-transform shrink-0">
-              <BgColorsOutlined />
-            </div>
-            <span>Hình nền giao diện</span>
-          </div>
-          <span className="text-[11.5px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-200 border border-purple-400/30">
-            Tùy biến
-          </span>
+        <button type="button" className="udm-item" onClick={closeMenuThen(() => setBgPickerOpen(true))}>
+          <BgColorsOutlined /> Hình nền
         </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setProfileDropdownOpen(false);
-            setAiModalOpen(true);
-          }}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-semibold text-slate-200 hover:text-white hover:bg-white/8 transition-all text-left cursor-pointer group"
-        >
-          <div className="w-8 h-8 rounded-lg bg-cyan-500/15 text-cyan-400 flex items-center justify-center border border-cyan-500/20 group-hover:scale-105 transition-transform shrink-0">
-            <RobotOutlined />
-          </div>
-          <span className="flex-1">Cấu hình AI (Gemini)</span>
+        <button type="button" className="udm-item" onClick={closeMenuThen(() => setAiModalOpen(true))}>
+          <RobotOutlined /> Cấu hình AI (Gemini)
         </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setProfileDropdownOpen(false);
-            navigate('/dashboard/logs');
-          }}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-semibold text-slate-200 hover:text-white hover:bg-white/8 transition-all text-left cursor-pointer group"
-        >
-          <div className="w-8 h-8 rounded-lg bg-amber-500/15 text-amber-400 flex items-center justify-center border border-amber-500/20 group-hover:scale-105 transition-transform shrink-0">
-            <CodeOutlined />
-          </div>
-          <span className="flex-1">Nhật ký hệ thống</span>
+        <button type="button" className="udm-item" onClick={closeMenuThen(() => navigate('/dashboard/logs'))}>
+          <CodeOutlined /> Nhật ký hệ thống
         </button>
       </div>
 
-      {/* Subtle Divider */}
-      <div className="border-t border-white/10 my-1" />
+      <div className="udm-list udm-list-last">
+        <button
+          type="button"
+          className="udm-item udm-item-danger"
+          onClick={closeMenuThen(() => {
+            logout();
+            navigate('/login');
+          })}
+        >
+          <LogoutOutlined /> Đăng xuất
+        </button>
+      </div>
 
-      {/* Logout Button */}
-      <button
-        type="button"
-        onClick={() => {
-          setProfileDropdownOpen(false);
-          logout();
-          navigate('/login');
-        }}
-        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-bold text-rose-200 hover:text-white bg-rose-500/12 hover:bg-rose-500/22 border border-rose-500/25 hover:border-rose-500/40 transition-all text-left cursor-pointer mt-1"
-      >
-        <div className="w-8 h-8 rounded-lg bg-rose-500/20 text-rose-300 flex items-center justify-center shrink-0">
-          <LogoutOutlined />
-        </div>
-        <span>Đăng xuất tài khoản</span>
-      </button>
+      <AppVersion className="udm-version" />
     </div>
   );
 
@@ -561,6 +497,7 @@ const DashboardLayout = () => {
           className="app-main-menu app-main-menu-text"
         />
       </div>
+      <AppVersion compact={collapsed && isDesktop} className="app-sidebar-version" />
     </Flex>
   );
 

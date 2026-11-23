@@ -17,6 +17,7 @@ import {
   Table,
   Popconfirm,
   Alert,
+  Dropdown,
 } from 'antd';
 import {
   SearchOutlined,
@@ -44,7 +45,6 @@ import {
   CompassOutlined,
   FolderOpenOutlined,
   ArrowLeftOutlined,
-  TrophyOutlined,
   AimOutlined,
   DeleteOutlined,
   FacebookFilled,
@@ -1962,39 +1962,8 @@ export default function ViralHunter() {
     <div className="group-hunter-content pb-12 animate-fade-in">
       {/* Box Săn Bài & Tìm Nhóm Chính */}
       <section className="group-hunter-setup">
-        <div className="group-hunter-section-head">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[11px] font-bold tracking-wider uppercase text-blue-400 bg-blue-500/10 border border-blue-500/25 px-2 py-0.5 rounded-md">
-                Săn Bài Viral
-              </span>
-            </div>
-            <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">
-              {hunterMode === 'DISCOVER_GROUPS'
-                ? 'Khám phá cộng đồng Facebook'
-                : hunterMode === 'TARGET_SOURCES'
-                ? 'Cào bài theo nguồn chỉ định'
-                : 'Săn bài viết theo chủ đề'}
-            </h3>
-            <p className="text-slate-400 text-xs sm:text-sm max-w-2xl leading-normal mt-0.5">
-              {hunterMode === 'DISCOVER_GROUPS'
-                ? 'Tìm kiếm và chọn lọc các nhóm Facebook chất lượng cao theo chủ đề.'
-                : hunterMode === 'TARGET_SOURCES'
-                ? 'Trích xuất bài viết mới nhất trực tiếp từ link Group hoặc Fanpage mục tiêu.'
-                : 'Tìm kiếm bài viết có tương tác cao từ Facebook, Threads và TikTok.'}
-            </p>
-          </div>
-
-          {activeCookieAcc && (
-            <span className="group-hunter-account">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Cookie: <b>{activeCookieAcc.pageName}</b></span>
-            </span>
-          )}
-        </div>
-
-        {/* Chuyển đổi 3 Chế Độ: Tab Pill Tinh Gọn */}
-        <div className="px-6 pt-4 pb-1">
+        {/* Chế độ + cookie đang dùng — 1 hàng gọn, không lặp lại tiêu đề trang */}
+        <div className="vh-mode-row">
           <div className="inline-flex p-1 rounded-xl bg-slate-950/80 border border-slate-800/80 backdrop-blur-md gap-1 flex-wrap">
             <button
               type="button"
@@ -2035,67 +2004,23 @@ export default function ViralHunter() {
               <span>Nguồn chỉ định</span>
             </button>
           </div>
+          {activeCookieAcc && (
+            <span className="vh-cookie" title="Nick dùng cookie để quét">
+              <span className="vh-cookie-dot" />
+              {activeCookieAcc.pageName}
+            </span>
+          )}
         </div>
 
         {/* ────────── CHẾ ĐỘ 1: TÌM KIẾM GROUP THEO KEYWORD ────────── */}
         {hunterMode === 'DISCOVER_GROUPS' && (
           <div className="p-5 sm:p-6 space-y-4">
-            {/* GỢI Ý CHỦ ĐỀ MẪU */}
-            <div className="flex items-center justify-between flex-wrap gap-2 p-2.5 sm:p-3 rounded-xl bg-slate-900/50 border border-slate-800/80">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-slate-400 text-xs font-semibold">Chủ đề mẫu:</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCategoryFilter('PHIM');
-                    setGroupKeyword('Review phim');
-                  }}
-                  className={`px-3 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer border ${
-                    categoryFilter === 'PHIM'
-                      ? 'bg-blue-600/20 text-blue-300 border-blue-500/40'
-                      : 'bg-slate-800/60 text-slate-400 hover:text-white border-slate-700/60'
-                  }`}
-                >
-                  <span>🎬 Phim ảnh</span>
-                  <span className="text-[11px] opacity-75">({INITIAL_GROUPS.filter(g => g.category === 'PHIM').length})</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCategoryFilter('PETS');
-                    setGroupKeyword('Yêu chó mèo');
-                  }}
-                  className={`px-3 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer border ${
-                    categoryFilter === 'PETS'
-                      ? 'bg-emerald-600/20 text-emerald-300 border-emerald-500/40'
-                      : 'bg-slate-800/60 text-slate-400 hover:text-white border-slate-700/60'
-                  }`}
-                >
-                  <span>🐱 Thú cưng</span>
-                  <span className="text-[11px] opacity-75">({INITIAL_GROUPS.filter(g => g.category === 'PETS').length})</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setCategoryFilter('ALL')}
-                  className={`px-3 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer border ${
-                    categoryFilter === 'ALL'
-                      ? 'bg-slate-800 text-white border-slate-600'
-                      : 'bg-slate-900/40 text-slate-500 hover:text-slate-300 border-slate-800'
-                  }`}
-                >
-                  Tất cả ({discoveredGroups.length})
-                </button>
-              </div>
-            </div>
-
             {/* Ô TÌM KIẾM + CHỌN SỐ LƯỢNG QUÉT */}
             <div className="flex flex-col sm:flex-row items-stretch gap-2.5">
               <div className="flex-1 relative">
                 <Input
                   size="large"
-                  placeholder="Nhập từ khóa tìm group (review phim, thú cưng, ẩm thực, khởi nghiệp...)"
+                  placeholder="Tìm nhóm theo từ khoá"
                   value={groupKeyword}
                   onChange={(e) => setGroupKeyword(e.target.value)}
                   onPressEnter={() => handleSearchGroups()}
@@ -2160,6 +2085,21 @@ export default function ViralHunter() {
             {/* Thanh Bộ Lọc Chất Lượng Nhóm */}
             <div className="pt-2.5 border-t border-slate-800/70 flex flex-wrap items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-4 flex-wrap">
+                <Segmented
+                  size="small"
+                  value={categoryFilter}
+                  onChange={(v) => {
+                    const val = v as typeof categoryFilter;
+                    setCategoryFilter(val);
+                    if (val === 'PHIM') setGroupKeyword('Review phim');
+                    if (val === 'PETS') setGroupKeyword('Yêu chó mèo');
+                  }}
+                  options={[
+                    { value: 'ALL', label: `Tất cả (${discoveredGroups.length})` },
+                    { value: 'PHIM', label: 'Phim ảnh' },
+                    { value: 'PETS', label: 'Thú cưng' },
+                  ]}
+                />
                 <div className="flex items-center gap-1.5">
                   <span className="text-slate-400">Quy mô:</span>
                   <Select
@@ -2181,7 +2121,7 @@ export default function ViralHunter() {
                   onChange={(e) => setFilterSpamGroups(e.target.checked)}
                   className="text-xs text-slate-300"
                 >
-                  Lọc nhóm rác / thanh lý
+                  Lọc nhóm rác
                 </Checkbox>
 
                 <Checkbox
@@ -2194,7 +2134,7 @@ export default function ViralHunter() {
               </div>
 
               <div className="text-xs text-slate-400">
-                Hiển thị <span className="text-blue-400 font-bold">{filteredGroups.length}</span> / {discoveredGroups.length} nhóm
+                {filteredGroups.length}/{discoveredGroups.length} nhóm
               </div>
             </div>
 
@@ -2205,7 +2145,6 @@ export default function ViralHunter() {
                   <span className="text-[13px] font-bold text-amber-400 flex items-center gap-1.5">
                     <StarFilled /> Nhóm bạn đã lưu ({savedGroups.length}):
                   </span>
-                  <span className="text-xs text-slate-300">Bấm nút "Quét bài hay" để cào nội dung ngay</span>
                 </div>
                 <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin">
                   {savedGroups.map((g) => (
@@ -2766,12 +2705,8 @@ export default function ViralHunter() {
           {/* Thanh công cụ kết quả */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3 sm:p-3.5 rounded-2xl bg-slate-900/80 backdrop-blur-xl border border-white/10 shadow-lg">
             <div className="flex items-center gap-3 flex-wrap">
-              <span className="text-sm font-bold text-white flex items-center gap-2">
-                <TrophyOutlined className="text-amber-400 text-base" />
-                Cộng đồng Facebook: <span className="text-blue-400 font-semibold">"{groupKeyword}"</span>
-              </span>
-              <span className="text-xs font-mono font-medium px-2 py-0.5 rounded-md bg-white/[0.06] text-slate-300 border border-white/10">
-                {filteredGroups.length} nhóm
+              <span className="text-sm font-semibold text-white">
+                {filteredGroups.length} nhóm{groupKeyword ? <span className="text-slate-400 font-normal"> · “{groupKeyword}”</span> : null}
               </span>
 
               {/* Chế độ xem: Bảng vs Thẻ */}
@@ -2801,48 +2736,20 @@ export default function ViralHunter() {
               </div>
             </div>
 
-            {/* Các tiện ích tra cứu & Xuất file */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <Button
-                size="middle"
-                icon={<FileExcelOutlined className="text-emerald-400" />}
-                onClick={handleExportExcelFile}
-                className="bg-emerald-950/60 text-emerald-300 border-emerald-700/60 hover:bg-emerald-900/60 hover:border-emerald-500 hover:text-white text-xs h-8.5 rounded-xl font-medium shadow-sm"
-                title="Tải về file Excel (.xlsx)"
-              >
-                Xuất Excel
-              </Button>
-
-              <Button
-                size="middle"
-                icon={<CopyOutlined />}
-                onClick={handleCopyGroupsList}
-                className="bg-slate-800/80 hover:bg-slate-800 text-slate-200 border-slate-700 hover:border-slate-500 hover:text-white text-xs h-8.5 rounded-xl font-medium"
-                title="Sao chép toàn bộ link và tên nhóm"
-              >
-                Copy link
-              </Button>
-
-              <Button
-                size="middle"
-                icon={<ShareAltOutlined />}
-                onClick={handleCopyGroupsExcel}
-                className="bg-slate-800/80 hover:bg-slate-800 text-slate-200 border-slate-700 hover:border-slate-500 hover:text-white text-xs h-8.5 rounded-xl font-medium"
-                title="Sao chép dạng bảng để dán vào Sheets/Excel"
-              >
-                Dán Sheets
-              </Button>
-
-              <Button
-                size="middle"
-                icon={<FileTextOutlined />}
-                onClick={() => setQuickTextModalOpen(true)}
-                className="bg-slate-800/80 hover:bg-slate-800 text-slate-200 border-slate-700 hover:border-slate-500 hover:text-white text-xs h-8.5 rounded-xl font-medium"
-                title="Mở hộp thoại xem danh sách văn bản"
-              >
-                Xem text
-              </Button>
-            </div>
+            {/* Xuất danh sách nhóm: gộp 4 nút thành 1 menu */}
+            <Dropdown
+              trigger={['click']}
+              menu={{
+                items: [
+                  { key: 'excel', icon: <FileExcelOutlined />, label: 'Tải file Excel', onClick: handleExportExcelFile },
+                  { key: 'copy', icon: <CopyOutlined />, label: 'Chép tên + link', onClick: handleCopyGroupsList },
+                  { key: 'sheets', icon: <ShareAltOutlined />, label: 'Chép dạng bảng (dán Sheets)', onClick: handleCopyGroupsExcel },
+                  { key: 'text', icon: <FileTextOutlined />, label: 'Xem dạng văn bản', onClick: () => setQuickTextModalOpen(true) },
+                ],
+              }}
+            >
+              <Button size="middle" icon={<FileExcelOutlined />}>Xuất danh sách</Button>
+            </Dropdown>
           </div>
 
           {/* ── CHẾ ĐỘ 1: BẢNG TRA CỨU NHANH (FROSTED GLASS TABLE) ── */}
@@ -2872,7 +2779,7 @@ export default function ViralHunter() {
                     ),
                   },
                   {
-                    title: 'Tên Nhóm Facebook',
+                    title: 'Nhóm',
                     key: 'name',
                     render: (_, record) => {
                       const isSaved = savedGroups.some((g) => g.url === record.url || g.id === record.id);
@@ -2898,25 +2805,8 @@ export default function ViralHunter() {
                               </a>
                               {isSaved && <StarFilled className="text-amber-400 text-xs shrink-0" />}
                             </div>
-                            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                              <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-slate-800 text-slate-200 border border-white/10">
-                                {record.privacy || 'Công khai'}
-                              </span>
-                              {record.category === 'PHIM' && (
-                                <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-rose-950/60 text-rose-300 border border-rose-800/60">
-                                  🎬 Phim
-                                </span>
-                              )}
-                              {record.category === 'PETS' && (
-                                <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-800/60">
-                                  🐱 Thú Cưng
-                                </span>
-                              )}
-                              {record.qualityBadge && (
-                                <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-amber-950/50 text-amber-300 border border-amber-800/50">
-                                  {record.qualityBadge}
-                                </span>
-                              )}
+                            <div className="text-xs text-slate-400 mt-0.5">
+                              {[record.privacy || 'Công khai', record.category === 'PHIM' ? 'Phim' : record.category === 'PETS' ? 'Thú cưng' : null].filter(Boolean).join(' · ')}
                             </div>
                           </div>
                         </div>
@@ -2924,7 +2814,7 @@ export default function ViralHunter() {
                     },
                   },
                   {
-                    title: 'Đường Dẫn (Link Group)',
+                    title: 'Link',
                     key: 'url',
                     render: (_, record) => (
                       <div className="flex items-center gap-1.5 font-mono text-xs">
@@ -2953,7 +2843,7 @@ export default function ViralHunter() {
                     ),
                   },
                   {
-                    title: 'Số Member',
+                    title: 'Thành viên',
                     key: 'members',
                     width: 140,
                     sorter: (a, b) => (a.memberCount || 0) - (b.memberCount || 0),
@@ -2962,9 +2852,6 @@ export default function ViralHunter() {
                         <span className="text-sm font-bold text-white tracking-tight">
                           {formatMemberDisplay(record)}
                         </span>
-                        <div className="text-xs text-slate-300 font-medium">
-                          {record.privacy === 'Riêng tư' ? 'Nhóm kín' : 'Cộng đồng mở'}
-                        </div>
                       </div>
                     ),
                   },
