@@ -1349,6 +1349,15 @@ public class PostQueueService {
         }
     }
 
+    /**
+     * Khoá "worker ưu tiên" theo NICK (c_user), không theo connectionId: mọi Page/Group của cùng 1 nick
+     * luôn rơi vào cùng 1 worker, nên khoá AsyncPostingLock (theo c_user, nằm trong từng tiến trình worker)
+     * chặn được 2 phiên song song của cùng nick. Trước đây ~35 connection của cùng nick rải đều 3 worker.
+     */
+    static String workerAffinityKey(SocialAccount account) {
+        return account != null ? NickThrottleService.nickKey(account) : null;
+    }
+
     private String publishViaPlaywrightWorker(SocialAccount account, PostQueue post, String content) {
         List<String> mediaUrls = parseMediaUrls(post.getMediaUrls());
         log.info("📦 [PLAYWRIGHT ENGINE] Gửi {} media trong cùng một bài Facebook (postType: {}).", mediaUrls.size(), post.getPostType());
@@ -1362,7 +1371,7 @@ public class PostQueueService {
                                         String originalUrl, String affiliateLink, String postType, String targetFanpageId) {
         String finalFanpageId = (targetFanpageId != null && !targetFanpageId.isBlank()) ? targetFanpageId : account.getPlatformAccountId();
         log.info("🎭 [PLAYWRIGHT ENGINE] Đang gửi yêu cầu đăng bài tự động qua Playwright Worker cho Fanpage ID {}...", finalFanpageId);
-        String playwrightUrl = workerRouterService.getPostingWorkerUrl("/api/post-facebook", account != null ? String.valueOf(account.getId()) : null);
+        String playwrightUrl = workerRouterService.getPostingWorkerUrl("/api/post-facebook", workerAffinityKey(account));
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
@@ -1457,7 +1466,7 @@ public class PostQueueService {
 
     private String publishTikTokPost(SocialAccount account, PostQueue post, String content, List<String> mediaUrls) {
         log.info("🎵 [TIKTOK ENGINE] Đang gửi yêu cầu đăng bài TikTok qua Playwright Worker cho Account ID {}...", account.getId());
-        String playwrightUrl = workerRouterService.getPostingWorkerUrl("/api/post-tiktok", account != null ? String.valueOf(account.getId()) : null);
+        String playwrightUrl = workerRouterService.getPostingWorkerUrl("/api/post-tiktok", workerAffinityKey(account));
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
@@ -1492,7 +1501,7 @@ public class PostQueueService {
 
     private String publishThreadsPost(SocialAccount account, PostQueue post, String content, List<String> mediaUrls) {
         log.info("🧵 [THREADS ENGINE] Đang gửi yêu cầu đăng bài Threads qua Playwright Worker cho Account ID {}...", account.getId());
-        String playwrightUrl = workerRouterService.getPostingWorkerUrl("/api/post-threads", account != null ? String.valueOf(account.getId()) : null);
+        String playwrightUrl = workerRouterService.getPostingWorkerUrl("/api/post-threads", workerAffinityKey(account));
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
@@ -1617,7 +1626,7 @@ public class PostQueueService {
      * Playwright/cookie với publishViaPlaywrightWorker, chỉ khác endpoint worker được gọi.
      */
     private void publishReelWithGroupsViaWorker(SocialAccount account, PostQueue post, String content, String videoUrl) {
-        String playwrightUrl = workerRouterService.getPostingWorkerUrl("/api/post-facebook-reel-groups", account != null ? String.valueOf(account.getId()) : null);
+        String playwrightUrl = workerRouterService.getPostingWorkerUrl("/api/post-facebook-reel-groups", workerAffinityKey(account));
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
@@ -1904,7 +1913,7 @@ public class PostQueueService {
 
     private GroupPublishResult sendToFacebookGroupWorker(SocialAccount account, String content, List<String> mediaUrls,
                                             String originalUrl, String targetGroupId, String affiliateLink, boolean isAnonymous, PostQueue post) {
-        String playwrightUrl = workerRouterService.getPostingWorkerUrl("/api/post-facebook-group", account != null ? String.valueOf(account.getId()) : null);
+        String playwrightUrl = workerRouterService.getPostingWorkerUrl("/api/post-facebook-group", workerAffinityKey(account));
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
@@ -2139,7 +2148,7 @@ public class PostQueueService {
     }
 
     public void publishStoryViaWorker(SocialAccount account, String mediaUrl, String originalUrl, String affiliateLink) {
-        String playwrightUrl = workerRouterService.getPostingWorkerUrl("/api/post-story", account != null ? String.valueOf(account.getId()) : null);
+        String playwrightUrl = workerRouterService.getPostingWorkerUrl("/api/post-story", workerAffinityKey(account));
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 

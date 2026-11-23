@@ -137,6 +137,13 @@ public class CampaignScheduler {
     }
 
     static String publishingIdentityKey(SocialAccount account) {
+        // Mọi connection mang cookie có c_user (PERSONAL_COOKIE, PERSONAL_PROFILE_COOKIE, kết nối đăng nhóm
+        // ẩn danh…) đều là CÙNG 1 nick → chung 1 làn. Trước đây chỉ PERSONAL_COOKIE mới khoá theo c_user,
+        // nên conn 35 "Thành An" (đăng nhóm) chạy song song với các Page của chính nick đó.
+        String cUserIdentity = extractCookieValue(account.getAccessToken(), "c_user");
+        if (cUserIdentity != null && !cUserIdentity.isBlank()) {
+            return "facebook-cookie:" + sha256(cUserIdentity);
+        }
         if ("PERSONAL_COOKIE".equalsIgnoreCase(account.getAccountType())) {
             String cookieIdentity = extractCookieValue(account.getAccessToken(), "c_user");
             if (cookieIdentity == null || cookieIdentity.isBlank()) {
@@ -239,6 +246,14 @@ public class CampaignScheduler {
     private final Map<String, Long> targetsCurrentlyPublishing = new ConcurrentHashMap<>();
     // Thời điểm mỗi target (Fanpage/Group) đăng xong bài gần nhất
     private final Map<String, Long> lastPublishFinishedAtByTarget = new ConcurrentHashMap<>();
+    // Post ID đang giữ khoá của từng làn/target — để bộ dọn khoá kẹt KHÔNG nhả khoá khi bài vẫn đang
+    // thật sự chạy (PostQueueService.isInFlight). 1 bài Page + nhiều nhóm có thể chạy > 5 phút.
+    private final Map<String, Long> postIdHoldingAccountLock = new ConcurrentHashMap<>();
+    private final Map<String, Long> postIdHoldingTargetLock = new ConcurrentHashMap<>();
+    /** Khoá đã giữ quá mốc này mà bài KHÔNG còn in-flight → coi là kẹt (worker read timeout là 600s). */
+    static final long LANE_LOCK_STALE_MS = 660_000;
+    /** Mốc tuyệt đối: dù còn in-flight, quá 45 phút vẫn nhả để không treo làn vĩnh viễn. */
+    static final long LANE_LOCK_HARD_LIMIT_MS = 45 * 60_000;
 
     // 2. Tiến trình tự động đăng bài theo lịch đặt trước mỗi 5 giây (siêu nhạy, đúng giờ là chạy ngay).
     @Scheduled(fixedRate = 5000)
@@ -250,28 +265,24 @@ public class CampaignScheduler {
             return;
         }
 
-        // Tự động dọn dẹp khóa nếu bị kẹt quá 5 phút
+        // Tự động dọn dẹp khóa kẹt — nhưng KHÔNG nhả khi bài giữ khoá vẫn đang chạy thật (in-flight).
         long nowMs = System.currentTimeMillis();
-        accountsCurrentlyPublishing.entrySet().removeIf(entry -> {
-            boolean stale = (nowMs - entry.getValue() > 300_000);
-            if (stale) {
-                log.warn("⚠️ Khóa đăng của account '{}' bị kẹt quá 5 phút — tự động giải phóng để thông hàng đợi.", entry.getKey());
-            }
-            return stale;
-        });
-        targetsCurrentlyPublishing.entrySet().removeIf(entry -> {
-            boolean stale = (nowMs - entry.getValue() > 300_000);
-            if (stale) {
-                log.warn("⚠️ Khóa đăng của target '{}' bị kẹt quá 5 phút — tự động giải phóng để thông hàng đợi.", entry.getKey());
-            }
-            return stale;
-        });
+        accountsCurrentlyPublishing.entrySet().removeIf(entry ->
+                releaseIfStale("account", entry.getKey(), entry.getValue(), postIdHoldingAccountLock, nowMs));
+        targetsCurrentlyPublishing.entrySet().removeIf(entry ->
+                releaseIfStale("target", entry.getKey(), entry.getValue(), postIdHoldingTargetLock, nowMs));
 
         List<PostQueue> pendingPosts = postQueueRepository
                 .findByStatusAndScheduledAtBeforeOrderByScheduledAtAscIdAsc("PENDING", now);
 
         if (pendingPosts.isEmpty()) {
             return;
+        }
+        if (pendingPosts.size() >= PENDING_PAGE_SIZE) {
+            // Trang 100 bài cũ nhất đã đầy: có thể 1 nick đang nghỉ (throttle) chiếm hết, làm các nick khác
+            // "vô hình". Bổ sung bài sớm nhất của TỪNG target để làn nào cũng được xét trong tick này.
+            pendingPosts = mergeLaneHeads(pendingPosts,
+                    postQueueRepository.findOverduePendingHeadPerTarget(now));
         }
 
         if (accountsCurrentlyPublishing.size() >= MAX_PARALLEL_ACCOUNTS) {
@@ -305,19 +316,18 @@ public class CampaignScheduler {
             // 1. Nếu là CÙNG 1 Target (Fanpage/Group) thì giãn cách 10 giây để trang nghỉ nhẹ.
             // 2. Nếu là Target KHÁC NHAU (Group khác / Page khác) của cùng via: chỉ cần 3 giây sau khi bài trước đóng trình duyệt.
             // 3. Nếu bài đã trễ hạn quá 1 phút: ưu tiên đăng bù ngay lập tức, không chờ giãn cách.
-            boolean isOverdue = firstPost.getScheduledAt() != null && firstPost.getScheduledAt().isBefore(now.minusMinutes(1));
+            // 3. Bài trễ hạn KHÔNG còn được bỏ qua giãn cách: trước đây làn bị trễ sẽ đăng dồn liên tiếp
+            //    (không nghỉ) tới khi chạm trần bài/giờ — đúng kiểu nhịp làm Facebook giới hạn tần suất.
+            //    Giờ mọi bài cùng nick đều phải cách bài trước ≥ minGapSeconds (Cài đặt lịch), tối thiểu 3s.
             Long lastTargetFinished = lastPublishFinishedAtByTarget.get(targetId);
             Long lastAccountFinished = lastPublishFinishedAt.get(accountKey);
 
-            if (!isOverdue) {
-                if (lastTargetFinished != null && (nowMs - lastTargetFinished < 10_000)) {
-                    // Cùng Group/Fanpage vừa đăng xong — nghỉ nhẹ 10s
-                    continue;
-                }
-                if (lastAccountFinished != null && (nowMs - lastAccountFinished < 3_000)) {
-                    // Trình duyệt vừa đóng — nghỉ 3s để giải phóng tài nguyên
-                    continue;
-                }
+            if (lastTargetFinished != null && (nowMs - lastTargetFinished < 10_000)) {
+                // Cùng Group/Fanpage vừa đăng xong — nghỉ nhẹ 10s
+                continue;
+            }
+            if (lastAccountFinished != null && (nowMs - lastAccountFinished < sameNickGapMs())) {
+                continue;
             }
 
             // Nick đang bị Facebook giới hạn tần suất hoặc đã chạm trần bài/giờ → để bài chờ tick sau (không đổi lịch).
@@ -338,6 +348,8 @@ public class CampaignScheduler {
                 targetsCurrentlyPublishing.remove(targetId);
                 continue;
             }
+            postIdHoldingAccountLock.put(accountKey, firstPost.getId());
+            postIdHoldingTargetLock.put(targetId, firstPost.getId());
             nickThrottleService.recordStart(nickKey, nowMs);
 
             log.info("🚀 [Scheduler] Đang tự động xử lý Post ID {} (Tên: '{}') cho account '{}' vào target '{}' (nick đã đăng {}/{} bài trong 60 phút)...",
@@ -355,15 +367,66 @@ public class CampaignScheduler {
                         long doneTime = System.currentTimeMillis();
                         lastPublishFinishedAt.put(accountKey, doneTime);
                         lastPublishFinishedAtByTarget.put(targetId, doneTime);
-                        accountsCurrentlyPublishing.remove(accountKey);
-                        targetsCurrentlyPublishing.remove(targetId);
+                        releaseLaneLocks(accountKey, targetId, firstPost.getId());
                     }
                 });
             } catch (Exception submitErr) {
                 log.error("Không thể submit tác vụ đăng Post ID {}: {}", firstPost.getId(), submitErr.getMessage());
-                accountsCurrentlyPublishing.remove(accountKey);
-                targetsCurrentlyPublishing.remove(targetId);
+                releaseLaneLocks(accountKey, targetId, firstPost.getId());
             }
+        }
+    }
+
+    static final int PENDING_PAGE_SIZE = 100;
+
+    /** Giãn cách tối thiểu giữa 2 bài cùng nick: minGapSeconds trong Cài đặt lịch, không dưới 3s. */
+    long sameNickGapMs() {
+        long gapSeconds = 0;
+        try {
+            gapSeconds = postingWindowService.get().minGapSeconds();
+        } catch (Exception ignored) {
+            // Lỗi đọc cấu hình → dùng mức tối thiểu
+        }
+        return Math.max(3_000L, gapSeconds * 1000L);
+    }
+
+    /**
+     * Gộp danh sách bài đầu làn vào trang 100 bài cũ nhất (bỏ trùng theo ID), giữ thứ tự giờ hẹn rồi ID.
+     */
+    static List<PostQueue> mergeLaneHeads(List<PostQueue> oldestPage, List<PostQueue> laneHeads) {
+        if (laneHeads == null || laneHeads.isEmpty()) return oldestPage;
+        Map<Long, PostQueue> byId = new LinkedHashMap<>();
+        for (PostQueue p : oldestPage) byId.put(p.getId(), p);
+        for (PostQueue p : laneHeads) byId.putIfAbsent(p.getId(), p);
+        List<PostQueue> merged = new ArrayList<>(byId.values());
+        merged.sort(Comparator
+                .comparing(PostQueue::getScheduledAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(PostQueue::getId, Comparator.nullsLast(Comparator.naturalOrder())));
+        return merged;
+    }
+
+    /** Trả true (→ xoá khoá) nếu khoá đã kẹt: quá LANE_LOCK_STALE_MS mà bài không còn in-flight, hoặc quá mốc tuyệt đối. */
+    boolean releaseIfStale(String kind, String key, Long lockedAtMs, Map<String, Long> holderMap, long nowMs) {
+        long heldMs = nowMs - (lockedAtMs != null ? lockedAtMs : nowMs);
+        if (heldMs <= LANE_LOCK_STALE_MS) return false;
+        Long holderPostId = holderMap.get(key);
+        boolean stillRunning = holderPostId != null && postQueueService.isInFlight(holderPostId);
+        if (stillRunning && heldMs <= LANE_LOCK_HARD_LIMIT_MS) {
+            return false;
+        }
+        log.warn("⚠️ Khóa đăng {} '{}' (Post ID {}) giữ {} phút{} — tự động giải phóng để thông hàng đợi.",
+                kind, key, holderPostId, heldMs / 60_000, stillRunning ? " (vẫn in-flight, vượt mốc tuyệt đối)" : "");
+        holderMap.remove(key, holderPostId);
+        return true;
+    }
+
+    private void releaseLaneLocks(String accountKey, String targetId, Long postId) {
+        // Chỉ gỡ khoá nếu chính bài này đang giữ (tránh gỡ nhầm khoá của bài khác sau khi bị dọn kẹt).
+        if (postIdHoldingAccountLock.remove(accountKey, postId) || !postIdHoldingAccountLock.containsKey(accountKey)) {
+            accountsCurrentlyPublishing.remove(accountKey);
+        }
+        if (postIdHoldingTargetLock.remove(targetId, postId) || !postIdHoldingTargetLock.containsKey(targetId)) {
+            targetsCurrentlyPublishing.remove(targetId);
         }
     }
 
@@ -423,7 +486,7 @@ public class CampaignScheduler {
                 String key = publishingIdentityKey(candidate);
                 boolean isPublishing = accountsCurrentlyPublishing.containsKey(key);
                 Long lastFinished = lastPublishFinishedAt.get(key);
-                boolean inCooldown = (lastFinished != null && (System.currentTimeMillis() - lastFinished < MIN_MS_BETWEEN_POSTS_SAME_ACCOUNT));
+                boolean inCooldown = (lastFinished != null && (System.currentTimeMillis() - lastFinished < sameNickGapMs()));
                 boolean alreadyAssigned = assignedKeysInThisTick.contains(key);
                 String candidateNick = com.autopost.saas.service.NickThrottleService.nickKey(candidate);
                 boolean throttled = nickThrottleService.rateLimitedUntil(candidateNick, now) != null

@@ -3166,6 +3166,10 @@ app.post('/api/post-facebook', async (req, res) => {
       }
     }
 
+    // Cờ chặn click đúp/click lặp lại làm đăng 2 bài giống nhau. Khai báo TRƯỚC dismissPromoModal
+    // (trước đây `let` nằm sau các lần gọi → ReferenceError "Cannot access before initialization").
+    let postAlreadySubmitted = postedDirectly;
+
     // Hàm gỡ các popup/modal quảng bá của Facebook (VD: "Speak to people directly", "Rời khỏi trang?", v.v.)
     const dismissPromoModal = async () => {
       // 1. Popup "Speak to people directly" / "Make it easier for people to speak with you by adding a 'Call Now' button"
@@ -3224,33 +3228,58 @@ app.post('/api/post-facebook', async (req, res) => {
     };
 
     if (!postedDirectly) {
-      await page.waitForTimeout(5000);
-
-      console.log('[Playwright] 🚀 Bấm nút Bước 2 (Tiếp)...');
-      let clickedStep2Next = await clickVisibleButtonByText(page, /^(Tiếp|Next)$/i, composerMaxButtonY, activeDialog);
+      // Bước 2: phần lớn composer chỉ còn nút "Đăng" (2026-11: chỉ 4/52 lần có thêm nút "Tiếp").
+      // Trước đây chờ cứng 5s + dò "Tiếp" tới 25s → phí ~30s/bài. Giờ poll tới 15s, dừng ngay khi
+      // thấy nút Đăng (aria-label hoặc text), chỉ bấm "Tiếp" nếu nó thật sự xuất hiện.
+      // Chờ 2.5s cho màn Bước 1 chuyển hẳn, tránh bấm lại nút "Tiếp" cũ đang biến mất.
+      await page.waitForTimeout(2500);
+      const step2Deadline = Date.now() + 15000;
+      let clickedStep2Next = false;
+      while (Date.now() < step2Deadline) {
+        const step2Next = activeDialog.locator('div[role="button"][aria-label="Tiếp"], div[role="button"][aria-label="Next"]').filter({ hasNotText: /^(Đăng|Post)$/i });
+        if (await step2Next.first().isVisible().catch(() => false)) {
+          console.log('[Playwright] 🚀 Bấm nút Bước 2 (Tiếp)...');
+          clickedStep2Next = await clickVisibleButtonByText(page, /^(Tiếp|Next)$/i, composerMaxButtonY, activeDialog, 5000);
+          break;
+        }
+        const submitReady = await activeDialog.locator('div[role="button"][aria-label="Đăng"], div[role="button"][aria-label="Post"]').last().isVisible().catch(() => false)
+          || await activeDialog.locator('div[role="button"]').filter({ hasText: /^(Đăng|Post)$/i }).last().isVisible().catch(() => false);
+        if (submitReady) break;
+        const textNext = await activeDialog.locator('div[role="button"]').filter({ hasText: /^(Tiếp|Next)$/i }).last().isVisible().catch(() => false);
+        if (textNext) {
+          console.log('[Playwright] 🚀 Bấm nút Bước 2 (Tiếp)...');
+          clickedStep2Next = await clickVisibleButtonByText(page, /^(Tiếp|Next)$/i, composerMaxButtonY, activeDialog, 5000);
+          break;
+        }
+        await page.waitForTimeout(500);
+      }
       if (clickedStep2Next) {
         await page.waitForTimeout(4000);
       }
 
       await dismissPromoModal();
 
-      console.log('[Playwright] 🚀 Bấm nút Bước cuối (Đăng)...');
-      const preciseSubmitBtn = activeDialog.locator('div[role="button"][aria-label="Đăng"], div[role="button"][aria-label="Post"]').last();
-      await waitUntilEnabled(preciseSubmitBtn, page, 15000).catch(() => { });
-      if (await preciseSubmitBtn.isVisible().catch(() => false)) {
-        await preciseSubmitBtn.click({ force: true }).catch(() => { });
+      if (postAlreadySubmitted) {
+        console.log('[Playwright] ℹ️ Đã bấm Đăng trong lúc gỡ popup "Rời khỏi trang?" — bỏ qua Bước cuối để không đăng trùng.');
       } else {
-        await clickVisibleButtonByText(page, /^(Đăng|Post)$/i, composerMaxButtonY, activeDialog);
+        console.log('[Playwright] 🚀 Bấm nút Bước cuối (Đăng)...');
+        const preciseSubmitBtn = activeDialog.locator('div[role="button"][aria-label="Đăng"], div[role="button"][aria-label="Post"]').last();
+        await waitUntilEnabled(preciseSubmitBtn, page, 15000).catch(() => { });
+        postAlreadySubmitted = true;
+        if (await preciseSubmitBtn.isVisible().catch(() => false)) {
+          await preciseSubmitBtn.click({ force: true }).catch(() => { });
+        } else {
+          await clickVisibleButtonByText(page, /^(Đăng|Post)$/i, composerMaxButtonY, activeDialog);
+        }
+        await page.waitForTimeout(2000);
       }
-      await page.waitForTimeout(2000);
       await dismissPromoModal();
     } else {
       console.log('[Playwright] ✅ Đã bấm nút "Đăng" trực tiếp ở Bước 1. Đang chờ Facebook xử lý bài...');
       await page.waitForTimeout(2000);
     }
     await assertNoFacebookSpamBlock(page, postQueueId, 'Page: sau khi bấm Đăng');
-    // Cờ chặn click đúp/click lặp lại làm đăng 2 bài giống nhau
-    let postAlreadySubmitted = true;
+    postAlreadySubmitted = true;
 
     // Lưới an toàn dự phòng: nếu vẫn lỡ rẽ nhầm sang màn chọn nhóm (VD Facebook đổi cấu trúc DOM
     // lần nữa trong tương lai), không chọn nhóm nào — bấm "Xong" để thoát rồi bấm lại Đăng thật.
@@ -4943,7 +4972,11 @@ app.post('/api/post-facebook-group', async (req, res) => {
   let browser = null;
   let downloadedFilePaths = [];
   let anonymousSucceeded = false;
+  // Ảnh "tiến trình" trên luồng thành công chỉ chụp khi bật DEBUG_GROUP_SHOTS=1 (mỗi ảnh full-page
+  // tốn ~0.5-1s và 3 worker ghi đè cùng tên file). Ảnh lỗi / trước-sau khi bấm Đăng luôn được chụp.
+  const PROGRESS_SHOTS = new Set(['after_identity_check', 'dialog_opened', 'after_modal_identity_check', 'after_red_background', 'after_media_attached']);
   const debugShot = async (page, name) => {
+    if (PROGRESS_SHOTS.has(name) && process.env.DEBUG_GROUP_SHOTS !== '1') return;
     try { await page.screenshot({ path: path.join(DEBUG_OUTPUT_DIR, `debug_group_${name}.png`) }); } catch (e) { }
   };
   const saveComposerDebugArtifacts = async (page, name) => {
@@ -5331,6 +5364,11 @@ app.post('/api/post-facebook-group', async (req, res) => {
         const nonIUserCookies = currentCookies.filter(c => c.name !== 'i_user');
         await context.clearCookies();
         await context.addCookies(nonIUserCookies);
+        // Đã bỏ i_user → từ đây phiên là Nick cá nhân. Đặt cờ NGAY (không chờ thấy ô đăng bài):
+        // trước đây ô composer chưa kịp render sau 3.5s nên cờ vẫn false, bước "đổi danh tính trong
+        // Modal" chạy tiếp, không tìm thấy Trang, nhấn Escape → đóng luôn Modal → lỗi "Không tìm thấy
+        // ô nhập nội dung" (64/98 lỗi Group tới 2026-11-23).
+        fellBackToPersonal = true;
 
         console.log(`[Playwright][Group] 🌐 Mở lại Group dưới danh tính Cá nhân: ${groupUrl}`);
         await navigateFacebookSurface(page, groupUrl, `Group ${targetGroupId}`).catch(() => { });
@@ -5421,6 +5459,8 @@ app.post('/api/post-facebook-group', async (req, res) => {
             await page.waitForTimeout(2000);
             break;
           }
+          // Composer đã sẵn sàng (không có popup chen ngang) → thôi dò, tiết kiệm ~3s/bài.
+          if (await dialog.first().locator('div[role="textbox"]').first().isVisible().catch(() => false)) break;
           await page.waitForTimeout(600);
         }
 
@@ -5469,16 +5509,19 @@ app.post('/api/post-facebook-group', async (req, res) => {
         const modalPosterBtn = dialog.first().locator([
           'div[role="dialog"] div[aria-haspopup="menu"]',
           'div[role="dialog"] [aria-haspopup="dialog"]',
-          'div[role="dialog"] div[role="combobox"]',
-          'div[role="dialog"] div[role="button"]:not([aria-label*="Đóng"]):not([aria-label*="Close"]):not([aria-label*="close"]):not([aria-label*="đóng"])'
+          'div[role="dialog"] div[role="combobox"]'
+          // KHÔNG dùng fallback "bất kỳ div[role=button]" — nó bấm nhầm nút khác trong Modal (ảnh, cảm xúc…).
         ].join(', ')).first();
 
         let optionSelected = false;
+        let identityPopupOpened = false;
         if (await modalPosterBtn.isVisible().catch(() => false)) {
           const btnLabel = (await modalPosterBtn.getAttribute('aria-label').catch(() => '')) || '';
           if (!btnLabel.toLowerCase().includes('đóng') && !btnLabel.toLowerCase().includes('close')) {
+            const dialogCountBefore = await page.locator('div[role="dialog"]').count().catch(() => 0);
             await modalPosterBtn.click({ force: true }).catch(() => {});
             await page.waitForTimeout(2000);
+            identityPopupOpened = (await page.locator('div[role="dialog"]').count().catch(() => 0)) > dialogCountBefore;
 
             const escProfile = targetProfileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const profileRegex = new RegExp(escProfile, 'i');
@@ -5497,9 +5540,14 @@ app.post('/api/post-facebook-group', async (req, res) => {
           console.warn(`[Playwright][Group] ⚠️ Không tìm thấy option "${targetProfileName}" trong menu danh tính của Nhóm.`);
           if (req.body.allowPersonalFallback !== false) {
             console.log(`[Playwright][Group] ℹ️ Cho phép fallback cá nhân: tiếp tục đăng bài bằng tài khoản hiện tại.`);
-            // Đóng menu chọn danh tính (nếu đang mở) bằng Escape, KHÔNG click vào backdrop (10, 10) vì sẽ làm tắt Modal!
-            await page.keyboard.press('Escape').catch(() => {});
-            await page.waitForTimeout(600);
+            // Đóng menu chọn danh tính bằng Escape CHỈ KHI menu thật sự đang mở — Escape lúc không có
+            // menu sẽ đóng luôn Modal "Tạo bài viết". KHÔNG click backdrop (10, 10) vì cũng tắt Modal.
+            const identityMenuOpen = identityPopupOpened
+              || await page.locator('div[role="menu"], div[role="listbox"]').first().isVisible().catch(() => false);
+            if (identityMenuOpen) {
+              await page.keyboard.press('Escape').catch(() => {});
+              await page.waitForTimeout(600);
+            }
           } else {
             throw new Error(`Trang "${targetProfileName}" chưa gia nhập Nhóm hoặc không có quyền đăng bài trong Nhóm này. Vui lòng duyệt Trang vào Nhóm hoặc chọn tài khoản khác.`);
           }
@@ -5514,7 +5562,8 @@ app.post('/api/post-facebook-group', async (req, res) => {
       const reOpenBtn = await findVisibleCreatePostButton();
       if (reOpenBtn) {
         await reOpenBtn.click({ force: true }).catch(() => {});
-        await page.waitForTimeout(2500);
+        await dialog.first().locator('div[role="textbox"], [contenteditable="true"]').first()
+          .waitFor({ state: 'visible', timeout: 30000 }).catch(() => { });
       }
     }
 

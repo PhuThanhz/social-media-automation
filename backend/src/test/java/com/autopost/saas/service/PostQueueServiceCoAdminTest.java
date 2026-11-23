@@ -30,6 +30,15 @@ class PostQueueServiceCoAdminTest {
             new NickThrottleService(), mock(SocialAccountService.class));
 
     @Test
+    void workerAffinityIsPerNickNotPerConnection() {
+        // 2 Page khác nhau của cùng nick phải về cùng 1 worker (khoá c_user của worker nằm trong từng tiến trình).
+        String a = PostQueueService.workerAffinityKey(cookieAccount(7L, LAM_SEN, NICK_1));
+        String b = PostQueueService.workerAffinityKey(cookieAccount(98L, "61594906257820", NICK_1));
+        String c = PostQueueService.workerAffinityKey(cookieAccount(110L, LAM_SEN, NICK_2));
+        assertThat(a).isEqualTo(b).isNotEqualTo(c).doesNotContain(NICK_1);
+    }
+
+    @Test
     void coAdminViaWithoutConnectionForThisPageIsNotUsed() {
         // Nick 2 là admin Làm Sen nhưng chỉ có kết nối cho Page "BaT" → không được đem kết nối BaT ra đăng Làm Sen.
         List<SocialAccount> accounts = new ArrayList<>(List.of(

@@ -29,6 +29,23 @@ public interface PostQueueRepository extends JpaRepository<PostQueue, Long> {
     List<PostQueue> findByStatusAndScheduledAtBeforeOrderByScheduledAtAscIdAsc(@org.springframework.data.repository.query.Param("status") String status, @org.springframework.data.repository.query.Param("time") LocalDateTime time, Pageable pageable);
 
     /**
+     * Bài PENDING quá hạn SỚM NHẤT của từng target (Page/connection). Scheduler chỉ gọi khi trang 100 bài
+     * cũ nhất đã đầy, để 1 nick đang nghỉ có hàng trăm bài trễ không che mất các nick khác.
+     */
+    @Query("SELECT p FROM PostQueue p LEFT JOIN FETCH p.campaign c LEFT JOIN FETCH c.user u "
+            + "WHERE p.status = 'PENDING' AND p.scheduledAt < :time AND p.targetFanpageId IS NOT NULL "
+            + "AND p.id = (SELECT MIN(p2.id) FROM PostQueue p2 WHERE p2.status = 'PENDING' "
+            + "  AND p2.targetFanpageId = p.targetFanpageId "
+            + "  AND p2.scheduledAt = (SELECT MIN(p3.scheduledAt) FROM PostQueue p3 WHERE p3.status = 'PENDING' "
+            + "    AND p3.targetFanpageId = p.targetFanpageId AND p3.scheduledAt < :time)) "
+            + "ORDER BY p.scheduledAt ASC, p.id ASC")
+    List<PostQueue> findOverduePendingHeadPerTarget(@org.springframework.data.repository.query.Param("time") LocalDateTime time, Pageable pageable);
+
+    default List<PostQueue> findOverduePendingHeadPerTarget(LocalDateTime time) {
+        return findOverduePendingHeadPerTarget(time, org.springframework.data.domain.PageRequest.of(0, 300));
+    }
+
+    /**
      * Giới hạn an toàn mặc định 100 bài mỗi nhịp tick scheduler (5 giây) để bảo vệ JVM Heap & MySQL I/O.
      */
     default List<PostQueue> findByStatusAndScheduledAtBeforeOrderByScheduledAtAscIdAsc(String status, LocalDateTime time) {
