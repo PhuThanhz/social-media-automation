@@ -21,7 +21,7 @@ import {
   Tooltip,
   Upload,
 } from 'antd';
-import { DeleteOutlined, DownloadOutlined, KeyOutlined, ReloadOutlined, UploadOutlined, CloudUploadOutlined, UndoOutlined, RedoOutlined, QuestionCircleOutlined, PlusOutlined, PictureOutlined, FilterOutlined, TagsOutlined, AppstoreOutlined, PlayCircleOutlined, SoundOutlined, MutedOutlined, EyeInvisibleOutlined, RobotOutlined } from '@ant-design/icons';
+import { DeleteOutlined, DownloadOutlined, KeyOutlined, ReloadOutlined, UploadOutlined, CloudUploadOutlined, UndoOutlined, RedoOutlined, QuestionCircleOutlined, PlusOutlined, PictureOutlined, PlayCircleOutlined, SoundOutlined, MutedOutlined, EyeInvisibleOutlined, RobotOutlined } from '@ant-design/icons';
 import FacebookPostPreview from '../components/studio/FacebookPostPreview';
 import api from '../config/axios';
 import { getStoredGeminiKeys, saveStoredGeminiKeys } from '../components/modals/AiSettingsModal';
@@ -152,7 +152,6 @@ const ITEMS_KEY = 'newsCardStudio.items.v1';
 const DEFAULTS_KEY = 'newsCardStudio.defaults.v1';
 const PRESETS_KEY = 'newsCardStudio.presets.v1';
 const CUSTOM_FRAMES_KEY = 'newsCardStudio.customFrames.v1';
-const AI_KEY = 'newsCardStudio.geminiKey';
 const PREVIEW_MODE_KEY = 'newsCardStudio.previewMode';
 
 const DEFAULT_CUSTOM_FRAMES: CustomFramePreset[] = [
@@ -2410,120 +2409,122 @@ export default function NewsCardStudio() {
             <div className="text-xs text-slate-500 py-10 text-center">Chọn một bài đã cào xong để chỉnh</div>
           ) : (
             <>
-              {/* Thanh chọn Kênh & Mẫu nhanh trên đầu bộ soạn */}
-              <div className="flex flex-col gap-2 p-2.5 rounded-xl bg-slate-900 border border-slate-800">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <span className="text-xs font-semibold text-slate-300 shrink-0">Kênh:</span>
-                    <Select
-                      size="small"
-                      className="flex-1 text-xs"
-                      placeholder="Chọn Kênh thương hiệu..."
-                      value={active.channelId || (active.style.customFrameUrl ? customFrames.find((f) => f.url === active.style.customFrameUrl)?.id : undefined)}
-                      onChange={(val) => applyChannelToItem(active.id, val)}
-                      options={customFrames.map((f) => ({
-                        value: f.id,
-                        label: (
-                          <span className="flex items-center gap-1.5 truncate">
-                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: f.tagColor || '#3b82f6' }} />
-                            <span className="truncate">{f.name}</span>
-                          </span>
-                        ),
-                      }))}
-                    />
-                  </div>
+              {/* Kênh & Mẫu — hai hàng phẳng, nhãn thẳng cột */}
+              <div className="nc-panel-fields">
+                <div className="nc-field-row">
+                  <span className="nc-field-label">Kênh</span>
+                  <Select
+                    className="nc-field-select"
+                    placeholder="Chọn kênh thương hiệu"
+                    value={active.channelId || (active.style.customFrameUrl ? customFrames.find((f) => f.url === active.style.customFrameUrl)?.id : undefined)}
+                    onChange={(val) => applyChannelToItem(active.id, val)}
+                    options={customFrames.map((f) => ({
+                      value: f.id,
+                      label: (
+                        <span className="flex items-center gap-1.5 truncate">
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: f.tagColor || '#3b82f6' }} />
+                          <span className="truncate">{f.name}</span>
+                        </span>
+                      ),
+                    }))}
+                  />
                   {checkedItems.length > 1 && (
                     <Button
                       size="small"
-                      type="dashed"
+                      type="text"
+                      className="nc-field-extra"
                       onClick={applyCurrentChannelToAllChecked}
                       title={`Áp dụng khung và phong cách của kênh này cho tất cả ${checkedItems.length} bài đã chọn`}
                     >
-                      Gán Kênh ({checkedItems.length})
+                      Gán {checkedItems.length} bài
                     </Button>
                   )}
                 </div>
-
-                <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-800/60">
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <span className="text-xs font-semibold text-slate-300 shrink-0">Mẫu:</span>
-                    <Select
-                      size="small"
-                      className="flex-1 text-xs"
-                      value={normalizeTemplate(s.template)}
-                      onChange={(tVal) => {
-                        const tpl = tVal as CardTemplate;
-                        setStyle({
-                          template: tpl,
-                          ...(tpl === 'gradient'
-                            ? { useCustomFrame: false, bandBg: '#090d16', textColor: '#ffffff', accent: '#ec4899' }
-                            : {}),
-                        });
-                      }}
-                      options={TEMPLATES.map((t) => ({
-                        value: t.value,
-                        label: (
-                          <span className="flex items-center gap-1.5 truncate">
-                            {t.value === 'gradient' && <span className="text-pink-400">✨</span>}
-                            <span>{t.label}</span>
-                          </span>
-                        ),
-                      }))}
-                    />
-                  </div>
+                <div className="nc-field-row">
+                  <span className="nc-field-label">Mẫu</span>
+                  <Select
+                    className="nc-field-select"
+                    value={normalizeTemplate(s.template)}
+                    onChange={(tVal) => {
+                      const tpl = tVal as CardTemplate;
+                      setStyle({
+                        template: tpl,
+                        ...(tpl === 'gradient'
+                          ? { useCustomFrame: false, bandBg: '#090d16', textColor: '#ffffff', accent: '#ec4899' }
+                          : {}),
+                      });
+                    }}
+                    options={TEMPLATES.map((t) => ({ value: t.value, label: t.label }))}
+                  />
                   {checkedItems.length > 1 && (
                     <Button
                       size="small"
-                      type="dashed"
+                      type="text"
+                      className="nc-field-extra"
                       onClick={() => applyTemplateToChecked(normalizeTemplate(s.template))}
                       title={`Gán mẫu thiết kế này cho tất cả ${checkedItems.length} bài đã chọn`}
                     >
-                      Gán Mẫu ({checkedItems.length})
+                      Gán {checkedItems.length} bài
                     </Button>
                   )}
                 </div>
               </div>
 
-              <Button
-                type="primary"
-                block
-                loading={active.headlineLoading}
-                onClick={() => runPackage(active)}
-                className="!h-10 !rounded-xl !bg-gradient-to-r !from-blue-600 !via-indigo-600 !to-cyan-600 hover:!from-blue-500 hover:!to-cyan-500 !border-sky-400/30 !shadow-md !shadow-blue-600/20 font-bold text-xs sm:text-[13px] flex items-center justify-center gap-1.5 transition-all"
-                title="Tự động tạo tiêu đề, caption, tóm tắt và gợi ý nhãn"
-              >
-                <span className="text-sm">✨</span>
-                <span>AI Soạn bài tự động (Trọn gói)</span>
-              </Button>
-              {checkedItems.length > 1 && (
+              {/* Hành động chính: AI soạn trọn gói */}
+              <div className="nc-primary-block">
                 <Button
+                  type="primary"
                   block
-                  size="small"
                   icon={<RobotOutlined />}
-                  loading={batchCaptionLoading}
-                  onClick={runPackageForAllChecked}
-                  className="mt-1.5 !h-8 text-xs text-sky-300 !bg-sky-950/40 border-sky-500/30 hover:border-sky-400 !rounded-lg"
+                  loading={active.headlineLoading}
+                  onClick={() => runPackage(active)}
+                  className="nc-primary-action"
+                  title="Tự động tạo tiêu đề, caption, tóm tắt và gợi ý nhãn"
                 >
-                  {batchCaptionProgress || `AI soạn bài cho tất cả ${checkedItems.length} bài chọn`}
+                  AI soạn bài trọn gói
                 </Button>
-              )}
-              <div className="flex-1 min-h-0 flex flex-col">
+                <div className="nc-primary-hint">
+                  <span>Tiêu đề, caption, tóm tắt và nhãn trong một lần bấm</span>
+                  {checkedItems.length > 1 && (
+                    <Button
+                      size="small"
+                      type="link"
+                      className="nc-primary-batch"
+                      loading={batchCaptionLoading}
+                      onClick={runPackageForAllChecked}
+                    >
+                      {batchCaptionProgress || `Soạn cả ${checkedItems.length} bài chọn`}
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <div className="nc-tabs-wrap">
                 <Tabs
                   size="small"
                   activeKey={editorTab}
                   onChange={setEditorTab}
+                  tabBarGutter={0}
                   className="studio-editor-tabs"
                   items={[
                   {
                     key: 'content',
                     label: 'Nội dung',
                     children: (
-                      <div className="space-y-5 pb-2">
+                      <div className="nc-tab-body">
                         {/* Tiêu đề */}
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className={sectionTitle}>Tiêu đề trên ảnh</span>
-                            <Button size="small" icon={<ReloadOutlined />} loading={active.headlineLoading} onClick={() => generateHeadline(active)}>Chỉ viết lại tiêu đề</Button>
+                        <section className="nc-group">
+                          <div className="nc-group-head">
+                            <span className="nc-group-title">Tiêu đề trên ảnh</span>
+                            <Button
+                              size="small"
+                              type="text"
+                              icon={<ReloadOutlined />}
+                              loading={active.headlineLoading}
+                              onClick={() => generateHeadline(active)}
+                              title="Chỉ viết lại tiêu đề bằng AI, giữ nguyên caption"
+                            >
+                              AI viết lại
+                            </Button>
                           </div>
                           <TextArea
                             ref={headlineRef}
@@ -2538,48 +2539,18 @@ export default function NewsCardStudio() {
                           {(() => {
                             const words = active.headline.replace(/\[\[|\]\]/g, '').trim().split(/\s+/).filter(Boolean).length;
                             return (
-                              <div className="flex items-center justify-between mt-1 gap-2">
-                                <span className={`text-xs ${words > 40 ? 'text-amber-400' : 'text-slate-400'}`}>
-                                  {words} từ{words > 40 ? ' · hơi dài, chữ sẽ nhỏ' : ''} · bôi đen + Cmd/Ctrl+B để tô màu
+                              <div className="nc-headline-meta">
+                                <span className={words > 40 ? 'text-amber-400' : undefined}>
+                                  {words} từ{words > 40 ? ' · hơi dài, chữ sẽ nhỏ' : ''}
                                 </span>
-                                <Button size="small" onClick={highlightSelection}>Tô màu</Button>
+                                <Button size="small" onClick={highlightSelection} title="Bôi đen một cụm chữ trong ô tiêu đề rồi bấm (phím tắt Cmd/Ctrl+B)">
+                                  Tô màu cụm đã bôi đen
+                                </Button>
                               </div>
                             );
                           })()}
-
-                          {/* Chọn nhanh màu chữ chính & màu nhấn ngay tại tab Nội dung */}
-                          <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-800/80 text-xs text-slate-300 flex-wrap gap-2">
-                            <div className="flex items-center gap-1.5">
-                              <span>Màu chữ:</span>
-                              <ColorPicker size="small" value={s.textColor} onChange={(c) => setStyle({ textColor: c.toHexString() })} />
-                              {['#111827', '#ffffff', '#1e293b', '#0369a1'].map((c) => (
-                                <button
-                                  key={c}
-                                  type="button"
-                                  onClick={() => setStyle({ textColor: c })}
-                                  className={`w-4 h-4 rounded-full border cursor-pointer transition-transform ${s.textColor.toLowerCase() === c.toLowerCase() ? 'ring-2 ring-blue-500 scale-110 border-white' : 'border-slate-600 hover:scale-105'}`}
-                                  style={{ background: c }}
-                                  title={`Màu chữ ${c}`}
-                                />
-                              ))}
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                              <span>Màu nhấn [[ ]]:</span>
-                              <ColorPicker size="small" value={s.accent} onChange={(c) => setStyle({ accent: c.toHexString() })} />
-                              {['#e11d48', '#d97706', '#2563eb', '#16a34a'].map((c) => (
-                                <button
-                                  key={c}
-                                  type="button"
-                                  onClick={() => setStyle({ accent: c })}
-                                  className={`w-4 h-4 rounded-full border cursor-pointer transition-transform ${s.accent.toLowerCase() === c.toLowerCase() ? 'ring-2 ring-blue-500 scale-110 border-white' : 'border-slate-600 hover:scale-105'}`}
-                                  style={{ background: c }}
-                                  title={`Màu nhấn ${c}`}
-                                />
-                              ))}
-                            </div>
-                          </div>
                           {(active.aiError || active.headlineFromTitle || !active.headline.trim()) && !active.headlineLoading && (
-                            <div className="mt-2 text-xs rounded-lg p-2.5 bg-red-500/10 border border-red-500/30 text-red-300 space-y-1.5">
+                            <div className="text-xs rounded-lg p-2.5 bg-red-500/10 border border-red-500/30 text-red-300 space-y-1.5">
                               <div>
                                 {!active.headline.trim()
                                   ? 'Chưa có tiêu đề nên dải chữ trên ảnh đang trống.'
@@ -2599,29 +2570,60 @@ export default function NewsCardStudio() {
                               </div>
                             </div>
                           )}
-                          <div className="mt-2">
-                            <Button size="small" type="dashed" block loading={suggesting} onClick={() => suggestHeadlines(active)}>
-                              AI gợi ý 3 tiêu đề khác
-                            </Button>
-                            {(suggestions[active.id] || []).length > 0 && (
-                              <div className="mt-2 space-y-1.5">
-                                {suggestions[active.id].map((h) => (
-                                  <button
-                                    key={h}
-                                    type="button"
-                                    onClick={() => patchItem(active.id, { headline: h })}
-                                    className={`w-full text-left text-xs leading-snug p-2 rounded-md border cursor-pointer bg-transparent ${h === active.headline ? 'border-blue-500 text-slate-100' : 'border-slate-700 text-slate-300 hover:border-slate-500'}`}
-                                  >
-                                    {h.split(/(\[\[[\s\S]*?\]\])/g).map((part, i) => {
-                                      const m = part.match(/^\[\[([\s\S]*?)\]\]$/);
-                                      return m ? <span key={i} className="text-red-400 font-semibold">{m[1]}</span> : <span key={i}>{part}</span>;
-                                    })}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
+                        </section>
+
+                        {/* Màu tiêu đề: ô đầu là màu đang dùng (bấm để chọn màu bất kỳ), sau là màu nhanh */}
+                        <section className="nc-group">
+                          <div className="nc-group-head">
+                            <span className="nc-group-title">Màu tiêu đề</span>
                           </div>
-                        </div>
+                          {([
+                            { key: 'textColor', label: 'Chữ', value: s.textColor, presets: ['#111827', '#ffffff', '#1e293b', '#0369a1'], name: 'Màu chữ' },
+                            { key: 'accent', label: 'Nhấn [[ ]]', value: s.accent, presets: ['#e11d48', '#d97706', '#2563eb', '#16a34a'], name: 'Màu nhấn' },
+                          ] as const).map((row) => (
+                            <div key={row.key} className="nc-color-row">
+                              <span className="nc-color-label">{row.label}</span>
+                              <ColorPicker value={row.value} onChange={(c) => setStyle({ [row.key]: c.toHexString() })}>
+                                <button type="button" className="nc-swatch nc-swatch-current" style={{ background: row.value }} title={`${row.name} đang dùng — bấm để chọn màu bất kỳ`} />
+                              </ColorPicker>
+                              <span className="nc-color-sep" />
+                              {row.presets.map((c) => (
+                                <button
+                                  key={c}
+                                  type="button"
+                                  onClick={() => setStyle({ [row.key]: c })}
+                                  className={`nc-swatch${row.value.toLowerCase() === c.toLowerCase() ? ' is-active' : ''}`}
+                                  style={{ background: c }}
+                                  title={`${row.name} ${c}`}
+                                />
+                              ))}
+                            </div>
+                          ))}
+                        </section>
+
+                        {/* Gợi ý AI — phụ, để sau nội dung chính */}
+                        <section className="nc-group">
+                          <Button size="small" block icon={<RobotOutlined />} loading={suggesting} onClick={() => suggestHeadlines(active)}>
+                            AI gợi ý 3 tiêu đề khác
+                          </Button>
+                          {(suggestions[active.id] || []).length > 0 && (
+                            <div className="space-y-1.5">
+                              {suggestions[active.id].map((h) => (
+                                <button
+                                  key={h}
+                                  type="button"
+                                  onClick={() => patchItem(active.id, { headline: h })}
+                                  className={`w-full text-left text-xs leading-snug p-2 rounded-md border cursor-pointer bg-transparent ${h === active.headline ? 'border-blue-500 text-slate-100' : 'border-slate-700 text-slate-300 hover:border-slate-500'}`}
+                                >
+                                  {h.split(/(\[\[[\s\S]*?\]\])/g).map((part, i) => {
+                                    const m = part.match(/^\[\[([\s\S]*?)\]\]$/);
+                                    return m ? <span key={i} className="text-red-400 font-semibold">{m[1]}</span> : <span key={i}>{part}</span>;
+                                  })}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </section>
                       </div>
                     ),
                   },
@@ -2629,16 +2631,16 @@ export default function NewsCardStudio() {
                     key: 'images',
                     label: 'Ảnh',
                     children: (
-                      <div className="space-y-5 pb-2">
-                        {/* Ảnh */}
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className={sectionTitle}>Ảnh trong bài ({active.images.length})</span>
+                      <div className="nc-tab-body">
+                        <PanelGroup
+                          title={`Ảnh trong bài (${active.images.length})`}
+                          extra={
                             <Upload accept="image/*" showUploadList={false} beforeUpload={uploadImage}>
                               <Button size="small" icon={<UploadOutlined />}>Tải thêm</Button>
                             </Upload>
-                          </div>
-                          <div className="text-xs text-slate-400 mb-2">Bấm để chọn ảnh, chọn 2-4 ảnh để ghép. Số trên ảnh là thứ tự ghép.</div>
+                          }
+                          hint="Bấm để chọn, chọn 2–4 ảnh để ghép. Số trên ảnh là thứ tự ghép."
+                        >
                           <div className="grid grid-cols-4 gap-1.5 max-h-56 overflow-y-auto pr-1">
                             {active.images.map((url) => {
                               const idx = active.selectedImages.indexOf(url);
@@ -2678,14 +2680,13 @@ export default function NewsCardStudio() {
                               );
                             })}
                           </div>
-                        </div>
+                        </PanelGroup>
 
                         {active.selectedImages.length > 0 && (
-                          <div>
-                            <div className={`${sectionTitle} mb-1.5`}>Bố cục ảnh</div>
-                            {active.selectedImages.length === 1 && (
-                              <div className="text-xs text-slate-400">Chọn thêm 1-3 ảnh ở trên để có các kiểu ghép ảnh.</div>
-                            )}
+                          <PanelGroup
+                            title="Bố cục ghép ảnh"
+                            hint={active.selectedImages.length === 1 ? 'Chọn thêm 1–3 ảnh ở trên để có các kiểu ghép.' : undefined}
+                          >
                             {active.selectedImages.length > 1 && (
                               <>
                                 <div className="grid grid-cols-3 gap-1.5">
@@ -2704,37 +2705,34 @@ export default function NewsCardStudio() {
                                     );
                                   })}
                                 </div>
-                                <div className="mt-3 space-y-2.5">
-                                  <FieldSlider label="Khoảng cách giữa ảnh" value={s.photoGap ?? 8} unit="px" min={0} max={30} step={1} onChange={(v) => setStyle({ photoGap: v })} />
-                                  {active.layout !== 'diag2' && (
-                                    <FieldSlider label="Bo góc từng ảnh" value={s.photoRadius ?? 0} unit="px" min={0} max={48} step={2} onChange={(v) => setStyle({ photoRadius: v })} />
-                                  )}
-                                  <div>
-                                    <div className="text-xs text-slate-300 mb-1">Màu đường chia</div>
-                                    <Segmented
-                                      block
-                                      size="small"
-                                      value={s.gapColor || 'band'}
-                                      onChange={(v) => setStyle({ gapColor: v as CardStyle['gapColor'] })}
-                                      options={[{ value: 'band', label: 'Theo nền' }, { value: 'white', label: 'Trắng' }, { value: 'accent', label: 'Màu nhấn' }]}
-                                    />
-                                  </div>
-                                </div>
+                                <FieldSlider label="Khoảng cách giữa ảnh" value={s.photoGap ?? 8} unit="px" min={0} max={30} step={1} onChange={(v) => setStyle({ photoGap: v })} />
+                                {active.layout !== 'diag2' && (
+                                  <FieldSlider label="Bo góc từng ảnh" value={s.photoRadius ?? 0} unit="px" min={0} max={48} step={2} onChange={(v) => setStyle({ photoRadius: v })} />
+                                )}
+                                <PanelField label="Màu đường chia">
+                                  <Segmented
+                                    block
+                                    size="small"
+                                    value={s.gapColor || 'band'}
+                                    onChange={(v) => setStyle({ gapColor: v as CardStyle['gapColor'] })}
+                                    options={[{ value: 'band', label: 'Theo nền' }, { value: 'white', label: 'Trắng' }, { value: 'accent', label: 'Màu nhấn' }]}
+                                  />
+                                </PanelField>
                               </>
                             )}
-                          </div>
+                          </PanelGroup>
                         )}
 
-                        {/* Vừa khung */}
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className={sectionTitle}>Ảnh vừa khung</span>
-                            {active.fitManual ? (
-                              <button type="button" className="text-xs text-blue-400 bg-transparent border-0 p-0 cursor-pointer" onClick={() => patchItem(active.id, { fitManual: false })}>Để Studio tự chọn</button>
+                        <PanelGroup
+                          title="Ảnh vừa khung"
+                          extra={
+                            active.fitManual ? (
+                              <Button size="small" type="link" className="nc-group-link" onClick={() => patchItem(active.id, { fitManual: false })}>Để Studio tự chọn</Button>
                             ) : (
-                              <span className="text-xs text-slate-400">Tự chọn theo ảnh</span>
-                            )}
-                          </div>
+                              <span className="nc-group-note">Tự chọn theo ảnh</span>
+                            )
+                          }
+                        >
                           <Segmented
                             block
                             size="small"
@@ -2743,168 +2741,124 @@ export default function NewsCardStudio() {
                             options={[{ value: 'cover', label: 'Cắt đầy khung' }, { value: 'contain', label: 'Giữ đủ ảnh' }]}
                           />
                           {s.fit === 'cover' && (
-                            <div className="mt-2.5 space-y-2 pt-2 border-t border-slate-800/60">
-                              <div className="flex items-center justify-between text-xs text-slate-300">
-                                <span>Phần ảnh hiển thị (Trên / Dưới)</span>
-                                <span className="text-slate-300 font-mono text-xs">{s.focusY}%</span>
-                              </div>
-                              <div className="grid grid-cols-3 gap-1">
-                                <Button
-                                  size="small"
-                                  className={s.focusY <= 25 ? '!border-blue-500 !text-blue-300' : ''}
-                                  onClick={() => setStyle({ focusY: 10 })}
-                                >
-                                  ⬆ Lấy trên (Đầu)
-                                </Button>
-                                <Button
-                                  size="small"
-                                  className={s.focusY > 25 && s.focusY < 75 ? '!border-blue-500 !text-blue-300' : ''}
-                                  onClick={() => setStyle({ focusY: 50 })}
-                                >
-                                  ⏺ Căn giữa
-                                </Button>
-                                <Button
-                                  size="small"
-                                  className={s.focusY >= 75 ? '!border-blue-500 !text-blue-300' : ''}
-                                  onClick={() => setStyle({ focusY: 90 })}
-                                >
-                                  ⬇ Lấy dưới
-                                </Button>
-                              </div>
-                              <Slider
+                            <>
+                              <FieldSlider
+                                label="Phần ảnh giữ lại"
+                                value={s.focusY}
+                                unit="%"
                                 min={0}
                                 max={100}
                                 step={1}
-                                value={s.focusY}
+                                marks={{ 10: 'Trên', 50: 'Giữa', 90: 'Dưới' }}
                                 onChange={(v) => setStyle({ focusY: v })}
-                                tooltip={{ formatter: (v) => `${v}% (0%: Đỉnh, 100%: Đáy)` }}
                               />
-                              <div className="text-xs text-slate-300">
-                                👉 Mẹo: Bạn cũng có thể dùng chuột kéo trực tiếp ảnh trên khung xem trước lên/xuống để chỉnh góc đẹp nhất.
-                              </div>
-                            </div>
+                              <div className="nc-group-hint">Có thể kéo ảnh lên/xuống ngay trên khung xem trước.</div>
+                            </>
                           )}
-                        </div>
+                        </PanelGroup>
 
-                        {/* Watermark / Nhãn thương hiệu Thạnh Phú & Che logo cũ */}
-                        <div className="pt-3 border-t border-slate-800/80 space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                              🏷️ Nhãn thương hiệu / Chữ ký (Thạnh Phú)
-                            </span>
-                            {s.videoWatermark ? (
-                              <Tag color="cyan" className="!mr-0 !text-xs">Đang bật: {s.videoWatermark}</Tag>
-                            ) : (
-                              <Tag className="!mr-0 !text-xs text-slate-300">Tắt</Tag>
-                            )}
-                          </div>
-                          <div className="text-xs text-slate-300 leading-relaxed">
-                            Chèn chữ ký bản quyền thương hiệu lên video/ảnh hoặc di chuyển để che logo watermark cũ.
-                          </div>
-                          <div className="space-y-1.5">
-                            <Input
-                              size="small"
-                              placeholder="Nhập tên thương hiệu: @channel, Tin Tức 24h..."
-                              value={s.videoWatermark || ''}
-                              onChange={(e) => setStyle({ videoWatermark: e.target.value })}
-                              allowClear
-                            />
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-xs text-slate-300 font-medium">Chọn nhanh:</span>
-                              {(() => {
-                                const currentUserName = (() => {
-                                  try {
-                                    return JSON.parse(localStorage.getItem('user') || '{}')?.username || '';
-                                  } catch { return ''; }
-                                })();
-                                const chips = [
-                                  currentUserName,
-                                  currentUserName ? `@${currentUserName.toLowerCase().replace(/\s+/g, '')}` : '',
-                                  '@channel',
-                                  'Official Studio',
-                                  '⚡ Breaking News',
-                                  'Bản Tin 24h',
-                                ].filter(Boolean);
-                                return chips.map((chip) => (
-                                  <Button
+                        {(() => {
+                          // Chữ ký thương hiệu (watermark) — cũng dùng để đè che logo cũ
+                          const currentUserName = (() => {
+                            try {
+                              return JSON.parse(localStorage.getItem('user') || '{}')?.username || '';
+                            } catch { return ''; }
+                          })();
+                          const chips: string[] = [
+                            currentUserName,
+                            currentUserName ? `@${currentUserName.toLowerCase().replace(/\s+/g, '')}` : '',
+                            '@channel',
+                            'Official Studio',
+                            'Breaking News',
+                            'Bản Tin 24h',
+                          ].filter(Boolean);
+                          const pickWatermark = (text: string) => {
+                            const currentPos = (s.videoWatermarkX === undefined || s.videoWatermarkX === 74) ? { videoWatermarkPos: 'center' as const, videoWatermarkX: 35, videoWatermarkY: 46 } : {};
+                            setStyle({ videoWatermark: text, ...currentPos });
+                          };
+                          const applyWatermark = () => {
+                            const wm = s.videoWatermark;
+                            const pos = s.videoWatermarkPos;
+                            const x = s.videoWatermarkX;
+                            const y = s.videoWatermarkY;
+                            const bg = s.videoWatermarkBg;
+                            const size = s.videoWatermarkSize;
+                            const opacity = s.videoWatermarkOpacity;
+                            const applyToChecked = checkedItems.length > 1;
+                            setItems((prev) =>
+                              prev.map((it) => {
+                                if (applyToChecked && !it.checked && it.id !== active?.id) return it;
+                                return {
+                                  ...it,
+                                  style: {
+                                    ...it.style,
+                                    videoWatermark: wm,
+                                    videoWatermarkPos: pos,
+                                    videoWatermarkX: x,
+                                    videoWatermarkY: y,
+                                    videoWatermarkBg: bg,
+                                    videoWatermarkSize: size,
+                                    videoWatermarkOpacity: opacity,
+                                  },
+                                };
+                              })
+                            );
+                            message.success(
+                              applyToChecked
+                                ? `Đã gán chữ ký "${wm || 'Tắt'}" cho ${checkedItems.length} bài đã chọn!`
+                                : `Đã áp dụng chữ ký "${wm || 'Tắt'}" cho toàn bộ ${items.length} bài!`
+                            );
+                          };
+                          return (
+                            <PanelGroup
+                              title="Chữ ký thương hiệu"
+                              extra={
+                                <Switch
+                                  size="small"
+                                  checked={!!s.videoWatermark}
+                                  onChange={(on) => (on ? pickWatermark(chips[0] || '@channel') : setStyle({ videoWatermark: '' }))}
+                                />
+                              }
+                              hint={s.videoWatermark ? undefined : 'Ghi tên kênh lên ảnh/video, hoặc đặt đè lên logo cũ để che.'}
+                            >
+                              <Input
+                                size="small"
+                                placeholder="Tên kênh, ví dụ @channel"
+                                value={s.videoWatermark || ''}
+                                onChange={(e) => setStyle({ videoWatermark: e.target.value })}
+                                allowClear
+                              />
+                              <div className="nc-chip-row">
+                                {chips.map((chip) => (
+                                  <button
                                     key={chip}
-                                    size="small"
-                                    type={s.videoWatermark === chip ? 'primary' : 'dashed'}
-                                    className={`!text-xs !h-7 !px-2.5 font-medium ${
-                                      s.videoWatermark === chip
-                                        ? 'bg-blue-600 text-white border-blue-400'
-                                        : 'bg-slate-900/60 text-slate-300 hover:!text-cyan-300 hover:!border-cyan-400'
-                                    }`}
-                                    onClick={() => {
-                                      const currentPos = (s.videoWatermarkX === undefined || s.videoWatermarkX === 74) ? { videoWatermarkPos: 'center' as const, videoWatermarkX: 35, videoWatermarkY: 46 } : {};
-                                      setStyle({ videoWatermark: chip, ...currentPos });
-                                    }}
+                                    type="button"
+                                    className={`nc-chip${s.videoWatermark === chip ? ' is-active' : ''}`}
+                                    onClick={() => pickWatermark(chip)}
                                   >
                                     {chip}
-                                  </Button>
-                                ));
-                              })()}
-                              {s.videoWatermark && (
-                                <Button
-                                  size="small"
-                                  danger
-                                  type="text"
-                                  className="!text-xs !h-7 !px-2"
-                                  onClick={() => setStyle({ videoWatermark: '' })}
-                                >
-                                  ✕ Tắt nhãn
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-
-                          {s.videoWatermark && (
-                            <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-2.5 space-y-2.5">
-                              <div className="bg-cyan-950/40 border border-cyan-800/40 rounded p-2.5 text-xs text-cyan-200 flex items-start gap-1.5">
-                                <span className="text-base leading-none">💡</span>
-                                <span>
-                                  <b>Kéo thả trực tiếp:</b> Dùng chuột kéo nhãn nguồn trên khung xem trước đến bất kỳ đâu (hoặc đè thẳng lên logo cũ để che). Cuộn chuột trên nhãn để đổi cỡ chữ nhanh!
-                                </span>
+                                  </button>
+                                ))}
                               </div>
-
-                                <div>
-                                  <div className="text-xs text-slate-300 mb-1.5 font-medium">Kiểu hiển thị & Che logo:</div>
-                                  <div className="grid grid-cols-3 gap-1.5">
-                                    {[
-                                      { value: 'clean', label: 'Không viền', desc: 'Chữ đổ bóng' },
-                                      { value: 'stroke', label: 'Viền đen', desc: 'Chuẩn TikTok' },
-                                      { value: 'glass', label: 'Kính mờ', desc: 'Bán trong suốt' },
-                                      { value: 'blur', label: 'Che mờ', desc: 'Mờ nền sau' },
-                                      { value: 'card', label: 'Thẻ đen', desc: 'Hộp bo góc' },
-                                      { value: 'dark', label: 'Tối mờ', desc: 'Nền tối nhẹ' },
-                                      { value: 'accent', label: 'Màu nhấn', desc: 'Theo màu chủ đề' },
-                                    ].map((opt) => {
-                                      const isSelected = (s.videoWatermarkBg || 'clean') === opt.value;
-                                      return (
-                                        <button
-                                          key={opt.value}
-                                          type="button"
-                                          onClick={() => setStyle({ videoWatermarkBg: opt.value as any })}
-                                          className={`px-2 py-1.5 rounded-lg text-xs font-semibold border text-center transition-all cursor-pointer ${
-                                            isSelected
-                                              ? 'bg-blue-600 border-blue-400 text-white shadow-sm ring-1 ring-blue-400/50'
-                                              : 'bg-slate-800/90 border-slate-700/80 text-slate-300 hover:bg-slate-750 hover:text-white hover:border-slate-600'
-                                          }`}
-                                          title={opt.desc}
-                                        >
-                                          {opt.label}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                  <div className="text-xs text-slate-300 mt-1.5">
-                                    💡 <b>Không viền</b> & <b>Viền đen</b>: Chữ nổi không có khung hộp bọc quanh, đặt ở giữa hoặc kéo ở đâu cũng thoáng mắt, dễ nhìn!
-                                  </div>
-                                </div>
-
-                                <div>
-                                  <div className="text-xs text-slate-300 mb-1 font-medium">Đặt nhanh vị trí:</div>
-                                  <div className="flex items-center gap-1.5">
+                              {s.videoWatermark && (
+                                <>
+                                  <PanelField label="Kiểu nền">
+                                    <OptionGrid
+                                      cols={4}
+                                      value={s.videoWatermarkBg || 'clean'}
+                                      onChange={(v) => setStyle({ videoWatermarkBg: v as CardStyle['videoWatermarkBg'] })}
+                                      options={[
+                                        { value: 'clean', label: 'Không viền', title: 'Chữ đổ bóng, không khung' },
+                                        { value: 'stroke', label: 'Viền đen', title: 'Chữ viền đen kiểu TikTok' },
+                                        { value: 'glass', label: 'Kính mờ', title: 'Nền bán trong suốt' },
+                                        { value: 'blur', label: 'Che mờ', title: 'Làm mờ phần nền phía sau (che logo cũ)' },
+                                        { value: 'card', label: 'Thẻ đen', title: 'Hộp đen bo góc' },
+                                        { value: 'dark', label: 'Tối mờ', title: 'Nền tối nhẹ' },
+                                        { value: 'accent', label: 'Màu nhấn', title: 'Nền theo màu nhấn của bài' },
+                                      ]}
+                                    />
+                                  </PanelField>
+                                  <PanelField label="Vị trí">
                                     <CornerButtons
                                       value={s.videoWatermarkPos === 'center' ? undefined : s.videoWatermarkPos}
                                       onPick={(c) => {
@@ -2917,104 +2871,29 @@ export default function NewsCardStudio() {
                                         const [x, y] = coords[c] || [74, 4];
                                         setStyle({ videoWatermarkPos: c, videoWatermarkX: x, videoWatermarkY: y });
                                       }}
+                                      center={{
+                                        active: s.videoWatermarkX === 35 && s.videoWatermarkY === 46,
+                                        onPick: () => setStyle({ videoWatermarkPos: 'center', videoWatermarkX: 35, videoWatermarkY: 46 }),
+                                      }}
                                     />
-                                    <Button
-                                      size="small"
-                                      type={s.videoWatermarkX === 35 && s.videoWatermarkY === 46 ? 'primary' : 'dashed'}
-                                      className="!text-xs !h-7 text-cyan-300 border-cyan-700/60"
-                                      onClick={() => setStyle({ videoWatermarkPos: 'center', videoWatermarkX: 35, videoWatermarkY: 46 })}
-                                    >
-                                      📍 Ra giữa video
-                                    </Button>
+                                  </PanelField>
+                                  <div className="nc-field-pair">
+                                    <FieldSlider label="Ngang" value={s.videoWatermarkX ?? 74} unit="%" min={0} max={95} step={1} onChange={(v) => setStyle({ videoWatermarkX: v })} />
+                                    <FieldSlider label="Dọc" value={s.videoWatermarkY ?? 4} unit="%" min={0} max={95} step={1} onChange={(v) => setStyle({ videoWatermarkY: v })} />
                                   </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-2">
-                                  <FieldSlider
-                                    label="X (Ngang)"
-                                    value={s.videoWatermarkX ?? 74}
-                                    unit="%"
-                                    min={0}
-                                    max={95}
-                                    step={1}
-                                    onChange={(v) => setStyle({ videoWatermarkX: v })}
-                                  />
-                                <FieldSlider
-                                  label="Y (Dọc)"
-                                  value={s.videoWatermarkY ?? 4}
-                                  unit="%"
-                                  min={0}
-                                  max={95}
-                                  step={1}
-                                  onChange={(v) => setStyle({ videoWatermarkY: v })}
-                                />
-                              </div>
-
-                              <div className="grid grid-cols-2 gap-2">
-                                <FieldSlider
-                                  label="Cỡ chữ"
-                                  value={s.videoWatermarkSize ?? 28}
-                                  unit="px"
-                                  min={14}
-                                  max={54}
-                                  step={2}
-                                  onChange={(v) => setStyle({ videoWatermarkSize: v })}
-                                />
-                                <FieldSlider
-                                  label="Độ mờ"
-                                  value={Math.round((s.videoWatermarkOpacity ?? 1) * 100)}
-                                  unit="%"
-                                  min={20}
-                                  max={100}
-                                  step={5}
-                                  onChange={(v) => setStyle({ videoWatermarkOpacity: v / 100 })}
-                                />
-                              </div>
-
-                                <Button
-                                  size="small"
-                                  block
-                                  type="dashed"
-                                  className="!text-cyan-300 !border-cyan-500/50 hover:!border-cyan-400 mt-1"
-                                  onClick={() => {
-                                    const wm = s.videoWatermark;
-                                    const pos = s.videoWatermarkPos;
-                                    const x = s.videoWatermarkX;
-                                    const y = s.videoWatermarkY;
-                                    const bg = s.videoWatermarkBg;
-                                    const size = s.videoWatermarkSize;
-                                    const opacity = s.videoWatermarkOpacity;
-                                    const applyToChecked = checkedItems.length > 1;
-                                    setItems((prev) =>
-                                      prev.map((it) => {
-                                        if (applyToChecked && !it.checked && it.id !== active?.id) return it;
-                                        return {
-                                          ...it,
-                                          style: {
-                                            ...it.style,
-                                            videoWatermark: wm,
-                                            videoWatermarkPos: pos,
-                                            videoWatermarkX: x,
-                                            videoWatermarkY: y,
-                                            videoWatermarkBg: bg,
-                                            videoWatermarkSize: size,
-                                            videoWatermarkOpacity: opacity,
-                                          },
-                                        };
-                                      })
-                                    );
-                                    message.success(
-                                      applyToChecked
-                                        ? `Đã gán chữ ký "${wm || 'Tắt'}" cho ${checkedItems.length} bài đã chọn!`
-                                        : `Đã áp dụng chữ ký "${wm || 'Tắt'}" cho toàn bộ ${items.length} bài!`
-                                    );
-                                  }}
-                                >
-                                  🏷️ Áp dụng chữ ký này cho {checkedItems.length > 1 ? `${checkedItems.length} bài chọn` : `tất cả ${items.length} bài`}
-                                </Button>
-                            </div>
-                          )}
-                        </div>
+                                  <div className="nc-field-pair">
+                                    <FieldSlider label="Cỡ chữ" value={s.videoWatermarkSize ?? 28} unit="px" min={14} max={54} step={2} onChange={(v) => setStyle({ videoWatermarkSize: v })} />
+                                    <FieldSlider label="Độ đậm" value={Math.round((s.videoWatermarkOpacity ?? 1) * 100)} unit="%" min={20} max={100} step={5} onChange={(v) => setStyle({ videoWatermarkOpacity: v / 100 })} />
+                                  </div>
+                                  <div className="nc-group-hint">Kéo chữ ký trên khung xem trước để đặt chỗ bất kỳ, lăn chuột trên chữ ký để đổi cỡ.</div>
+                                  <Button size="small" block onClick={applyWatermark}>
+                                    Áp chữ ký cho {checkedItems.length > 1 ? `${checkedItems.length} bài chọn` : `tất cả ${items.length} bài`}
+                                  </Button>
+                                </>
+                              )}
+                            </PanelGroup>
+                          );
+                        })()}
                       </div>
                     ),
                   },
@@ -3024,418 +2903,233 @@ export default function NewsCardStudio() {
                       <span className="flex items-center gap-1.5">
                         <span>Thiết kế</span>
                         {s.useCustomFrame && s.customFrameUrl && (
-                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Đang dùng khung kênh" />
                         )}
                       </span>
                     ),
                     children: (
-                      <div className="space-y-5 pb-2">
-                        {/* KHUNG & LOGO KÊNH THƯƠNG HIỆU */}
-                        <div className="rounded-xl border border-blue-500/30 bg-blue-950/20 p-3 space-y-3">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                                🖼️ Khung ảnh & Logo Kênh
-                              </span>
-                              {s.useCustomFrame && s.customFrameUrl ? (
-                                <Tag color="success" className="!mr-0 !text-xs">Đang bật</Tag>
-                              ) : (
-                                <Tag className="!mr-0 !text-xs text-slate-300">Tắt</Tag>
-                              )}
-                            </div>
-                            <Switch
-                              size="small"
-                              checked={!!s.useCustomFrame}
-                              onChange={(on) => setStyle({ useCustomFrame: on })}
-                            />
+                      <div className="nc-tab-body">
+                        {/* Khung & logo kênh thương hiệu */}
+                        <PanelGroup
+                          title="Khung và logo kênh"
+                          extra={<Switch size="small" checked={!!s.useCustomFrame} onChange={(on) => setStyle({ useCustomFrame: on })} />}
+                        >
+                          <div className="nc-field-pair">
+                            <Upload accept="image/png,image/webp" showUploadList={false} beforeUpload={uploadCustomFrame} className="nc-upload-block">
+                              <Button block size="small" icon={<UploadOutlined />} loading={uploadingFrame} type={!s.customFrameUrl ? 'primary' : 'default'}>
+                                {s.customFrameUrl ? 'Đổi khung' : 'Tải khung PNG'}
+                              </Button>
+                            </Upload>
+                            <Upload accept="image/*" showUploadList={false} beforeUpload={uploadLogo} className="nc-upload-block">
+                              <Button block size="small" icon={<UploadOutlined />} loading={logoBusy}>
+                                {s.logoUrl ? 'Đổi logo' : 'Tải logo'}
+                              </Button>
+                            </Upload>
                           </div>
 
-                          <div className="space-y-2.5">
-                            {/* Nút tải Frame & Logo đi kèm */}
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <div className="text-xs text-slate-300 mb-1 font-medium">1. Khung bài (PNG)</div>
-                                <Upload
-                                  accept="image/png,image/webp"
-                                  showUploadList={false}
-                                  beforeUpload={uploadCustomFrame}
-                                  className="w-full"
-                                >
-                                  <Button
-                                    block
-                                    size="small"
-                                    icon={<UploadOutlined />}
-                                    loading={uploadingFrame}
-                                    type={!s.customFrameUrl ? 'primary' : 'default'}
-                                  >
-                                    {s.customFrameUrl ? 'Đổi khung' : 'Tải Frame PNG'}
-                                  </Button>
-                                </Upload>
-                              </div>
-
-                              <div>
-                                <div className="text-xs text-slate-300 mb-1 font-medium">2. Logo kênh</div>
-                                <Upload
-                                  accept="image/*"
-                                  showUploadList={false}
-                                  beforeUpload={uploadLogo}
-                                  className="w-full"
-                                >
-                                  <Button
-                                    block
-                                    size="small"
-                                    icon={<UploadOutlined />}
-                                    loading={logoBusy}
-                                  >
-                                    {s.logoUrl ? 'Đổi logo' : 'Tải Logo kênh'}
-                                  </Button>
-                                </Upload>
-                              </div>
-                            </div>
-
-                            {/* Preview nhỏ của Khung và Logo hiện tại */}
-                            {(s.customFrameUrl || s.logoUrl) && (
-                              <div className="rounded-lg border border-slate-700/60 bg-slate-900/60 p-2.5 space-y-2.5">
-                                <div className="flex items-center gap-2.5">
-                                  {s.customFrameUrl && (
-                                    <div className="relative shrink-0">
-                                      <img
-                                        src={s.customFrameUrl}
-                                        alt="Frame"
-                                        className="w-10 h-10 object-contain rounded bg-black/50 border border-slate-700 p-0.5"
-                                        title="Khung bài hiện tại"
-                                      />
-                                    </div>
-                                  )}
-                                  {s.logoUrl && (
-                                    <div className="relative shrink-0">
-                                      <img
-                                        src={logoSourceOf(s)}
-                                        alt="Logo"
-                                        className="w-10 h-10 object-contain rounded bg-black/50 border border-slate-700 p-0.5"
-                                        title="Logo kênh hiện tại"
-                                      />
-                                    </div>
-                                  )}
-                                  <div className="min-w-0 flex-1">
-                                    <div className="text-xs font-semibold text-slate-200 truncate">
-                                      {active.channelName || (s.useCustomFrame ? 'Đang dùng khung tuỳ chỉnh' : 'Khung đã nạp')}
-                                    </div>
-                                    <div className="text-xs text-slate-300 flex items-center gap-1.5 flex-wrap mt-0.5">
-                                      <span className={s.logoUrl && s.showLogo ? 'text-emerald-400 font-medium' : 'text-slate-500'}>
-                                        {s.logoUrl && s.showLogo ? '✓ Logo bật' : 'Logo tắt'}
-                                      </span>
-                                      <span className="text-slate-600">•</span>
-                                      <span className={s.useCustomFrame ? 'text-emerald-400 font-medium' : 'text-slate-500'}>
-                                        {s.useCustomFrame ? '✓ Khung bật' : 'Khung tắt'}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800/60">
-                                  <Popover
-                                    open={saveFramePopoverOpen}
-                                    onOpenChange={setSaveFramePopoverOpen}
-                                    trigger="click"
-                                    content={
-                                      <div className="p-1 space-y-2 w-56">
-                                        <div className="text-xs font-semibold text-slate-200">Lưu thành Kênh mẫu:</div>
-                                        <div className="text-xs text-slate-300">Lưu trọn bộ: Khung PNG + Logo + Tone màu để sau này chọn Kênh 1 chạm.</div>
-                                        <Input
-                                          size="small"
-                                          placeholder="VD: Vietnam Health News"
-                                          value={frameNameInput}
-                                          onChange={(e) => setFrameNameInput(e.target.value)}
-                                          onPressEnter={saveCurrentFrameAsPreset}
-                                        />
-                                        <Button size="small" type="primary" block onClick={saveCurrentFrameAsPreset}>
-                                          Lưu mẫu Kênh
-                                        </Button>
-                                      </div>
-                                    }
-                                  >
-                                    <Button size="small" type="primary" ghost block icon={<PlusOutlined />}>Lưu Kênh</Button>
-                                  </Popover>
-                                  <Button size="small" block onClick={applyFrameToSelected}>Gán các bài chọn</Button>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Logo Quick Settings khi có logo */}
-                            {s.logoUrl && (
-                              <div className="pt-2 border-t border-slate-800/80 space-y-2">
-                                <div className="flex items-center justify-between text-xs">
-                                  <span className="text-slate-300">Hiển thị logo trên bài</span>
-                                  <Switch size="small" checked={!!s.showLogo} onChange={(on) => setStyle({ showLogo: on })} />
-                                </div>
-                                {s.showLogo && (
-                                  <>
-                                    <CornerButtons value={s.logoPos} onPick={placeLogo} />
-                                    <div className="flex justify-between text-xs text-slate-300">
-                                      <span>Cỡ logo</span>
-                                      <span>{s.logoSize}px</span>
-                                    </div>
-                                    <Slider min={100} max={480} step={10} value={s.logoSize} onChange={(v) => setStyle({ logoSize: v })} tooltip={{ open: false }} />
-                                  </>
+                          {(s.customFrameUrl || s.logoUrl) && (
+                            <>
+                              <div className="nc-current-kit">
+                                {s.customFrameUrl && (
+                                  <img src={s.customFrameUrl} alt="Khung" className="nc-kit-thumb" title="Khung bài hiện tại" />
                                 )}
-                              </div>
-                            )}
-
-                            {/* Thư viện các kênh đã lưu */}
-                            <div className="pt-2 border-t border-slate-800/80">
-                              <div className="text-xs font-semibold text-slate-200 mb-2 flex items-center justify-between">
-                                <span>Thư viện Kênh thương hiệu ({customFrames.length})</span>
-                                <Upload
-                                  accept="image/png,image/webp"
-                                  showUploadList={false}
-                                  beforeUpload={uploadCustomFrame}
-                                >
-                                  <Button size="small" type="link" className="!p-0 !text-xs !text-blue-400 font-semibold" icon={<PlusOutlined />}>
-                                    Thêm Khung PNG
-                                  </Button>
-                                </Upload>
-                              </div>
-                              <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
-                                {/* Thẻ nút bấm nạp thêm Khung PNG nhanh */}
-                                <Upload
-                                  accept="image/png,image/webp"
-                                  showUploadList={false}
-                                  beforeUpload={uploadCustomFrame}
-                                  className="w-full"
-                                >
-                                  <div className="rounded-lg border-2 border-dashed border-slate-700 hover:border-blue-500 bg-slate-900/40 p-2 cursor-pointer flex flex-col items-center justify-center text-center aspect-square transition-all group hover:bg-blue-500/5">
-                                    <PlusOutlined className="text-xl text-slate-400 group-hover:text-blue-400 mb-1" />
-                                    <span className="text-xs font-semibold text-slate-200 group-hover:text-blue-300">Nạp Khung PNG</span>
-                                    <span className="text-xs text-slate-300 mt-0.5">Thêm vào thư viện</span>
+                                {s.logoUrl && (
+                                  <img src={logoSourceOf(s)} alt="Logo" className="nc-kit-thumb" title="Logo kênh hiện tại" />
+                                )}
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-xs font-semibold text-slate-200 truncate">
+                                    {active.channelName || (s.useCustomFrame ? 'Đang dùng khung tuỳ chỉnh' : 'Khung đã nạp')}
                                   </div>
-                                </Upload>
+                                  <div className="text-xs text-slate-400 mt-0.5">
+                                    <span className={s.useCustomFrame ? 'text-emerald-400' : undefined}>{s.useCustomFrame ? 'Khung bật' : 'Khung tắt'}</span>
+                                    {' · '}
+                                    <span className={s.logoUrl && s.showLogo ? 'text-emerald-400' : undefined}>{s.logoUrl && s.showLogo ? 'Logo bật' : 'Logo tắt'}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="nc-field-pair">
+                                <Popover
+                                  open={saveFramePopoverOpen}
+                                  onOpenChange={setSaveFramePopoverOpen}
+                                  trigger="click"
+                                  content={
+                                    <div className="p-1 space-y-2 w-56">
+                                      <div className="text-xs font-semibold text-slate-200">Lưu thành kênh mẫu</div>
+                                      <div className="text-xs text-slate-300">Lưu trọn bộ khung PNG, logo và tone màu để lần sau chọn kênh một chạm.</div>
+                                      <Input
+                                        size="small"
+                                        placeholder="VD: Vietnam Health News"
+                                        value={frameNameInput}
+                                        onChange={(e) => setFrameNameInput(e.target.value)}
+                                        onPressEnter={saveCurrentFrameAsPreset}
+                                      />
+                                      <Button size="small" type="primary" block onClick={saveCurrentFrameAsPreset}>
+                                        Lưu kênh
+                                      </Button>
+                                    </div>
+                                  }
+                                >
+                                  <Button size="small" block icon={<PlusOutlined />}>Lưu thành kênh</Button>
+                                </Popover>
+                                <Button size="small" block onClick={applyFrameToSelected}>Gán cho bài chọn</Button>
+                              </div>
+                            </>
+                          )}
 
-                                {customFrames.map((frame) => {
-                                  const isCur = s.customFrameUrl === frame.url && s.useCustomFrame;
-                                  return (
-                                    <div
-                                      key={frame.id}
-                                      onClick={() => applyCustomFramePreset(frame)}
-                                      className={`group relative rounded-lg border p-1.5 cursor-pointer transition-all flex flex-col justify-between ${
-                                        isCur
-                                          ? 'border-emerald-500 bg-emerald-500/10'
-                                          : 'border-slate-800 bg-slate-900/40 hover:border-slate-600'
-                                      }`}
-                                    >
-                                      <div className="aspect-square w-full rounded bg-black/60 flex items-center justify-center overflow-hidden mb-1 border border-slate-800/60 relative">
-                                        {frame.url ? (
-                                          <img
-                                            src={frame.url}
-                                            alt={frame.name}
-                                            className="w-full h-full object-contain"
-                                            loading="lazy"
-                                          />
-                                        ) : (
-                                          <div
-                                            className="w-full h-full flex flex-col items-center justify-center p-2 text-center"
-                                            style={{
-                                              background: frame.template === 'gradient'
-                                                ? 'linear-gradient(135deg, #090d16 0%, #2a0b3f 100%)'
-                                                : frame.template === 'breaking'
-                                                ? '#0b0b0b'
-                                                : '#1e293b'
-                                            }}
-                                          >
-                                            <span className="text-lg mb-0.5">{frame.template === 'gradient' ? '✨' : '📰'}</span>
-                                            <span className="text-[11px] font-bold text-white leading-tight truncate max-w-full px-1">
-                                              {frame.template === 'gradient' ? 'Radiant' : frame.name}
-                                            </span>
-                                          </div>
-                                        )}
-                                        {frame.logoUrl && (
-                                          <img
-                                            src={frame.logoUrl}
-                                            alt="Logo"
-                                            className="absolute top-1 right-1 w-5 h-5 object-contain rounded-full bg-black/40 border border-white/20"
-                                          />
-                                        )}
-                                      </div>
-                                      <div className="flex items-center justify-between gap-1">
-                                        <span className="text-xs font-medium text-slate-200 truncate" title={frame.name}>
-                                          {frame.name}
+                          {s.logoUrl && (
+                            <div className="nc-inline-row">
+                              <span>Vị trí, cỡ, kiểu logo</span>
+                              <Button size="small" type="link" className="nc-group-link" onClick={() => setEditorTab('overlay')}>Chỉnh ở tab Chèn thêm</Button>
+                            </div>
+                          )}
+                        </PanelGroup>
+
+                        {/* Thư viện các kênh đã lưu */}
+                        <PanelGroup title={`Thư viện kênh (${customFrames.length})`} hint="Bấm một kênh để dùng khung, logo và màu của kênh đó.">
+                          <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
+                            <Upload accept="image/png,image/webp" showUploadList={false} beforeUpload={uploadCustomFrame} className="w-full">
+                              <div className="nc-add-tile">
+                                <PlusOutlined className="text-lg" />
+                                <span>Thêm khung PNG</span>
+                              </div>
+                            </Upload>
+
+                            {customFrames.map((frame) => {
+                              const isCur = s.customFrameUrl === frame.url && s.useCustomFrame;
+                              return (
+                                <div
+                                  key={frame.id}
+                                  onClick={() => applyCustomFramePreset(frame)}
+                                  className={`group relative rounded-lg border p-1.5 cursor-pointer transition-colors flex flex-col justify-between ${
+                                    isCur ? 'border-emerald-500 bg-emerald-500/10' : 'border-slate-800 hover:border-slate-600'
+                                  }`}
+                                >
+                                  <div className="aspect-square w-full rounded bg-black/60 flex items-center justify-center overflow-hidden mb-1 relative">
+                                    {frame.url ? (
+                                      <img src={frame.url} alt={frame.name} className="w-full h-full object-contain" loading="lazy" />
+                                    ) : (
+                                      <div
+                                        className="w-full h-full flex items-center justify-center p-2 text-center"
+                                        style={{ background: frame.template === 'gradient' ? '#2a0b3f' : frame.template === 'breaking' ? '#0b0b0b' : '#1e293b' }}
+                                      >
+                                        <span className="text-[11px] font-bold text-white leading-tight truncate max-w-full px-1">
+                                          {frame.template === 'gradient' ? 'Radiant' : frame.name}
                                         </span>
-                                        <Popconfirm
-                                          title="Xóa mẫu kênh này?"
-                                          okText="Xóa"
-                                          cancelText="Hủy"
-                                          onConfirm={(e) => deleteCustomFramePreset(frame.id, e as any)}
-                                        >
-                                          <Button
-                                            size="small"
-                                            type="text"
-                                            danger
-                                            className="!p-0 !h-4 !w-4 opacity-0 group-hover:opacity-100 transition-opacity"
-                                            icon={<DeleteOutlined className="text-xs" />}
-                                            onClick={(e) => e?.stopPropagation()}
-                                          />
-                                        </Popconfirm>
                                       </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-
-                            {/* Căn chỉnh vị trí & kích thước (Vùng ảnh + Tiêu đề) */}
-                            {s.useCustomFrame && s.customFrameUrl && (
-                              <div className="space-y-3 pt-2 border-t border-slate-800">
-                                <div className="text-xs font-semibold text-slate-200">Căn chỉnh tọa độ khung</div>
-                                <div className="rounded-lg border border-slate-800 p-2.5 bg-slate-900/30 space-y-2">
-                                  <div className="text-xs text-slate-300 font-medium">Vùng ảnh (Photo)</div>
-                                  <FieldSlider
-                                    label="Top"
-                                    value={s.framePhotoTop ?? 0}
-                                    unit="%"
-                                    min={0}
-                                    max={30}
-                                    step={1}
-                                    onChange={(v) => setStyle({ framePhotoTop: v })}
-                                  />
-                                  <FieldSlider
-                                    label="Chiều cao"
-                                    value={s.framePhotoHeight ?? 68}
-                                    unit="%"
-                                    min={40}
-                                    max={95}
-                                    step={1}
-                                    onChange={(v) => setStyle({ framePhotoHeight: v })}
-                                  />
-                                </div>
-
-                                <div className="rounded-lg border border-slate-800 p-2 bg-slate-900/30 space-y-2">
-                                  <div className="text-xs text-slate-300 font-medium">Hộp tiêu đề (Headline)</div>
-                                  <FieldSlider
-                                    label="Cách đáy"
-                                    value={s.frameTextBottom ?? 4}
-                                    unit="%"
-                                    min={0}
-                                    max={30}
-                                    step={1}
-                                    onChange={(v) => setStyle({ frameTextBottom: v })}
-                                  />
-                                  <FieldSlider
-                                    label="Chiều cao hộp"
-                                    value={s.frameTextHeight ?? 24}
-                                    unit="%"
-                                    min={10}
-                                    max={45}
-                                    step={1}
-                                    onChange={(v) => setStyle({ frameTextHeight: v })}
-                                  />
-                                  <div className="grid grid-cols-2 gap-2">
-                                    <FieldSlider
-                                      label="Lề trái"
-                                      value={s.frameTextLeft ?? 6}
-                                      unit="%"
-                                      min={0}
-                                      max={25}
-                                      step={1}
-                                      onChange={(v) => setStyle({ frameTextLeft: v })}
-                                    />
-                                    <FieldSlider
-                                      label="Lề phải"
-                                      value={s.frameTextRight ?? 6}
-                                      unit="%"
-                                      min={0}
-                                      max={25}
-                                      step={1}
-                                      onChange={(v) => setStyle({ frameTextRight: v })}
-                                    />
+                                    )}
+                                    {frame.logoUrl && (
+                                      <img src={frame.logoUrl} alt="Logo" className="absolute top-1 right-1 w-5 h-5 object-contain rounded-full bg-black/40 border border-white/20" />
+                                    )}
                                   </div>
-                                  <div>
-                                    <div className="text-xs text-slate-300 mb-1">Căn lề chữ tiêu đề</div>
-                                    <Segmented
-                                      block
-                                      size="small"
-                                      value={s.frameTextAlign || 'center'}
-                                      onChange={(v) => setStyle({ frameTextAlign: v as 'left' | 'center' | 'right' })}
-                                      options={[
-                                        { value: 'left', label: 'Căn trái' },
-                                        { value: 'center', label: 'Căn giữa' },
-                                        { value: 'right', label: 'Căn phải' },
-                                      ]}
+                                  <div className="flex items-center justify-between gap-1">
+                                    <span className="text-xs font-medium text-slate-200 truncate" title={frame.name}>
+                                      {frame.name}
+                                    </span>
+                                    <Popconfirm
+                                      title="Xóa mẫu kênh này?"
+                                      okText="Xóa"
+                                      cancelText="Hủy"
+                                      onConfirm={(e) => deleteCustomFramePreset(frame.id, e as any)}
+                                    >
+                                      <Button
+                                        size="small"
+                                        type="text"
+                                        danger
+                                        className="!p-0 !h-4 !w-4 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        icon={<DeleteOutlined className="text-xs" />}
+                                        onClick={(e) => e?.stopPropagation()}
                                       />
-                                    </div>
+                                    </Popconfirm>
                                   </div>
                                 </div>
-                              )}
-
-                            {/* TỰ ĐỘNG ẨN KHUNG SAU N GIÂY (HOOK VIDEO 5S) */}
-                            <div className="pt-3 border-t border-slate-800 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs font-semibold text-white flex items-center gap-1.5">
-                                  ⏱️ Tự động ẩn khung sau vài giây (Hook Video)
-                                </span>
-                                {s.frameDuration ? (
-                                  <Tag color="cyan" className="!mr-0 !text-xs">Ẩn sau {s.frameDuration}s</Tag>
-                                ) : (
-                                  <Tag className="!mr-0 !text-xs text-slate-300">Luôn hiện khung</Tag>
-                                )}
-                              </div>
-                              <div className="text-xs text-slate-300 leading-relaxed">
-                                Hiển thị khung & tiêu đề trong <b>3 - 5 giây đầu</b> để giật tít giữ chân người xem (Hook), sau đó khung sẽ <b>mờ dần và biến mất</b> để lộ trọn vẹn toàn bộ video full màn hình!
-                              </div>
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                {[
-                                  { label: 'Luôn hiện khung', val: 0 },
-                                  { label: 'Ẩn sau 3s', val: 3 },
-                                  { label: 'Ẩn sau 5s (Chuẩn)', val: 5 },
-                                  { label: 'Ẩn sau 7s', val: 7 },
-                                  { label: 'Ẩn sau 10s', val: 10 },
-                                ].map((opt) => (
-                                  <Button
-                                    key={opt.val}
-                                    size="small"
-                                    type={(s.frameDuration ?? 0) === opt.val ? 'primary' : 'dashed'}
-                                    className="!text-xs !h-7"
-                                    onClick={() => setStyle({ frameDuration: opt.val })}
-                                  >
-                                    {opt.label}
-                                  </Button>
-                                ))}
-                              </div>
-                              {checkedItems.length > 1 && (
-                                <Button
-                                  size="small"
-                                  block
-                                  type="dashed"
-                                  className="!text-cyan-300 !border-cyan-500/50 hover:!border-cyan-400 mt-1"
-                                  onClick={() => {
-                                    const fd = s.frameDuration ?? 0;
-                                    setItems((prev) =>
-                                      prev.map((it) => {
-                                        if (!it.checked && it.id !== active?.id) return it;
-                                        return {
-                                          ...it,
-                                          style: {
-                                            ...it.style,
-                                            frameDuration: fd,
-                                          },
-                                        };
-                                      })
-                                    );
-                                    message.success(fd > 0 ? `Đã đặt ẩn khung sau ${fd}s cho ${checkedItems.length} bài chọn!` : `Đã đặt luôn hiện khung cho ${checkedItems.length} bài chọn!`);
-                                  }}
-                                >
-                                  Gán thiết lập ẩn khung ({s.frameDuration ? `${s.frameDuration}s` : 'Luôn hiện'}) cho {checkedItems.length} bài chọn
-                                </Button>
-                              )}
-                            </div>
+                              );
+                            })}
                           </div>
-                        </div>
+                        </PanelGroup>
+
+                        {/* Căn vùng ảnh + hộp tiêu đề trong khung PNG */}
+                        {s.useCustomFrame && s.customFrameUrl && (
+                          <PanelGroup title="Căn vùng trong khung">
+                            <div className="nc-subtitle">Vùng ảnh</div>
+                            <div className="nc-field-pair">
+                              <FieldSlider label="Cách trên" value={s.framePhotoTop ?? 0} unit="%" min={0} max={30} step={1} onChange={(v) => setStyle({ framePhotoTop: v })} />
+                              <FieldSlider label="Chiều cao" value={s.framePhotoHeight ?? 68} unit="%" min={40} max={95} step={1} onChange={(v) => setStyle({ framePhotoHeight: v })} />
+                            </div>
+                            <div className="nc-subtitle">Hộp tiêu đề</div>
+                            <div className="nc-field-pair">
+                              <FieldSlider label="Cách đáy" value={s.frameTextBottom ?? 4} unit="%" min={0} max={30} step={1} onChange={(v) => setStyle({ frameTextBottom: v })} />
+                              <FieldSlider label="Chiều cao" value={s.frameTextHeight ?? 24} unit="%" min={10} max={45} step={1} onChange={(v) => setStyle({ frameTextHeight: v })} />
+                            </div>
+                            <div className="nc-field-pair">
+                              <FieldSlider label="Lề trái" value={s.frameTextLeft ?? 6} unit="%" min={0} max={25} step={1} onChange={(v) => setStyle({ frameTextLeft: v })} />
+                              <FieldSlider label="Lề phải" value={s.frameTextRight ?? 6} unit="%" min={0} max={25} step={1} onChange={(v) => setStyle({ frameTextRight: v })} />
+                            </div>
+                            <PanelField label="Căn chữ tiêu đề">
+                              <Segmented
+                                block
+                                size="small"
+                                value={s.frameTextAlign || 'center'}
+                                onChange={(v) => setStyle({ frameTextAlign: v as 'left' | 'center' | 'right' })}
+                                options={[
+                                  { value: 'left', label: 'Trái' },
+                                  { value: 'center', label: 'Giữa' },
+                                  { value: 'right', label: 'Phải' },
+                                ]}
+                              />
+                            </PanelField>
+                          </PanelGroup>
+                        )}
+
+                        {/* Tự động ẩn khung sau N giây (hook video) */}
+                        <PanelGroup
+                          title="Ẩn khung khi phát video"
+                          hint="Khung và tiêu đề hiện ở vài giây đầu để giữ người xem, rồi mờ dần để lộ video toàn màn hình. 5 giây là chuẩn."
+                        >
+                          <Segmented
+                            block
+                            size="small"
+                            className="nc-seg-fit"
+                            value={s.frameDuration ?? 0}
+                            onChange={(v) => setStyle({ frameDuration: Number(v) })}
+                            options={[
+                              { value: 0, label: 'Luôn hiện' },
+                              { value: 3, label: 'Sau 3s' },
+                              { value: 5, label: 'Sau 5s' },
+                              { value: 7, label: 'Sau 7s' },
+                              { value: 10, label: 'Sau 10s' },
+                            ]}
+                          />
+                          {checkedItems.length > 1 && (
+                            <Button
+                              size="small"
+                              block
+                              onClick={() => {
+                                const fd = s.frameDuration ?? 0;
+                                setItems((prev) =>
+                                  prev.map((it) => {
+                                    if (!it.checked && it.id !== active?.id) return it;
+                                    return {
+                                      ...it,
+                                      style: {
+                                        ...it.style,
+                                        frameDuration: fd,
+                                      },
+                                    };
+                                  })
+                                );
+                                message.success(fd > 0 ? `Đã đặt ẩn khung sau ${fd}s cho ${checkedItems.length} bài chọn!` : `Đã đặt luôn hiện khung cho ${checkedItems.length} bài chọn!`);
+                              }}
+                            >
+                              Gán ({s.frameDuration ? `ẩn sau ${s.frameDuration}s` : 'luôn hiện'}) cho {checkedItems.length} bài chọn
+                            </Button>
+                          )}
+                        </PanelGroup>
 
                         {/* Mẫu thiết kế cơ bản */}
-                        <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <span className={sectionTitle}>Mẫu thiết kế cơ bản ({TEMPLATES.length})</span>
-                            <Button size="small" type="link" className="!px-0" onClick={() => setGalleryOpen(true)}>Xem lớn tất cả mẫu</Button>
-                          </div>
+                        <PanelGroup
+                          title={`Mẫu thiết kế (${TEMPLATES.length})`}
+                          extra={<Button size="small" type="link" className="nc-group-link" onClick={() => setGalleryOpen(true)}>Xem lớn</Button>}
+                        >
                           <div className="grid grid-cols-2 gap-2">
                             {TEMPLATES.map((t) => {
                               const on = normalizeTemplate(s.template) === t.value;
@@ -3454,8 +3148,7 @@ export default function NewsCardStudio() {
                             })}
                           </div>
                           {normalizeTemplate(s.template) === 'quote' && (
-                            <div className="mt-2.5">
-                              <div className="text-xs text-slate-300 mb-1">Tên người nói (để trống là ẩn)</div>
+                            <PanelField label="Tên người nói (để trống là ẩn)">
                               <Input
                                 size="small"
                                 value={s.quoteBy || ''}
@@ -3463,13 +3156,12 @@ export default function NewsCardStudio() {
                                 onChange={(e) => setStyle({ quoteBy: e.target.value })}
                                 placeholder="Ví dụ: Chủ tịch UBND tỉnh"
                               />
-                            </div>
+                            </PanelField>
                           )}
-                        </div>
+                        </PanelGroup>
 
                         {/* Bảng màu */}
-                        <div>
-                          <div className={`${sectionTitle} mb-2`}>Bảng màu</div>
+                        <PanelGroup title="Bảng màu">
                           <div className="grid grid-cols-4 gap-2">
                             {COLOR_PRESETS.map((p) => {
                               const on = s.bandBg === p.bandBg && s.textColor === p.textColor && s.accent === p.accent;
@@ -3489,23 +3181,30 @@ export default function NewsCardStudio() {
                               );
                             })}
                           </div>
-                          <div className="grid grid-cols-3 gap-2 mt-2.5 text-xs text-slate-300">
-                            <div className="flex items-center gap-1.5"><ColorPicker size="small" value={s.bandBg} onChange={(c) => setStyle({ bandBg: c.toHexString() })} />Nền</div>
-                            <div className="flex items-center gap-1.5"><ColorPicker size="small" value={s.textColor} onChange={(c) => setStyle({ textColor: c.toHexString() })} />Chữ</div>
-                            <div className="flex items-center gap-1.5"><ColorPicker size="small" value={s.accent} onChange={(c) => setStyle({ accent: c.toHexString() })} />Nhấn</div>
+                          <div className="nc-color-trio">
+                            <label><ColorPicker size="small" value={s.bandBg} onChange={(c) => setStyle({ bandBg: c.toHexString() })} />Nền</label>
+                            <label><ColorPicker size="small" value={s.textColor} onChange={(c) => setStyle({ textColor: c.toHexString() })} />Chữ</label>
+                            <label><ColorPicker size="small" value={s.accent} onChange={(c) => setStyle({ accent: c.toHexString() })} />Nhấn</label>
                           </div>
-                        </div>
+                        </PanelGroup>
+
+                        {/* Cỡ chữ */}
+                        <PanelGroup title="Chữ tiêu đề">
+                          <FieldSlider label="Cỡ chữ" value={s.fontScale} min={0.7} max={1.4} step={0.05} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setStyle({ fontScale: v })} />
+                          <FieldSlider label="Dải chữ cao tối đa" value={s.bandMaxRatio} min={0.2} max={0.45} step={0.01} format={(v) => `${Math.round(v * 100)}% ảnh`} onChange={(v) => setStyle({ bandMaxRatio: v })} />
+                        </PanelGroup>
 
                         {/* Chân ảnh */}
-                        <div className={`rounded-lg border p-3 space-y-2.5 transition-colors ${s.showFooter || s.template === 'footer' ? 'border-blue-500/50 bg-blue-500/5' : 'border-slate-800'}`}>
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs font-semibold text-slate-200">Chân ảnh: tên page và ngày</span>
+                        <PanelGroup
+                          title="Chân ảnh: tên page và ngày"
+                          extra={
                             <Switch
                               size="small"
                               checked={s.showFooter || s.template === 'footer'}
                               onChange={(on) => setStyle({ showFooter: on, ...(s.template === 'footer' ? { template: 'classic' as const } : {}) })}
                             />
-                          </div>
+                          }
+                        >
                           {(s.showFooter || s.template === 'footer') && (
                             <>
                               <Input
@@ -3515,31 +3214,23 @@ export default function NewsCardStudio() {
                                 onChange={(e) => updateLogoEverywhere({ footerText: e.target.value })}
                                 placeholder="Tên page (dùng chung mọi bài)"
                               />
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs text-slate-300">Ghi ngày hôm nay</span>
+                              <div className="nc-inline-row">
+                                <span>Ghi ngày hôm nay</span>
                                 <Switch size="small" checked={s.showDate} onChange={(on) => setStyle({ showDate: on })} />
                               </div>
                             </>
                           )}
-                        </div>
-
-                        <div>
-                          <div className={`flex justify-between ${sectionTitle}`}><span>Cỡ chữ</span><span className="text-slate-500 font-normal">{Math.round(s.fontScale * 100)}%</span></div>
-                          <Slider min={0.7} max={1.4} step={0.05} value={s.fontScale} onChange={(v) => setStyle({ fontScale: v })} tooltip={{ open: false }} />
-                          <div className={`flex justify-between ${sectionTitle}`}><span>Dải chữ tối đa</span><span className="text-slate-500 font-normal">{Math.round(s.bandMaxRatio * 100)}% ảnh</span></div>
-                          <Slider min={0.2} max={0.45} step={0.01} value={s.bandMaxRatio} onChange={(v) => setStyle({ bandMaxRatio: v })} tooltip={{ open: false }} />
-                        </div>
+                        </PanelGroup>
 
                         {/* Mẫu kiểu */}
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className={sectionTitle}>Mẫu kiểu</span>
-                            <Button size="small" type="link" className="!px-0" onClick={() => setPresetModalOpen(true)}>Lưu kiểu hiện tại</Button>
-                          </div>
+                        <PanelGroup
+                          title="Mẫu kiểu đã lưu"
+                          extra={<Button size="small" type="link" className="nc-group-link" onClick={() => setPresetModalOpen(true)}>Lưu kiểu hiện tại</Button>}
+                        >
                           <Select
                             size="small"
                             className="w-full"
-                            placeholder={presets.length ? 'Chọn mẫu để áp dụng cho bài này' : 'Chưa có mẫu — chỉnh xong bấm "Lưu kiểu hiện tại"'}
+                            placeholder={presets.length ? 'Chọn mẫu để áp dụng cho bài này' : 'Chưa có mẫu, chỉnh xong bấm "Lưu kiểu hiện tại"'}
                             value={null}
                             onChange={(v) => v && applyPreset(v)}
                             options={presets.map((p) => ({
@@ -3558,7 +3249,7 @@ export default function NewsCardStudio() {
                               ),
                             }))}
                           />
-                        </div>
+                        </PanelGroup>
                       </div>
                     ),
                   },
@@ -3566,8 +3257,8 @@ export default function NewsCardStudio() {
                     key: 'overlay',
                     label: 'Chèn thêm',
                     children: (
-                      <div className="space-y-3 pb-2">
-                        <div className="text-xs text-slate-300">Kéo trực tiếp trên khung xem trước để di chuyển, lăn chuột trên phần đó để phóng to / thu nhỏ.</div>
+                      <div className="nc-tab-body">
+                        <div className="nc-tab-intro">Kéo trên khung xem trước để di chuyển, lăn chuột để phóng to hoặc thu nhỏ.</div>
 
                         {/* Nhãn góc */}
                         <ToolCard
@@ -3576,12 +3267,12 @@ export default function NewsCardStudio() {
                           onToggle={(on) => (on ? enableBadge(active.badgeSuggestion ? { text: active.badgeSuggestion, bg: s.accent, color: '#ffffff' } : BADGE_PRESETS[0]) : setBadge(null))}
                           hint="Chữ nổi bật dán lên góc ảnh, ví dụ NÓNG, LÃI 10,5%."
                         >
-                          <div className="flex flex-wrap gap-1.5">
+                          <div className="nc-chip-row">
                             {active.badgeSuggestion && (
                               <button
                                 type="button"
                                 onClick={() => enableBadge({ text: active.badgeSuggestion!, bg: s.accent, color: '#ffffff' })}
-                                className="px-2.5 py-1 rounded text-xs font-black cursor-pointer border border-dashed border-blue-500 bg-transparent text-blue-300"
+                                className="nc-chip is-suggest"
                                 title="AI gợi ý từ nội dung bài"
                               >
                                 AI: {active.badgeSuggestion}
@@ -3592,7 +3283,7 @@ export default function NewsCardStudio() {
                                 key={b.text}
                                 type="button"
                                 onClick={() => enableBadge(b)}
-                                className={`px-2.5 py-1 rounded text-xs font-black cursor-pointer border ${active.badge?.text === b.text ? 'border-blue-500' : 'border-transparent'}`}
+                                className={`nc-badge-sample${active.badge?.text === b.text ? ' is-active' : ''}`}
                                 style={{ background: b.bg, color: b.color }}
                               >
                                 {b.text}
@@ -3608,9 +3299,9 @@ export default function NewsCardStudio() {
                                 onChange={(e) => setBadge({ text: e.target.value.toUpperCase() })}
                                 placeholder="Chữ trên nhãn"
                               />
-                              <div className="grid grid-cols-3 gap-2 text-xs text-slate-300 items-center">
-                                <div className="flex items-center gap-1.5">Nền <ColorPicker size="small" value={active.badge.bg} onChange={(c) => setBadge({ bg: c.toHexString() })} /></div>
-                                <div className="flex items-center gap-1.5">Chữ <ColorPicker size="small" value={active.badge.color} onChange={(c) => setBadge({ color: c.toHexString() })} /></div>
+                              <div className="nc-color-trio">
+                                <label><ColorPicker size="small" value={active.badge.bg} onChange={(c) => setBadge({ bg: c.toHexString() })} />Nền</label>
+                                <label><ColorPicker size="small" value={active.badge.color} onChange={(c) => setBadge({ color: c.toHexString() })} />Chữ</label>
                                 <Segmented
                                   size="small"
                                   value={active.badge.tilt === false ? 'flat' : 'tilt'}
@@ -3619,7 +3310,9 @@ export default function NewsCardStudio() {
                                 />
                               </div>
                               <FieldSlider label="Cỡ nhãn" value={active.badge.size} unit="px" min={36} max={110} step={2} onChange={(v) => setBadge({ size: v })} />
-                              <CornerButtons onPick={(c) => placeBadge(c)} />
+                              <PanelField label="Đặt nhanh vào góc">
+                                <CornerButtons onPick={(c) => placeBadge(c)} />
+                              </PanelField>
                             </>
                           )}
                         </ToolCard>
@@ -3636,8 +3329,7 @@ export default function NewsCardStudio() {
                             const borderColor = ins.borderColor || s.accent;
                             return (
                               <>
-                                <div>
-                                  <div className="text-xs text-slate-300 mb-1">Chọn ảnh</div>
+                                <PanelField label="Chọn ảnh">
                                   <div className="flex gap-1.5 flex-wrap max-h-28 overflow-y-auto">
                                     {active.images.map((u) => (
                                       <button
@@ -3650,14 +3342,13 @@ export default function NewsCardStudio() {
                                       </button>
                                     ))}
                                     <Upload accept="image/*" showUploadList={false} beforeUpload={async (f) => { const url = await uploadFile(f); if (url) { patchItem(active.id, (it) => ({ images: [...it.images, url] })); setInset({ url }); } return false; }}>
-                                      <button type="button" className="w-11 h-11 rounded-md border-2 border-dashed border-slate-600 bg-transparent text-slate-400 cursor-pointer grid place-items-center" title="Tải ảnh khác lên">
+                                      <button type="button" className="nc-add-thumb" title="Tải ảnh khác lên">
                                         <UploadOutlined />
                                       </button>
                                     </Upload>
                                   </div>
-                                </div>
-                                <div>
-                                  <div className="text-xs text-slate-300 mb-1">Hình dạng</div>
+                                </PanelField>
+                                <PanelField label="Hình dạng">
                                   <Segmented
                                     block
                                     size="small"
@@ -3665,36 +3356,38 @@ export default function NewsCardStudio() {
                                     onChange={(v) => setInset({ shape: v as InsetOptions['shape'] })}
                                     options={[{ value: 'circle', label: 'Tròn' }, { value: 'rounded', label: 'Bo góc' }, { value: 'square', label: 'Vuông' }]}
                                   />
-                                </div>
-                                <div>
-                                  <div className="text-xs text-slate-300 mb-1">Màu viền</div>
-                                  <div className="flex items-center gap-1.5">
+                                </PanelField>
+                                <PanelField label="Màu viền">
+                                  <div className="flex items-center gap-2">
                                     {[s.accent, '#ffffff', '#111111', '#ffd400'].map((c, i) => (
                                       <button
                                         key={`${c}-${i}`}
                                         type="button"
                                         onClick={() => setInset({ borderColor: i === 0 ? undefined : c })}
-                                        className={`w-6 h-6 rounded-full cursor-pointer border-2 ${(i === 0 ? !ins.borderColor : ins.borderColor === c) ? 'border-blue-500' : 'border-slate-600'}`}
+                                        className={`nc-swatch${(i === 0 ? !ins.borderColor : ins.borderColor === c) ? ' is-active' : ''}`}
                                         style={{ background: c }}
                                         title={i === 0 ? 'Màu nhấn của bài' : c}
                                       />
                                     ))}
                                     <ColorPicker size="small" value={borderColor} onChange={(c) => setInset({ borderColor: c.toHexString() })} />
-                                    <span className="ml-auto flex items-center gap-1.5 text-xs text-slate-300">
-                                      Đổ bóng <Switch size="small" checked={ins.shadow !== false} onChange={(on) => setInset({ shadow: on })} />
-                                    </span>
                                   </div>
+                                </PanelField>
+                                <div className="nc-inline-row">
+                                  <span>Đổ bóng</span>
+                                  <Switch size="small" checked={ins.shadow !== false} onChange={(on) => setInset({ shadow: on })} />
                                 </div>
                                 <FieldSlider label="Độ dày viền" value={ins.borderWidth ?? 12} unit="px" min={0} max={30} step={1} onChange={(v) => setInset({ borderWidth: v })} />
                                 <FieldSlider label="Cỡ ảnh chèn" value={ins.size} unit="px" min={220} max={560} step={10} onChange={(v) => setInset({ size: v })} />
                                 <FieldSlider label="Phóng to chi tiết" value={ins.zoom} unit="x" min={1} max={3} step={0.1} digits={1} onChange={(v) => setInset({ zoom: v })} />
                                 {ins.zoom > 1 && (
-                                  <div className="grid grid-cols-2 gap-3">
-                                    <FieldSlider label="Trái ↔ phải" value={ins.x} unit="%" min={0} max={100} step={1} onChange={(v) => setInset({ x: v })} />
-                                    <FieldSlider label="Trên ↕ dưới" value={ins.y} unit="%" min={0} max={100} step={1} onChange={(v) => setInset({ y: v })} />
+                                  <div className="nc-field-pair">
+                                    <FieldSlider label="Vùng ngang" value={ins.x} unit="%" min={0} max={100} step={1} onChange={(v) => setInset({ x: v })} />
+                                    <FieldSlider label="Vùng dọc" value={ins.y} unit="%" min={0} max={100} step={1} onChange={(v) => setInset({ y: v })} />
                                   </div>
                                 )}
-                                <CornerButtons onPick={placeInset} />
+                                <PanelField label="Đặt nhanh vào góc">
+                                  <CornerButtons onPick={placeInset} />
+                                </PanelField>
                               </>
                             );
                           })()}
@@ -3709,7 +3402,7 @@ export default function NewsCardStudio() {
                           hint={s.logoUrl ? undefined : 'Tải logo lên một lần, dùng chung cho mọi bài.'}
                           alwaysShow
                         >
-                          <div className="flex items-center gap-2">
+                          <div className="nc-current-kit">
                             {s.logoUrl && (
                               // Nền caro để thấy rõ phần đã tách nền
                               <div
@@ -3722,43 +3415,41 @@ export default function NewsCardStudio() {
                             <Upload accept="image/*" showUploadList={false} beforeUpload={uploadLogo}>
                               <Button size="small" icon={<UploadOutlined />} loading={logoBusy}>{s.logoUrl ? 'Đổi logo' : 'Tải logo lên'}</Button>
                             </Upload>
-                            <span className="text-xs text-slate-300">{s.logoUrl ? 'Bật/tắt riêng từng bài' : 'PNG nền trong suốt là đẹp nhất'}</span>
+                            <span className="text-xs text-slate-400">{s.logoUrl ? 'Bật/tắt riêng từng bài' : 'PNG nền trong suốt là đẹp nhất'}</span>
                           </div>
                           {s.showLogo && s.logoUrl && (
-                            <div className="mt-2 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs text-slate-300">Tách nền (xoá nền trắng quanh logo)</span>
+                            <>
+                              <div className="nc-inline-row">
+                                <span>Tách nền trắng quanh logo</span>
                                 {s.logoNoBgUrl ? (
                                   <Switch size="small" checked={s.logoBgRemoved} onChange={(on) => updateLogoEverywhere({ logoBgRemoved: on })} />
                                 ) : (
                                   <Button size="small" loading={logoBusy} onClick={removeBgFromCurrentLogo}>Tách nền</Button>
                                 )}
                               </div>
-                              <div>
-                                <div className="text-xs text-slate-300 mb-1">Kiểu khung</div>
-                                <Segmented
-                                  block
-                                  size="small"
+                              <PanelField label="Kiểu khung logo">
+                                <OptionGrid
+                                  cols={5}
                                   value={s.logoFrame}
                                   onChange={(v) => setStyle({ logoFrame: v as LogoFrame })}
                                   options={[
                                     { value: 'none', label: 'Không' },
                                     { value: 'circle', label: 'Tròn' },
                                     { value: 'rounded', label: 'Bo góc' },
-                                    { value: 'pill', label: 'Viên thuốc' },
+                                    { value: 'pill', label: 'Thuôn', title: 'Khung bo tròn hai đầu' },
                                     { value: 'square', label: 'Vuông' },
                                   ]}
                                 />
-                              </div>
+                              </PanelField>
                               {s.logoFrame !== 'none' && (
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-xs text-slate-300 mr-1">Màu khung</span>
+                                <div className="nc-color-row">
+                                  <span className="nc-color-label">Màu khung</span>
                                   {LOGO_FRAME_BG_PRESETS.map((c) => (
                                     <button
                                       key={c}
                                       type="button"
                                       onClick={() => setStyle({ logoFrameBg: c })}
-                                      className={`w-6 h-6 rounded-full cursor-pointer border-2 ${s.logoFrameBg === c ? 'border-blue-500' : 'border-slate-600'}`}
+                                      className={`nc-swatch${s.logoFrameBg === c ? ' is-active' : ''}`}
                                       style={{ background: c }}
                                       title={c}
                                     />
@@ -3766,8 +3457,7 @@ export default function NewsCardStudio() {
                                   <ColorPicker size="small" value={s.logoFrameBg} onChange={(c) => setStyle({ logoFrameBg: c.toRgbString() })} />
                                 </div>
                               )}
-                              <div>
-                                <div className="text-xs text-slate-300 mb-1">Màu logo</div>
+                              <PanelField label="Màu logo">
                                 <Segmented
                                   block
                                   size="small"
@@ -3782,34 +3472,40 @@ export default function NewsCardStudio() {
                                 {s.logoTint !== 'original' && !s.logoBgRemoved && s.logoFrame === 'none' && (
                                   <div className="text-xs text-amber-400 mt-1">Nên bật Tách nền, nếu không cả ô nền cũng bị đổi màu.</div>
                                 )}
-                              </div>
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs text-slate-300">Đổ bóng</span>
+                              </PanelField>
+                              <div className="nc-inline-row">
+                                <span>Đổ bóng</span>
                                 <Switch size="small" checked={s.logoShadow} onChange={(on) => setStyle({ logoShadow: on })} />
                               </div>
-                              <div className="flex justify-between text-xs text-slate-300"><span>Độ đậm</span><span>{Math.round(s.logoOpacity * 100)}%</span></div>
-                              <Slider min={0.3} max={1} step={0.05} value={s.logoOpacity} onChange={(v) => setStyle({ logoOpacity: v })} tooltip={{ open: false }} />
-                              <CornerButtons value={s.logoPos} onPick={placeLogo} />
-                              <div className="flex justify-between text-xs text-slate-300"><span>Cỡ logo</span><span>{s.logoSize}px</span></div>
-                              <Slider min={100} max={480} step={10} value={s.logoSize} onChange={(v) => setStyle({ logoSize: v })} tooltip={{ open: false }} />
-                            </div>
+                              <PanelField label="Vị trí">
+                                <CornerButtons value={s.logoPos} onPick={placeLogo} />
+                              </PanelField>
+                              <div className="nc-field-pair">
+                                <FieldSlider label="Cỡ logo" value={s.logoSize} unit="px" min={100} max={480} step={10} onChange={(v) => setStyle({ logoSize: v })} />
+                                <FieldSlider label="Độ đậm" value={s.logoOpacity} min={0.3} max={1} step={0.05} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setStyle({ logoOpacity: v })} />
+                              </div>
+                            </>
                           )}
                         </ToolCard>
 
                         {/* Nguồn */}
-                        <div className="rounded-lg border border-slate-800 p-3 flex items-center justify-between gap-2">
-                          <span className="text-xs font-semibold text-slate-300">Ghi "Nguồn: {sourceName(active.url)}" trên ảnh</span>
-                          <Switch size="small" checked={s.showCredit} onChange={(on) => setStyle({ showCredit: on })} />
-                        </div>
+                        <PanelGroup
+                          title="Ghi nguồn trên ảnh"
+                          extra={<Switch size="small" checked={s.showCredit} onChange={(on) => setStyle({ showCredit: on })} />}
+                          hint={`Hiện dòng "Nguồn: ${sourceName(active.url)}" ở góc ảnh.`}
+                        />
                       </div>
                     ),
                   },
                   ]}
                 />
               </div>
-              <div className="shrink-0 flex gap-2 pt-3 border-t border-slate-800">
-                <Button size="small" onClick={saveDefaults}>Lưu làm mặc định</Button>
-                <Button size="small" onClick={applyStyleToAll}>Áp dụng cho tất cả bài</Button>
+              <div className="nc-panel-footer">
+                <span className="nc-footer-label">Kiểu ảnh của bài này</span>
+                <div className="nc-footer-actions">
+                  <Button size="small" onClick={saveDefaults} title="Bài thêm vào Studio sau này sẽ dùng sẵn kiểu ảnh này">Lưu làm mặc định</Button>
+                  <Button size="small" onClick={applyStyleToAll} title={`Chép kiểu ảnh này sang tất cả ${items.length} bài đang có trong Studio`}>Áp cho cả {items.length} bài</Button>
+                </div>
               </div>
             </>
           )}
@@ -4000,20 +3696,29 @@ export default function NewsCardStudio() {
   );
 }
 
-function CornerButtons({ value, onPick }: { value?: Corner; onPick: (c: Corner) => void }) {
+// Bảng chọn vị trí theo sơ đồ góc ảnh; có thể thêm ô "Giữa" ở cột giữa
+function CornerButtons({ value, onPick, center }: {
+  value?: Corner;
+  onPick: (c: Corner) => void;
+  center?: { active: boolean; onPick: () => void };
+}) {
+  const cell = (c: Corner, label: string) => (
+    <button key={c} type="button" onClick={() => onPick(c)} className={`nc-option${value === c ? ' is-active' : ''}`}>
+      {label}
+    </button>
+  );
   return (
-    <Segmented
-      block
-      size="small"
-      value={value ?? (null as any)}
-      onChange={(v) => onPick(v as Corner)}
-      options={[
-        { value: 'tl', label: '↖ Trên-T' },
-        { value: 'tr', label: '↗ Trên-P' },
-        { value: 'bl', label: '↙ Dưới-T' },
-        { value: 'br', label: '↘ Dưới-P' },
-      ]}
-    />
+    <div className={`nc-pos-pad${center ? ' has-center' : ''}`}>
+      {cell('tl', 'Trên trái')}
+      {center && (
+        <button type="button" onClick={center.onPick} className={`nc-option nc-pos-center${center.active ? ' is-active' : ''}`}>
+          Giữa
+        </button>
+      )}
+      {cell('tr', 'Trên phải')}
+      {cell('bl', 'Dưới trái')}
+      {cell('br', 'Dưới phải')}
+    </div>
   );
 }
 
@@ -4044,7 +3749,63 @@ function TemplatePreview({ html, ratio }: { html: string; ratio: CardRatio }) {
   );
 }
 
-// Khung cho từng phần chèn thêm (nhãn, ảnh chèn, logo): tiêu đề + công tắc, mở ra phần chỉnh khi bật
+// Nhóm cài đặt phẳng dùng chung cho mọi tab: tiêu đề nhỏ + công tắc/nút bên phải, gợi ý ngắn, nội dung
+function PanelGroup({ title, extra, hint, children }: {
+  title: React.ReactNode;
+  extra?: React.ReactNode;
+  hint?: React.ReactNode;
+  children?: React.ReactNode;
+}) {
+  return (
+    <section className="nc-group">
+      <div className="nc-group-head">
+        <span className="nc-group-title">{title}</span>
+        {extra}
+      </div>
+      {hint && <div className="nc-group-hint">{hint}</div>}
+      {children && <div className="nc-group-body">{children}</div>}
+    </section>
+  );
+}
+
+// Một trường trong nhóm: nhãn (và giá trị hiện tại) ở trên, điều khiển ở dưới
+function PanelField({ label, value, children }: { label: React.ReactNode; value?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="nc-field">
+      <div className="nc-field-head">
+        <span>{label}</span>
+        {value !== undefined && <span className="nc-field-value">{value}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// Lưới nút chọn một (dùng khi quá nhiều lựa chọn để nhét vừa một Segmented)
+function OptionGrid<T extends string | number>({ value, options, onChange, cols = 3 }: {
+  value: T | undefined;
+  options: Array<{ value: T; label: string; title?: string }>;
+  onChange: (v: T) => void;
+  cols?: number;
+}) {
+  return (
+    <div className="nc-option-grid" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+      {options.map((o) => (
+        <button
+          key={String(o.value)}
+          type="button"
+          title={o.title}
+          onClick={() => onChange(o.value)}
+          className={`nc-option${o.value === value ? ' is-active' : ''}`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Phần chèn thêm (nhãn, ảnh chèn, logo): nhóm có công tắc cạnh tiêu đề, mở phần chỉnh khi bật
 function ToolCard({ title, checked, onToggle, disabled, hint, alwaysShow, children }: {
   title: string;
   checked: boolean;
@@ -4055,32 +3816,32 @@ function ToolCard({ title, checked, onToggle, disabled, hint, alwaysShow, childr
   children?: React.ReactNode;
 }) {
   return (
-    <div className={`rounded-lg border p-3 transition-colors ${checked ? 'border-blue-500/50 bg-blue-500/5' : 'border-slate-800'}`}>
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-semibold text-slate-200">{title}</span>
-        <Switch size="small" checked={checked} disabled={disabled} onChange={onToggle} />
-      </div>
-      {hint && !checked && <div className="text-xs text-slate-300 mt-1">{hint}</div>}
-      {(checked || alwaysShow) && children && <div className="mt-2.5 space-y-2.5">{children}</div>}
-    </div>
+    <PanelGroup
+      title={title}
+      extra={<Switch size="small" checked={checked} disabled={disabled} onChange={onToggle} />}
+      hint={hint && !checked ? hint : undefined}
+    >
+      {(checked || alwaysShow) && children ? children : null}
+    </PanelGroup>
   );
 }
 
-function FieldSlider({ label, value, unit, min, max, step, digits = 0, onChange }: {
+function FieldSlider({ label, value, unit = '', min, max, step, digits = 0, format, marks, onChange }: {
   label: string;
   value: number;
-  unit: string;
+  unit?: string;
   min: number;
   max: number;
   step: number;
   digits?: number;
+  format?: (v: number) => string;
+  marks?: Record<number, string>;
   onChange: (v: number) => void;
 }) {
   return (
-    <div>
-      <div className="flex justify-between text-xs text-slate-300"><span>{label}</span><span>{value.toFixed(digits)}{unit}</span></div>
-      <Slider min={min} max={max} step={step} value={value} onChange={onChange} tooltip={{ open: false }} className="!my-1" />
-    </div>
+    <PanelField label={label} value={format ? format(value) : `${value.toFixed(digits)}${unit}`}>
+      <Slider min={min} max={max} step={step} value={value} onChange={onChange} marks={marks} tooltip={{ open: false }} className={`nc-slider${marks ? ' has-marks' : ''}`} />
+    </PanelField>
   );
 }
 

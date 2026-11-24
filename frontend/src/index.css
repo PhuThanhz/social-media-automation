@@ -10069,6 +10069,498 @@ body .fb-post-mock {
   min-height: 0;
   overflow-y: auto;
   padding-right: 6px;
+  /* nội dung cuộn mờ dần ở mép trên, không trông như bị thanh tab đè lên */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 10px);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 10px);
+}
+
+/* Studio Ảnh Tin — panel cài đặt (cột phải) */
+.nc-panel-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nc-field-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.nc-field-label {
+  flex: 0 0 40px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.nc-field-select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+body .dashboard-shell .nc-field-extra {
+  flex: 0 0 auto;
+  padding-inline: 6px;
+  font-size: 12px;
+  color: #7dd3fc;
+}
+
+.nc-primary-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+body .dashboard-shell .nc-primary-action.ant-btn {
+  height: 38px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 700;
+  background: #2563eb;
+  border-color: #2563eb;
+  box-shadow: none;
+}
+
+body .dashboard-shell .nc-primary-action.ant-btn:not(:disabled):hover {
+  background: #3b82f6;
+  border-color: #3b82f6;
+}
+
+.nc-primary-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  font-size: 11.5px;
+  color: #94a3b8;
+}
+
+body .dashboard-shell .nc-primary-batch.ant-btn {
+  height: auto;
+  padding: 0;
+  font-size: 12px;
+}
+
+/* Khối tab co theo nội dung: nội dung ngắn thì chân panel nằm ngay dưới, dài thì tự cuộn */
+.nc-tabs-wrap {
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 4 tab chia đều bề ngang — không bị cắt chữ, không ẩn sau nút "…" */
+.studio-editor-tabs>.ant-tabs-nav .ant-tabs-nav-list {
+  flex: 1 1 auto;
+}
+
+body .dashboard-shell .studio-editor-tabs>.ant-tabs-nav .ant-tabs-tab {
+  flex: 1 1 0;
+  justify-content: center;
+  margin: 0;
+  padding: 9px 4px;
+  font-size: 13px !important;
+  white-space: nowrap;
+}
+
+body .dashboard-shell .studio-editor-tabs>.ant-tabs-nav .ant-tabs-tab-active .ant-tabs-tab-btn {
+  text-shadow: none;
+}
+
+.studio-editor-tabs>.ant-tabs-nav .ant-tabs-nav-operations {
+  display: none !important;
+}
+
+/* ── Chuẩn chung cho mọi tab của panel: nhóm phẳng, ngăn bằng một đường kẻ mảnh ── */
+.nc-tab-body {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 4px;
+}
+
+.nc-tab-intro {
+  font-size: 12px;
+  color: #94a3b8;
+  padding: 12px 0 2px;
+}
+
+.nc-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 0;
+  border-top: 1px solid rgba(255, 255, 255, .08);
+}
+
+.nc-tab-body>.nc-group:first-child {
+  border-top: 0;
+  padding-top: 12px;
+}
+
+.nc-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.nc-group-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #e2e8f0;
+  min-width: 0;
+}
+
+body .dashboard-shell .nc-group-head .ant-btn {
+  font-size: 12px;
+  color: #7dd3fc;
+  padding-inline: 6px;
+  flex: 0 0 auto;
+}
+
+body .dashboard-shell .nc-group-head .ant-btn.nc-group-link {
+  padding-inline: 0;
+  height: auto;
+}
+
+.nc-group-note {
+  font-size: 12px;
+  color: #64748b;
+  flex: 0 0 auto;
+}
+
+.nc-group-hint {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #94a3b8;
+}
+
+.nc-group-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.nc-subtitle {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #94a3b8;
+  margin-bottom: -4px;
+}
+
+.nc-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.nc-field-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+.nc-field-value {
+  color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+}
+
+.nc-field-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px 14px;
+}
+
+.nc-inline-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+body .dashboard-shell .nc-inline-row .ant-btn.nc-group-link {
+  padding-inline: 0;
+  height: auto;
+  font-size: 12px;
+}
+
+body .dashboard-shell .nc-slider.ant-slider {
+  margin: 2px 4px 0;
+}
+
+body .dashboard-shell .nc-slider.ant-slider.has-marks {
+  margin-bottom: 18px;
+}
+
+body .dashboard-shell .nc-slider .ant-slider-mark-text {
+  font-size: 11.5px;
+  color: #94a3b8;
+}
+
+body .dashboard-shell .nc-slider .ant-slider-mark-text-active {
+  color: #cbd5e1;
+}
+
+/* Nút chọn một trong lưới (kiểu nền, khung logo, vị trí) — chữ nhật bo nhẹ, không pill */
+.nc-option-grid {
+  display: grid;
+  gap: 4px;
+}
+
+.nc-option {
+  min-width: 0;
+  padding: 5px 2px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  background: rgba(255, 255, 255, .04);
+  color: #cbd5e1;
+  font-size: 12px;
+  line-height: 1.3;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: border-color .15s ease, background-color .15s ease;
+}
+
+.nc-option:hover {
+  border-color: rgba(255, 255, 255, .28);
+  color: #fff;
+}
+
+.nc-option.is-active {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, .18);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Segmented chia theo độ dài chữ thay vì chia đều, để nhãn dài không bị cắt */
+body .dashboard-shell .nc-seg-fit .ant-segmented-item {
+  flex: 1 1 auto;
+  min-width: auto;
+}
+
+.nc-pos-pad {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+.nc-pos-pad.has-center {
+  grid-template-columns: 1fr .8fr 1fr;
+}
+
+.nc-pos-center {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.nc-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.nc-chip {
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  background: rgba(255, 255, 255, .04);
+  color: #cbd5e1;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.nc-chip:hover {
+  border-color: rgba(255, 255, 255, .28);
+  color: #fff;
+}
+
+.nc-chip.is-active {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, .18);
+  color: #fff;
+}
+
+.nc-chip.is-suggest {
+  border-color: rgba(59, 130, 246, .6);
+  color: #93c5fd;
+  font-weight: 700;
+}
+
+.nc-badge-sample {
+  padding: 3px 9px;
+  border-radius: 4px;
+  border: 2px solid transparent;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.nc-badge-sample.is-active {
+  border-color: #3b82f6;
+}
+
+.nc-color-trio {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 14px;
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+.nc-color-trio>label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.nc-current-kit {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nc-kit-thumb {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, .45);
+  border: 1px solid rgba(255, 255, 255, .12);
+  padding: 2px;
+  flex: 0 0 auto;
+}
+
+.nc-upload-block,
+.nc-upload-block .ant-upload {
+  display: block;
+  width: 100%;
+}
+
+.nc-add-tile {
+  aspect-ratio: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  background: rgba(255, 255, 255, .03);
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color .15s ease, color .15s ease;
+}
+
+.nc-add-tile:hover {
+  border-color: #3b82f6;
+  color: #93c5fd;
+}
+
+.nc-add-thumb {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, .18);
+  background: rgba(255, 255, 255, .03);
+  color: #94a3b8;
+  cursor: pointer;
+}
+
+.nc-add-thumb:hover {
+  border-color: #3b82f6;
+  color: #93c5fd;
+}
+
+.nc-headline-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.nc-color-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nc-color-label {
+  flex: 0 0 72px;
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+.nc-color-sep {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, .14);
+  margin-inline: 2px;
+}
+
+.nc-swatch {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, .28);
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition: box-shadow .15s ease;
+}
+
+.nc-swatch:hover {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, .35);
+}
+
+.nc-swatch.is-active {
+  box-shadow: 0 0 0 2px #0b1220, 0 0 0 4px #38bdf8;
+}
+
+/* Ô màu đang dùng: vuông bo nhẹ để phân biệt với màu nhanh */
+.nc-swatch.nc-swatch-current {
+  width: 28px;
+  border-radius: 6px;
+}
+
+.nc-panel-footer {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, .09);
+}
+
+.nc-footer-label {
+  font-size: 11.5px;
+  color: #94a3b8;
+}
+
+.nc-footer-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
 
 /* ========================================================================== */
