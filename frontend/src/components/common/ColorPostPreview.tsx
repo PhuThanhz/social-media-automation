@@ -1,5 +1,6 @@
 import { Tag } from 'antd';
 import { LikeOutlined, MessageOutlined, ShareAltOutlined } from '@ant-design/icons';
+import { getColorBackgroundPreset } from '../../utils/colorBackgroundPresets';
 
 // Facebook tự hủy phông nền khi status dài hơn 130 ký tự; worker cắt còn 126 ký tự + "..." trước khi gõ.
 const COLOR_POST_MAX_CHARS = 130;
@@ -10,9 +11,12 @@ interface ColorPostPreviewProps {
   authorName?: string;
   hasMedia?: boolean;
   mode?: boolean | 'RED_PHOTO_TRICK';
+  preset?: string;
 }
 
-const ColorPostPreview = ({ text, comment, authorName = 'Fanpage', hasMedia, mode }: ColorPostPreviewProps) => {
+const ColorPostPreview = ({ text, comment, authorName = 'Fanpage', hasMedia, mode, preset }: ColorPostPreviewProps) => {
+  // Mẹo 3 chấm chỉ hỗ trợ nền đỏ.
+  const bg = getColorBackgroundPreset(mode === 'RED_PHOTO_TRICK' ? 'RED' : preset);
   const trimmed = (text || '').trim();
   const postedText = trimmed.length > COLOR_POST_MAX_CHARS ? trimmed.slice(0, 126) + '...' : trimmed;
   const fontSize = postedText.length <= 60 ? 'text-[26px]' : postedText.length <= 100 ? 'text-[22px]' : 'text-lg';
@@ -39,8 +43,8 @@ const ColorPostPreview = ({ text, comment, authorName = 'Fanpage', hasMedia, mod
           </div>
         </div>
 
-        <div className="bg-[#e41e3f] min-h-[240px] flex items-center justify-center px-6 py-8">
-          <p className={`m-0 text-white font-bold text-center leading-snug whitespace-pre-wrap break-words ${fontSize}`}>
+        <div className="min-h-[240px] flex items-center justify-center px-6 py-8" style={{ background: bg.css }}>
+          <p style={{ color: bg.textColor }} className={`m-0 font-bold text-center leading-snug whitespace-pre-wrap break-words ${fontSize}`}>
             {postedText || 'Nhập caption để xem trước'}
           </p>
         </div>

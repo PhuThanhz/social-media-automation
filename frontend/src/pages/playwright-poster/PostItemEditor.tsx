@@ -39,6 +39,7 @@ import {
 } from '@ant-design/icons';
 import PasteLinkInput from '../../components/common/PasteLinkInput';
 import ColorPostPreview from '../../components/common/ColorPostPreview';
+import ColorBackgroundPicker from '../../components/common/ColorBackgroundPicker';
 import type { ItemPreview, PostLinkItem, PostMode, SocialAccount } from './types';
 import { buildExtraGroupOptions, filterSelectByLabel } from './shared';
 
@@ -50,6 +51,7 @@ type AnyFn = (...args: any[]) => any;
 // Các hàm từ PlaywrightPoster; truyền qua useStableActions nên reference không đổi giữa các lần render
 export interface PostItemEditorActions {
   openNewsCardForItem: AnyFn;
+  openTextCardForItem: AnyFn;
   isMediaVideo: AnyFn;
   setMediaViewer: AnyFn;
   handleMediaDragStart: AnyFn;
@@ -148,6 +150,7 @@ function PostItemEditor({
   const { message } = App.useApp();
   const {
     openNewsCardForItem,
+    openTextCardForItem,
     isMediaVideo,
     setMediaViewer,
     handleMediaDragStart,
@@ -707,7 +710,7 @@ function PostItemEditor({
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-[13px] font-bold text-red-300">
-                          {item.colorBackground === 'RED_PHOTO_TRICK' ? '🔴 Đang chọn: Nền Đỏ + Kèm Ảnh (Mẹo 3 chấm)' : '🔴 Đang chọn: Status Nền Đỏ (Thuần chữ)'}
+                          {item.colorBackground === 'RED_PHOTO_TRICK' ? '🔴 Đang chọn: Nền Đỏ + Kèm Ảnh (Mẹo 3 chấm)' : 'Đang chọn: Status nền màu (Thuần chữ)'}
                         </span>
                         <div className="inline-flex rounded-lg bg-black/40 p-0.5 border border-red-800/50 text-xs">
                           <button
@@ -759,6 +762,13 @@ function PostItemEditor({
                       )}
                     </div>
 
+                    {item.colorBackground === true && (
+                      <ColorBackgroundPicker
+                        value={item.colorBackgroundPreset}
+                        onChange={(key: string) => setLinkItems((prev: PostLinkItem[]) => prev.map((it) => it.id === item.id ? { ...it, colorBackgroundPreset: key } : it))}
+                      />
+                    )}
+
                     {item.colorBackground === 'RED_PHOTO_TRICK' && (
                       <div className="text-xs text-amber-200 bg-amber-950/40 p-2.5 rounded-lg border border-amber-800/40 flex items-center gap-1.5">
                         <span>💡</span>
@@ -789,6 +799,7 @@ function PostItemEditor({
                       authorName={previewAuthorName}
                       hasMedia={!!item.manualMediaUrls?.length}
                       mode={item.colorBackground}
+                      preset={item.colorBackgroundPreset}
                     />
                   </div>
                 )}
@@ -1040,7 +1051,7 @@ function PostItemEditor({
 
               <div className="mt-3 flex items-center gap-2 flex-wrap">
 
-                <Tooltip title="Đăng status phông nền màu đỏ giật tít trên Facebook (Tối đa 130 ký tự, toàn bộ nội dung bài viết & hashtag sẽ tự động thả ở bình luận đầu tiên)">
+                <Tooltip title="Đăng status phông nền màu (đỏ, cầu vồng, gradient...) giật tít trên Facebook (Tối đa 130 ký tự, toàn bộ nội dung bài viết & hashtag sẽ tự động thả ở bình luận đầu tiên)">
                   <button
                     type="button"
                     onClick={() => toggleColorBackground(item.id)}
@@ -1049,8 +1060,18 @@ function PostItemEditor({
                         : 'poster-opt-chip'
                       }`}
                   >
-                    <span className="poster-opt-dot" /><span>Nền đỏ</span>
+                    <span className="poster-opt-dot" /><span>Nền màu</span>
                     {item.colorBackground && <CheckOutlined className="text-xs text-rose-400" />}
+                  </button>
+                </Tooltip>
+
+                <Tooltip title="Vẽ chữ của bài lên ảnh với hơn 100 nền (gradient, loang màu, nhiễu hạt, họa tiết...) rồi đăng như ảnh — không giới hạn 130 ký tự như nền Facebook">
+                  <button
+                    type="button"
+                    onClick={() => openTextCardForItem(item, 'MANUAL')}
+                    className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border cursor-pointer flex items-center gap-1.5 select-none poster-opt-chip"
+                  >
+                    <span className="poster-opt-dot" /><span>Ảnh chữ</span>
                   </button>
                 </Tooltip>
 
@@ -1665,7 +1686,7 @@ function PostItemEditor({
                             <div className="flex items-center justify-between flex-wrap gap-2">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-xs font-bold text-red-300">
-                                  {item.colorBackground === 'RED_PHOTO_TRICK' ? '🔴 Đang chọn: Nền Đỏ + Kèm Ảnh (Mẹo 3 chấm)' : '🔴 Đang chọn: Status Nền Đỏ (Thuần chữ)'}
+                                  {item.colorBackground === 'RED_PHOTO_TRICK' ? '🔴 Đang chọn: Nền Đỏ + Kèm Ảnh (Mẹo 3 chấm)' : 'Đang chọn: Status nền màu (Thuần chữ)'}
                                 </span>
                                 <div className="inline-flex rounded-lg bg-black/40 p-0.5 border border-red-800/50 text-xs">
                                   <button
@@ -1717,6 +1738,13 @@ function PostItemEditor({
                               )}
                             </div>
 
+                            {item.colorBackground === true && (
+                              <ColorBackgroundPicker
+                                value={item.colorBackgroundPreset}
+                                onChange={(key: string) => setLinkItems((prev: PostLinkItem[]) => prev.map((it) => it.id === item.id ? { ...it, colorBackgroundPreset: key } : it))}
+                              />
+                            )}
+
                             {item.colorBackground === 'RED_PHOTO_TRICK' && (
                               <div className="text-xs text-amber-200 bg-amber-950/40 p-2.5 rounded-lg border border-amber-800/40 flex items-center gap-1.5">
                                 <span>💡</span>
@@ -1747,6 +1775,7 @@ function PostItemEditor({
                               authorName={previewAuthorName}
                               hasMedia={!!preview?.mediaUrls?.length}
                               mode={item.colorBackground}
+                              preset={item.colorBackgroundPreset}
                             />
                           </div>
                         )}
@@ -1756,7 +1785,7 @@ function PostItemEditor({
                       {/* Tùy chọn bài viết */}
                       <div className="mt-3 flex items-center gap-2 flex-wrap">
 
-                        <Tooltip title="Đăng status phông nền màu đỏ giật tít trên Facebook (Tối đa 130 ký tự, toàn bộ nội dung bài báo & hashtag sẽ tự động thả ở bình luận đầu tiên)">
+                        <Tooltip title="Đăng status phông nền màu (đỏ, cầu vồng, gradient...) giật tít trên Facebook (Tối đa 130 ký tự, toàn bộ nội dung bài báo & hashtag sẽ tự động thả ở bình luận đầu tiên)">
                           <button
                             type="button"
                             onClick={() => toggleColorBackground(item.id)}
@@ -1765,9 +1794,19 @@ function PostItemEditor({
                                 : 'poster-opt-chip'
                               }`}
                           >
-                            <span className="poster-opt-dot" /><span>Nền đỏ</span>
+                            <span className="poster-opt-dot" /><span>Nền màu</span>
                             <span className="text-[10px] opacity-75">(&lt; 130 ký tự)</span>
                             {item.colorBackground && <CheckOutlined className="text-xs text-rose-400" />}
+                          </button>
+                        </Tooltip>
+
+                        <Tooltip title="Vẽ chữ của bài lên ảnh với hơn 100 nền (gradient, loang màu, nhiễu hạt, họa tiết...) rồi đăng như ảnh — không giới hạn 130 ký tự như nền Facebook">
+                          <button
+                            type="button"
+                            onClick={() => openTextCardForItem(item, 'LINK')}
+                            className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border cursor-pointer flex items-center gap-1.5 select-none poster-opt-chip"
+                          >
+                            <span className="poster-opt-dot" /><span>Ảnh chữ</span>
                           </button>
                         </Tooltip>
 
@@ -1881,7 +1920,7 @@ function PostItemEditor({
 
                 <div className="mt-3 flex items-center gap-2 flex-wrap">
 
-                  <Tooltip title="Đăng status phông nền màu đỏ (tối đa 130 ký tự). Dán link xong sẽ hiện khung chọn Thuần chữ / Kèm ảnh và xem trước.">
+                  <Tooltip title="Đăng status phông nền màu (đỏ, cầu vồng, gradient...) (tối đa 130 ký tự). Dán link xong sẽ hiện khung chọn Thuần chữ / Kèm ảnh và xem trước.">
                     <button
                       type="button"
                       onClick={() => toggleColorBackground(item.id)}
@@ -1890,8 +1929,18 @@ function PostItemEditor({
                           : 'poster-opt-chip'
                         }`}
                     >
-                      <span className="poster-opt-dot" /><span>Nền đỏ</span>
+                      <span className="poster-opt-dot" /><span>Nền màu</span>
                       {item.colorBackground && <CheckOutlined className="text-xs text-rose-400" />}
+                    </button>
+                  </Tooltip>
+
+                  <Tooltip title="Vẽ chữ của bài lên ảnh với hơn 100 nền (gradient, loang màu, nhiễu hạt, họa tiết...) rồi đăng như ảnh — không giới hạn 130 ký tự như nền Facebook">
+                    <button
+                      type="button"
+                      onClick={() => openTextCardForItem(item, 'LINK')}
+                      className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border cursor-pointer flex items-center gap-1.5 select-none poster-opt-chip"
+                    >
+                      <span className="poster-opt-dot" /><span>Ảnh chữ</span>
                     </button>
                   </Tooltip>
 

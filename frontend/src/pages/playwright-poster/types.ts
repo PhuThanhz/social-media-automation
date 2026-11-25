@@ -33,6 +33,8 @@ export interface PostLinkItem {
   groupCommentEnabled?: boolean;
   customCaption?: string;
   colorBackground?: boolean | 'RED_PHOTO_TRICK';
+  /** Phông nền status nền màu (key trong utils/colorBackgroundPresets) — mặc định RED. */
+  colorBackgroundPreset?: string;
   extraGroupIds?: string[];
 }
 

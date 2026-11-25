@@ -53,6 +53,8 @@ import api from '../config/axios';
 import { DEFAULT_FANPAGE_PLATFORM_ACCOUNT_ID } from '../config/constants';
 import { cleanSocialUrl } from '../components/common/PasteLinkInput';
 import NewsCardModal, { type NewsCardSource } from '../components/modals/NewsCardModal';
+import TextCardModal from '../components/modals/TextCardModal';
+import TextBulkModal, { type TextBulkPost } from '../components/modals/TextBulkModal';
 import PostDetailModal from '../components/modals/PostDetailModal';
 import QuickUpdateCookieModal from '../components/modals/QuickUpdateCookieModal';
 import { POSTING_WINDOW_QUERY_KEY, schedulePayload, type ScheduleValue } from '../components/common/postingSchedule';
@@ -387,20 +389,69 @@ const PlaywrightPoster = () => {
     });
   };
 
-  const applyNewsCardToItem = (cardUrl: string) => {
-    if (!newsCardTarget) return;
-    const { itemId, mode } = newsCardTarget;
+  // Gắn 1 ảnh đã dựng (Ảnh tin / Ảnh chữ) làm media duy nhất của bài
+  const attachCardImageToItem = (itemId: string, mode: 'LINK' | 'MANUAL', cardUrl: string) => {
     if (mode === 'MANUAL') {
       setLinkItems((prev) => prev.map((it) => (it.id === itemId ? { ...it, manualMediaUrls: [cardUrl], manualMediaKinds: ['image'] } : it)));
     } else {
       // Giữ originalMediaUrls để nút khôi phục media gốc vẫn dùng được
+      // Bài dán từ "Dán nhanh nhiều link" có thể chỉ có preview trong bulkDrawerPreviews
+      const itemUrl = linkItems.find((it) => it.id === itemId)?.url?.trim() || '';
       setPreviews((prev) => {
-        const cur = prev[itemId];
-        if (!cur) return prev;
+        const cur = prev[itemId] || bulkDrawerPreviews[itemUrl] || { loading: false };
         return { ...prev, [itemId]: { ...cur, mediaUrls: [cardUrl], mediaKinds: ['image'], imageCount: 1, videoCount: 0 } };
       });
     }
+  };
+
+  const applyNewsCardToItem = (cardUrl: string) => {
+    if (!newsCardTarget) return;
+    attachCardImageToItem(newsCardTarget.itemId, newsCardTarget.mode, cardUrl);
     setNewsCardTarget(null);
+  };
+
+  // Studio "Ảnh chữ": chữ của bài vẽ lên nền → ảnh đăng kèm bài
+  const [textCardTarget, setTextCardTarget] = useState<{ itemId: string; mode: 'LINK' | 'MANUAL'; text: string } | null>(null);
+  const openTextCardForItem = (item: PostLinkItem, mode: 'LINK' | 'MANUAL', textOverride?: string) => {
+    const text = textOverride !== undefined ? textOverride : mode === 'MANUAL'
+      ? (item.manualContent || '')
+      : (item.customCaption !== undefined ? item.customCaption : (previews[item.id]?.caption || ''));
+    setTextCardTarget({ itemId: item.id, mode, text });
+  };
+  // "Dán nhiều bài chữ": mỗi đoạn thành 1 bài tự soạn — ngắn thì phông nền FB, dài thì ảnh chữ đã vẽ sẵn
+  const [textBulkOpen, setTextBulkOpen] = useState(false);
+  const createTextBulkPosts = (posts: TextBulkPost[]) => {
+    setLinkItems((prev) => {
+      // Bỏ các dòng trống đang chờ nhập để danh sách chỉ còn bài thật
+      const kept = prev.filter((it) => it.url.trim() || it.manualContent?.trim() || it.manualMediaUrls?.length);
+      const last = kept[kept.length - 1];
+      let t = last?.scheduledAt ? dayjs(last.scheduledAt) : dayjs();
+      const stamp = Date.now();
+      const added: PostLinkItem[] = posts.map((p, i) => {
+        t = t.add(batchInterval || 15, 'minute');
+        return {
+          id: `txt_${stamp}_${i}`,
+          url: '',
+          inputType: 'MANUAL',
+          manualContent: p.text,
+          isNow: false,
+          scheduledAt: t,
+          includeCredit: false,
+          ...(p.imageUrl
+            ? { manualMediaUrls: [p.imageUrl], manualMediaKinds: ['image' as const] }
+            : { colorBackground: true, colorBackgroundPreset: p.colorBackgroundPreset }),
+        };
+      });
+      return [...kept, ...added];
+    });
+  };
+
+  const applyTextCardToItem = (cardUrl: string) => {
+    if (!textCardTarget) return;
+    attachCardImageToItem(textCardTarget.itemId, textCardTarget.mode, cardUrl);
+    // Đã có ảnh thì không đăng kiểu phông nền Facebook nữa (bài nền màu bị bỏ media)
+    setLinkItems((prev) => prev.map((it) => (it.id === textCardTarget.itemId ? { ...it, colorBackground: false } : it)));
+    setTextCardTarget(null);
   };
 
   const isMediaVideo = (url: string, kind?: string) =>
@@ -3521,6 +3572,7 @@ const PlaywrightPoster = () => {
                 groupCommentEnabled: Boolean(i.groupCommentEnabled) && isGroupCommentAllowedForGroup(gId),
                 includeCredit: i.includeCredit !== false,
                 colorBackground: resolveColorBgValue(i.colorBackground),
+                colorBackgroundPreset: i.colorBackgroundPreset,
               });
             };
 
@@ -3560,6 +3612,7 @@ const PlaywrightPoster = () => {
           const expandedGroupCommentEnabled = scheduledTasks.map((t) => t.groupCommentEnabled);
           const expandedIncludeCredits = scheduledTasks.map((t) => t.includeCredit);
           const expandedColorBackgrounds = scheduledTasks.map((t) => t.colorBackground);
+          const expandedColorBackgroundPresets = scheduledTasks.map((t) => t.colorBackgroundPreset || null);
 
           const isFirstImmediate = validItems[0].isNow;
 
@@ -3581,6 +3634,7 @@ const PlaywrightPoster = () => {
             commentDisabled: expandedCommentDisabled,
             groupCommentEnabled: expandedGroupCommentEnabled,
             colorBackgrounds: expandedColorBackgrounds,
+            colorBackgroundPresets: expandedColorBackgroundPresets,
             customCaptions: expandedCustomCaptions,
             customMediaUrls: expandedCustomMediaUrls,
             isAnonymous,
@@ -3600,6 +3654,7 @@ const PlaywrightPoster = () => {
           return Boolean(i.groupCommentEnabled) || Boolean(itemAff && itemAff.trim().length > 0);
         });
         const colorBackgrounds = validItems.map((i) => resolveColorBgValue(i.colorBackground));
+        const colorBackgroundPresets = validItems.map((i) => i.colorBackgroundPreset || null);
 
         const hasPerItemExtraGroups = validItems.some((i) => (i.extraGroupIds?.length || 0) > 0);
         const targetGroupNamesList = hasPerItemExtraGroups
@@ -3626,6 +3681,7 @@ const PlaywrightPoster = () => {
           commentDisabled,
           groupCommentEnabled,
           colorBackgrounds,
+          colorBackgroundPresets,
           customCaptions,
           customMediaUrls,
           groupNames: effectiveGroupNames,
@@ -3752,6 +3808,7 @@ const PlaywrightPoster = () => {
               groupCommentEnabled: Boolean(i.groupCommentEnabled) && isGroupCommentAllowedForGroup(gId),
               includeCredit: i.includeCredit !== false,
               colorBackground: Boolean(i.colorBackground),
+              colorBackgroundPreset: i.colorBackgroundPreset,
             });
           };
 
@@ -3791,6 +3848,7 @@ const PlaywrightPoster = () => {
         const expandedGroupCommentEnabled = scheduledGroupTasks.map((t) => t.groupCommentEnabled);
         const expandedIncludeCredits = scheduledGroupTasks.map((t) => t.includeCredit);
         const expandedColorBackgrounds = scheduledGroupTasks.map((t) => t.colorBackground);
+        const expandedColorBackgroundPresets = scheduledGroupTasks.map((t) => t.colorBackgroundPreset || null);
 
         const isFirstImmediate = validItems[0].isNow;
 
@@ -3813,6 +3871,7 @@ const PlaywrightPoster = () => {
           groupCommentEnabled: expandedGroupCommentEnabled,
           includeCredits: expandedIncludeCredits,
           colorBackgrounds: expandedColorBackgrounds,
+          colorBackgroundPresets: expandedColorBackgroundPresets,
           customCaptions: expandedCustomCaptions,
           customMediaUrls: expandedCustomMediaUrls,
           forceRefresh,
@@ -4481,6 +4540,7 @@ const PlaywrightPoster = () => {
 
   const postItemActions = useStableActions({
     openNewsCardForItem,
+    openTextCardForItem,
     isMediaVideo,
     setMediaViewer,
     handleMediaDragStart,
@@ -4812,6 +4872,7 @@ const PlaywrightPoster = () => {
               linkItems={linkItems}
               manualMediaUrlInputs={manualMediaUrlInputs}
               setShowArticleBatchModal={setShowArticleBatchModal}
+              onOpenTextBulk={() => setTextBulkOpen(true)}
               swipeReviewItems={swipeReviewItems}
               openSwipeReview={openSwipeReview}
               setBatchToolsOpen={setBatchToolsOpen}
@@ -5246,6 +5307,10 @@ const PlaywrightPoster = () => {
             primaryGroupIds={activeSelectedGroupIds}
             onExtraGroupIdsChange={updateLinkExtraGroupIds}
             onRemoveMedia={removeMediaItem}
+            onToggleColorBackground={(id) => toggleColorBackground(id)}
+            onSetColorBackgroundPreset={(id, key) => setLinkItems((prev) => prev.map((it) => (it.id === id ? { ...it, colorBackgroundPreset: key } : it)))}
+            onOpenTextCard={(item, text) => openTextCardForItem(item, item.inputType === 'MANUAL' ? 'MANUAL' : 'LINK', text)}
+            shortcutsPaused={!!textCardTarget}
           />
         </Suspense>
       )}
@@ -5353,6 +5418,15 @@ const PlaywrightPoster = () => {
         source={newsCardTarget?.source || null}
         onClose={() => setNewsCardTarget(null)}
         onApply={(url) => applyNewsCardToItem(url)}
+      />
+
+      <TextBulkModal open={textBulkOpen} onClose={() => setTextBulkOpen(false)} onCreate={createTextBulkPosts} />
+
+      <TextCardModal
+        open={!!textCardTarget}
+        text={textCardTarget?.text || ''}
+        onClose={() => setTextCardTarget(null)}
+        onApply={(url) => applyTextCardToItem(url)}
       />
 
 

@@ -58,6 +58,11 @@ public class PostQueue {
     @Column(name = "post_type", length = 20)
     private String postType; // FEED (mặc định, kể cả khi null) hoặc STORY
 
+    // Phông nền cho status nền màu (COLOR_BACKGROUND): RED, RAINBOW, PURPLE... — null = RED như cũ.
+    // Danh sách preset ở worker/fb-background.js.
+    @Column(name = "background_preset", length = 30)
+    private String backgroundPreset;
+
     @Column(name = "scheduled_at")
     private LocalDateTime scheduledAt;
 

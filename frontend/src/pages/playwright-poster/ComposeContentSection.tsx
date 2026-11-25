@@ -27,6 +27,7 @@ import {
   FireOutlined,
   ThunderboltFilled,
   FileTextOutlined,
+  FontSizeOutlined,
   ShareAltOutlined,
   TagOutlined,
   EyeFilled,
@@ -54,6 +55,7 @@ interface ComposeContentSectionProps {
   linkItems: PostLinkItem[];
   manualMediaUrlInputs: Record<string, string>;
   setShowArticleBatchModal: React.Dispatch<React.SetStateAction<boolean>>;
+  onOpenTextBulk?: () => void;
   swipeReviewItems: PostLinkItem[];
   openSwipeReview: () => void;
   setBatchToolsOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -102,7 +104,7 @@ interface ComposeContentSectionProps {
   postItemTargetOptions: { value: string; label: string; }[];
   groupAccountsWithId?: SocialAccount[];
   primaryGroupIds?: string[];
-  postItemActions: { openNewsCardForItem: (item: PostLinkItem, mode: "LINK" | "MANUAL") => void; isMediaVideo: (url: string, kind?: string) => boolean; setMediaViewer: React.Dispatch<React.SetStateAction<{ url: string; kind: "image" | "video"; title?: string; }>>; handleMediaDragStart: (e: React.DragEvent<Element>, itemId: string, index: number) => void; handleMediaDragOver: (e: React.DragEvent<Element>, itemId: string, index: number) => void; handleMediaDragEnd: () => void; handleMediaDrop: (e: React.DragEvent<Element>, itemId: string, dropIndex: number) => void; moveMediaItem: (itemId: string, fromIdx: number, toIdx: number) => void; removeMediaItem: (itemId: string, idxToRemove: number) => void; handlePreviewLink: (item: PostLinkItem) => Promise<void>; setLinkItems: React.Dispatch<React.SetStateAction<PostLinkItem[]>>; setManualMediaUrlInputs: React.Dispatch<React.SetStateAction<Record<string, string>>>; accountTargetValue: (account: SocialAccount) => string; setCustomItemTargets: React.Dispatch<React.SetStateAction<Record<string, string>>>; updateLinkUrl: (id: string, url: string) => void; updateLinkAffiliate: (id: string, affiliateLink: string) => void; updateLinkCustomCaption: (id: string, customCaption: string) => void; updateLinkInputType: (id: string, inputType: "LINK" | "MANUAL") => void; updateLinkManualContent: (id: string, manualContent: string) => void; handleUploadMedia: (itemId: string, files: FileList | File[]) => Promise<void>; handlePasteMediaFromClipboard: (itemId: string, e: React.ClipboardEvent<Element>) => Promise<void>; handlePasteFromClipboardButton: (itemId: string) => Promise<void>; handleAddManualMediaUrl: (itemId: string, rawUrl: string) => void; moveManualMediaItem: (itemId: string, fromIdx: number, toIdx: number) => void; removeManualMediaItem: (itemId: string, index: number) => void; toggleCommentBox: (id: string) => void; toggleIncludeCredit: (id: string) => void; toggleColorBackground: (id: string, specificMode?: boolean | "RED_PHOTO_TRICK") => void; replaceOrAppendCreditText: (caption: string, creditText: string) => string; applyAnonymousCreditToAll: () => void; toUnicodeBold: (text: string) => string; toUnicodeSerifBold: (text: string) => string; toUnicodeItalic: (text: string) => string; toUnicodeBoldItalic: (text: string) => string; toUnicodeStrikethrough: (text: string) => string; toUnicodeUnderline: (text: string) => string; toUnicodeBoxedTag: (text: string) => string; toUnicodeHeading1: (text: string) => string; toUnicodeHeading2: (text: string) => string; applyTransformToSelection: (id: string, transformFn: (text: string) => string, successMsg?: string) => void; insertSnippetAtCursor: (id: string, snippet: string) => void; setDragOverDropzone: React.Dispatch<React.SetStateAction<string>>; toggleSkipComment: (id: string) => void; toggleGroupComment: (id: string) => void; updateLinkMode: (id: string, isNow: boolean) => void; updateLinkTime: (id: string, time: Dayjs) => void; removeLinkItem: (id: string) => void; updateLinkExtraGroupIds: (id: string, groupIds: string[]) => void; };
+  postItemActions: { openNewsCardForItem: (item: PostLinkItem, mode: "LINK" | "MANUAL") => void; openTextCardForItem: (item: PostLinkItem, mode: "LINK" | "MANUAL") => void; isMediaVideo: (url: string, kind?: string) => boolean; setMediaViewer: React.Dispatch<React.SetStateAction<{ url: string; kind: "image" | "video"; title?: string; }>>; handleMediaDragStart: (e: React.DragEvent<Element>, itemId: string, index: number) => void; handleMediaDragOver: (e: React.DragEvent<Element>, itemId: string, index: number) => void; handleMediaDragEnd: () => void; handleMediaDrop: (e: React.DragEvent<Element>, itemId: string, dropIndex: number) => void; moveMediaItem: (itemId: string, fromIdx: number, toIdx: number) => void; removeMediaItem: (itemId: string, idxToRemove: number) => void; handlePreviewLink: (item: PostLinkItem) => Promise<void>; setLinkItems: React.Dispatch<React.SetStateAction<PostLinkItem[]>>; setManualMediaUrlInputs: React.Dispatch<React.SetStateAction<Record<string, string>>>; accountTargetValue: (account: SocialAccount) => string; setCustomItemTargets: React.Dispatch<React.SetStateAction<Record<string, string>>>; updateLinkUrl: (id: string, url: string) => void; updateLinkAffiliate: (id: string, affiliateLink: string) => void; updateLinkCustomCaption: (id: string, customCaption: string) => void; updateLinkInputType: (id: string, inputType: "LINK" | "MANUAL") => void; updateLinkManualContent: (id: string, manualContent: string) => void; handleUploadMedia: (itemId: string, files: FileList | File[]) => Promise<void>; handlePasteMediaFromClipboard: (itemId: string, e: React.ClipboardEvent<Element>) => Promise<void>; handlePasteFromClipboardButton: (itemId: string) => Promise<void>; handleAddManualMediaUrl: (itemId: string, rawUrl: string) => void; moveManualMediaItem: (itemId: string, fromIdx: number, toIdx: number) => void; removeManualMediaItem: (itemId: string, index: number) => void; toggleCommentBox: (id: string) => void; toggleIncludeCredit: (id: string) => void; toggleColorBackground: (id: string, specificMode?: boolean | "RED_PHOTO_TRICK") => void; replaceOrAppendCreditText: (caption: string, creditText: string) => string; applyAnonymousCreditToAll: () => void; toUnicodeBold: (text: string) => string; toUnicodeSerifBold: (text: string) => string; toUnicodeItalic: (text: string) => string; toUnicodeBoldItalic: (text: string) => string; toUnicodeStrikethrough: (text: string) => string; toUnicodeUnderline: (text: string) => string; toUnicodeBoxedTag: (text: string) => string; toUnicodeHeading1: (text: string) => string; toUnicodeHeading2: (text: string) => string; applyTransformToSelection: (id: string, transformFn: (text: string) => string, successMsg?: string) => void; insertSnippetAtCursor: (id: string, snippet: string) => void; setDragOverDropzone: React.Dispatch<React.SetStateAction<string>>; toggleSkipComment: (id: string) => void; toggleGroupComment: (id: string) => void; updateLinkMode: (id: string, isNow: boolean) => void; updateLinkTime: (id: string, time: Dayjs) => void; removeLinkItem: (id: string) => void; updateLinkExtraGroupIds: (id: string, groupIds: string[]) => void; };
 }
 
 // Bước "Thêm nội dung": nguồn bài, danh sách bài và lịch đăng — tách từ PlaywrightPoster, state vẫn nằm ở trang cha
@@ -117,6 +119,7 @@ export default function ComposeContentSection({
   linkItems,
   manualMediaUrlInputs,
   setShowArticleBatchModal,
+  onOpenTextBulk,
   swipeReviewItems,
   openSwipeReview,
   setBatchToolsOpen,
@@ -213,6 +216,12 @@ export default function ComposeContentSection({
           <FileTextOutlined className="text-emerald-400 text-sm" />
           <span>Cào báo & tin tức</span>
         </button>
+        {onOpenTextBulk && (
+          <button type="button" onClick={onOpenTextBulk} className="quick-source-chip">
+            <FontSizeOutlined className="text-sky-400 text-sm" />
+            <span>Dán nhiều bài chữ</span>
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setGroupHunterDrawerVisible(true)}

@@ -1354,6 +1354,10 @@ public class PostQueueService {
      * luôn rơi vào cùng 1 worker, nên khoá AsyncPostingLock (theo c_user, nằm trong từng tiến trình worker)
      * chặn được 2 phiên song song của cùng nick. Trước đây ~35 connection của cùng nick rải đều 3 worker.
      */
+    static String resolveBackgroundPreset(String preset) {
+        return preset != null && !preset.isBlank() ? preset.trim().toUpperCase() : "RED";
+    }
+
     static String workerAffinityKey(SocialAccount account) {
         return account != null ? NickThrottleService.nickKey(account) : null;
     }
@@ -1364,11 +1368,12 @@ public class PostQueueService {
         String effectiveTargetFanpageId = (post.getTargetFanpageId() != null && !post.getTargetFanpageId().trim().isEmpty() && !"null".equalsIgnoreCase(post.getTargetFanpageId()))
                 ? post.getTargetFanpageId().split(":")[0].trim()
                 : account.getPlatformAccountId();
-        return sendToPlaywrightWorker(account, content, mediaUrls, post.getOriginalUrl(), post.getAffiliateLink(), post.getPostType(), effectiveTargetFanpageId);
+        return sendToPlaywrightWorker(account, content, mediaUrls, post.getOriginalUrl(), post.getAffiliateLink(), post.getPostType(), effectiveTargetFanpageId, post.getBackgroundPreset());
     }
 
     private String sendToPlaywrightWorker(SocialAccount account, String content, List<String> mediaUrls,
-                                        String originalUrl, String affiliateLink, String postType, String targetFanpageId) {
+                                        String originalUrl, String affiliateLink, String postType, String targetFanpageId,
+                                        String backgroundPreset) {
         String finalFanpageId = (targetFanpageId != null && !targetFanpageId.isBlank()) ? targetFanpageId : account.getPlatformAccountId();
         log.info("🎭 [PLAYWRIGHT ENGINE] Đang gửi yêu cầu đăng bài tự động qua Playwright Worker cho Fanpage ID {}...", finalFanpageId);
         String playwrightUrl = workerRouterService.getPostingWorkerUrl("/api/post-facebook", workerAffinityKey(account));
@@ -1416,7 +1421,10 @@ public class PostQueueService {
         }
         if (postType != null && !postType.isBlank()) {
             requestBody.put("postType", postType.trim());
-            if ("COLOR_BACKGROUND".equalsIgnoreCase(postType.trim()) || "RED_PHOTO_TRICK".equalsIgnoreCase(postType.trim())) {
+            if ("COLOR_BACKGROUND".equalsIgnoreCase(postType.trim())) {
+                requestBody.put("backgroundColor", resolveBackgroundPreset(backgroundPreset));
+            } else if ("RED_PHOTO_TRICK".equalsIgnoreCase(postType.trim())) {
+                // Mẹo 3 chấm (sửa bài → gỡ ảnh → nền đỏ) chỉ hỗ trợ nền đỏ.
                 requestBody.put("backgroundColor", "RED");
             }
         }
@@ -1995,7 +2003,8 @@ public class PostQueueService {
         String groupPostType = post != null ? post.getPostType() : null;
         if ("COLOR_BACKGROUND".equalsIgnoreCase(groupPostType) || "RED_PHOTO_TRICK".equalsIgnoreCase(groupPostType)) {
             requestBody.put("postType", "COLOR_BACKGROUND");
-            requestBody.put("backgroundColor", "RED");
+            requestBody.put("backgroundColor", "RED_PHOTO_TRICK".equalsIgnoreCase(groupPostType)
+                    ? "RED" : resolveBackgroundPreset(post.getBackgroundPreset()));
         }
 
         boolean isPersonal = isExplicitPersonal || isAnonymous

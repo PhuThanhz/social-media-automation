@@ -390,6 +390,8 @@ public class PostQueueController {
 
         // Cho phép đăng bài phông nền màu đỏ (Facebook Color Background)
         List<?> rawColorBackgrounds = requestBody.get("colorBackgrounds") instanceof List<?> cbList ? cbList : null;
+        // Phông nền chọn cho từng bài nền màu (RED, RAINBOW, PURPLE...) — thiếu thì worker dùng RED.
+        List<?> rawColorBackgroundPresets = requestBody.get("colorBackgroundPresets") instanceof List<?> cbpList ? cbpList : null;
 
         User user = resolveUser(authentication);
         Campaign quickPostCampaign = resolveQuickPostCampaign(user);
@@ -538,6 +540,10 @@ public class PostQueueController {
             Object rawCb = rawColorBackgrounds != null && rawColorBackgrounds.size() > i ? rawColorBackgrounds.get(i) : null;
             boolean isRedPhotoTrick = "RED_PHOTO_TRICK".equalsIgnoreCase(String.valueOf(rawCb)) || "COLOR_PHOTO_TRICK".equalsIgnoreCase(String.valueOf(rawCb));
             boolean itemColorBackground = isRedPhotoTrick || (rawCb != null && (Boolean.TRUE.equals(rawCb) || "true".equalsIgnoreCase(String.valueOf(rawCb)) || "COLOR_BACKGROUND".equalsIgnoreCase(String.valueOf(rawCb))));
+            Object rawCbPreset = rawColorBackgroundPresets != null && rawColorBackgroundPresets.size() > i ? rawColorBackgroundPresets.get(i) : null;
+            String itemBackgroundPreset = itemColorBackground && !isRedPhotoTrick && rawCbPreset != null
+                    && String.valueOf(rawCbPreset).matches("[A-Za-z_]{1,30}")
+                    ? String.valueOf(rawCbPreset).toUpperCase() : null;
 
             boolean forceRefresh = "true".equalsIgnoreCase(String.valueOf(requestBody.get("forceRefresh")));
             String currentUrl = urls.get(i);
@@ -578,6 +584,7 @@ public class PostQueueController {
                         .mediaUrls(itemColorBackground && !isRedPhotoTrick ? "" : (itemCustomMedia != null ? itemCustomMedia : ""))
                         .originalUrl(currentUrl.startsWith("manual://") || isRedditPost ? currentUrl : "manual://" + System.currentTimeMillis() + "_" + i)
                         .postType(postType)
+                        .backgroundPreset(itemBackgroundPreset)
                         .targetFanpageId(itemTargetFanpageId)
                         .targetGroupNames(itemTargetGroupNames)
                         .affiliateLink(itemAffiliateLink)
@@ -633,6 +640,7 @@ public class PostQueueController {
                             }
                         } else if (itemColorBackground) {
                             p.setPostType("COLOR_BACKGROUND");
+                            p.setBackgroundPreset(itemBackgroundPreset);
                             p.setMediaUrls("");
                         }
                     }
@@ -671,6 +679,7 @@ public class PostQueueController {
                         }
                     } else if (itemColorBackground) {
                         p.setPostType("COLOR_BACKGROUND");
+                        p.setBackgroundPreset(itemBackgroundPreset);
                         p.setMediaUrls("");
                     }
                 }

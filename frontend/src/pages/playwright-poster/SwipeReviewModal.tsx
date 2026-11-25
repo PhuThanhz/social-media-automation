@@ -31,6 +31,8 @@ import {
 } from '@ant-design/icons';
 import type { PostLinkItem, ItemPreview, SocialAccount } from './types';
 import { cleanMarkdownAsterisks, buildExtraGroupOptions, filterSelectByLabel } from './shared';
+import ColorPostPreview from '../../components/common/ColorPostPreview';
+import ColorBackgroundPicker from '../../components/common/ColorBackgroundPicker';
 
 interface SwipeReviewModalProps {
   onRemoveMedia?: (itemId: string, mediaIndex: number) => void;
@@ -58,6 +60,13 @@ interface SwipeReviewModalProps {
   groupAccountsWithId?: SocialAccount[];
   primaryGroupIds?: string[];
   onExtraGroupIdsChange?: (itemId: string, groupIds: string[]) => void;
+  /** Bật/tắt status phông nền Facebook cho bài đang duyệt */
+  onToggleColorBackground?: (itemId: string) => void;
+  onSetColorBackgroundPreset?: (itemId: string, preset: string) => void;
+  /** Mở studio "Ảnh chữ" với chữ hiện tại của bài */
+  onOpenTextCard?: (item: PostLinkItem, text: string) => void;
+  /** Tạm khóa phím tắt khi có hộp thoại khác mở phía trên (vd. studio Ảnh chữ) */
+  shortcutsPaused?: boolean;
 }
 
 // Duyệt nhanh từng bài (kiểu Tinder) với Drag cử chỉ thực thụ, Phím tắt siêu tốc & Preload mượt mà
@@ -87,6 +96,10 @@ function SwipeReviewModal({
   primaryGroupIds = [],
   onExtraGroupIdsChange,
   onRemoveMedia,
+  onToggleColorBackground,
+  onSetColorBackgroundPreset,
+  onOpenTextCard,
+  shortcutsPaused = false,
 }: SwipeReviewModalProps) {
   const { message } = App.useApp();
 
@@ -103,6 +116,15 @@ function SwipeReviewModal({
       setLocalCaption(activeSwipeCaption || '');
     }
   }, [activeSwipeItem?.id, activeSwipeCaption]);
+
+  // Bật nền màu với chữ > 130 ký tự thì trang cha tự rút gọn caption → nạp lại vào ô sửa
+  const prevColorBgRef = useRef(activeSwipeItem?.colorBackground);
+  useEffect(() => {
+    if (prevColorBgRef.current !== activeSwipeItem?.colorBackground) {
+      prevColorBgRef.current = activeSwipeItem?.colorBackground;
+      setLocalCaption(activeSwipeCaption || '');
+    }
+  }, [activeSwipeItem?.colorBackground, activeSwipeCaption]);
 
   // Debounce đẩy dữ liệu lên trang cha (350ms)
   const syncCaptionToParent = (val: string) => {
@@ -169,7 +191,7 @@ function SwipeReviewModal({
 
   // Bộ lắng nghe phím tắt thông minh ngay trong Modal Tinder
   useEffect(() => {
-    if (!swipeReviewOpen || !activeSwipeItem) return;
+    if (!swipeReviewOpen || !activeSwipeItem || shortcutsPaused) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       const activeEl = document.activeElement;
@@ -238,7 +260,7 @@ function SwipeReviewModal({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [swipeReviewOpen, activeSwipeItem?.id, swipeReviewIndex, activeSwipeMediaUrls.length, swipeMediaIndex, isMediaVideo, setMediaViewer, setSwipeMediaIndex, setSwipeReviewIndex, localCaption]);
+  }, [swipeReviewOpen, activeSwipeItem?.id, swipeReviewIndex, activeSwipeMediaUrls.length, swipeMediaIndex, isMediaVideo, setMediaViewer, setSwipeMediaIndex, setSwipeReviewIndex, localCaption, shortcutsPaused]);
 
   // Xử lý kéo vuốt siêu mượt trực tiếp trên DOM (Hardware-Accelerated 120fps Gesture)
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -539,6 +561,15 @@ function SwipeReviewModal({
                   )
                 ) : activeSwipePreview?.loading ? (
                   <div className="poster-swipe-empty"><LoadingOutlined spin /> Đang tải nội dung bài...</div>
+                ) : activeSwipeItem.colorBackground ? (
+                  <div className="swipe-color-preview">
+                    <ColorPostPreview
+                      text={localCaption}
+                      mode={activeSwipeItem.colorBackground}
+                      preset={activeSwipeItem.colorBackgroundPreset}
+                      comment={activeSwipeItem.skipComment ? null : (activeSwipeItem.affiliateLink?.trim() || null)}
+                    />
+                  </div>
                 ) : (
                   <div className="poster-swipe-empty"><PictureOutlined /> Bài này không có ảnh hoặc video</div>
                 )}
@@ -683,6 +714,57 @@ function SwipeReviewModal({
                   </Tooltip>
                 )}
               </div>
+
+              {/* Nền cho bài: phông nền Facebook (chỉ bài không ảnh) hoặc vẽ chữ thành ảnh */}
+              {(onToggleColorBackground || onOpenTextCard) && (
+                <div className="swipe-bg-tools">
+                  <div className="swipe-bg-tools__row">
+                    <span className="swipe-bg-tools__label">Nền</span>
+                    {onToggleColorBackground && activeSwipeMediaUrls.length === 0 && (charCount <= 130 || activeSwipeItem.colorBackground) && (
+                      <Tooltip title="Đăng status phông nền màu của Facebook (tối đa 130 ký tự, phần dư chuyển xuống bình luận)">
+                        <button
+                          type="button"
+                          className={`swipe-bg-tools__btn${activeSwipeItem.colorBackground ? ' is-active' : ''}`}
+                          onClick={() => {
+                            flushCaptionToParent();
+                            onToggleColorBackground(activeSwipeItem.id);
+                          }}
+                        >
+                          Nền màu Facebook
+                        </button>
+                      </Tooltip>
+                    )}
+                    {onOpenTextCard && (
+                      <Tooltip title="Vẽ chữ của bài lên ảnh với hơn 100 nền rồi đăng như ảnh (thay media hiện có)">
+                        <button
+                          type="button"
+                          className="swipe-bg-tools__btn"
+                          onClick={() => {
+                            flushCaptionToParent();
+                            onOpenTextCard(activeSwipeItem, localCaption);
+                          }}
+                        >
+                          Tạo ảnh chữ
+                        </button>
+                      </Tooltip>
+                    )}
+                  </div>
+                  {activeSwipeItem.colorBackground === true && onSetColorBackgroundPreset && (
+                    <ColorBackgroundPicker
+                      value={activeSwipeItem.colorBackgroundPreset}
+                      onChange={(key) => onSetColorBackgroundPreset(activeSwipeItem.id, key)}
+                    />
+                  )}
+                  {!activeSwipeItem.colorBackground && activeSwipeMediaUrls.length === 0 && charCount > 130 && onOpenTextCard && (
+                    <div className="swipe-bg-tools__hint">Bài dài {charCount} ký tự: Facebook chỉ cho phông nền khi ≤ 130 ký tự, hãy dùng Tạo ảnh chữ.</div>
+                  )}
+                  {activeSwipeItem.colorBackground && charCount > 130 && (
+                    <div className="swipe-bg-tools__warn">
+                      Dài {charCount} ký tự: Facebook chỉ giữ phông nền khi ≤ 130 ký tự, bài sẽ bị cắt còn 126 ký tự kèm "...".
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Ô Nhập/Sửa Caption Trực Tiếp */}
               <div className="flex-1 my-2 flex flex-col min-h-0">

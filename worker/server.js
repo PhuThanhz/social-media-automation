@@ -66,6 +66,7 @@ const { renderNewsCard, renderNewsCardHtml, renderHtmlLayers } = require('./news
 const { renderDarkQuoteCard } = require('./quote-card');
 const { generateSeedingComments } = require('./ai-seeding');
 const { huntFacebookFeed } = require('./fb-feed-hunter');
+const { selectFacebookBackground } = require('./fb-background');
 
 const app = express();
 app.use(cors());
@@ -2612,7 +2613,7 @@ const globalPostingLock = new AsyncPostingLock(MAX_PARALLEL_POSTING);
 app.post('/api/post-facebook', async (req, res) => {
   const { cookieString, content, targetFanpageId = DEFAULT_FANPAGE_PLATFORM_ACCOUNT_ID, socialAccountId, mediaUrls, originalUrl, affiliateLink, postType, backgroundColor } = req.body;
   const isRedPhotoTrick = postType === 'RED_PHOTO_TRICK' || postType === 'COLOR_PHOTO_TRICK';
-  const isColorBackground = (postType === 'COLOR_BACKGROUND' || backgroundColor === 'RED') && !isRedPhotoTrick;
+  const isColorBackground = (postType === 'COLOR_BACKGROUND' || !!backgroundColor) && !isRedPhotoTrick;
 
   // QUY TẮC BẢO VỆ UY TÍN: Fanpage Vietnam Real Estate (ID 100053405437835) tuyệt đối không để link Shopee/Affiliate/bán hàng!
   let safeAffiliateLink = affiliateLink;
@@ -3086,7 +3087,7 @@ app.post('/api/post-facebook', async (req, res) => {
       console.log(`[Playwright] 📝 Nội dung ô soạn bài (${typedText.length} ký tự): ${typedText.slice(0, 50).replace(/\n/g, ' ')}...`);
 
       if (isColorBackground) {
-        await selectFacebookRedBackground(dialog, page);
+        await selectFacebookBackground(dialog, page, backgroundColor, selectFacebookRedBackground);
       }
     }
 
@@ -4928,7 +4929,7 @@ app.post('/api/join-group', async (req, res) => {
 // Điều kiện bắt buộc: Fanpage (pageName) phải ĐÃ LÀ THÀNH VIÊN của Group đó từ trước.
 app.post('/api/post-facebook-group', async (req, res) => {
   const { cookieString, content, targetGroupId, pageName, pageId, socialAccountId, mediaUrls, originalUrl, affiliateLink, isPersonalProfile, enableGroupComment, postType, backgroundColor } = req.body;
-  const isColorBackground = postType === 'COLOR_BACKGROUND' || postType === 'RED_PHOTO_TRICK' || backgroundColor === 'RED';
+  const isColorBackground = postType === 'COLOR_BACKGROUND' || postType === 'RED_PHOTO_TRICK' || !!backgroundColor;
 
   if (!cookieString || !content || !targetGroupId) {
     return res.status(400).json({ success: false, error: 'Thiếu cookieString, content hoặc targetGroupId' });
@@ -5715,7 +5716,7 @@ app.post('/api/post-facebook-group', async (req, res) => {
       await page.waitForTimeout(1000);
 
       if (isColorBackground) {
-        await selectFacebookRedBackground(dialog, page);
+        await selectFacebookBackground(dialog, page, backgroundColor, selectFacebookRedBackground);
         await debugShot(page, 'after_red_background');
       }
     }

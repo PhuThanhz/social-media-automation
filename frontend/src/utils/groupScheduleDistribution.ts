@@ -11,6 +11,7 @@ export interface GroupScheduleTask {
   groupCommentEnabled: boolean;
   includeCredit: boolean;
   colorBackground: boolean | string;
+  colorBackgroundPreset?: string;
 }
 
 export interface GroupScheduleOptions {
