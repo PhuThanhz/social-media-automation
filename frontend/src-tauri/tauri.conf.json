@@ -47,6 +47,10 @@
     "resources": {
       "sidecar/": "sidecar/"
     },
+    "macOS": {
+      "signingIdentity": "-",
+      "minimumSystemVersion": "11.0"
+    },
     "createUpdaterArtifacts": true
   },
   "plugins": {
