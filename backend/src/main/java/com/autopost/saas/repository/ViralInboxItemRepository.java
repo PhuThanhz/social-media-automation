@@ -20,6 +20,10 @@ public interface ViralInboxItemRepository extends JpaRepository<ViralInboxItem, 
 
     java.util.Optional<ViralInboxItem> findByPostUrl(String postUrl);
 
+    /** Thanh "Kiểm tra link". */
+    @org.springframework.data.jpa.repository.Query("SELECT v FROM ViralInboxItem v WHERE LOWER(v.postUrl) LIKE CONCAT('%', :needle, '%') ORDER BY v.id DESC")
+    List<ViralInboxItem> searchByPostUrlNeedle(@org.springframework.data.repository.query.Param("needle") String needle, org.springframework.data.domain.Pageable pageable);
+
     @Query("select i.postUrl from ViralInboxItem i where i.postUrl in :urls")
     Set<String> findExistingUrls(Collection<String> urls);
 

@@ -22,6 +22,7 @@ import { useAuthStore } from '../../store/authStore';
 import { resolveBackgroundImage, useBackgroundStore } from '../../store/backgroundStore';
 import BackgroundPicker from './BackgroundPicker';
 import QueueFinishBadge from './QueueFinishBadge';
+import LinkCheckBar from './LinkCheckBar';
 import SystemEngineBadge from './SystemEngineBadge';
 
 interface SocialAccountLite {
@@ -528,6 +529,7 @@ const DashboardLayout = () => {
           </Flex>
 
           <Flex align="center" gap={10} className="app-topbar-actions shrink-0">
+            <LinkCheckBar />
             <SystemEngineBadge />
             <QueueFinishBadge />
             <Tooltip title={expiredCookieCount > 0 ? `${expiredCookieCount} Fanpage có Cookie hết hạn — Bấm để cập nhật ngay` : 'Không có cảnh báo'}>

@@ -1854,9 +1854,22 @@ async function expandPhotoAlbumViaLightbox(page, previewPhotoUrls, expectedPhoto
         return real[0]?.src || null;
       }).catch(() => null);
 
+      let videoSlideSkips = 0;
       for (let i = 0; i < 100; i++) {
         const currentSrc = await readCurrentSrc();
-        if (!currentSrc || seen.has(currentSrc)) break;
+        if (!currentSrc) {
+          // Album hỗn hợp: slide hiện tại là VIDEO (không có ảnh lớn) — bỏ qua sang slide kế thay vì dừng cả album
+          const onVideoSlide = (await dialog.locator('video').count().catch(() => 0)) > 0;
+          const nextBtnOnVideo = dialog.locator('[aria-label="Ảnh tiếp theo"], [aria-label="Next photo"], [aria-label="Tiếp theo"], [aria-label="Next"]').first();
+          if (onVideoSlide && videoSlideSkips < 3 && await nextBtnOnVideo.isVisible().catch(() => false)) {
+            videoSlideSkips++;
+            await nextBtnOnVideo.click().catch(() => { });
+            await page.waitForTimeout(1500);
+            continue;
+          }
+          break;
+        }
+        if (seen.has(currentSrc)) break;
         seen.add(currentSrc);
         orderedPhotos.push(currentSrc);
         if (expectedPhotoCount && orderedPhotos.length >= expectedPhotoCount) break;
@@ -8075,7 +8088,12 @@ async function scrapeContentHandler(req, res) {
           }
         });
 
+        const requestedThreadsPost = isThreadsDirectPostUrl(sourceUrl) || isThreadsShareUrl(sourceUrl);
         sourceUrl = await navigateThreadsPage(page, sourceUrl);
+        // Link bài đã xoá/không tồn tại: Threads chuyển hướng về trang chủ/profile → KHÔNG được cào bài đầu feed
+        if (requestedThreadsPost && !isThreadsDirectPostUrl(sourceUrl)) {
+          throw new Error('Bài Threads không tồn tại hoặc đã bị xoá (link bị chuyển về trang chủ)');
+        }
         await page.waitForSelector('span[dir="auto"], div[dir="auto"], article', { timeout: 10000 }).catch(() => { });
         await page.waitForTimeout(3000);
         const isDirectThreadsPost = isThreadsDirectPostUrl(sourceUrl);
@@ -9124,7 +9142,12 @@ async function scrapeContentHandler(req, res) {
             if (commentSection && commentSection.contains(video)) return;
             if (video.poster) posters.push(video.poster);
             if (video.getAttribute('poster')) posters.push(video.getAttribute('poster'));
-            const parent = video.closest('div[data-visualcompletion], div[data-pagelet*="Video"], div[role="presentation"], div[tabindex]');
+            let parent = video.closest('div[data-visualcompletion], div[data-pagelet*="Video"], div[role="presentation"], div[tabindex]');
+            // Album hỗn hợp (video + ảnh): khối cha có thể bao CẢ album → mọi ảnh album bị coi là ảnh bìa video.
+            // Khi khối cha chứa link ảnh khác, chỉ lấy ảnh nằm trong ô của chính video đó.
+            if (parent && parent.querySelector('a[href*="/photo"], a[href*="fbid="]')) {
+              parent = video.closest('a') || video.parentElement;
+            }
             if (parent) {
               parent.querySelectorAll('img').forEach((img) => {
                 if (img.src) posters.push(img.src);
@@ -9148,11 +9171,22 @@ async function scrapeContentHandler(req, res) {
 
         // Fallback: nếu chưa lấy được ảnh nào từ selector thông thường, quét ảnh chất lượng cao (>200px) trực tiếp trong bài chính
         if (photoUrls.length === 0 && !hasFullVideoUrl(videoUrls)) {
-          const directDomPhotos = await page.evaluate(() => {
-            const article = document.querySelector('a[href*="/photo"], a[href*="set=gm"], a[href*="set=pcb"], a[href*="set=p."]')?.closest('div[role="article"], div[data-pagelet*="FeedUnit"], div[role="main"]')
-              || document.querySelector('div[role="article"]')
-              || document.querySelector('div[role="main"]')
-              || document.body;
+          const directDomPhotos = await page.evaluate((srcUrl) => {
+            // CHỈ quét trong đúng khối bài chính (khối chứa link tới ID bài đang cào). Trước đây rơi về
+            // div[role=main]/body → bài chỉ có chữ bị gắn nhầm ảnh bìa nhóm / ảnh bài khác bên dưới.
+            const postId = (String(srcUrl).match(/\/(?:posts|permalink)\/(\d+)/) || [])[1]
+              || (String(srcUrl).match(/[?&](?:story_fbid|fbid)=(\d+)/) || [])[1] || '';
+            const isComment = (el) => /Bình luận|Comment/i.test(el.getAttribute('aria-label') || '');
+            const dialog = Array.from(document.querySelectorAll('div[role="dialog"]')).find(d => d.querySelector('div[role="article"]') || /Bài viết của|Post by/i.test(d.innerText || ''));
+            let article = dialog || null;
+            if (!article && postId) {
+              const link = Array.from(document.querySelectorAll(`a[href*="${postId}"]`)).find(a => {
+                const art = a.closest('div[role="article"]');
+                return !art || !isComment(art);
+              });
+              article = link?.closest('div[role="article"]:not([aria-label*="Bình luận" i]):not([aria-label*="Comment" i]), div[data-pagelet*="FeedUnit"]') || null;
+            }
+            if (!article) return [];
             const imgs = Array.from(article.querySelectorAll('img'))
               .filter(img => {
                 if (!img.src || (!img.src.includes('scontent') && !img.src.includes('fbcdn.net'))) return false;
@@ -9163,8 +9197,9 @@ async function scrapeContentHandler(req, res) {
               })
               .map(img => img.src);
             return [...new Set(imgs)];
-          }).catch(() => []);
+          }, sourceUrl).catch(() => []);
           if (directDomPhotos.length > 0) {
+            console.log(`[FB_Scraper] 🖼️ Fallback DOM: lấy ${directDomPhotos.length} ảnh trong khối bài chính`);
             photoUrls = directDomPhotos.filter((url) => !mainVideoPosterUrls.has(url) && !isVideoCoverFrameUrl(url));
           }
         }
@@ -9210,7 +9245,7 @@ async function scrapeContentHandler(req, res) {
             const authorCandidates = [
               document.querySelector('[role="article"] a[href*="/user/"]:not([href*="/groups/"])'),
               document.querySelector('[role="article"] a[href*="profile.php"]:not([href*="/groups/"])'),
-              document.querySelector('[role="article"] a[role="link"][tabindex="0"]:not([href*="/groups/"]):not([href*="/posts/"]):not([href*="/share/"])'),
+              document.querySelector('[role="article"] a[role="link"][tabindex="0"]:not([href*="/groups/"]):not([href*="/posts/"]):not([href*="/share/"]):not([href*="/photo"]):not([href*="/videos/"]):not([href*="fbid="])'),
               document.querySelector('div[role="dialog"] a[href*="/user/"]:not([href*="/groups/"])'),
               document.querySelector('div[role="dialog"] a[href*="profile.php"]:not([href*="/groups/"])'),
               document.querySelector('[role="article"] h2 a:not([href*="/groups/"]), [role="article"] h3 a:not([href*="/groups/"]), [role="article"] h4 a:not([href*="/groups/"])'),
@@ -9221,7 +9256,7 @@ async function scrapeContentHandler(req, res) {
             for (const cand of authorCandidates) {
               if (cand) {
                 const text = (cand.getAttribute('aria-label') || cand.innerText || cand.textContent || '').trim();
-                if (text && text.length >= 2 && text.length <= 50 && !text.includes('\n') && !/[.!?]/.test(text) && !/^(Facebook|Home|Trang chủ|Group|Nhóm|Theo dõi|Follow)$/i.test(text)) {
+                if (text && text.length >= 2 && text.length <= 50 && !text.includes('\n') && !/[.!?]/.test(text) && !/^(Facebook|Home|Trang chủ|Group|Nhóm|Theo dõi|Follow)$/i.test(text) && !/^\d{1,2}:\d{2}/.test(text) && !/^(Có thể là|May be)/i.test(text)) {
                   if (!detectedGroupName || text.toLowerCase() !== detectedGroupName.toLowerCase()) {
                     detectedAuthor = text;
                     break;
@@ -9255,6 +9290,8 @@ async function scrapeContentHandler(req, res) {
             if (/^(Facebook|Bài viết Facebook|Video Facebook|Group|Nhóm|Trang chủ|Home|Feed|Reels?|Watch|Chỉ báo trạng thái online|Trạng thái online)$/i.test(a)) return '';
             if (a.toLowerCase().includes('online status') || a.toLowerCase().includes('trực tuyến') || a.length < 2 || a.length > 50) return '';
             if (/[.!?]/.test(a)) return '';
+            // Chữ của ô media (thời lượng video "0:00 / 0:04", mô tả ảnh tự động "Có thể là hình ảnh về...") không phải tên người
+            if (/^\d{1,2}:\d{2}/.test(a) || /^(Có thể là|May be|No photo description|Không có mô tả ảnh)/i.test(a)) return '';
             return a;
           };
 
@@ -9606,7 +9643,19 @@ async function scrapeContentHandler(req, res) {
           } catch (eDir) { }
         }
 
-        if (fullVideoUrl) {
+        const isPureVideoLink = isReelOrWatchUrl || /\/(share\/v|share\/r|watch|reel|videos)\//i.test(sourceUrl);
+        if (fullVideoUrl && photoUrls.length > 0 && !isPureVideoLink) {
+          // Album hỗn hợp (video + ảnh trong cùng 1 bài): giữ đủ cả hai, video đặt đúng vị trí trước/sau ảnh như bài gốc
+          const videoFirst = await page.evaluate(() => {
+            const v = document.querySelector('div[role="main"] video, div[role="dialog"] video, video');
+            const p = document.querySelector('a[href*="/photo"], a[href*="fbid="]');
+            if (!v || !p) return true;
+            return Boolean(v.compareDocumentPosition(p) & Node.DOCUMENT_POSITION_FOLLOWING);
+          }).catch(() => true);
+          const photos = [...new Set(photoUrls)];
+          allMedia = videoFirst ? [fullVideoUrl, ...photos] : [...photos, fullVideoUrl];
+          console.log(`[FB_Scraper] 🧩 Album hỗn hợp: 1 video + ${photos.length} ảnh (video ${videoFirst ? 'đầu' : 'cuối'})`);
+        } else if (fullVideoUrl) {
           // Bài video Facebook: thuần video MP4 100%, không kèm ảnh thumbnail/bìa
           allMedia = [fullVideoUrl];
         } else if (photoUrls.length > 0) {

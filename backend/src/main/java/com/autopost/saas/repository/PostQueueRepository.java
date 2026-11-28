@@ -65,6 +65,13 @@ public interface PostQueueRepository extends JpaRepository<PostQueue, Long> {
     @Query("SELECT p FROM PostQueue p LEFT JOIN p.campaign c LEFT JOIN c.user u WHERE u.id = :userId AND p.originalUrl LIKE CONCAT('%', :postId, '%') AND p.status IN ('PENDING', 'PROCESSING', 'PUBLISHED', 'PENDING_APPROVAL')")
     List<PostQueue> findActiveByUserIdAndOriginalUrlContaining(@org.springframework.data.repository.query.Param("userId") Long userId, @org.springframework.data.repository.query.Param("postId") String postId);
 
+    /** Thanh "Kiểm tra link": mọi trạng thái, khớp link gốc hoặc link đã đăng. Cần lọc lại chính xác ở tầng gọi. */
+    @Query("SELECT p FROM PostQueue p LEFT JOIN FETCH p.campaign c LEFT JOIN c.user u WHERE u.id = :userId AND ("
+            + "LOWER(p.originalUrl) LIKE CONCAT('%', :needle, '%') OR LOWER(p.publishedPostUrl) LIKE CONCAT('%', :needle, '%') "
+            + "OR LOWER(p.publishedGroupPostUrls) LIKE CONCAT('%', :needle, '%') OR LOWER(p.fbPostId) LIKE CONCAT('%', :needle, '%')) "
+            + "ORDER BY p.id DESC")
+    List<PostQueue> searchByLinkNeedle(@org.springframework.data.repository.query.Param("userId") Long userId, @org.springframework.data.repository.query.Param("needle") String needle, Pageable pageable);
+
     /**
      * Dedup theo content-hash (thay cho original_url): khi Playwright không tìm thấy permalink
      * riêng của 1 bài, original_url bị fallback về URL của Group/Page nguồn nên nhiều bài khác

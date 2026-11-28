@@ -61,6 +61,7 @@ import {
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../config/axios';
+import TelegramBotPanel from '../components/connections/TelegramBotPanel';
 import { useSearchParams } from 'react-router-dom';
 import QuickUpdateCookieModal from '../components/modals/QuickUpdateCookieModal';
 import FacebookBrowserLoginModal from '../components/modals/FacebookBrowserLoginModal';
@@ -94,6 +95,7 @@ export interface SocialAccount {
   proxyUrl?: string;
   userAgent?: string;
   postingIdentityAccountId?: number;
+  paused?: boolean | null;
 }
 
 export interface FacebookPageAccess {
@@ -282,7 +284,8 @@ const Connections = () => {
   );
   const viaCompletenessScore = (hasViaCUser ? 1 : 0) + (hasViaXs ? 1 : 0) + (hasViaSecurity ? 1 : 0);
 
-  const activeTab = searchParams.get('tab') === 'groups' ? 'groups' : 'accounts';
+  const tabParam = searchParams.get('tab');
+  const activeTab = tabParam === 'groups' || tabParam === 'telegram' ? tabParam : 'accounts';
 
   // 1. Fetch danh sách tài khoản
   const { data: accounts, isLoading } = useQuery({
@@ -525,6 +528,19 @@ const Connections = () => {
     },
     onError: (err: any) => {
       message.error(err?.response?.data?.message || 'Lỗi khi lưu cấu hình');
+    },
+  });
+
+  // Tạm dừng / chạy lại cả nick (mọi kết nối cùng c_user) — scheduler bỏ qua bài của nick đang dừng
+  const pauseMutation = useMutation({
+    mutationFn: async ({ id, paused }: { id: number; paused: boolean }) =>
+      (await api.put(`/connections/${id}/pause`, { paused, wholeNick: true })).data as { accounts: string[]; paused: boolean },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['socialAccounts'] });
+      message.success(`${data.paused ? 'Đã tạm dừng' : 'Đã chạy lại'} ${data.accounts?.length || 0} kết nối`);
+    },
+    onError: (err: any) => {
+      message.error(err?.response?.data?.message || 'Không đổi được trạng thái nick');
     },
   });
 
@@ -773,15 +789,25 @@ const Connections = () => {
     <div className="bg-slate-900/80 border border-slate-800/80 rounded-2xl px-5 py-1.5 mb-4 backdrop-blur-md shadow-sm">
       <Tabs
         activeKey={activeTab}
-        onChange={(key) => setSearchParams(key === 'groups' ? { tab: 'groups' } : {})}
+        onChange={(key) => setSearchParams(key === 'accounts' ? {} : { tab: key })}
         className="!mb-0"
         items={[
           { key: 'accounts', label: `Tài khoản & Fanpage (${publishableAccounts.length})` },
           { key: 'groups', label: `Nhóm Facebook (${groupCount})` },
+          { key: 'telegram', label: 'Telegram bot' },
         ]}
       />
     </div>
   );
+
+  if (activeTab === 'telegram') {
+    return (
+      <div className="app-page space-y-4">
+        {tabsBar}
+        <TelegramBotPanel />
+      </div>
+    );
+  }
 
   if (activeTab === 'groups') {
     return (
@@ -992,6 +1018,7 @@ const Connections = () => {
               })
               .map(({ cUser, viaAccount, viaName, pages }) => {
                 const isViaExpired = viaAccount.tokenStatus === 'EXPIRED';
+                const isViaPaused = !!viaAccount.paused || pages.some((p) => !!p.paused);
                 const displayedPages = pages.filter((p) => {
                   if (statusFilter === 'OK' && p.tokenStatus !== 'OK') return false;
                   if (statusFilter === 'EXPIRED' && p.tokenStatus !== 'EXPIRED') return false;
@@ -1035,6 +1062,11 @@ const Connections = () => {
                                 setQuickCookieModalOpen(true);
                               }}
                             />
+                            {isViaPaused && (
+                              <Tooltip title="Scheduler không tự đăng bài của nick này; bài vẫn giữ trong hàng đợi. Bấm Đăng ngay vẫn chạy.">
+                                <span className="conn-paused-tag">Tạm dừng</span>
+                              </Tooltip>
+                            )}
                           </div>
                           <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 mt-1">
                             <span>{pages.length} Page</span>
@@ -1080,6 +1112,17 @@ const Connections = () => {
                             Cập nhật Cookie
                           </Button>
                         )}
+
+                        <Tooltip title={isViaPaused ? 'Cho scheduler đăng tiếp bài của nick này' : 'Tạm dừng tự đăng mọi Page của nick này (bài vẫn giữ trong hàng đợi)'}>
+                          <Button
+                            size="small"
+                            loading={pauseMutation.isPending && pauseMutation.variables?.id === viaAccount.id}
+                            onClick={() => pauseMutation.mutate({ id: viaAccount.id, paused: !isViaPaused })}
+                            className="text-xs rounded-lg"
+                          >
+                            {isViaPaused ? 'Chạy lại' : 'Tạm dừng'}
+                          </Button>
+                        </Tooltip>
 
                         <Tooltip title="Kiểm tra cookie">
                           <Button

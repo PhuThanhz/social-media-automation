@@ -682,50 +682,15 @@ public class VideoToolController {
     }
 
     private boolean isSameFacebookPostUrl(String url1, String url2) {
-        if (url1 == null || url2 == null) return false;
-        String u1 = url1.trim();
-        String u2 = url2.trim();
-        if (u1.isBlank() || u2.isBlank()) return false;
-        if (u1.equalsIgnoreCase(u2)) return true;
-
-        if (u1.matches("^https?://(www\\.)?facebook\\.com/groups/[^/]+/?$") || 
-            u2.matches("^https?://(www\\.)?facebook\\.com/groups/[^/]+/?$")) {
-            return false;
-        }
-
-        String norm1 = com.autopost.saas.util.FacebookPostIds.normalizeFacebookUrl(u1);
-        String norm2 = com.autopost.saas.util.FacebookPostIds.normalizeFacebookUrl(u2);
-        if (!norm1.isBlank() && norm1.equalsIgnoreCase(norm2)) return true;
-
-        String id1 = extractFacebookPostId(u1);
-        String id2 = extractFacebookPostId(u2);
-        return id1 != null && !id1.isBlank() && id1.equalsIgnoreCase(id2);
-    }
-
-    private String extractFacebookPostId(String url) {
-        return com.autopost.saas.util.FacebookPostIds.extractPostId(url);
+        return com.autopost.saas.util.FacebookPostIds.isSameFacebookPostUrl(url1, url2);
     }
 
     private String extractTikTokVideoId(String url) {
-        if (url == null || url.isBlank()) return null;
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(?:video|v)/(\\d{15,25})").matcher(url);
-        if (m.find()) {
-            return m.group(1);
-        }
-        if (url.matches("^\\d{15,25}$")) {
-            return url;
-        }
-        return null;
+        return com.autopost.saas.util.FacebookPostIds.extractTikTokVideoId(url);
     }
 
     private boolean isSameTikTokVideo(String targetId, String targetUrl, String existingUrl) {
-        if (existingUrl == null || existingUrl.isBlank()) return false;
-        String exist = existingUrl.trim();
-        if (targetUrl != null && targetUrl.equalsIgnoreCase(exist)) return true;
-        if (targetId != null && !targetId.isBlank() && exist.contains(targetId)) return true;
-        String existId = extractTikTokVideoId(exist);
-        if (existId != null && targetId != null && existId.equals(targetId)) return true;
-        return false;
+        return com.autopost.saas.util.FacebookPostIds.isSameTikTokVideo(targetId, targetUrl, existingUrl);
     }
 }
 

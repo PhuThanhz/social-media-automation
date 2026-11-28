@@ -43,6 +43,8 @@ public class PostQueueController {
     private final UserRepository userRepository;
     private final SocialAccountRepository socialAccountRepository;
     private final PostQueueRepository postQueueRepository;
+    private final com.autopost.saas.repository.PostQueueGroupResultRepository postQueueGroupResultRepository;
+    private final com.autopost.saas.repository.ViralInboxItemRepository viralInboxItemRepository;
     private final FacebookGraphApiService facebookGraphApiService;
     private final com.autopost.saas.service.PostingWindowService postingWindowService;
     private final com.autopost.saas.publishing.service.PublishingPreflightService publishingPreflightService;
@@ -169,6 +171,110 @@ public class PostQueueController {
                 .filter(a -> "FACEBOOK_PROFILE".equalsIgnoreCase(a.getPlatform()) || "PERSONAL_PROFILE_COOKIE".equalsIgnoreCase(a.getAccountType()))
                 .sorted(java.util.Comparator.comparing(SocialAccount::getId))
                 .toList();
+    }
+
+    /**
+     * Thanh "Kiểm tra link": dán link nguồn hoặc link bài đã đăng → bài đó đang chờ / đã đăng / lỗi chưa.
+     * Chỉ đọc. FB so theo ID bài, TikTok theo ID video, còn lại theo link chuẩn hóa.
+     */
+    @GetMapping("/check-link")
+    public ResponseEntity<Map<String, Object>> checkLink(Authentication authentication, @RequestParam String url) {
+        String q = url == null ? "" : url.trim();
+        String needle = com.autopost.saas.util.FacebookPostIds.searchNeedle(q);
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("url", q);
+        if (needle == null || needle.length() < 5) {
+            out.put("summary", com.autopost.saas.util.FacebookPostIds.isFacebookNonPostUrl(q) ? "NOT_A_POST" : "INVALID");
+            out.put("items", List.of());
+            out.put("inbox", List.of());
+            return ResponseEntity.ok(out);
+        }
+        needle = needle.toLowerCase();
+        User user = resolveUser(authentication);
+        org.springframework.data.domain.PageRequest page = org.springframework.data.domain.PageRequest.of(0, 50);
+
+        Map<String, String> pageNames = new java.util.HashMap<>();
+        for (SocialAccount a : socialAccountRepository.findByUserId(user.getId())) {
+            if (a.getPlatformAccountId() != null && a.getPageName() != null) pageNames.putIfAbsent(a.getPlatformAccountId(), a.getPageName());
+        }
+
+        Map<Long, Map<String, Object>> items = new java.util.LinkedHashMap<>();
+        for (PostQueue p : postQueueRepository.searchByLinkNeedle(user.getId(), needle, page)) {
+            String matchedBy = null;
+            if (com.autopost.saas.util.FacebookPostIds.isSameLink(q, p.getOriginalUrl())) matchedBy = "SOURCE";
+            else if (com.autopost.saas.util.FacebookPostIds.isSameLink(q, p.getPublishedPostUrl())) matchedBy = "PUBLISHED_LINK";
+            else if (p.getPublishedGroupPostUrls() != null) {
+                for (String g : p.getPublishedGroupPostUrls().split(",")) {
+                    if (com.autopost.saas.util.FacebookPostIds.isSameLink(q, g.trim())) { matchedBy = "GROUP_LINK"; break; }
+                }
+            }
+            if (matchedBy == null && p.getFbPostId() != null) {
+                String id = com.autopost.saas.util.FacebookPostIds.extractPostId(q);
+                if (id != null && (p.getFbPostId().equals(id) || p.getFbPostId().endsWith("_" + id))) matchedBy = "PUBLISHED_LINK";
+            }
+            if (matchedBy != null) items.put(p.getId(), checkLinkItem(p, matchedBy, pageNames));
+        }
+        for (com.autopost.saas.entity.PostQueueGroupResult r : postQueueGroupResultRepository.searchByPostUrlNeedle(user.getId(), needle, page)) {
+            if (items.containsKey(r.getPostQueue().getId())) continue;
+            if (!com.autopost.saas.util.FacebookPostIds.isSameLink(q, r.getPostUrl())) continue;
+            Map<String, Object> it = checkLinkItem(r.getPostQueue(), "GROUP_LINK", pageNames);
+            if (r.getSocialAccount() != null && r.getSocialAccount().getPageName() != null) it.put("groupName", r.getSocialAccount().getPageName());
+            it.put("publishedPostUrl", r.getPostUrl());
+            items.put(r.getPostQueue().getId(), it);
+        }
+
+        List<Map<String, Object>> inbox = new ArrayList<>();
+        for (com.autopost.saas.entity.ViralInboxItem v : viralInboxItemRepository.searchByPostUrlNeedle(needle, page)) {
+            if (!com.autopost.saas.util.FacebookPostIds.isSameLink(q, v.getPostUrl())) continue;
+            Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("id", v.getId());
+            m.put("status", v.getStatus());
+            m.put("sourceName", v.getSourceName());
+            m.put("foundAt", v.getFoundAt());
+            inbox.add(m);
+        }
+
+        List<Map<String, Object>> list = new ArrayList<>(items.values());
+        java.util.Set<String> statuses = new java.util.HashSet<>();
+        for (Map<String, Object> m : list) statuses.add(String.valueOf(m.get("status")));
+        String summary;
+        if (statuses.contains("PUBLISHED")) summary = "PUBLISHED";
+        else if (statuses.stream().anyMatch(st -> List.of("PENDING", "PROCESSING", "PENDING_APPROVAL", "NEEDS_REVIEW").contains(st))) summary = "QUEUED";
+        else if (!list.isEmpty()) summary = "FAILED_ONLY";
+        else if (!inbox.isEmpty()) summary = "INBOX_ONLY";
+        else summary = "NOT_FOUND";
+        out.put("summary", summary);
+        out.put("items", list);
+        out.put("inbox", inbox);
+        return ResponseEntity.ok(out);
+    }
+
+    private Map<String, Object> checkLinkItem(PostQueue p, String matchedBy, Map<String, String> pageNames) {
+        Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("id", p.getId());
+        m.put("status", p.getStatus());
+        m.put("matchedBy", matchedBy);
+        m.put("postType", p.getPostType());
+        String target = p.getTargetFanpageId();
+        m.put("targetFanpageId", target);
+        if (target != null) {
+            String pid = target.contains(":") ? target.substring(0, target.indexOf(':')) : target;
+            m.put("targetName", "PERSONAL_PROFILE".equals(pid) ? "Trang cá nhân" : pageNames.get(pid));
+        }
+        m.put("targetGroupNames", p.getTargetGroupNames());
+        m.put("scheduledAt", p.getScheduledAt());
+        m.put("publishedAt", p.getPublishedAt());
+        m.put("publishedPostUrl", p.getPublishedPostUrl());
+        m.put("originalUrl", p.getOriginalUrl());
+        m.put("errorMessage", p.getErrorMessage());
+        m.put("campaignName", p.getCampaign() != null ? p.getCampaign().getName() : null);
+        String text = p.getTitle() != null && !p.getTitle().isBlank() ? p.getTitle() : p.getContent();
+        if (text != null) {
+            text = text.replaceAll("\\s+", " ").trim();
+            if (text.length() > 80) text = text.substring(0, 80) + "…";
+        }
+        m.put("contentPreview", text);
+        return m;
     }
 
     @GetMapping("/counts")

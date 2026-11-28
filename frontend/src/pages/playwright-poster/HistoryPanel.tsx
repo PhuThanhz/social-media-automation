@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { App, Button, Card, Input, Select, Table, Tooltip, Popover, Popconfirm } from 'antd';
 import type { TableProps } from 'antd';
 import {
@@ -33,10 +33,16 @@ import {
   FlagOutlined,
   UserOutlined,
   FacebookFilled,
+  LinkOutlined,
+  ExportOutlined,
+  VideoCameraOutlined,
+  PictureOutlined,
+  FilterOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { GroupStatItem, PendingPageBreakdownItem, PostQueue, SocialAccount } from './types';
-import { EMPTY_GROUP_STAT, PAGE_PALETTE, stripEmojiPrefix } from './shared';
+import { EMPTY_GROUP_STAT, PAGE_PALETTE, stripEmojiPrefix, detectPostMedia, type PostMediaType } from './shared';
+import ExportPendingLinksModal from './ExportPendingLinksModal';
 
 interface HistoryPanelProps {
   selectedRowKeys: React.Key[];
@@ -56,6 +62,8 @@ interface HistoryPanelProps {
   historyPageFilter: string;
   setHistoryStatusFilter: React.Dispatch<React.SetStateAction<string>>;
   historyStatusFilter: string;
+  historyMediaTypeFilter: PostMediaType;
+  setHistoryMediaTypeFilter: React.Dispatch<React.SetStateAction<PostMediaType>>;
   historySearchText: string;
   setHistorySearchText: React.Dispatch<React.SetStateAction<string>>;
   historyOpen: boolean;
@@ -94,6 +102,8 @@ export default function HistoryPanel({
   historyPageFilter,
   setHistoryStatusFilter,
   historyStatusFilter,
+  historyMediaTypeFilter,
+  setHistoryMediaTypeFilter,
   historySearchText,
   setHistorySearchText,
   historyOpen,
@@ -116,6 +126,35 @@ export default function HistoryPanel({
 }: HistoryPanelProps) {
   const { message } = App.useApp();
   const [overviewTab, setOverviewTab] = useState<'GROUPS' | 'PAGES'>('GROUPS');
+  const [exportLinksModalVisible, setExportLinksModalVisible] = useState(false);
+  const [exportSelectedOnly, setExportSelectedOnly] = useState(false);
+
+  // Thống kê phân loại Media (Video / Ảnh / Text) theo trạng thái đang chọn
+  const mediaBreakdown = useMemo(() => {
+    const targetPosts = (posts || []).filter((p) => {
+      if (historyStatusFilter === 'ALL') return true;
+      if (historyStatusFilter === 'PROCESSING') return p.status === 'PROCESSING';
+      if (historyStatusFilter === 'PENDING') return p.status === 'PENDING';
+      if (historyStatusFilter === 'PUBLISHED') return p.status === 'PUBLISHED';
+      if (historyStatusFilter === 'FAILED') return p.status === 'FAILED' || p.status === 'CANCELLED';
+      return true;
+    });
+
+    let video = 0;
+    let image = 0;
+    let text = 0;
+    let colorBg = 0;
+
+    targetPosts.forEach((p) => {
+      const info = detectPostMedia(p);
+      if (info.type === 'VIDEO') video++;
+      else if (info.type === 'IMAGE') image++;
+      else if (info.type === 'COLOR_BACKGROUND') colorBg++;
+      else text++;
+    });
+
+    return { all: targetPosts.length, video, image, text, colorBg };
+  }, [posts, historyStatusFilter]);
   return (
     <Card
       className="poster-history-card border border-slate-700/60 bg-slate-900/90 shadow-lg rounded-2xl overflow-hidden backdrop-blur-md"
@@ -185,6 +224,20 @@ export default function HistoryPanel({
                 </Popconfirm>
               </>
             )}
+            {postCounts.pending > 0 && (
+              <Button
+                size="small"
+                icon={<ExportOutlined />}
+                onClick={() => {
+                  setExportSelectedOnly(false);
+                  setExportLinksModalVisible(true);
+                }}
+                className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 rounded-xl text-xs font-semibold h-8 px-3 transition-all"
+                title="Xem và xuất toàn bộ link các bài đang chờ đăng"
+              >
+                🔗 Xuất link chờ ({postCounts.pending})
+              </Button>
+            )}
             <Button
               size="small"
               onClick={() => setHistoryOpen((open) => !open)}
@@ -215,6 +268,20 @@ export default function HistoryPanel({
               className="bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-xl h-8 px-3.5 border-none shadow-sm transition-all"
             >
               Đăng ngay tất cả
+            </Button>
+
+            <Button
+              size="small"
+              icon={<ExportOutlined />}
+              disabled={isBulkProcessing}
+              onClick={() => {
+                setExportSelectedOnly(true);
+                setExportLinksModalVisible(true);
+              }}
+              className="bg-sky-600/25 hover:bg-sky-600/35 text-sky-200 border border-sky-500/40 font-semibold text-xs rounded-xl h-8 px-3 transition-all"
+              title="Xuất danh sách link của các bài viết đã chọn"
+            >
+              🔗 Xuất link đã chọn ({selectedRowKeys.length})
             </Button>
 
             <Button
@@ -436,6 +503,109 @@ export default function HistoryPanel({
         </button>
       </div>
 
+      {/* THANH BỘ LỌC ĐỊNH DẠNG MEDIA: VIDEO / HÌNH ẢNH / CHỈ CHỮ */}
+      <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-2xl bg-slate-950/70 border border-slate-800/90 shadow-inner flex-wrap backdrop-blur-md">
+        <span className="text-xs text-slate-400 font-bold flex items-center gap-1.5 shrink-0">
+          <FilterOutlined className="text-sky-400 text-xs" />
+          <span>Định dạng bài:</span>
+        </span>
+
+        {/* 1. Tất cả */}
+        <button
+          type="button"
+          onClick={() => setHistoryMediaTypeFilter('ALL')}
+          className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer border flex items-center gap-1.5 ${
+            historyMediaTypeFilter === 'ALL'
+              ? 'bg-blue-600/30 border-blue-500 text-blue-100 shadow-sm ring-1 ring-blue-500/40'
+              : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+          }`}
+        >
+          <span>Tất cả</span>
+          <span className="font-mono text-xs opacity-75">({mediaBreakdown.all})</span>
+        </button>
+
+        {/* 2. Video */}
+        <button
+          type="button"
+          onClick={() => setHistoryMediaTypeFilter(historyMediaTypeFilter === 'VIDEO' ? 'ALL' : 'VIDEO')}
+          className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer border flex items-center gap-1.5 ${
+            historyMediaTypeFilter === 'VIDEO'
+              ? 'bg-purple-600/35 border-purple-400 text-purple-100 shadow-md ring-2 ring-purple-500/50'
+              : 'bg-purple-950/25 border-purple-500/30 text-purple-300 hover:bg-purple-900/40 hover:text-white'
+          }`}
+        >
+          <VideoCameraOutlined className="text-purple-400 text-xs" />
+          <span>🎬 Video / Reels</span>
+          <span
+            className={`px-1.5 py-0.2 rounded-full font-mono text-xs font-bold ${
+              historyMediaTypeFilter === 'VIDEO'
+                ? 'bg-purple-500/40 text-purple-100 border border-purple-300/40'
+                : 'bg-purple-900/50 text-purple-300 border border-purple-500/30'
+            }`}
+          >
+            {mediaBreakdown.video}
+          </span>
+        </button>
+
+        {/* 3. Hình ảnh */}
+        <button
+          type="button"
+          onClick={() => setHistoryMediaTypeFilter(historyMediaTypeFilter === 'IMAGE' ? 'ALL' : 'IMAGE')}
+          className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer border flex items-center gap-1.5 ${
+            historyMediaTypeFilter === 'IMAGE'
+              ? 'bg-cyan-600/35 border-cyan-400 text-cyan-100 shadow-md ring-2 ring-cyan-500/50'
+              : 'bg-cyan-950/25 border-cyan-500/30 text-cyan-300 hover:bg-cyan-900/40 hover:text-white'
+          }`}
+        >
+          <PictureOutlined className="text-cyan-400 text-xs" />
+          <span>🖼️ Hình ảnh</span>
+          <span
+            className={`px-1.5 py-0.2 rounded-full font-mono text-xs font-bold ${
+              historyMediaTypeFilter === 'IMAGE'
+                ? 'bg-cyan-500/40 text-cyan-100 border border-cyan-300/40'
+                : 'bg-cyan-900/50 text-cyan-300 border border-cyan-500/30'
+            }`}
+          >
+            {mediaBreakdown.image}
+          </span>
+        </button>
+
+        {/* 4. Chỉ chữ / Nền màu */}
+        <button
+          type="button"
+          onClick={() => setHistoryMediaTypeFilter(historyMediaTypeFilter === 'TEXT' ? 'ALL' : 'TEXT')}
+          className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer border flex items-center gap-1.5 ${
+            historyMediaTypeFilter === 'TEXT'
+              ? 'bg-slate-600/40 border-slate-400 text-slate-100 shadow-md ring-2 ring-slate-400/50'
+              : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-white'
+          }`}
+        >
+          <FileTextOutlined className="text-slate-400 text-xs" />
+          <span>📝 Chỉ chữ / Nền màu</span>
+          <span
+            className={`px-1.5 py-0.2 rounded-full font-mono text-xs font-bold ${
+              historyMediaTypeFilter === 'TEXT'
+                ? 'bg-slate-700 text-slate-100 border border-slate-400/40'
+                : 'bg-slate-800 text-slate-300 border border-slate-700'
+            }`}
+          >
+            {mediaBreakdown.text + mediaBreakdown.colorBg}
+          </span>
+        </button>
+
+        {historyMediaTypeFilter !== 'ALL' && (
+          <Button
+            size="small"
+            type="text"
+            icon={<ClearOutlined />}
+            onClick={() => setHistoryMediaTypeFilter('ALL')}
+            className="text-xs text-blue-400 hover:text-blue-300 ml-auto shrink-0"
+          >
+            Bỏ lọc định dạng
+          </Button>
+        )}
+      </div>
+
       {/* THANH BỘ LỌC PHỤ: LỌC THEO NHÓM/PAGE + Ô TÌM KIẾM TỪ KHÓA */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 mb-3">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-1">
@@ -493,7 +663,7 @@ export default function HistoryPanel({
           />
         </div>
 
-        {(historyGroupFilter !== 'ALL' || historyPageFilter !== 'ALL' || historyStatusFilter !== 'ALL' || historySearchText) && (
+        {(historyGroupFilter !== 'ALL' || historyPageFilter !== 'ALL' || historyStatusFilter !== 'ALL' || historyMediaTypeFilter !== 'ALL' || historySearchText) && (
           <Button
             size="middle"
             type="text"
@@ -502,6 +672,7 @@ export default function HistoryPanel({
               setHistoryGroupFilter('ALL');
               setHistoryPageFilter('ALL');
               setHistoryStatusFilter('ALL');
+              setHistoryMediaTypeFilter('ALL');
               setHistorySearchText('');
             }}
             className="text-slate-300 hover:text-white text-xs rounded-xl border border-slate-700 bg-slate-800/60 hover:bg-slate-700 shrink-0"
@@ -1106,6 +1277,18 @@ export default function HistoryPanel({
                 <>
                   <Button
                     size="small"
+                    icon={<ExportOutlined />}
+                    onClick={() => {
+                      setExportSelectedOnly(false);
+                      setExportLinksModalVisible(true);
+                    }}
+                    className="font-bold text-xs rounded-lg bg-blue-600/30 hover:bg-blue-600/40 text-blue-200 border-blue-500/40 cursor-pointer"
+                    title="Hiển thị hoặc xuất file danh sách link của toàn bộ bài chờ đăng"
+                  >
+                    🔗 Xuất / Xem link chờ ({currentPendingDistribution.totalPending})
+                  </Button>
+                  <Button
+                    size="small"
                     icon={<ApartmentOutlined />}
                     onClick={() => onSpreadGroups?.()}
                     className="font-bold text-xs rounded-lg bg-indigo-600/30 hover:bg-blue-600/30 text-indigo-200 border-indigo-500/40"
@@ -1236,6 +1419,14 @@ export default function HistoryPanel({
         rowClassName={(record: PostQueue) =>
           `history-row history-row-${(record.status || 'PENDING').toLowerCase()}`
         }
+      />
+
+      <ExportPendingLinksModal
+        open={exportLinksModalVisible}
+        onClose={() => setExportLinksModalVisible(false)}
+        posts={posts || []}
+        selectedRowKeys={selectedRowKeys}
+        initialSelectedOnly={exportSelectedOnly}
       />
     </Card>
   );

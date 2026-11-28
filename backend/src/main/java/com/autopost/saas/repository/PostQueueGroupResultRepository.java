@@ -23,6 +23,10 @@ public interface PostQueueGroupResultRepository extends JpaRepository<PostQueueG
     @EntityGraph(attributePaths = "socialAccount")
     List<PostQueueGroupResult> findByPostQueue_IdOrderByAttemptedAtDesc(Long postQueueId);
 
+    /** Thanh "Kiểm tra link": permalink từng nhóm. */
+    @org.springframework.data.jpa.repository.Query("SELECT r FROM PostQueueGroupResult r JOIN FETCH r.postQueue p LEFT JOIN FETCH p.campaign c LEFT JOIN FETCH r.socialAccount WHERE c.user.id = :userId AND LOWER(r.postUrl) LIKE CONCAT('%', :needle, '%') ORDER BY r.id DESC")
+    List<PostQueueGroupResult> searchByPostUrlNeedle(@org.springframework.data.repository.query.Param("userId") Long userId, @org.springframework.data.repository.query.Param("needle") String needle, org.springframework.data.domain.Pageable pageable);
+
     void deleteByPostQueue_Id(Long postQueueId);
 
     void deleteBySocialAccount_Id(Long socialAccountId);

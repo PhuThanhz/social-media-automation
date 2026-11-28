@@ -140,4 +140,107 @@ public final class FacebookPostIds {
                 || lower.contains("tinder pet")
                 || lower.contains("tinder pets");
     }
+
+    private static final Pattern BARE_GROUP_URL = Pattern.compile("^https?://(www\\.|m\\.|mobile\\.)?facebook\\.com/groups/[^/?#]+/?(?:[?#].*)?$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TIKTOK_VIDEO_ID = Pattern.compile("(?:video|v)/(\\d{15,25})");
+
+    /** Link Facebook không chứa ID bài (Group/Page/trang cá nhân). */
+    public static boolean isFacebookNonPostUrl(String url) {
+        if (url == null) return false;
+        String l = url.toLowerCase();
+        return (l.contains("facebook.com") || l.contains("fb.com")) && extractPostId(url) == null;
+    }
+
+    /** Link Group/Page trống (không trỏ tới bài cụ thể) — không dùng để so trùng. */
+    public static boolean isBareGroupUrl(String url) {
+        return url != null && BARE_GROUP_URL.matcher(url.trim()).matches();
+    }
+
+    /** Cùng 1 bài Facebook: khớp nguyên chuỗi, khớp link đã chuẩn hóa, hoặc khớp ID bài. */
+    public static boolean isSameFacebookPostUrl(String url1, String url2) {
+        if (url1 == null || url2 == null) return false;
+        String u1 = url1.trim();
+        String u2 = url2.trim();
+        if (u1.isBlank() || u2.isBlank()) return false;
+        if (u1.equalsIgnoreCase(u2)) return true;
+        if (isBareGroupUrl(u1) || isBareGroupUrl(u2)) return false;
+        String norm1 = normalizeFacebookUrl(u1);
+        String norm2 = normalizeFacebookUrl(u2);
+        if (!norm1.isBlank() && norm1.equalsIgnoreCase(norm2)) return true;
+        String id1 = extractPostId(u1);
+        String id2 = extractPostId(u2);
+        return id1 != null && !id1.isBlank() && id1.equalsIgnoreCase(id2);
+    }
+
+    public static String extractTikTokVideoId(String url) {
+        if (url == null || url.isBlank()) return null;
+        Matcher m = TIKTOK_VIDEO_ID.matcher(url);
+        if (m.find()) return m.group(1);
+        if (url.matches("^\\d{15,25}$")) return url;
+        return null;
+    }
+
+    public static boolean isSameTikTokVideo(String targetId, String targetUrl, String existingUrl) {
+        if (existingUrl == null || existingUrl.isBlank()) return false;
+        String exist = existingUrl.trim();
+        if (targetUrl != null && targetUrl.equalsIgnoreCase(exist)) return true;
+        if (targetId != null && !targetId.isBlank() && exist.contains(targetId)) return true;
+        String existId = extractTikTokVideoId(exist);
+        return existId != null && existId.equals(targetId);
+    }
+
+    public static boolean isTikTokUrl(String url) {
+        return url != null && url.toLowerCase().contains("tiktok.com");
+    }
+
+    /** Chuẩn hóa link bất kỳ (không phải FB): bỏ protocol/www, query tracking utm_*, trailing slash. */
+    public static String normalizeGenericUrl(String url) {
+        if (url == null || url.isBlank()) return "";
+        String u = url.trim().replaceFirst("^https?://", "").replaceFirst("^www\\.", "");
+        int hash = u.indexOf('#');
+        if (hash != -1) u = u.substring(0, hash);
+        int q = u.indexOf('?');
+        if (q != -1) {
+            String path = u.substring(0, q);
+            java.util.List<String> kept = new java.util.ArrayList<>();
+            for (String p : u.substring(q + 1).split("&")) {
+                String k = p.split("=")[0].toLowerCase();
+                if (k.isEmpty() || k.startsWith("utm_") || k.equals("fbclid") || k.equals("igsh") || k.equals("si")
+                        || k.equals("is_from_webapp") || k.equals("sender_device") || k.equals("_r") || k.equals("_t")) continue;
+                kept.add(p);
+            }
+            u = kept.isEmpty() ? path : path + "?" + String.join("&", kept);
+        }
+        if (u.endsWith("/")) u = u.substring(0, u.length() - 1);
+        return u.toLowerCase();
+    }
+
+    /** Cùng 1 link (mọi nền tảng): FB theo ID bài, TikTok theo ID video, còn lại theo link chuẩn hóa. */
+    public static boolean isSameLink(String query, String existing) {
+        if (query == null || existing == null || query.isBlank() || existing.isBlank()) return false;
+        if (isTikTokUrl(query)) {
+            String id = extractTikTokVideoId(query);
+            return id != null ? isSameTikTokVideo(id, query, existing) : normalizeGenericUrl(query).equals(normalizeGenericUrl(existing));
+        }
+        if (query.toLowerCase().contains("facebook.com") || query.toLowerCase().contains("fb.watch")) {
+            return isSameFacebookPostUrl(query, existing);
+        }
+        String nq = normalizeGenericUrl(query);
+        return !nq.isEmpty() && nq.equals(normalizeGenericUrl(existing));
+    }
+
+    /** Chuỗi ngắn để LIKE trong DB: ID bài/ID video nếu có, không thì link đã chuẩn hóa. */
+    public static String searchNeedle(String url) {
+        if (url == null || url.isBlank()) return null;
+        if (isTikTokUrl(url)) {
+            String id = extractTikTokVideoId(url);
+            if (id != null) return id;
+        } else if (url.toLowerCase().contains("facebook.com")) {
+            // Link Group/Page/trang cá nhân không trỏ tới bài cụ thể → không tra (tool hay lưu chúng làm link dự phòng).
+            String id = extractPostId(url);
+            return id != null && id.length() >= 5 ? id : null;
+        }
+        String n = normalizeGenericUrl(url);
+        return n.isEmpty() ? null : n;
+    }
 }

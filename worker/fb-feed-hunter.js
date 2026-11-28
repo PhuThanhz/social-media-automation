@@ -131,13 +131,19 @@ async function revealPagePermalinks(page, target, onUnitDone) {
         const txt = (a.innerText || a.getAttribute('aria-label') || '').trim();
         if (ignoreWords.test(txt)) continue;
         if (h.includes('/user/') || h.includes('/people/') || h.includes('/hashtag/')) continue;
+        // Link giờ của BÌNH LUẬN cũng trỏ về /posts/<id> → rê vào sẽ đọc nhầm giờ bình luận thành giờ đăng bài
+        const cmtArt = a.closest('[role="article"]');
+        if (cmtArt && cmtArt !== el && /Bình luận|Comment|Phản hồi|Reply/i.test(cmtArt.getAttribute('aria-label') || '')) continue;
+        if (a.closest('form, [aria-label*="Viết bình luận" i]')) continue;
 
         if (re.test(h) || h.includes('/posts/') || h.includes('/permalink') || h.includes('/videos/') || h.includes('/reel/') || h.includes('/photo')) {
           indices.push(i);
           continue;
         }
         const hidden = !h || h.startsWith('#') || h.includes('__cft__');
-        if (hidden && (timeWords.test(txt) || a.querySelector('abbr, time') || (txt.length <= 30 && /\d/.test(txt)))) {
+        // Mốc giờ bài chính bị FB làm rối chữ ("r͏S͏d͏o͏…" chèn ký tự U+034F) → vẫn là ứng viên
+        const obfuscated = /͏/.test(txt);
+        if (hidden && (obfuscated || timeWords.test(txt) || a.querySelector('abbr, time') || (txt.length <= 30 && /\d/.test(txt)))) {
           indices.push(i);
         }
       }
@@ -163,19 +169,23 @@ async function revealPagePermalinks(page, target, onUnitDone) {
       const hidden = !h || h.startsWith('#') || /^(?:https:\/\/www\.facebook\.com)?\/?\?__cft__/.test(h);
       if (!hidden && !postHref.test(h)) continue;
       await a.scrollIntoViewIfNeeded({ timeout: 400 }).catch(() => { });
+      // Tooltip FB hiện CHẬM: đọc ngay sau khi rê sẽ ra tooltip của link TRƯỚC → giờ bị lệch sang bài bên cạnh.
+      // Rời chuột, chờ tooltip cũ tắt hẳn, rồi mới rê vào link này và chờ tooltip mới.
+      await page.mouse.move(2, 2).catch(() => { });
+      for (let w = 0; w < 8 && (await readTip()); w++) await page.waitForTimeout(80);
       await a.hover({ timeout: 500 }).catch(() => { });
       await page.waitForTimeout(100);
       const revealed = await a.evaluate((el) => el.href).catch(() => '');
-      if (!revealed || !postHref.test(revealed) || (!isGroup && !isOwnedByPage(revealed, target))) continue;
+      if (!revealed || !postHref.test(revealed) || revealed.includes('comment_id=') || (!isGroup && !isOwnedByPage(revealed, target))) continue;
       tries++;
       if (!foundHref) foundHref = revealed;
-      let tip = await readTip();
-      if (!looksLikeDate(tip) || tip === lastTip) {
-        // Tooltip đôi khi hiện chậm hơn link → chờ thêm chút rồi đọc lại
-        await page.waitForTimeout(150);
+      let tip = '';
+      for (let w = 0; w < 15; w++) {
         tip = await readTip();
+        if (looksLikeDate(tip)) break;
+        await page.waitForTimeout(100);
       }
-      if (looksLikeDate(tip) && tip !== lastTip) {
+      if (looksLikeDate(tip)) {
         foundTip = tip;
         break;
       }
@@ -673,10 +683,16 @@ async function huntFacebookFeed(params, deps = {}) {
           for (const art of articles) {
             if (isCommentOrNoise(art)) continue;
             // Phần tử nằm trong một bài con (bình luận / bài được chia sẻ lồng bên trong) chứ không phải chính bài này
-            const ownArticle = art.matches('[role="article"]') ? art : art.querySelector('[role="article"]');
+            const isCommentArticle = (a) => /Bình luận|Comment|Phản hồi|Reply/i.test(a.getAttribute('aria-label') || '');
+            // Bài chính KHÔNG được là khối bình luận — trước đây lấy article đầu tiên bên trong (thường là bình luận)
+            // → giờ/link của bình luận bị coi là của bài (giờ đăng muộn hơn thật 20-60 phút)
+            const ownArticle = art.matches('[role="article"]') ? art
+              : (Array.from(art.querySelectorAll('[role="article"]')).find((a) => !isCommentArticle(a)) || null);
             const inNestedArticle = (el) => {
               const a = el.closest('[role="article"]');
-              return Boolean(a && a !== ownArticle && art.contains(a));
+              if (!a || !art.contains(a) && a !== art) return false;
+              if (a !== art && isCommentArticle(a)) return true;
+              return Boolean(a !== ownArticle && a !== art && art.contains(a));
             };
             // Bài vừa tải thêm trong lúc rê chuột chưa được đọc ngày giờ → để vòng sau
             if (requireScanned && !readTag(art, 'data-ztr-scanned')) continue;
@@ -699,8 +715,19 @@ async function huntFacebookFeed(params, deps = {}) {
               }
             }
 
+            // Ưu tiên 0b: nhãn nút "Hành động đối với bài viết này của <Tên>" / "Actions for this post by <Name>"
+            if (!rawAuthor) {
+              for (const el of Array.from(art.querySelectorAll('[aria-label]'))) {
+                if (inNestedArticle(el)) continue;
+                const mm = (el.getAttribute('aria-label') || '').match(/^(?:Hành động đối với bài viết này của|Actions for this post by)\s+(.+)$/i);
+                if (mm && mm[1].trim().length >= 2 && mm[1].trim().length <= 60) { rawAuthor = mm[1].trim(); break; }
+              }
+            }
+
             if (!rawAuthor) {
               const authorCandidates = [
+                // Link thành viên trong nhóm có dạng /groups/<gid>/user/<uid>/ — trước đây bị loại vì chứa "/groups/"
+                Array.from(art.querySelectorAll('a[href*="/groups/"][href*="/user/"]')).find(a => !inNestedArticle(a) && (a.innerText || '').trim()),
                 art.querySelector('a[href*="/user/"]:not([href*="/groups/"]) strong, a[href*="/user/"]:not([href*="/groups/"]) span, a[href*="/user/"]:not([href*="/groups/"])'),
                 art.querySelector('a[href*="profile.php"]:not([href*="/groups/"]) strong, a[href*="profile.php"]:not([href*="/groups/"]) span, a[href*="profile.php"]:not([href*="/groups/"])'),
                 art.querySelector('a[href*="/people/"]:not([href*="/groups/"]) strong, a[href*="/people/"]:not([href*="/groups/"]) span, a[href*="/people/"]:not([href*="/groups/"])'),
@@ -760,7 +787,16 @@ async function huntFacebookFeed(params, deps = {}) {
               }
               if (!postUrl) continue;
             }
-            for (const a of (pageMode ? [] : links)) {
+            // Ưu tiên tuyệt đối: link /posts/ID hoặc /permalink/ID thật ở BẤT KỲ đâu trong bài (thường là link ngày giờ)
+            if (!pageMode) {
+              for (const a of links) {
+                const h = a.href || '';
+                if (h.includes('comment_id=') || inNestedArticle(a)) continue;
+                const pm = h.match(/\/groups\/[^\/]+\/(?:posts|permalink)\/(\d+)/);
+                if (pm) { postUrl = gid ? `https://www.facebook.com/groups/${gid}/posts/${pm[1]}/` : h.split('?')[0]; break; }
+              }
+            }
+            for (const a of ((pageMode || postUrl) ? [] : links)) {
               const h = a.href || '';
               // Bỏ qua link profile người dùng, story, hashtag, quy tắc nhóm
               if (
@@ -792,8 +828,9 @@ async function huntFacebookFeed(params, deps = {}) {
                 break;
               }
 
-              // Ưu tiên 3: Lấy post_id từ set=pcb. hoặc set=gm. hoặc set=g. hoặc set=a.
-              const pcbMatch = h.match(/set=(?:pcb|gm|g|a)\.([a-zA-Z0-9_]+)/);
+              // Ưu tiên 3: post_id từ set=pcb. / set=gm. — KHÔNG dùng set=a. (ID album cá nhân) hay set=g. (ID nhóm):
+              // dựng /posts/<id> từ 2 loại này ra link chết, bài không cào/đăng được
+              const pcbMatch = h.match(/set=(?:pcb|gm)\.(\d+)/);
               if (pcbMatch) {
                 postUrl = gid ? `https://www.facebook.com/groups/${gid}/posts/${pcbMatch[1]}/` : h;
                 break;
@@ -939,6 +976,19 @@ async function huntFacebookFeed(params, deps = {}) {
               caption = dedupeP.join('\n\n').trim();
             }
 
+            // Bản rút gọn ("...") + bản đầy đủ sau "Xem thêm" bị nối liền nhau → chỉ giữ bản đầy đủ
+            if (caption) {
+              const norm = (x) => x.replace(/\s+/g, '').toLowerCase();
+              const segs = caption.split(/(?:\.\.\.|…)/);
+              if (segs.length >= 2) {
+                const head = norm(segs[0]);
+                for (let k = 1; k < segs.length; k++) {
+                  const tail = segs.slice(k).join('...');
+                  if (head.length >= 10 && norm(tail).startsWith(head)) { caption = tail.trim(); break; }
+                }
+              }
+            }
+
             // 4. Tìm Ảnh / Media preview
             const imgs = Array.from(new Set(Array.from(art.querySelectorAll('a[href*="/photo"] img, a[href*="set="] img, div[data-visualcompletion="media-vc-image"] img, img'))
               .filter(img => {
@@ -990,6 +1040,7 @@ async function huntFacebookFeed(params, deps = {}) {
             if (!postedTime && postUrl) {
               const postLinks = links.filter(a => {
                 const h = a.href || '';
+                if (inNestedArticle(a)) return false;
                 return h && (h === postUrl || h.includes(postUrl) || postUrl.includes(h.split('?')[0]));
               });
               for (const a of postLinks) {
@@ -1006,6 +1057,7 @@ async function huntFacebookFeed(params, deps = {}) {
               for (const a of links) {
                 const h = a.href || '';
                 if (h.includes('/user/') || h.includes('/people/') || h.includes('/profile.php') || h.includes('comment_id=')) continue;
+                if (inNestedArticle(a)) continue;
                 const txt = (a.innerText || a.getAttribute('aria-label') || '').trim();
                 if (!shortTime(txt)) continue;
                 if (strictTimeRe.test(txt)) {
@@ -1019,6 +1071,7 @@ async function huntFacebookFeed(params, deps = {}) {
             if (!postedTime) {
               const timeEls = Array.from(art.querySelectorAll('abbr, time, span[aria-label*="phút" i], span[aria-label*="giờ" i], span[aria-label*="ngày" i], span[aria-label*="hôm" i], span[aria-label*="tháng" i], a[aria-label*="phút" i], a[aria-label*="giờ" i], a[aria-label*="ngày" i], a[aria-label*="tháng" i]'));
               for (const el of timeEls) {
+                if (inNestedArticle(el)) continue;
                 const aria = (el.getAttribute('aria-label') || '').trim();
                 const inner = (el.innerText || '').trim();
                 const cand = aria || inner;
@@ -1047,16 +1100,30 @@ async function huntFacebookFeed(params, deps = {}) {
             let comments = 0;
             let shares = 0;
 
-            const rxEls = Array.from(art.querySelectorAll('[aria-label*="bày tỏ cảm xúc" i], [aria-label*="reactions" i], [aria-label*="người thích" i], [role="toolbar"] span, span[data-visualcompletion] span'));
+            // Đọc số đếm FB: "12", "1,2K", "1.234" (= 1234), "3 N", "1,5 triệu"
+            const toCount = (numStr, unit) => {
+              let s = String(numStr).trim();
+              let n;
+              if (/^\d{1,3}(?:[.,]\d{3})+$/.test(s)) n = parseInt(s.replace(/[.,]/g, ''), 10);
+              else n = parseFloat(s.replace(',', '.'));
+              const u = (unit || '').toLowerCase();
+              if (u === 'k' || u === 'n' || u === 'nghìn' || u === 'ngàn') n *= 1000;
+              if (u === 'm' || u === 'tr' || u === 'triệu') n *= 1000000;
+              return Number.isFinite(n) ? Math.round(n) : 0;
+            };
+            // CHỈ nhận số từ nhãn cảm xúc thật hoặc span CHỈ chứa đúng 1 số đếm — trước đây lấy MỌI con số trong
+            // span bất kỳ (tên "pedro1212026", số trong caption, năm "2026"...) rồi chọn số lớn nhất → reaction ảo.
+            const rxAriaRe = /(\d+(?:[.,]\d+)*)\s*(k|m|n|nghìn|ngàn|triệu|tr)?\s*(?:người|reactions?|lượt bày tỏ|cảm xúc)/i;
+            const pureCountRe = /^(\d+(?:[.,]\d+)*)\s*(k|m|n|nghìn|ngàn|triệu|tr)?$/i;
+            const rxEls = Array.from(art.querySelectorAll('[aria-label*="bày tỏ cảm xúc" i], [aria-label*="reactions" i], [aria-label*="người thích" i], [aria-label*="Tất cả cảm xúc" i], [role="toolbar"] span, span[data-visualcompletion] span'));
             for (const el of rxEls) {
-              const aria = el.getAttribute('aria-label') || '';
-              const txt = (el.innerText || aria).trim();
-              const m = txt.match(/(\d+(?:[.,]\d+)?)\s*(k|m|người)?/i);
+              if (el.closest('[aria-label*="Bình luận" i][role="article"], [aria-label*="Comment" i][role="article"]')) continue;
+              const aria = (el.getAttribute('aria-label') || '').trim();
+              let m = aria ? aria.match(rxAriaRe) : null;
+              if (!m) m = (el.innerText || '').trim().match(pureCountRe);
               if (m) {
-                let num = parseFloat(m[1].replace(',', '.'));
-                if (m[2]?.toLowerCase() === 'k') num *= 1000;
-                if (m[2]?.toLowerCase() === 'm') num *= 1000000;
-                if (num > reactions) reactions = Math.round(num);
+                const num = toCount(m[1], m[2]);
+                if (num > reactions && num < 50000000) reactions = num;
               }
             }
 
@@ -1064,28 +1131,35 @@ async function huntFacebookFeed(params, deps = {}) {
               .map(el => (el.innerText || '').trim())
               .filter(Boolean);
 
+            // Số bình luận / chia sẻ nằm trong aria-label nút hành động: "Bình luận về bài viết của X, 46 bình luận",
+            // "Chia sẻ bài viết của X, 1 lượt chia sẻ" (chữ hiển thị chỉ có con số trần "46")
+            for (const el of Array.from(art.querySelectorAll('[aria-label]'))) {
+              if (inNestedArticle(el)) continue;
+              const al = el.getAttribute('aria-label') || '';
+              const cm = al.match(/(\d+(?:[.,]\d+)*)\s*(k|m|n|nghìn|triệu)?\s*(?:bình luận|comments?)\s*$/i);
+              if (cm) { const c = toCount(cm[1], cm[2]); if (c > comments) comments = c; }
+              const sm = al.match(/(\d+(?:[.,]\d+)*)\s*(k|m|n|nghìn|triệu)?\s*(?:lượt chia sẻ|shares?)\s*$/i);
+              if (sm) { const sh = toCount(sm[1], sm[2]); if (sh > shares) shares = sh; }
+            }
+
             for (const t of textNodes) {
-              const cmtMatch = t.match(/(\d+(?:[.,]\d+)?)\s*(k|m)?\s*(?:bình luận|comments?)/i);
+              const cmtMatch = t.match(/^(\d+(?:[.,]\d+)*)\s*(k|m|n|nghìn|triệu)?\s*(?:bình luận|comments?)$/i);
               if (cmtMatch) {
-                let c = parseFloat(cmtMatch[1].replace(',', '.'));
-                if (cmtMatch[2]?.toLowerCase() === 'k') c *= 1000;
-                if (c > comments) comments = Math.round(c);
+                const c = toCount(cmtMatch[1], cmtMatch[2]);
+                if (c > comments) comments = c;
               }
-              const shareMatch = t.match(/(\d+(?:[.,]\d+)?)\s*(k|m)?\s*(?:lượt chia sẻ|shares?)/i);
+              const shareMatch = t.match(/^(\d+(?:[.,]\d+)*)\s*(k|m|n|nghìn|triệu)?\s*(?:lượt chia sẻ|shares?)$/i);
               if (shareMatch) {
-                let s = parseFloat(shareMatch[1].replace(',', '.'));
-                if (shareMatch[2]?.toLowerCase() === 'k') s *= 1000;
-                if (s > shares) shares = Math.round(s);
+                const sh = toCount(shareMatch[1], shareMatch[2]);
+                if (sh > shares) shares = sh;
               }
             }
 
             if (reactions === 0) {
               const countSpan = art.querySelector('span[aria-hidden="true"]');
               if (countSpan && /^\d+(?:[.,]\d+)?\s*[kKmM]?$/.test(countSpan.innerText?.trim())) {
-                const raw = countSpan.innerText.trim();
-                let num = parseFloat(raw.replace(',', '.'));
-                if (/[kK]/.test(raw)) num *= 1000;
-                reactions = Math.round(num);
+                const mm = countSpan.innerText.trim().match(pureCountRe);
+                if (mm) reactions = toCount(mm[1], mm[2]);
               }
             }
 
@@ -1093,6 +1167,10 @@ async function huntFacebookFeed(params, deps = {}) {
             const isViral = viralScore >= 50;
 
             const kw = (scanKeyword || '').toLowerCase().trim();
+            // Tên tác giả trùng dòng đầu caption → là lấy nhầm chữ bài viết (bài ẩn danh), không phải tên người
+            if (author && author !== 'Thành viên nhóm' && caption && caption.trim().split('\n')[0].trim().startsWith(author) && author.split(/\s+/).length >= 4) {
+              author = 'Thành viên nhóm';
+            }
             const matchedKeyword = Boolean(kw && (caption.toLowerCase().includes(kw) || author.toLowerCase().includes(kw)));
 
             results.push({

@@ -66,6 +66,12 @@ function parseFbPostedTime(raw, now = Date.now()) {
 
   if (/^(?:vừa xong|just now|bây giờ|now)\b/.test(t)) return now;
 
+  // Ngày cụ thể "26 tháng 11, 2026" phải xét TRƯỚC thời gian tương đối — nếu không "26 tháng" bị hiểu là "26 tháng trước"
+  const calVi = t.match(/(\d{1,2})\s*(?:tháng|thg)\s*(\d{1,2})(?!\s*(?:phút|giờ|ngày|tuần|năm trước))(?:\s*(?:,|năm)\s*(\d{4}))?/);
+  if (calVi && parseInt(calVi[2], 10) >= 1 && parseInt(calVi[2], 10) <= 12) {
+    return calendarDate(parseInt(calVi[1], 10), parseInt(calVi[2], 10) - 1, calVi[3] ? parseInt(calVi[3], 10) : null, readClock(t), now);
+  }
+
   // Thời gian tương đối: "5 phút", "3 giờ trước", "2 ngày", "1 tuần", "5m", "3h", "2d", "1w", "1y"
   const rel = t.match(/(?:^|\s)(\d{1,3})\s*(phút|giờ|ngày|tuần|tháng|năm|mins?|minutes?|hrs?|hours?|days?|weeks?|years?|yrs?|m|h|d|w|y)(?:\s+trước|\s+ago)?(?:\s|$)/);
   if (rel) {

@@ -384,6 +384,21 @@ public class SocialAccountController {
         return ResponseEntity.ok(socialAccountService.saveAccount(existing));
     }
 
+    /** Body: {paused: true|false, wholeNick?: true} — wholeNick mặc định true (dừng cả nick, mọi Page dùng chung c_user). */
+    @PutMapping("/{id}/pause")
+    public ResponseEntity<Map<String, Object>> setPaused(@PathVariable Long id, @RequestBody Map<String, Object> body, Authentication authentication) {
+        User user = resolveUser(authentication);
+        boolean paused = Boolean.TRUE.equals(body.get("paused")) || "true".equalsIgnoreCase(String.valueOf(body.get("paused")));
+        boolean wholeNick = body.get("wholeNick") == null || Boolean.TRUE.equals(body.get("wholeNick"))
+                || "true".equalsIgnoreCase(String.valueOf(body.get("wholeNick")));
+        try {
+            List<String> names = socialAccountService.setPaused(user.getId(), id, paused, wholeNick);
+            return ResponseEntity.ok(Map.of("success", true, "paused", paused, "accounts", names));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+
     @PostMapping("/{id}/check-group-health")
     public ResponseEntity<java.util.Map<String, Object>> checkGroupHealth(@PathVariable Long id) {
         return ResponseEntity.ok(groupHealthService.checkGroupHealth(id));

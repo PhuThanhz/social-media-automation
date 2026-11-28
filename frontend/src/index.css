@@ -13389,3 +13389,171 @@ body .lookup-groups-table .ant-pagination .ant-pagination-item-active a {
 .tc-bg__grid { grid-template-columns: repeat(auto-fill, minmax(42px, 1fr)); }
 .tc-stage__layout { padding-top: 4px; }
 .tc-stage__canvas { min-height: 300px; }
+
+/* ===== Telegram bot (Kết nối → Telegram bot) — form phẳng: nhãn trái, điều khiển phải, kẻ mảnh ===== */
+.tg-panel {
+  padding: 20px 24px;
+  max-width: 880px;
+}
+
+.tg-head h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.tg-head p {
+  margin: 0 0 8px;
+  color: #94a3b8;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.tg-row {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: 16px;
+  align-items: start;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.tg-row-last {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.tg-row > label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #cbd5e1;
+  padding-top: 5px;
+}
+
+.tg-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-height: 32px;
+}
+
+.tg-control-col {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.tg-token-input {
+  width: 360px;
+  max-width: 100%;
+}
+
+.tg-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #e2e8f0;
+}
+
+.tg-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.tg-help {
+  color: #94a3b8;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.tg-error {
+  color: #fca5a5;
+  font-size: 12px;
+  word-break: break-word;
+}
+
+.tg-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 4px;
+  color: #f1f5f9;
+}
+
+.tg-chat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #e2e8f0;
+  font-size: 13px;
+}
+
+.tg-test {
+  margin-top: 4px;
+}
+
+.tg-steps {
+  margin: 0;
+  padding-left: 18px;
+  color: #94a3b8;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+@media (max-width: 640px) {
+  .tg-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+}
+
+.conn-paused-tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  border-radius: 6px;
+  padding: 0 6px;
+  line-height: 18px;
+}
+
+/* Thanh "Kiểm tra link" trên topbar */
+.link-check-input.ant-input-affix-wrapper {
+  width: 300px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 13px;
+}
+.link-check-input .ant-input-prefix { color: #94a3b8; }
+@media (max-width: 1280px) { .link-check-input.ant-input-affix-wrapper { width: 220px; } }
+@media (max-width: 900px) { .link-check-input.ant-input-affix-wrapper { display: none; } }
+
+.link-check-result { width: 440px; max-width: calc(100vw - 32px); }
+.link-check-loading { display: flex; gap: 8px; align-items: center; color: #94a3b8; font-size: 13px; }
+.link-check-summary { font-size: 14px; font-weight: 600; color: #e2e8f0; }
+.link-check-summary.is-published { color: #34d399; }
+.link-check-summary.is-queued { color: #60a5fa; }
+.link-check-summary.is-failed_only, .link-check-summary.is-failed { color: #f87171; }
+.link-check-summary.is-inbox_only { color: #fbbf24; }
+.link-check-summary.is-not_found { color: #cbd5e1; }
+
+.link-check-list { list-style: none; margin: 10px 0 0; padding: 0; max-height: 360px; overflow-y: auto; }
+.link-check-row { padding: 8px 0; border-top: 1px solid rgba(148, 163, 184, 0.15); }
+.link-check-row-head { display: flex; gap: 10px; align-items: baseline; font-size: 13px; }
+.link-check-status { font-weight: 600; flex-shrink: 0; color: #cbd5e1; }
+.link-check-status.st-published { color: #34d399; }
+.link-check-status.st-pending, .link-check-status.st-pending_approval { color: #60a5fa; }
+.link-check-status.st-processing { color: #fbbf24; }
+.link-check-status.st-failed, .link-check-status.st-needs_review { color: #f87171; }
+.link-check-status.st-cancelled { color: #64748b; }
+.link-check-target { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #e2e8f0; }
+.link-check-when { flex-shrink: 0; color: #94a3b8; font-size: 12px; }
+.link-check-preview { margin-top: 2px; color: #94a3b8; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.link-check-error { margin-top: 2px; color: #fca5a5; font-size: 12px; }
+.link-check-meta { display: flex; gap: 12px; margin-top: 4px; font-size: 12px; color: #64748b; }
+.link-check-inbox { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(148, 163, 184, 0.15); font-size: 12px; color: #fbbf24; }

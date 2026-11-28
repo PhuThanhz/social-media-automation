@@ -196,6 +196,39 @@ public class SocialAccountService {
         return updatedNames;
     }
 
+    /**
+     * Tạm dừng / tiếp tục 1 kết nối. wholeNick=true áp dụng cho MỌI kết nối của user dùng chung c_user
+     * (Via + các Page nick đó quản trị) vì scheduler khoá làn theo nick chứ không theo Page.
+     * Trả về tên các kết nối đã đổi.
+     */
+    @CacheEvict(value = "socialAccountsByUser", allEntries = true)
+    public List<String> setPaused(Long userId, Long accountId, boolean paused, boolean wholeNick) {
+        SocialAccount target = repository.findById(accountId).orElseThrow(() -> new IllegalArgumentException("Không tìm thấy kết nối " + accountId));
+        if (target.getUser() == null || !target.getUser().getId().equals(userId)) {
+            throw new IllegalArgumentException("Kết nối " + accountId + " không thuộc tài khoản này");
+        }
+        String cUser = wholeNick ? extractCUser(target.getAccessToken()) : null;
+        List<SocialAccount> affected = new java.util.ArrayList<>();
+        if (cUser == null || cUser.isBlank()) {
+            affected.add(target);
+        } else {
+            for (SocialAccount acc : repository.findByUserId(userId)) {
+                String accCUser = extractCUser(acc.getAccessToken());
+                if (acc.getId().equals(accountId) || (accCUser != null && accCUser.equalsIgnoreCase(cUser))) {
+                    affected.add(acc);
+                }
+            }
+        }
+        List<String> names = new java.util.ArrayList<>();
+        for (SocialAccount acc : affected) {
+            acc.setPaused(paused ? Boolean.TRUE : null);
+            repository.save(acc);
+            names.add(acc.getPageName() != null ? acc.getPageName() : String.valueOf(acc.getId()));
+        }
+        log.info("{} {} kết nối: {}", paused ? "⏸️ Tạm dừng" : "▶️ Tiếp tục", names.size(), names);
+        return names;
+    }
+
     @CacheEvict(value = "socialAccountsByUser", allEntries = true)
     @org.springframework.transaction.annotation.Transactional
     public void deleteAccount(Long id) {

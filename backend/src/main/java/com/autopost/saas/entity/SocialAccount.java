@@ -83,6 +83,9 @@ public class SocialAccount {
     @Column(name = "user_agent", columnDefinition = "TEXT")
     private String userAgent; // User-Agent gốc khi lấy cookie để Playwright giả lập chuẩn 100% môi trường trình duyệt.
 
+    @Column(name = "paused")
+    private Boolean paused; // true = người dùng tạm dừng nick (scheduler không tự đăng bài của kết nối này; "Đăng ngay" vẫn chạy)
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

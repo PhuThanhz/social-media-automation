@@ -30,7 +30,7 @@ gemini:
 
 worker:
   base-url: ${WORKER_BASE_URL:http://localhost:3001}
-  urls: ${WORKER_URLS:http://localhost:3001,http://localhost:3002,http://localhost:3003}
+  urls: ${WORKER_URLS:http://localhost:3001,http://localhost:3002}
 
 app:
   publishing:

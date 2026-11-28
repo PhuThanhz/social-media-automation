@@ -154,3 +154,152 @@ Mọi người có thể ghé link xem thử, không mua cũng không sao đâu 
 Cảm ơn mọi người đã dành chút yêu thương cho các em 🥹🐾💗`;
 
 export const STORAGE_KEY_COMMENT = 'autopost_default_affiliate_comment';
+
+export type PostMediaType = 'ALL' | 'VIDEO' | 'IMAGE' | 'TEXT' | 'COLOR_BACKGROUND';
+
+export interface PostMediaInfo {
+  type: 'VIDEO' | 'IMAGE' | 'TEXT' | 'COLOR_BACKGROUND';
+  label: string;
+  badgeText: string;
+  color: string;
+  tagColor: string;
+  iconName: 'video' | 'image' | 'text' | 'palette';
+  videoCount: number;
+  imageCount: number;
+  mediaCount: number;
+  hasVideo: boolean;
+  hasImage: boolean;
+  isColorBackground: boolean;
+  isTextOnly: boolean;
+  rawMediaList: string[];
+}
+
+export const isVideoMediaUrl = (url: string): boolean => {
+  if (!url) return false;
+  return /\.mp4|\.mov|\.webm|\/video\/|\/v\/t16\/|\/v\/t2\/|\/m84\/|\/m86\/|\/m366\/|\/m367\/|\/o1\/v\/|video_dashinit/i.test(url);
+};
+
+export const isVideoOriginalUrl = (url: string): boolean => {
+  if (!url) return false;
+  return /\/(?:reel|reels|watch|videos|share\/v)\//i.test(url) || /[\?&]v=/i.test(url);
+};
+
+export const parseRawMediaUrls = (mediaUrls?: string | string[] | null): string[] => {
+  if (!mediaUrls) return [];
+  if (Array.isArray(mediaUrls)) {
+    return mediaUrls.map((u) => String(u).trim()).filter(Boolean);
+  }
+  const str = String(mediaUrls).trim();
+  if (!str || str === '[]') return [];
+  if (str.startsWith('[') && str.endsWith(']')) {
+    try {
+      const parsed = JSON.parse(str);
+      if (Array.isArray(parsed)) {
+        return parsed.map((u) => String(u).trim()).filter(Boolean);
+      }
+    } catch {
+      // fallback
+    }
+  }
+  return str.split(/[\n,]+/).map((u) => u.trim()).filter(Boolean);
+};
+
+export const detectPostMedia = (post: {
+  postType?: string;
+  mediaUrls?: string | string[];
+  originalUrl?: string;
+  content?: string;
+}): PostMediaInfo => {
+  const rawList = parseRawMediaUrls(post.mediaUrls);
+  const explicitType = (post.postType || '').toUpperCase();
+  const url = post.originalUrl || '';
+
+  const hasVideoFromUrl = isVideoOriginalUrl(url);
+  const videoUrls = rawList.filter(isVideoMediaUrl);
+  const photoUrls = rawList.filter((u) => !isVideoMediaUrl(u));
+
+  const hasVideo = explicitType === 'VIDEO' || videoUrls.length > 0 || hasVideoFromUrl;
+  const isColorBackground = explicitType === 'COLOR_BACKGROUND';
+  const hasImage = !hasVideo && !isColorBackground && (explicitType === 'IMAGE' || photoUrls.length > 0);
+
+  if (hasVideo) {
+    const vCount = Math.max(videoUrls.length, 1);
+    const isReels = /\/(?:reel|reels)\//i.test(url);
+    const badgeText = isReels
+      ? (vCount > 1 ? `${vCount} Reels` : '🎬 Reels')
+      : (vCount > 1 ? `${vCount} Video` : '🎬 Video');
+    return {
+      type: 'VIDEO',
+      label: isReels ? 'Reels (Video ngắn)' : 'Video',
+      badgeText,
+      color: 'purple',
+      tagColor: 'purple',
+      iconName: 'video',
+      videoCount: vCount,
+      imageCount: photoUrls.length,
+      mediaCount: vCount + photoUrls.length,
+      hasVideo: true,
+      hasImage: photoUrls.length > 0,
+      isColorBackground: false,
+      isTextOnly: false,
+      rawMediaList: rawList,
+    };
+  }
+
+  if (isColorBackground) {
+    return {
+      type: 'COLOR_BACKGROUND',
+      label: 'Status nền màu',
+      badgeText: '🎨 Nền màu',
+      color: 'magenta',
+      tagColor: 'magenta',
+      iconName: 'palette',
+      videoCount: 0,
+      imageCount: photoUrls.length,
+      mediaCount: photoUrls.length,
+      hasVideo: false,
+      hasImage: photoUrls.length > 0,
+      isColorBackground: true,
+      isTextOnly: false,
+      rawMediaList: rawList,
+    };
+  }
+
+  if (hasImage) {
+    const imgCount = photoUrls.length > 0 ? photoUrls.length : 1;
+    return {
+      type: 'IMAGE',
+      label: 'Hình ảnh',
+      badgeText: imgCount > 1 ? `🖼️ ${imgCount} ảnh` : '🖼️ Ảnh',
+      color: 'cyan',
+      tagColor: 'cyan',
+      iconName: 'image',
+      videoCount: 0,
+      imageCount: imgCount,
+      mediaCount: imgCount,
+      hasVideo: false,
+      hasImage: true,
+      isColorBackground: false,
+      isTextOnly: false,
+      rawMediaList: rawList,
+    };
+  }
+
+  return {
+    type: 'TEXT',
+    label: 'Chỉ chữ (Text)',
+    badgeText: '📝 Chỉ chữ',
+    color: 'default',
+    tagColor: 'default',
+    iconName: 'text',
+    videoCount: 0,
+    imageCount: 0,
+    mediaCount: 0,
+    hasVideo: false,
+    hasImage: false,
+    isColorBackground: false,
+    isTextOnly: true,
+    rawMediaList: rawList,
+  };
+};
+

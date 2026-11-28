@@ -8,3 +8,6 @@ temp_media_*
 downloads/
 _archive_debug_scripts/
 browser_profiles/
+
+# Cài đặt runtime của worker (token Telegram, trạng thái dừng khẩn...) — mẫu: system_settings.example.json
+system_settings.json

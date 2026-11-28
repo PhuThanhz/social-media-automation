@@ -337,6 +337,10 @@ public class CampaignScheduler {
             if (nickThrottleService.blockReason(nickKey, laneAccount != null ? laneAccount.getPageName() : accountKey, now, nowMs) != null) {
                 continue;
             }
+            // Người dùng tạm dừng nick (Kết nối / bot Telegram) → giữ bài PENDING, không đổi giờ.
+            if (laneAccount != null && Boolean.TRUE.equals(laneAccount.getPaused())) {
+                continue;
+            }
 
             if (targetsCurrentlyPublishing.putIfAbsent(targetId, nowMs) != null) {
                 // Nhóm/Target này đang có 1 luồng/worker khác xử lý — bỏ qua để chia worker sang các nhóm khác nhau!
@@ -480,21 +484,32 @@ public class CampaignScheduler {
             // Tiêu chí:
             // a) Chưa được giao bài nào trong tick này (!assignedKeysInThisTick)
             // b) Không đang bận xử lý bài dở (!accountsCurrentlyPublishing)
-            // c) Đã qua thời gian nghỉ giãn cách 2 phút
+            // c) Đã qua thời gian nghỉ giãn cách giữa các bài cùng nick
+            // d) Ưu tiên Via đăng ÍT BÀI HƠN trong 60 phút qua để tự động chia đều tải giữa 2 Via
             SocialAccount bestVia = null;
+            int minStarts = Integer.MAX_VALUE;
+            long oldestFinished = Long.MAX_VALUE;
+            long nowMsVal = System.currentTimeMillis();
+
             for (SocialAccount candidate : candidates) {
                 String key = publishingIdentityKey(candidate);
                 boolean isPublishing = accountsCurrentlyPublishing.containsKey(key);
                 Long lastFinished = lastPublishFinishedAt.get(key);
-                boolean inCooldown = (lastFinished != null && (System.currentTimeMillis() - lastFinished < sameNickGapMs()));
+                boolean inCooldown = (lastFinished != null && (nowMsVal - lastFinished < sameNickGapMs()));
                 boolean alreadyAssigned = assignedKeysInThisTick.contains(key);
                 String candidateNick = com.autopost.saas.service.NickThrottleService.nickKey(candidate);
                 boolean throttled = nickThrottleService.rateLimitedUntil(candidateNick, now) != null
-                        || nickThrottleService.isOverHourlyCap(candidateNick, System.currentTimeMillis());
+                        || nickThrottleService.isOverHourlyCap(candidateNick, nowMsVal)
+                        || Boolean.TRUE.equals(candidate.getPaused());
 
                 if (!isPublishing && !inCooldown && !alreadyAssigned && !throttled) {
-                    bestVia = candidate;
-                    break;
+                    int starts = nickThrottleService.startsInLastHour(candidateNick, nowMsVal);
+                    long finishTime = lastFinished != null ? lastFinished : 0L;
+                    if (starts < minStarts || (starts == minStarts && finishTime < oldestFinished)) {
+                        minStarts = starts;
+                        oldestFinished = finishTime;
+                        bestVia = candidate;
+                    }
                 }
             }
 

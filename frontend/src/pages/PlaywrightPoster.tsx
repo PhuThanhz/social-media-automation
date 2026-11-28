@@ -63,7 +63,7 @@ import HistoryPanel from './playwright-poster/HistoryPanel';
 import ComposeAdvancedOptions from './playwright-poster/ComposeAdvancedOptions';
 import ComposeContentSection from './playwright-poster/ComposeContentSection';
 import ComposeTargetSection from './playwright-poster/ComposeTargetSection';
-import { DEFAULT_SAVED_COMMENT, STORAGE_KEY_COMMENT, stripEmojiPrefix, resolveItemGroupTargets } from './playwright-poster/shared';
+import { DEFAULT_SAVED_COMMENT, STORAGE_KEY_COMMENT, stripEmojiPrefix, resolveItemGroupTargets, detectPostMedia, type PostMediaType } from './playwright-poster/shared';
 import { useStableActions } from './playwright-poster/useStableActions';
 import type { DiagnosticEvidence, DiagnosticLogPayload, GroupStatItem, ItemPreview, PendingPageBreakdownItem, PostLinkItem, PostMode, PostQueue, SocialAccount } from './playwright-poster/types';
 import { useOpenedOnce } from './playwright-poster/useOpenedOnce';
@@ -587,6 +587,14 @@ const PlaywrightPoster = () => {
     return cleaned.trim();
   };
 
+  // Backend bọc lỗi worker thành chuỗi dài "Cào bài thất bại: 500 ... on POST request for ...: {"error":"..."}" — chỉ giữ lý do
+  const cleanScrapeError = (raw: string | undefined, fallback: string): string => {
+    if (!raw) return fallback;
+    const inner = raw.match(/"error"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+    if (inner) return inner[1];
+    return raw.replace(/^Cào bài thất bại:\s*/, '').slice(0, 200);
+  };
+
   // Phát hiện thông báo lỗi phân quyền riêng tư từ Facebook để tránh ghi đè caption hợp lệ
   const isFbRestrictionError = (text?: string): boolean => {
     if (!text) return false;
@@ -908,6 +916,8 @@ const PlaywrightPoster = () => {
   const [bulkModalVisible, setBulkModalVisible] = useState(false);
   const [bulkAutoDistributeTwoVias, setBulkAutoDistributeTwoVias] = useState(false);
   const [bulkText, setBulkText] = useState('');
+  // Link cào lỗi đã bị tự bỏ khỏi ô dán (giữ lại để hiện số thất bại + lý do)
+  const [bulkFailedLinks, setBulkFailedLinks] = useState<Array<{ url: string; error: string }>>([]);
   const {
     hunterDrawerVisible, setHunterDrawerVisible, hunterTarget, setHunterTarget, setHunterLimit, hunterLimit,
     hunterMinViews, setHunterMinViews, hunterDurationFilter, setHunterDurationFilter, hunterSortBy,
@@ -968,6 +978,7 @@ const PlaywrightPoster = () => {
   const [historyGroupFilter, setHistoryGroupFilter] = useState<string>('ALL');
   const [historyPageFilter, setHistoryPageFilter] = useState<string>('ALL');
   const [historyStatusFilter, setHistoryStatusFilter] = useState<string>('ALL');
+  const [historyMediaTypeFilter, setHistoryMediaTypeFilter] = useState<PostMediaType>('ALL');
   const [historySearchText, setHistorySearchText] = useState<string>('');
   const [historyOpen, setHistoryOpen] = useState(true);
   const [historyTablePage, setHistoryTablePage] = useState({ current: 1, pageSize: 10 });
@@ -2316,10 +2327,10 @@ const PlaywrightPoster = () => {
           },
         }));
       } else {
-        setBulkDrawerPreviews((prev) => ({ ...prev, [trimmed]: { loading: false, error: res.data?.message || 'Không cào được' } }));
+        setBulkDrawerPreviews((prev) => ({ ...prev, [trimmed]: { loading: false, error: cleanScrapeError(res.data?.message, 'Không cào được') } }));
       }
     } catch (err: any) {
-      setBulkDrawerPreviews((prev) => ({ ...prev, [trimmed]: { loading: false, error: err?.response?.data?.message || 'Lỗi cào' } }));
+      setBulkDrawerPreviews((prev) => ({ ...prev, [trimmed]: { loading: false, error: cleanScrapeError(err?.response?.data?.message, 'Lỗi cào') } }));
     }
   }, [bulkDrawerPreviews]);
 
@@ -2446,9 +2457,22 @@ const PlaywrightPoster = () => {
       return !!p && !p.loading && !!p.error;
     });
     if (failed.length === 0) return;
+    setBulkFailedLinks((prev) => {
+      const known = new Set(prev.map((f) => f.url));
+      const added = failed
+        .map((u) => u.trim())
+        .filter((u) => !known.has(u))
+        .map((u) => ({ url: u, error: bulkDrawerPreviews[u]?.error || 'Không cào được' }));
+      return added.length ? [...prev, ...added] : prev;
+    });
     failed.forEach((u) => removeUrlFromBulkText(u));
     message.warning({ content: `Đã bỏ ${failed.length} link lỗi`, key: 'bulk-failed-removed' });
   }, [bulkModalVisible, bulkPasteSummary.finalUrls, bulkDrawerPreviews, removeUrlFromBulkText]);
+
+  // Reset danh sách link lỗi khi đóng Drawer hoặc xoá trống ô dán
+  useEffect(() => {
+    if (!bulkModalVisible || !bulkText.trim()) setBulkFailedLinks((prev) => (prev.length ? [] : prev));
+  }, [bulkModalVisible, bulkText]);
 
   const fetchAllDrawerPreviews = useCallback(() => {
     bulkPasteSummary.finalUrls.forEach((url, idx) => {
@@ -2502,6 +2526,19 @@ const PlaywrightPoster = () => {
       });
     };
   }, [bulkModalVisible, drawerUrlsKey]);
+
+  // Cào lại 1 link đã lỗi: xoá kết quả cũ rồi đưa link trở lại ô dán để auto-fetch chạy lại
+  const retryFailedLink = useCallback((url: string) => {
+    const trimmed = url.trim();
+    drawerQueuedUrlsRef.current.delete(trimmed);
+    setBulkFailedLinks((prev) => prev.filter((f) => f.url !== trimmed));
+    setBulkDrawerPreviews((prev) => {
+      const next = { ...prev };
+      delete next[trimmed];
+      return next;
+    });
+    setBulkText((prev) => (prev.trim() ? `${prev.replace(/\s+$/, '')}\n${trimmed}\n` : `${trimmed}\n`));
+  }, []);
 
   // Số lượng thống kê bài viết theo từng trạng thái (Ưu tiên số đếm chính xác từ DB)
   const postCounts = useMemo(() => {
@@ -2561,9 +2598,18 @@ const PlaywrightPoster = () => {
         if (posterName !== historyPageFilter) return false;
       }
 
+      // 5. Lọc theo Định dạng Media (Video / Hình ảnh / Chỉ chữ / Nền màu)
+      if (historyMediaTypeFilter !== 'ALL') {
+        const mediaInfo = detectPostMedia(post);
+        if (historyMediaTypeFilter === 'VIDEO' && !mediaInfo.hasVideo) return false;
+        if (historyMediaTypeFilter === 'IMAGE' && (!mediaInfo.hasImage || mediaInfo.hasVideo)) return false;
+        if (historyMediaTypeFilter === 'TEXT' && (!mediaInfo.isTextOnly && !mediaInfo.isColorBackground)) return false;
+        if (historyMediaTypeFilter === 'COLOR_BACKGROUND' && !mediaInfo.isColorBackground) return false;
+      }
+
       return true;
     });
-  }, [posts, historyGroupFilter, historyStatusFilter, historySearchText, historyPageFilter, resolvePosterIdentityName]);
+  }, [posts, historyGroupFilter, historyStatusFilter, historyMediaTypeFilter, historySearchText, historyPageFilter, resolvePosterIdentityName]);
 
   // Thống kê các chỉ số theo từng Nhóm / Fanpage kèm phân bổ Page đang chờ đăng:
   // 1. Số bài đã đăng THÀNH CÔNG HÔM NAY (publishedToday)
@@ -3421,6 +3467,81 @@ const PlaywrightPoster = () => {
     }, 120);
   };
 
+  // Áp dụng đợt tự soạn bài & ảnh hàng loạt từ Drawer
+  const handleApplyBulkManualPosts = (
+    manualPosts: Array<{
+      content: string;
+      mediaUrls: string[];
+      mediaKinds?: ('image' | 'video')[];
+    }>,
+    andOpenSwipe = false
+  ) => {
+    if (!manualPosts || manualPosts.length === 0) {
+      message.warning('Vui lòng nhập ít nhất một bài viết!');
+      return;
+    }
+
+    const now = dayjs();
+    const newItems: PostLinkItem[] = manualPosts.map((post, index) => {
+      const id = Math.random().toString(36).substring(2, 9);
+      let scheduledAt: Dayjs;
+      if (scheduleChoice.mode === 'NOW') {
+        scheduledAt = now;
+      } else if (scheduleChoice.mode === 'AT' && scheduleChoice.at) {
+        scheduledAt = scheduleChoice.at.add(index * batchInterval, 'minute');
+      } else {
+        scheduledAt = now.add(index * batchInterval, 'minute');
+      }
+
+      return {
+        id,
+        url: '',
+        inputType: 'MANUAL',
+        manualContent: post.content.trim(),
+        manualMediaUrls: post.mediaUrls || [],
+        manualMediaKinds: post.mediaKinds || (post.mediaUrls || []).map(() => 'image'),
+        isNow: scheduleChoice.mode === 'NOW',
+        scheduledAt,
+        includeCredit: false,
+        skipComment: false,
+      };
+    });
+
+    // Đồng bộ vào previews để hiển thị ảnh thumbnail và swipe review mượt mà
+    const initialPreviews: typeof previews = {};
+    newItems.forEach((item) => {
+      initialPreviews[item.id] = {
+        loading: false,
+        caption: item.manualContent || '',
+        author: 'Tự soạn',
+        mediaUrls: item.manualMediaUrls || [],
+        mediaKinds: item.manualMediaKinds || [],
+        originalMediaUrls: [...(item.manualMediaUrls || [])],
+        originalMediaKinds: [...(item.manualMediaKinds || [])],
+        videoCount: (item.manualMediaKinds || []).filter((k) => k === 'video').length,
+        imageCount: (item.manualMediaKinds || []).filter((k) => k === 'image').length,
+      };
+    });
+    setPreviews((prev) => ({ ...prev, ...initialPreviews }));
+
+    setLinkItems(newItems);
+    setBulkModalVisible(false);
+
+    if (bulkAutoDistributeTwoVias) {
+      setTimeout(() => {
+        handleQuickSelectTwoVias();
+      }, 50);
+    }
+
+    message.success(`⚡ Đã tạo thành công ${newItems.length} bài tự soạn kèm ảnh!`);
+
+    if (andOpenSwipe) {
+      setTimeout(() => {
+        openSwipeReview();
+      }, 120);
+    }
+  };
+
   const {
     resetFailedModalVisible, setResetFailedModalVisible, resetFailedMode, setResetFailedMode,
     resetFailedSpacing, setResetFailedSpacing, handleResetFailedBatch, handleRetryAllFailed,
@@ -4079,6 +4200,24 @@ const PlaywrightPoster = () => {
             </Paragraph>
             <Space size={8} wrap>
               <span className="text-xs font-mono text-slate-300">#{record.id}</span>
+              {(() => {
+                const mediaInfo = detectPostMedia(record);
+                return (
+                  <Tooltip title={`Định dạng: ${mediaInfo.label} (${mediaInfo.badgeText}) · Nhấp để ${historyMediaTypeFilter === mediaInfo.type ? 'bỏ lọc' : 'lọc xem loại này'}`}>
+                    <Tag
+                      className="!m-0 !text-xs font-bold cursor-pointer hover:opacity-85 transition-all shadow-2xs"
+                      color={historyMediaTypeFilter === mediaInfo.type ? "gold" : mediaInfo.tagColor}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setHistoryMediaTypeFilter((prev) => (prev === mediaInfo.type ? 'ALL' : mediaInfo.type));
+                      }}
+                    >
+                      {mediaInfo.badgeText}
+                      {historyMediaTypeFilter === mediaInfo.type && ' ✓'}
+                    </Tag>
+                  </Tooltip>
+                );
+              })()}
               {resolvePosterIdentityName(record) && (
                 <Tooltip title={`Đăng bài với danh nghĩa: ${resolvePosterIdentityName(record)} · Nhấn để ${historyPageFilter === resolvePosterIdentityName(record) ? 'bỏ lọc' : 'lọc xem chỉ bài của Page này'}`}>
                   <Tag
@@ -5355,6 +5494,8 @@ const PlaywrightPoster = () => {
             bulkPasteSummary={bulkPasteSummary}
             currentKpiTarget={currentKpiTarget}
             bulkScrapeStats={bulkScrapeStats}
+            bulkFailedLinks={bulkFailedLinks}
+            retryFailedLink={retryFailedLink}
             fetchOneDrawerPreview={fetchOneDrawerPreview}
             updateDrawerPreviewCaption={updateDrawerPreviewCaption}
             moveDrawerMedia={moveDrawerMedia}
@@ -5367,6 +5508,7 @@ const PlaywrightPoster = () => {
             fetchAllDrawerPreviews={fetchAllDrawerPreviews}
             handleApplyBulkPaste={handleApplyBulkPaste}
             handleApplyAndOpenSwipeReview={handleApplyAndOpenSwipeReview}
+            handleApplyBulkManualPosts={handleApplyBulkManualPosts}
           />
         </Suspense>
       )}
@@ -5511,6 +5653,8 @@ const PlaywrightPoster = () => {
           historyPageFilter={historyPageFilter}
           setHistoryStatusFilter={setHistoryStatusFilter}
           historyStatusFilter={historyStatusFilter}
+          historyMediaTypeFilter={historyMediaTypeFilter}
+          setHistoryMediaTypeFilter={setHistoryMediaTypeFilter}
           historySearchText={historySearchText}
           setHistorySearchText={setHistorySearchText}
           historyOpen={historyOpen}
