@@ -396,6 +396,38 @@ export default function ComposeTargetSection({
                   </div>
                 </div>
 
+                <div className="flex items-center gap-2 flex-wrap mb-2.5">
+                  <span className="text-[11px] font-medium text-slate-400">Chọn nhanh cụm nhóm:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const econGroupIds = ['442952455895343', '414495725353336', '391775555405184'];
+                      const fieldName = postMode === 'GROUP_ONLY' ? 'targetGroupId' : 'groupNames';
+                      form.setFieldsValue({ [fieldName]: econGroupIds });
+                      setGroupStaggerInterval(5);
+                      message.success('📊 Đã chọn 3 Nhóm Kinh Tế và đặt giãn cách 5 phút/bài!');
+                    }}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 cursor-pointer transition-all shadow-xs"
+                    title="Vietnam Economy News, Hóng Hớt Kinh Tế, Vietnam Business News — giãn cách 5 phút/bài"
+                  >
+                    <span>📊 3 Nhóm Kinh Tế (5p/bài)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const catGroupIds = ['263510030791508'];
+                      const fieldName = postMode === 'GROUP_ONLY' ? 'targetGroupId' : 'groupNames';
+                      form.setFieldsValue({ [fieldName]: catGroupIds });
+                      setGroupStaggerInterval(20);
+                      message.success('🐱 Đã chọn nhóm Đảo Mèo và đặt giãn cách 20 phút/bài!');
+                    }}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 cursor-pointer transition-all"
+                    title="Đảo Mèo 1 — giãn cách an toàn 20 phút/bài"
+                  >
+                    <span>🐱 Đảo Mèo (20p/bài)</span>
+                  </button>
+                </div>
+
                 <Form.Item
                   name={postMode === 'GROUP_ONLY' ? 'targetGroupId' : 'groupNames'}
                   rules={[{ required: true, message: 'Vui lòng chọn ít nhất 1 nhóm nhận bài' }]}
@@ -839,7 +871,7 @@ export default function ComposeTargetSection({
                       const numGroups = Math.max(1, activeSelectedGroupIds.length);
                       const postCount = Math.max(1, validLinkCount || 1);
                       const totalSpanMins = Math.max(30, groupSpreadEnd.diff(groupSpreadStart, 'minute'));
-                      const avgGapMins = Math.max(20, Math.floor(totalSpanMins / Math.max(1, postCount)));
+                      const avgGapMins = Math.max(1, Math.floor(totalSpanMins / Math.max(1, postCount)));
                       const hours = Math.floor(avgGapMins / 60);
                       const mins = avgGapMins % 60;
                       const gapText = hours > 0 ? `${hours}h${mins > 0 ? `${mins}p` : ''}` : `${mins} phút`;
@@ -850,7 +882,7 @@ export default function ComposeTargetSection({
                             Dự kiến: <b>{postCount} bài</b> rải đều cho <b>{numGroups} nhóm</b> từ {groupSpreadStart.format('HH:mm')} đến {groupSpreadEnd.format('HH:mm')}.
                             {numGroups === 1
                               ? ` Mỗi bài cách nhau ~${gapText} (an toàn tuyệt đối cho nhóm).`
-                              : ` Trung bình cách ~${gapText}/bài, cùng 1 nhóm đảm bảo tối thiểu 20 phút.`}
+                              : ` Trung bình cách ~${gapText}/bài, cùng 1 nhóm đảm bảo tối thiểu ${groupStaggerInterval || 20} phút.`}
                           </span>
                         </div>
                       );
@@ -863,7 +895,7 @@ export default function ComposeTargetSection({
                         <span className="text-xs font-semibold text-purple-200 shrink-0">
                           Giãn cách bài:
                         </span>
-                        {[10, 15, 20, 30, 60].map((mins) => {
+                        {[5, 10, 15, 20, 30, 60].map((mins) => {
                           const active = groupStaggerInterval === mins;
                           return (
                             <button
@@ -876,7 +908,7 @@ export default function ComposeTargetSection({
                                   : 'bg-slate-800 text-slate-400 border-slate-700 hover:border-slate-600 hover:text-slate-200'
                               }`}
                             >
-                              {mins}p {mins === 20 ? '⭐ Khuyên dùng' : ''}
+                              {mins}p {mins === 5 ? '⚡ 5 phút' : mins === 20 ? '⭐ Khuyên dùng' : ''}
                             </button>
                           );
                         })}

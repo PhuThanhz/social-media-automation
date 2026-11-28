@@ -74,7 +74,7 @@ export function distributeGroupTasks(
     // - Giữa 2 bài của CÙNG 1 NHÓM: cách nhau tối thiểu staggerMins phút (VD 20p).
     // - Giữa các nhóm khác nhau: so le an toàn 2-3 phút để Nick nghỉ ngơi và không trùng giờ.
     const maxPostsPerGroup = Math.max(...groupKeys.map((k) => byGroup.get(k)!.length));
-    const interGroupOffset = Math.min(5, Math.max(2, Math.floor(staggerMins / Math.max(1, groupKeys.length))));
+    const interGroupOffset = Math.min(5, Math.max(1, Math.floor(staggerMins / Math.max(1, groupKeys.length))));
     const lastNickScheduledTime = new Map<string, Dayjs>();
     const lastGroupScheduledTime = new Map<string, Dayjs>();
     const scheduledTasks: ScheduledGroupTask[] = [];
@@ -185,8 +185,8 @@ export function distributeGroupTasks(
     let slot = c.desiredTime;
     if (slot.isBefore(start)) slot = start;
 
-    // Cùng 1 nhóm: tối thiểu 20 phút (hoặc staggerMins)
-    const minGroupMins = Math.max(15, staggerMins);
+    // Cùng 1 nhóm: tối thiểu staggerMins phút (linh hoạt theo cấu hình của người dùng, ví dụ 5 phút/bài)
+    const minGroupMins = Math.max(1, staggerMins);
     const lastGroupTime = lastGroupScheduledTime.get(c.groupKey);
     if (lastGroupTime && !slot.isAfter(lastGroupTime.add(minGroupMins - 1, 'minute'))) {
       slot = lastGroupTime.add(minGroupMins, 'minute');

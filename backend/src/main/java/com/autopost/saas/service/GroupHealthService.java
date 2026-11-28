@@ -60,7 +60,7 @@ public class GroupHealthService {
             body.put("socialAccountId", cookieOwnerAccount.getId());
             if (account.getPostingIdentityAccountId() != null) {
                 socialAccountRepository.findById(account.getPostingIdentityAccountId()).ifPresent(identityAcc -> {
-                    if (identityAcc.getPlatformAccountId() != null) {
+                    if (identityAcc.getPlatformAccountId() != null && "FACEBOOK_PAGE".equals(identityAcc.getPlatform())) {
                         body.put("targetFanpageId", identityAcc.getPlatformAccountId());
                     }
                 });

@@ -905,8 +905,9 @@ public class CampaignScheduler {
                 .distinct()
                 .count();
         if (groupCount > 1) {
-            log.info("🎯 [packContinuous] Phát hiện {} nhóm đích, tự động kích hoạt thuật toán rải đều theo Nhóm", groupCount);
-            return spreadEvenlyByGroups(postIds, from, null, null);
+            log.info("🎯 [packContinuous] Phát hiện {} nhóm đích, tự động kích hoạt thuật toán rải đều theo Nhóm (gap: {}s)", groupCount, gapSeconds);
+            Integer minGapMins = gapSeconds > 0 ? Math.max(1, gapSeconds / 60) : null;
+            return spreadEvenlyByGroups(postIds, from, null, minGapMins);
         }
 
         PostingWindow window = postingWindowService.get();
@@ -1055,10 +1056,11 @@ public class CampaignScheduler {
         candidates.sort(Comparator.comparing(Candidate::desiredTime).thenComparing(c -> c.post().getId()));
 
         // 4. Giải quyết xung đột (cùng Nick tối thiểu minNickGap, cùng Nhóm tối thiểu minGroupGap, và nhảy qua đêm theo PostingWindow)
-        long minNickGapSeconds = Math.max(120, window.enabled() ? window.minGapSeconds() : 120);
         long minGroupGapSeconds = (minGroupGapMinutes != null && minGroupGapMinutes > 0)
                 ? (minGroupGapMinutes * 60L)
-                : Math.max(1200L, minNickGapSeconds); // Mặc định 20 phút (1200s) cho cùng 1 Group để chống spam tuyệt đối
+                : 1200L; // Mặc định 20 phút (1200s) cho cùng 1 Group nếu không truyền
+        // Giữa các nhóm khác nhau trên cùng 1 nick: tối thiểu 60s để Chromium đóng và nick nghỉ ngơi
+        long minNickGapSeconds = Math.max(60L, Math.min(minGroupGapSeconds, 60L));
 
         Map<String, LocalDateTime> lastNickAssigned = new HashMap<>();
         Map<String, LocalDateTime> lastGroupAssigned = new HashMap<>();

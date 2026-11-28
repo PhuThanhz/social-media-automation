@@ -4708,6 +4708,31 @@ app.post('/api/check-group-health', async (req, res) => {
     await navigateFacebookSurface(page, groupUrl, `Group ${targetGroupId}`);
     await page.waitForTimeout(3000);
 
+    // XỬ LÝ FORCED_ACCOUNT_SWITCH: Nhóm không cho phép Fanpage xem/đăng, Facebook ép chuyển về Nick cá nhân
+    if (page.url().includes('forced_account_switch')) {
+      console.log(`[Playwright][GroupHealth] 🔄 Nhóm ${targetGroupId} không cho phép Fanpage xem/đăng (bị forced_account_switch). Đang bấm nút Chuyển sang Nick cá nhân...`);
+      await context.clearCookies({ name: 'i_user' }).catch(() => {});
+      const switchBtn = page.locator(
+        'div[role="button"]:has-text("Chuyển"), div[role="button"]:has-text("Switch"), ' +
+        'div[role="button"]:has-text("Chuyển trang cá nhân"), div[role="button"]:has-text("Switch profile"), ' +
+        'div[role="button"][aria-label*="Chuyển"], div[role="button"][aria-label*="Switch"]'
+      ).first();
+      if (await switchBtn.isVisible().catch(() => false)) {
+        await switchBtn.click().catch(() => {});
+        await page.waitForTimeout(4000);
+      }
+      if (page.url().includes('forced_account_switch')) {
+        const cUserCookie = cookies.find(c => c.name === 'c_user');
+        if (cUserCookie?.value) {
+          console.log(`[Playwright][GroupHealth] 🔄 Điều hướng profile/switch về c_user=${cUserCookie.value}...`);
+          await page.goto(`https://www.facebook.com/profile/switch/?target_id=${cUserCookie.value}`).catch(() => {});
+          await page.waitForTimeout(3000);
+          await navigateFacebookSurface(page, groupUrl, `Group ${targetGroupId}`).catch(() => {});
+          await page.waitForTimeout(3000);
+        }
+      }
+    }
+
     const isBlocked = await page.locator('text="Bạn hiện không xem được nội dung này", text="Content Not Found", text="Trang này không hiển thị"').first().isVisible().catch(() => false);
 
     if (isBlocked) {
@@ -4834,6 +4859,31 @@ app.post('/api/join-group', async (req, res) => {
     const groupUrl = `https://www.facebook.com/groups/${targetGroupId}`;
     await navigateFacebookSurface(page, groupUrl, `Group ${targetGroupId}`);
     await page.waitForTimeout(3000);
+
+    // XỬ LÝ FORCED_ACCOUNT_SWITCH: Nhóm không cho phép Fanpage xem/đăng, Facebook ép chuyển về Nick cá nhân
+    if (page.url().includes('forced_account_switch')) {
+      console.log(`[Playwright][GroupHealth] 🔄 Nhóm ${targetGroupId} không cho phép Fanpage xem/đăng (bị forced_account_switch). Đang bấm nút Chuyển sang Nick cá nhân...`);
+      await context.clearCookies({ name: 'i_user' }).catch(() => {});
+      const switchBtn = page.locator(
+        'div[role="button"]:has-text("Chuyển"), div[role="button"]:has-text("Switch"), ' +
+        'div[role="button"]:has-text("Chuyển trang cá nhân"), div[role="button"]:has-text("Switch profile"), ' +
+        'div[role="button"][aria-label*="Chuyển"], div[role="button"][aria-label*="Switch"]'
+      ).first();
+      if (await switchBtn.isVisible().catch(() => false)) {
+        await switchBtn.click().catch(() => {});
+        await page.waitForTimeout(4000);
+      }
+      if (page.url().includes('forced_account_switch')) {
+        const cUserCookie = cookies.find(c => c.name === 'c_user');
+        if (cUserCookie?.value) {
+          console.log(`[Playwright][GroupHealth] 🔄 Điều hướng profile/switch về c_user=${cUserCookie.value}...`);
+          await page.goto(`https://www.facebook.com/profile/switch/?target_id=${cUserCookie.value}`).catch(() => {});
+          await page.waitForTimeout(3000);
+          await navigateFacebookSurface(page, groupUrl, `Group ${targetGroupId}`).catch(() => {});
+          await page.waitForTimeout(3000);
+        }
+      }
+    }
 
     // Nếu tham gia bằng Fanpage, thử chuyển danh tính sang Trang trước
     if (!isPersonal && effectivePageName && !effectivePageName.toLowerCase().includes('cá nhân')) {
@@ -5155,6 +5205,30 @@ app.post('/api/post-facebook-group', async (req, res) => {
     console.log(`[Playwright][Group] Điều hướng tới Group: ${groupUrl}`);
     await navigateFacebookSurface(page, groupUrl, `Group ${targetGroupId}`);
     await page.waitForTimeout(2000);
+
+    // XỬ LÝ FORCED_ACCOUNT_SWITCH: Nhóm không cho phép Fanpage xem/đăng, Facebook ép chuyển về Nick cá nhân
+    if (page.url().includes('forced_account_switch')) {
+      console.log(`[Playwright][Group] 🔄 Nhóm ${targetGroupId} không cho phép Fanpage xem/đăng (bị forced_account_switch). Đang bấm nút Chuyển sang Nick cá nhân...`);
+      const switchBtn = page.locator(
+        'div[role="button"]:has-text("Chuyển"), div[role="button"]:has-text("Switch"), ' +
+        'div[role="button"]:has-text("Chuyển trang cá nhân"), div[role="button"]:has-text("Switch profile"), ' +
+        'div[role="button"][aria-label*="Chuyển"], div[role="button"][aria-label*="Switch"]'
+      ).first();
+      if (await switchBtn.isVisible().catch(() => false)) {
+        await switchBtn.click().catch(() => {});
+        await page.waitForTimeout(4000);
+      }
+      if (page.url().includes('forced_account_switch')) {
+        const cUserCookie = cookies.find(c => c.name === 'c_user');
+        if (cUserCookie?.value) {
+          console.log(`[Playwright][Group] 🔄 Điều hướng profile/switch về c_user=${cUserCookie.value}...`);
+          await page.goto(`https://www.facebook.com/profile/switch/?target_id=${cUserCookie.value}`).catch(() => {});
+          await page.waitForTimeout(3000);
+          await navigateFacebookSurface(page, groupUrl, `Group ${targetGroupId}`).catch(() => {});
+          await page.waitForTimeout(3000);
+        }
+      }
+    }
     await assertFacebookSession(page, socialAccountId);
 
     // Chỉ nhận phần tử có semantics button thật. Trước đây selector có cả
